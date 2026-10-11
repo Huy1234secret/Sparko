@@ -2784,3 +2784,16 @@ td {
   height: auto;
   border-radius: 14px;
 }
+.button-reset {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.button-reset[aria-pressed='true'] {
+  background: var(--brand-soft);
+  border-radius: 10px;
+}
