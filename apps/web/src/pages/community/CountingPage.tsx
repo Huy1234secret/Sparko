@@ -16,6 +16,7 @@ import {
 } from '@sparko/ui';
 import { Metric } from '../../components/AppShell';
 import { useFeatureConfig } from '../../features/config/useFeatureConfig';
+import { LiveEventsNotice } from '../../features/config/LiveEventsNotice';
 import { ConfigForm } from '../../features/config/ConfigForm';
 import { Tabs } from '../../features/config/Tabs';
 import {
@@ -54,6 +55,11 @@ function CountingSettings({ guildId }: { guildId: string }) {
           name="channelId"
           label="Counting channel"
           guildId={guildId}
+        />
+        <LiveEventsNotice
+          what="Counts are checked"
+          events="new messages"
+          intent="Message Content"
         />
         <div className="form-grid">
           <NumberField

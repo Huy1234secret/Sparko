@@ -361,3 +361,33 @@ describe('Studio draft ownership', () => {
     expect(screen.getByLabelText('Design name')).toBeVisible();
   });
 });
+
+describe('Studio status and shortcuts', () => {
+  it('shows the draft state and undoes with Ctrl+Z outside text fields', async () => {
+    const user = userEvent.setup();
+    vi.mocked(createVersion).mockImplementation(
+      async (_guild, source, snapshot) => ({
+        data: savedSnapshot(source, snapshot),
+      }),
+    );
+    renderStudio();
+    expect(screen.getByText('New design')).toBeVisible();
+    await openTemplate(user, templateA);
+    expect(
+      screen.getByText('Saved as version 1 of “Template A”'),
+    ).toBeVisible();
+    await user.type(screen.getByLabelText('Design name'), '!');
+    expect(screen.getByText('Unsaved changes since version 1')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(
+      await screen.findByText('Saved as version 2 of “Template A”'),
+    ).toBeVisible();
+    // Native undo stays with the text field; the shortcut acts elsewhere.
+    await user.click(screen.getByText('Live design preview'));
+    await user.keyboard('{Control>}z{/Control}');
+    expect(screen.getByLabelText('Design name')).toHaveValue('Template A');
+    expect(screen.getByText('Unsaved changes since version 2')).toBeVisible();
+    await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
+    expect(screen.getByLabelText('Design name')).toHaveValue('Template A!');
+  });
+});

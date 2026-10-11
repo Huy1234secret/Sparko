@@ -17,6 +17,7 @@ import {
   Field,
   Input,
   LoadingState,
+  Notice,
   PageHeading,
 } from '@sparko/ui';
 import { Metric, useSession } from '../../components/AppShell';
@@ -134,7 +135,11 @@ export function CardPreferences({
             <option value="compact">Compact</option>
           </select>
         </Field>
-        <Field label="Avatar shape" htmlFor="card-shape">
+        <Field
+          label="Picture shape"
+          htmlFor="card-shape"
+          hint="Cards currently show the Sparko mark in this shape, not your Discord avatar."
+        >
           <select id="card-shape" {...form.register('card.avatarShape')}>
             <option value="circle">Circle</option>
             <option value="rounded">Rounded square</option>
@@ -712,11 +717,16 @@ export function RankCardsPage() {
       />
       <Card>
         <p>
-          Members change accent colour, theme, layout and avatar shape, and can
+          Members change accent colour, theme, layout and picture shape, and can
           hide XP or rank. The website preview and Discord’s <code>/level</code>{' '}
           command use the same renderer and font, so they always match.
         </p>
       </Card>
+      <Notice tone="info" title="What rank cards do not show yet">
+        Cards draw the Sparko mark instead of members’ Discord avatars, and
+        custom background images are not drawn. Everything else on the card
+        comes from saved server records.
+      </Notice>
       {level.isPending ? (
         <LoadingState />
       ) : level.error ? (

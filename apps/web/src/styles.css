@@ -1558,18 +1558,21 @@ summary {
 }
 .setup-progress {
   display: flex;
-  gap: 28px;
+  flex-wrap: wrap;
+  gap: 12px 28px;
   align-items: center;
   margin: 30px 0;
+  padding: 0;
+  list-style: none;
 }
-.setup-progress > span {
+.setup-progress > li {
   display: flex;
   gap: 10px;
   align-items: center;
   color: var(--muted);
   font-size: 13px;
 }
-.setup-progress > span > span {
+.setup-progress > li > span {
   width: 27px;
   height: 27px;
   border-radius: 50%;
@@ -1583,6 +1586,12 @@ summary {
   color: var(--text);
 }
 .setup-progress .active > span {
+  font-weight: 650;
+}
+.setup-progress [aria-current='step'] {
+  font-weight: 650;
+}
+.setup-progress .active > span[aria-hidden] {
   background: var(--brand);
   color: #1c1917;
   border-color: var(--brand);
@@ -3352,5 +3361,183 @@ h2 {
   }
   .button:active:not(:disabled) {
     transform: none;
+  }
+}
+.diff-table th[scope='row'] {
+  font-weight: 500;
+  color: var(--text);
+}
+.diff-row > h3 {
+  margin: 0 0 10px;
+}
+.diff-row .advanced {
+  margin-top: 12px;
+}
+.setup-done {
+  align-items: center;
+}
+.how-it-works {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 28px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.how-it-works li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+.how-it-works small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+.server-section {
+  margin-bottom: 28px;
+}
+.server-section .count {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.server-search {
+  margin-bottom: 20px;
+  max-width: 360px;
+}
+.server-card .button {
+  width: 100%;
+}
+.small-value {
+  font-size: 16px !important;
+  font-weight: 600;
+}
+.how-it-works .step-index {
+  margin: 0;
+  flex-shrink: 0;
+}
+:root[data-theme='light'] .step-index,
+:root[data-theme='light'] .icon-tile {
+  color: #854d0e;
+}
+.overview-grid {
+  align-items: start;
+}
+.tabs .count {
+  color: var(--muted);
+  font-weight: 500;
+}
+/* Narrow screens: each table row becomes a labelled card. */
+@media (max-width: 600px) {
+  .responsive-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+  .responsive-table,
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td {
+    display: block;
+    width: 100%;
+  }
+  .responsive-table tr {
+    border-bottom: 1px solid var(--line);
+    padding: 12px 0;
+  }
+  .responsive-table td {
+    border: 0;
+    padding: 4px 0;
+  }
+  .responsive-table td[data-label] {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .responsive-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--font-sans);
+  }
+  .responsive-table .row-link {
+    display: none;
+  }
+}
+.studio-mode-hint {
+  margin: -6px 0 14px;
+}
+.studio-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  position: sticky;
+  top: 78px;
+  z-index: 12;
+}
+.studio-status .save-state {
+  font-weight: 600;
+  color: var(--text);
+}
+.studio-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+.studio-jump a {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 6px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+.studio-jump a:hover {
+  color: var(--text);
+  background: var(--raised);
+}
+.step-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 18px 0 8px;
+}
+.step-title .step-index {
+  margin: 0;
+  width: 26px;
+  height: 26px;
+}
+#studio-blocks,
+#studio-preview,
+#studio-properties,
+#studio-delivery,
+#studio-issues {
+  scroll-margin-top: 150px;
+}
+@media (max-width: 800px) {
+  .studio-status {
+    position: static;
+  }
+  .studio-jump {
+    margin-left: 0;
+    width: 100%;
   }
 }

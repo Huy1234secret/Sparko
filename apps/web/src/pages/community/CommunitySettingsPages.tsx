@@ -1,3 +1,4 @@
+import { LiveEventsNotice } from '../../features/config/LiveEventsNotice';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -40,6 +41,11 @@ export function WelcomePage() {
         eyebrow="Community"
         title="Welcome messages"
         description="Greet new members in a channel, by direct message, or both."
+      />
+      <LiveEventsNotice
+        what="Members are greeted"
+        events="member joins"
+        intent="Server Members"
       />
       <ConfigForm
         controller={controller.shell}
@@ -102,6 +108,11 @@ export function LeaveBoostPage() {
         eyebrow="Community"
         title="Leave & boost messages"
         description="Separate messages for members leaving and for new server boosts."
+      />
+      <LiveEventsNotice
+        what="Leaves and boosts are announced"
+        events="member updates"
+        intent="Server Members"
       />
       <ConfigForm
         controller={controller.shell}
@@ -166,6 +177,11 @@ export function AutoRolesPage() {
         eyebrow="Community"
         title="Automatic roles"
         description="Give roles when members join or boost. Sparko checks its role position before every change."
+      />
+      <LiveEventsNotice
+        what="Roles are given"
+        events="member joins and boosts"
+        intent="Server Members"
       />
       <ConfigForm
         controller={controller.shell}
@@ -267,6 +283,7 @@ export function StarboardPage() {
         title="Starboard"
         description="Mirror messages that collect enough reactions. Each member’s vote counts once."
       />
+      <LiveEventsNotice what="Reactions are counted" events="reaction events" />
       <ConfigForm
         controller={controller.shell}
         title="Starboard"

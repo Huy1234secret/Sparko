@@ -437,6 +437,24 @@ function StudioEditor() {
     setRedoStack((items) => items.slice(0, -1));
     setDocument(next);
   };
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      // Text fields keep their own native undo.
+      if (target?.closest('input, textarea, select, [contenteditable]')) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        undo();
+      } else if ((key === 'z' && event.shiftKey) || key === 'y') {
+        event.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', shortcut);
+    return () => window.removeEventListener('keydown', shortcut);
+  });
   const current = selectBlock(document, selected);
   const editBlock = (block: MessageBlock) => {
     if (selected) change(updateBlock(document, selected, block));
@@ -639,6 +657,8 @@ function StudioEditor() {
             className="icon-button"
             disabled={!undoStack.length}
             aria-label="Undo edit"
+            aria-keyshortcuts="Control+Z"
+            title="Undo (Ctrl+Z)"
             onClick={undo}
           >
             <Undo2 size={18} />
@@ -647,6 +667,8 @@ function StudioEditor() {
             className="icon-button"
             disabled={!redoStack.length}
             aria-label="Redo edit"
+            aria-keyshortcuts="Control+Shift+Z Control+Y"
+            title="Redo (Ctrl+Shift+Z)"
             onClick={redo}
           >
             <Redo2 size={18} />
@@ -657,8 +679,46 @@ function StudioEditor() {
           </Button>
         </div>
       </div>
+      <p className="field-hint studio-mode-hint">
+        {document.mode === 'v2'
+          ? 'Components V2 lays out text, images and buttons as blocks inside containers. Use it for new panels.'
+          : 'A traditional embed has a title, description, fields and an image. Use it when a channel or bot expects embeds.'}
+      </p>
+      <div className="studio-status">
+        <span className="save-state" role="status" aria-live="polite">
+          {(dirty || !template) && (
+            <span className="dirty-dot" aria-hidden="true" />
+          )}
+          {save.isPending
+            ? 'Saving…'
+            : !template
+              ? dirty
+                ? 'New design · not saved yet'
+                : 'New design'
+              : dirty
+                ? `Unsaved changes since version ${template.revision}`
+                : `Saved as version ${template.revision} of “${template.name}”`}
+          {autoSave && <Badge tone="info">Autosave on</Badge>}
+        </span>
+        {compiled.issues.length > 0 ? (
+          <a className="text-link danger-text" href="#studio-issues">
+            {compiled.issues.length} problem
+            {compiled.issues.length === 1 ? '' : 's'} to fix
+          </a>
+        ) : (
+          <span className="muted">Design is valid</span>
+        )}
+        <nav aria-label="Studio sections" className="studio-jump">
+          <a href="#studio-blocks">Blocks</a>
+          <a href="#studio-preview">Preview</a>
+          <a href="#studio-properties">Properties</a>
+          <a href="#studio-delivery">Save & publish</a>
+          <a href="#template-library">Templates</a>
+          <a href="#publication-inventory">Publications</a>
+        </nav>
+      </div>
       <div className="studio-layout">
-        <section className="card studio-blocks">
+        <section className="card studio-blocks" id="studio-blocks">
           <div className="section-heading">
             <h2>
               {document.mode === 'v2' ? 'Content blocks' : 'Embed editor'}
@@ -829,7 +889,7 @@ function StudioEditor() {
             />
           )}
         </section>
-        <section className="studio-canvas">
+        <section className="studio-canvas" id="studio-preview">
           <div className="preview-toolbar">
             <span>
               <Eye size={16} />
@@ -868,7 +928,7 @@ function StudioEditor() {
             </Card>
           )}
           {compiled.issues.length > 0 && (
-            <div className="alert alert-danger" role="alert">
+            <div className="alert alert-danger" role="alert" id="studio-issues">
               <div>
                 <strong>
                   Fix these design issues before saving or publishing.
@@ -883,7 +943,7 @@ function StudioEditor() {
           )}
         </section>
         <aside className="stack">
-          <Card>
+          <Card id="studio-properties">
             <h2>Design properties</h2>
             <Field label="Design name" htmlFor="design-name">
               <Input
@@ -1289,8 +1349,15 @@ function StudioEditor() {
                 ))}
             </div>
           </Card>
-          <Card>
-            <h3>Save & delivery</h3>
+          <Card id="studio-delivery">
+            <h3>Save & publish</h3>
+            <p className="field-hint">
+              Saving keeps a private version. Nothing appears in Discord until
+              you publish.
+            </p>
+            <p className="step-title">
+              <span className="step-index">1</span> Save a version
+            </p>
             {preservedDraft && (
               <div className="stack">
                 <p className="field-hint">
@@ -1378,6 +1445,9 @@ function StudioEditor() {
                 Draft saved. No message has been posted.
               </p>
             )}
+            <p className="step-title">
+              <span className="step-index">2</span> Choose where it goes
+            </p>
             <Field label="Discord destination" htmlFor="studio-channel">
               <select
                 id="studio-channel"
@@ -1397,6 +1467,9 @@ function StudioEditor() {
                   ))}
               </select>
             </Field>
+            <p className="step-title">
+              <span className="step-index">3</span> Test, then publish
+            </p>
             <div className="row">
               <Button
                 variant="secondary"

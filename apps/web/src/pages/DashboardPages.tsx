@@ -6,8 +6,14 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  Circle,
+  Gamepad2,
+  GraduationCap,
+  LifeBuoy,
+  Palette,
+  SlidersHorizontal,
+  Sun,
   Clock3,
-  ExternalLink,
   Filter,
   Plus,
   RefreshCw,
@@ -24,8 +30,11 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  Notice,
   PageHeading,
+  Advanced,
 } from '@sparko/ui';
+import { featureLabel, settingChanges } from '../features/setup/diff';
 import {
   getGuilds,
   getOverview,
@@ -35,6 +44,10 @@ import {
 } from '../services/guilds';
 import { errorMessage } from '../services/http';
 import { getTickets } from '../services/tickets';
+import { getPublications, type Publication } from '../services/messages';
+import { AnimatedIcon } from '@sparko/assets';
+import { motionPreference, useUi } from '../state/ui';
+import { TicketStatusBadge } from '../components/TicketStatus';
 import { useActionIdentity } from '../hooks/useActionIdentity';
 import { Metric, RuntimeState } from '../components/AppShell';
 
@@ -233,6 +246,14 @@ export function ServerPickerPage() {
     </>
   );
 }
+/** A delivered, non-test message carrying a ticket-create control. */
+export function isLiveTicketPanel(publication: Publication) {
+  return (
+    !publication.test &&
+    ['applied', 'published'].includes(publication.state) &&
+    JSON.stringify(publication.document ?? {}).includes('"ticket.create"')
+  );
+}
 export function OverviewPage() {
   const { guildId = '' } = useParams();
   const query = useQuery({
@@ -245,6 +266,12 @@ export function OverviewPage() {
     queryFn: ({ signal }) => getTickets(guildId, signal),
     retry: false,
   });
+  const publications = useQuery({
+    queryKey: ['publications', guildId],
+    queryFn: ({ signal }) => getPublications(guildId, signal),
+    retry: false,
+  });
+  const iconMotion = useUi((state) => motionPreference(state.motion));
   if (query.isPending)
     return <LoadingState label="Opening your server workspace…" />;
   if (query.error)
@@ -257,6 +284,46 @@ export function OverviewPage() {
   if (!query.data) return null;
   const data = query.data;
   const enabled = data.modules.filter((m) => m.enabled);
+  const base = `/dashboard/${guildId}`;
+  const ticketsOn = enabled.some((m) => m.id === 'tickets');
+  const steps = [
+    {
+      title: 'Sparko is connected',
+      done: data.bot.online,
+      doneText: 'The bot is online and applying saved settings.',
+      todoText:
+        'The bot is offline. You can still save settings; Discord changes wait until it reconnects.',
+      to: undefined,
+      action: '',
+    },
+    {
+      title: 'Choose a setup goal',
+      done: enabled.length > 0,
+      doneText: `${enabled.length} tool${enabled.length === 1 ? '' : 's'} turned on.`,
+      todoText: 'Pick a goal and preview every change before it is saved.',
+      to: `${base}/setup`,
+      action: 'Start guided setup',
+    },
+    {
+      title: 'Set up tickets',
+      done: ticketsOn,
+      doneText: 'Members can open private support tickets.',
+      todoText: 'Choose your support team and the questions members answer.',
+      to: `${base}/support/tickets/config`,
+      action: 'Configure tickets',
+    },
+    {
+      title: 'Publish the ticket panel',
+      done: !!publications.data?.some(isLiveTicketPanel),
+      doneText: 'Your panel is live in Discord.',
+      todoText:
+        'Post the panel to a channel so members can find it. Saving settings alone does not post anything.',
+      to: `${base}/support/tickets/config`,
+      action: 'Publish the panel',
+    },
+  ];
+  const nextStep = steps.find((step) => !step.done && step.to);
+  const allDone = steps.every((step) => step.done);
   return (
     <>
       <PageHeading
@@ -308,7 +375,11 @@ export function OverviewPage() {
               key={metric.id}
               label={metric.label}
               value={
-                metric.value === null ? '—' : metric.value.toLocaleString()
+                metric.value === null ? (
+                  <span className="small-value">Not collected yet</span>
+                ) : (
+                  metric.value.toLocaleString()
+                )
               }
               detail={`${metric.period} · ${metric.coverage}`}
             />
@@ -322,26 +393,55 @@ export function OverviewPage() {
         )}
       </div>
       <div className="overview-grid">
-        <section className="card next-step">
-          <span className="icon-tile">
-            <Ticket size={22} />
-          </span>
-          <p className="eyebrow">A helpful next step</p>
-          <h2>
-            {data.modules.some((m) => m.id === 'tickets' && m.enabled)
-              ? 'Make support feel personal.'
-              : 'Give every question a home.'}
-          </h2>
-          <p>
-            Set up a private ticket panel, choose your support team, and publish
-            a clear way for members to reach you.
-          </p>
-          <Link
-            className="button button-primary"
-            to={`/dashboard/${guildId}/support/tickets/config`}
-          >
-            Configure tickets <ArrowRight size={16} />
-          </Link>
+        <section className="card" aria-labelledby="getting-started">
+          <div className="section-heading">
+            <div>
+              <h2 id="getting-started">Getting started</h2>
+              <p className="muted">
+                {steps.filter((step) => step.done).length} of {steps.length}{' '}
+                done
+              </p>
+            </div>
+            {allDone && (
+              <AnimatedIcon
+                name="setup-success"
+                state="active"
+                motion={iconMotion}
+                size={40}
+                label="Setup complete"
+              />
+            )}
+          </div>
+          <ol className="checklist">
+            {steps.map((step) => (
+              <li key={step.title} className={step.done ? 'done' : 'todo'}>
+                {step.done ? (
+                  <CheckCircle2 size={20} aria-hidden="true" />
+                ) : (
+                  <Circle size={20} aria-hidden="true" />
+                )}
+                <div>
+                  <strong>
+                    {step.title}
+                    <span className="sr-only">
+                      {step.done ? ' (done)' : ' (to do)'}
+                    </span>
+                  </strong>
+                  <small>{step.done ? step.doneText : step.todoText}</small>
+                  {!step.done && step.to && step === nextStep && (
+                    <Link className="button button-primary" to={step.to}>
+                      {step.action} <ArrowRight size={16} />
+                    </Link>
+                  )}
+                  {!step.done && step.to && step !== nextStep && (
+                    <Link className="text-link" to={step.to}>
+                      {step.action} <ArrowRight size={15} />
+                    </Link>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
         <section className="card">
           <div className="section-heading">
@@ -367,7 +467,8 @@ export function OverviewPage() {
             </div>
           ) : (
             <EmptyState
-              title="Start with what you need"
+              compact
+              title="No tools turned on yet"
               description="Modules stay off until you configure them. Guided setup explains the changes before saving."
               action={
                 <Link className="text-link" to={`/dashboard/${guildId}/setup`}>
@@ -412,12 +513,14 @@ export function OverviewPage() {
                     {new Date(ticket.createdAt).toLocaleDateString()}
                   </small>
                 </span>
-                <Badge>{ticket.status.replaceAll('_', ' ')}</Badge>
+                <TicketStatusBadge status={ticket.status} />
               </Link>
             ))
           ) : (
             <EmptyState
-              title="A quiet inbox"
+              compact
+              icon={Ticket}
+              title="No tickets yet"
               description="New Discord tickets will appear here after your panel is published."
             />
           )}
@@ -449,6 +552,8 @@ export function OverviewPage() {
             ))
           ) : (
             <EmptyState
+              compact
+              icon={Clock3}
               title="Nothing waiting"
               description="Pending bot deliveries and scheduled operations appear here."
             />
@@ -462,7 +567,7 @@ export function OverviewPage() {
             className="text-link"
             to={`/dashboard/${guildId}/insights/audit`}
           >
-            Audit log <ExternalLink size={14} />
+            Audit log <ArrowRight size={14} />
           </Link>
         </div>
         {data.activity.length ? (
@@ -490,41 +595,42 @@ const presets = [
     id: 'small-community',
     title: 'Small community',
     detail: 'A warm welcome, suggestions, and a clear support path.',
-    icon: '☀',
+    icon: Sun,
   },
   {
     id: 'gaming',
     title: 'Gaming',
     detail: 'Community progression, counting, and engagement tools.',
-    icon: '⌘',
+    icon: Gamepad2,
   },
   {
     id: 'support',
     title: 'Support',
     detail: 'Private tickets and organized staff workflows.',
-    icon: '↗',
+    icon: LifeBuoy,
   },
   {
     id: 'creator',
     title: 'Creator',
     detail: 'Welcome new fans and collect their ideas.',
-    icon: '✦',
+    icon: Palette,
   },
   {
     id: 'study',
     title: 'Study group',
     detail: 'Focused community spaces and helpful reminders.',
-    icon: '⌁',
+    icon: GraduationCap,
   },
   {
     id: 'custom',
     title: 'Build your own',
     detail: 'Start quietly and configure each tool yourself.',
-    icon: '+',
+    icon: SlidersHorizontal,
   },
 ];
 export function SetupPage() {
   const { guildId = '' } = useParams();
+  const iconMotion = useUi((state) => motionPreference(state.motion));
   const [preset, setPreset] = useState('support');
   const identity = useActionIdentity();
   const query = useQueryClient();
@@ -542,21 +648,32 @@ export function SetupPage() {
   return (
     <>
       <PageHeading
-        eyebrow="Guided setup"
+        eyebrow="Three steps"
         title="Guided setup"
-        description="Choose your community’s goal. Review every configuration change before applying it."
+        description="Choose your community’s goal, review exactly what changes, then apply it. Nothing is saved until you apply."
       />
-      <div className="setup-progress">
-        <span className="active">
-          <span>1</span>Choose a goal
-        </span>
-        <span className={preview.isSuccess ? 'active' : ''}>
-          <span>2</span>Review changes
-        </span>
-        <span className={apply.isSuccess ? 'active' : ''}>
-          <span>3</span>Configure & publish
-        </span>
-      </div>
+      <ol className="setup-progress" aria-label="Setup progress">
+        {[
+          { label: 'Choose a goal', done: preview.isSuccess },
+          { label: 'Review changes', done: apply.isSuccess },
+          { label: 'Configure & publish', done: false },
+        ].map((step, index, all) => {
+          const current = all.findIndex((item) => !item.done) === index;
+          return (
+            <li
+              key={step.label}
+              className={step.done || current ? 'active' : ''}
+              aria-current={current ? 'step' : undefined}
+            >
+              <span aria-hidden="true">
+                {step.done ? <Check size={14} /> : index + 1}
+              </span>
+              {step.label}
+              {step.done && <span className="sr-only"> (done)</span>}
+            </li>
+          );
+        })}
+      </ol>
       <div className="preset-grid">
         {presets.map((item) => (
           <button
@@ -569,10 +686,14 @@ export function SetupPage() {
               apply.reset();
             }}
           >
-            <span className="preset-icon">{item.icon}</span>
+            <span className="preset-icon" aria-hidden="true">
+              <item.icon size={22} />
+            </span>
             <strong>{item.title}</strong>
             <p>{item.detail}</p>
-            {preset === item.id && <Check className="preset-check" size={19} />}
+            {preset === item.id && (
+              <Check className="preset-check" size={19} aria-hidden="true" />
+            )}
           </button>
         ))}
       </div>
@@ -595,37 +716,65 @@ export function SetupPage() {
                 or publish messages.
               </p>
             </div>
-            <Badge>{preset}</Badge>
+            <Badge>{presets.find((item) => item.id === preset)?.title}</Badge>
           </div>
           {preview.data.data.issues.map((issue) => (
-            <div className="alert alert-warning" key={issue}>
+            <Notice tone="warning" key={issue} title="Check before applying">
               {issue}
-            </div>
+            </Notice>
           ))}
           {preview.data.data.blockingIssues.map((issue) => (
-            <div className="alert alert-danger" key={issue}>
+            <Notice tone="danger" key={issue} title="Needs fixing first">
               {issue}
-            </div>
+            </Notice>
           ))}
           {preview.data.data.changes.length ? (
-            preview.data.data.changes.map((change) => (
-              <details className="diff-row" key={change.featureId}>
-                <summary>
-                  {change.featureId}
-                  <Badge>Configuration change</Badge>
-                </summary>
-                <div className="diff-grid">
-                  <div>
-                    <h4>Current</h4>
-                    <pre>{JSON.stringify(change.before, null, 2)}</pre>
-                  </div>
-                  <div>
-                    <h4>Proposed</h4>
-                    <pre>{JSON.stringify(change.after, null, 2)}</pre>
-                  </div>
-                </div>
-              </details>
-            ))
+            preview.data.data.changes.map((change) => {
+              const rows = settingChanges(change.before, change.after);
+              return (
+                <section className="diff-row" key={change.featureId}>
+                  <h3>{featureLabel(change.featureId)}</h3>
+                  {rows.length ? (
+                    <div className="table-wrap">
+                      <table className="diff-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Setting</th>
+                            <th scope="col">Now</th>
+                            <th scope="col">After applying</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row) => (
+                            <tr key={row.setting}>
+                              <th scope="row">{row.setting}</th>
+                              <td>{row.before}</td>
+                              <td>
+                                <strong>{row.after}</strong>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="muted">No visible setting changes.</p>
+                  )}
+                  <Advanced summary="Technical details">
+                    <div className="diff-grid">
+                      <div>
+                        <h4>Current</h4>
+                        <pre>{JSON.stringify(change.before, null, 2)}</pre>
+                      </div>
+                      <div>
+                        <h4>Proposed</h4>
+                        <pre>{JSON.stringify(change.after, null, 2)}</pre>
+                      </div>
+                    </div>
+                  </Advanced>
+                </section>
+              );
+            })
           ) : (
             <p className="muted">This preset has no configuration changes.</p>
           )}
@@ -647,8 +796,13 @@ export function SetupPage() {
       )}
       {apply.error && <ErrorState message={errorMessage(apply.error)} />}
       {apply.data && (
-        <div className="alert alert-success" role="status">
-          <CheckCircle2 size={21} />
+        <div className="alert alert-success setup-done" role="status">
+          <AnimatedIcon
+            name="setup-success"
+            state="active"
+            motion={iconMotion}
+            size={44}
+          />
           <div>
             <strong>
               Settings saved
@@ -660,12 +814,20 @@ export function SetupPage() {
               Finish ticket configuration with your actual channels and staff
               roles, then publish your panel.
             </p>
-            <Link
-              className="text-link"
-              to={`/dashboard/${guildId}/support/tickets/config`}
-            >
-              Continue to tickets <ArrowRight size={15} />
-            </Link>
+            <div className="row wrap">
+              <Link
+                className="button button-primary"
+                to={`/dashboard/${guildId}/support/tickets/config`}
+              >
+                Continue to tickets <ArrowRight size={15} />
+              </Link>
+              <Link
+                className="button button-ghost"
+                to={`/dashboard/${guildId}`}
+              >
+                Back to overview
+              </Link>
+            </div>
           </div>
         </div>
       )}
