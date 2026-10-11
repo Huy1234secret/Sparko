@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock3, Users } from 'lucide-react';
-import { Badge, Button, Card, ErrorState, Field, Input } from '@sparko/ui';
+import {
+  Advanced,
+  Badge,
+  Button,
+  Card,
+  ErrorState,
+  Field,
+  Input,
+} from '@sparko/ui';
 import {
   getTicketMetrics,
   getTicketStaff,
@@ -45,6 +53,12 @@ const duration = (minutes: number | null) =>
       : minutes < 2880
         ? `${(minutes / 60).toFixed(1)} h`
         : `${(minutes / 1440).toFixed(1)} days`;
+const timeValue = (minutes: number | null) =>
+  minutes === null ? (
+    <span className="small-value">No data yet</span>
+  ) : (
+    duration(minutes)
+  );
 /** Staff-only queries; members receive 403 and the panels stay hidden. */
 export function useTicketStaff(guildId: string, enabled = true) {
   return useQuery({
@@ -107,13 +121,13 @@ export function TeamPanel({ guildId }: { guildId: string }) {
           />
           <Metric
             label="Time to first claim"
-            value={duration(metrics.data.medianFirstClaimMinutes)}
-            detail={metrics.data.definitions.firstClaim}
+            value={timeValue(metrics.data.medianFirstClaimMinutes)}
+            detail="Median"
           />
           <Metric
             label="Time to resolve"
-            value={duration(metrics.data.medianResolutionMinutes)}
-            detail={metrics.data.definitions.resolution}
+            value={timeValue(metrics.data.medianResolutionMinutes)}
+            detail="Median"
           />
           <Metric
             label="Escalated"
@@ -121,6 +135,20 @@ export function TeamPanel({ guildId }: { guildId: string }) {
             detail={`of ${metrics.data.opened} opened`}
           />
         </div>
+      )}
+      {metrics.data && (
+        <Advanced summary="How these are measured">
+          <ul className="plain-list">
+            <li>
+              <strong>Time to first claim:</strong>{' '}
+              {metrics.data.definitions.firstClaim}
+            </li>
+            <li>
+              <strong>Time to resolve:</strong>{' '}
+              {metrics.data.definitions.resolution}
+            </li>
+          </ul>
+        </Advanced>
       )}
       <div className="team-grid">
         <section aria-labelledby="my-availability">

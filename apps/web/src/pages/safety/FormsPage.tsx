@@ -37,6 +37,7 @@ import {
   type FormRecord,
 } from '../../services/safety';
 import { applyServerFieldErrors } from '../../services/formErrors';
+import { getConfig } from '../../services/guilds';
 import { ApiError, errorMessage } from '../../services/http';
 import { useActionIdentity } from '../../hooks/useActionIdentity';
 import { DraftGuard } from '../../hooks/useDraftGuard';
@@ -58,6 +59,7 @@ const blankForm: FormInput = {
     },
   ],
   stages: ['Review'],
+  decisionRoleId: undefined,
 };
 /** Choices are edited one per line; an empty box means free text. */
 const lines = (value: string) =>
@@ -87,9 +89,9 @@ function FormEditor({
         maxSubmissions: record.data.maxSubmissions,
         fields: record.data.fields,
         stages: record.data.stages,
-        ...(record.data.decisionRoleId
-          ? { decisionRoleId: record.data.decisionRoleId }
-          : {}),
+        // Always present (even undefined): the registered select adds the key,
+        // and a missing default key would make the form look edited.
+        decisionRoleId: record.data.decisionRoleId,
       }
     : blankForm;
   const form = useForm<FormInput, unknown, z.output<typeof FormSchema>>({
@@ -416,6 +418,10 @@ function FormsList({ guildId }: { guildId: string }) {
     queryKey: ['forms', guildId],
     queryFn: ({ signal }) => getForms(guildId, signal),
   });
+  const config = useQuery({
+    queryKey: ['config', guildId, 'R25'],
+    queryFn: ({ signal }) => getConfig(guildId, 'R25', signal),
+  });
   if (forms.isPending) return <LoadingState />;
   if (forms.error)
     return (
@@ -427,6 +433,20 @@ function FormsList({ guildId }: { guildId: string }) {
   const current = forms.data.find((item) => item.id === selected) ?? null;
   return (
     <div className="stack">
+      {config.data && !config.data.config['enabled'] && (
+        <Notice
+          tone="warning"
+          title="Forms are turned off"
+          action={
+            <Link className="text-link" to="?tab=settings">
+              Turn on forms in Settings
+            </Link>
+          }
+        >
+          You can look around, but saving and publishing forms needs the module
+          on.
+        </Notice>
+      )}
       <Card>
         <div className="section-heading">
           <h2>Your forms</h2>

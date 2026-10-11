@@ -107,6 +107,7 @@ describe('support team panel', () => {
     renderWith(<TeamPanel guildId={guildId} />);
     expect(await screen.findByText('42 min')).toBeVisible();
     expect(screen.getByText('3.0 h')).toBeVisible();
+    await user.click(screen.getByText('How these are measured'));
     expect(
       screen.getByText('Minutes from opening to the first claim.'),
     ).toBeVisible();
