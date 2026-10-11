@@ -23,6 +23,7 @@ import {
   WorkflowSchema,
   CustomCommandSchema,
   automationConfigSchemas,
+  replyMatches,
   DestinationSchema as destination,
 } from '@sparko/contracts';
 export {
@@ -808,6 +809,9 @@ export const automationRoutes: DomainRoute[] = [
   ),
   route('GET', '/invites', 'member', undefined, (ctx) =>
     list(ctx, 'invite_attribution', !allowed(ctx.actor, 'analytics.read')),
+  ),
+  route('GET', '/invite-rewards', 'analytics.read', undefined, (ctx) =>
+    list(ctx, 'invite_reward'),
   ),
   route('GET', '/schedules', 'automation.manage', undefined, (ctx) =>
     list(ctx, 'schedule'),
@@ -2264,16 +2268,7 @@ export async function ingestAutomationEvent(
           r.excludedRoleIds.some((role) => e.roleIds.includes(role))
         )
           continue;
-        const content = e.content.normalize('NFKC').toLocaleLowerCase(),
-          pattern = r.pattern.normalize('NFKC').toLocaleLowerCase();
-        if (
-          !(r.match === 'exact'
-            ? content === pattern
-            : r.match === 'contains'
-              ? content.includes(pattern)
-              : content.startsWith(pattern))
-        )
-          continue;
+        if (!replyMatches(r, e.content)) continue;
         const key = `${reply.id}:${e.channelId}`,
           prior = await ctx.tx.record.findUnique({
             where: {

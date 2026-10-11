@@ -21,6 +21,13 @@ import {
   PageHeading,
 } from '@sparko/ui';
 import { ReportsAndAppealsCard, VerifyCard } from '../safety/MemberSafety';
+import {
+  BirthdayCard,
+  EventsCard,
+  PollsCard,
+  RemindersCard,
+} from '../automation/MemberAutomation';
+import { VoiceRoomCard } from '../automation/VoicePage';
 import { Metric, useSession } from '../../components/AppShell';
 import {
   claimCrate,
@@ -657,6 +664,13 @@ export function MemberPage() {
             me={session.data?.user?.id ?? ''}
           />
         </Card>
+      </div>
+      <div className="overview-grid" id="community">
+        <PollsCard guildId={guildId} />
+        <EventsCard guildId={guildId} />
+        <RemindersCard guildId={guildId} />
+        <BirthdayCard guildId={guildId} />
+        <VoiceRoomCard guildId={guildId} />
       </div>
       <div className="overview-grid">
         <Card id="leaderboard">

@@ -23,6 +23,17 @@ import {
   AutomodPage,
   RaidGuardPage,
 } from '../safety/ProtectionPages';
+import { PollsPage } from '../automation/PollsPage';
+import { EventsPage } from '../automation/EventsPage';
+import { RemindersPage } from '../automation/RemindersPage';
+import { BirthdaysPage } from '../automation/BirthdaysPage';
+import { VoicePage } from '../automation/VoicePage';
+import { InvitesPage } from '../automation/InvitesPage';
+import { SchedulesPage } from '../automation/SchedulesPage';
+import { RepliesPage } from '../automation/RepliesPage';
+import { StickyPage } from '../automation/StickyPage';
+import { WorkflowsPage } from '../automation/WorkflowsPage';
+import { CommandsPage } from '../automation/CommandsPage';
 
 /** Typed module pages; modules not listed here still use the generic page. */
 const typedPages: Record<string, ComponentType> = {
@@ -45,6 +56,17 @@ const typedPages: Record<string, ComponentType> = {
   'safety/automod': AutomodPage,
   'safety/raid-guard': RaidGuardPage,
   'safety/anti-nuke': AntiNukePage,
+  'community/polls': PollsPage,
+  'community/events': EventsPage,
+  'community/birthdays': BirthdaysPage,
+  'community/voice': VoicePage,
+  'community/invites': InvitesPage,
+  'automations/reminders': RemindersPage,
+  'automations/schedules': SchedulesPage,
+  'automations/replies': RepliesPage,
+  'automations/sticky': StickyPage,
+  'automations/workflows': WorkflowsPage,
+  'automations/commands': CommandsPage,
   'engagement/reward-roles': () => <LevelsPage defaultTab="rewards" />,
 };
 export function ModuleRouter() {
