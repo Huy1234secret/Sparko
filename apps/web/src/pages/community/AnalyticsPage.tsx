@@ -144,7 +144,7 @@ export function AnalyticsPage() {
     <>
       <PageHeading
         eyebrow="Insights"
-        title="See the story behind the activity."
+        title="Analytics"
         description="Observed activity by UTC hour. Hours Sparko did not observe are shown as gaps, never as zero."
         actions={
           <div className="row">

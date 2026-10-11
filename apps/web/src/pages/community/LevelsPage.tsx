@@ -663,7 +663,7 @@ export function LevelsPage({ defaultTab }: { defaultTab?: string }) {
     <>
       <PageHeading
         eyebrow="Engagement"
-        title="Progress that feels earned."
+        title="Levels & XP"
         description="Set how members earn XP, what each level is worth, and which roles reward progress."
       />
       <Tabs

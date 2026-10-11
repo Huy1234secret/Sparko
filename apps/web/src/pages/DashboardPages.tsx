@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
-  ArrowUpRight,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -11,6 +10,7 @@ import {
   ExternalLink,
   Filter,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Ticket,
@@ -29,6 +29,7 @@ import {
 import {
   getGuilds,
   getOverview,
+  type Guild,
   previewSetup,
   applySetup,
 } from '../services/guilds';
@@ -37,6 +38,26 @@ import { getTickets } from '../services/tickets';
 import { useActionIdentity } from '../hooks/useActionIdentity';
 import { Metric, RuntimeState } from '../components/AppShell';
 
+type GuildState = 'ready' | 'install' | 'member';
+const guildState = (guild: Guild): GuildState =>
+  guild.manageable ? (guild.installed ? 'ready' : 'install') : 'member';
+const guildSections: { state: GuildState; title: string; hint: string }[] = [
+  {
+    state: 'ready',
+    title: 'Ready to manage',
+    hint: 'Sparko is installed and your Discord permissions let you manage it.',
+  },
+  {
+    state: 'install',
+    title: 'Add Sparko to start',
+    hint: 'You can manage these servers, but Sparko is not in them yet. Adding it opens Discord so you can review the permissions it asks for.',
+  },
+  {
+    state: 'member',
+    title: 'Member access',
+    hint: 'Managing a server needs the Manage Server permission or a staff role delegated in Sparko. You can still open your member profile.',
+  },
+];
 export function ServerPickerPage() {
   const [search, setSearch] = useState('');
   const query = useQuery({
@@ -51,36 +72,45 @@ export function ServerPickerPage() {
     <>
       <PageHeading
         eyebrow="Your workspace"
-        title="Make yourself at home."
-        description="Choose a server to give your community its next little spark."
+        title="Your servers"
+        description="Choose a server to manage. The list follows your current Discord access."
+        actions={
+          <Button
+            variant="secondary"
+            busy={query.isFetching && !query.isPending}
+            onClick={() => void query.refetch()}
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            Refresh list
+          </Button>
+        }
       />
-      <div className="workspace-welcome">
-        <div>
-          <span className="eyebrow">A clearer way to run your community</span>
-          <h2>Good tools. Great connections.</h2>
-          <p>
-            Configure with confidence, make your messages your own, and keep an
-            eye on what matters.
-          </p>
-          <Link className="text-link" to="/docs">
-            A quick tour of Sparko <ArrowUpRight size={16} />
-          </Link>
-        </div>
-        <div className="welcome-art" aria-hidden="true">
-          <Zap fill="currentColor" size={88} />
-          <span className="art-spark spark-one">✦</span>
-          <span className="art-spark spark-two">✦</span>
-        </div>
-      </div>
-      <div className="section-heading">
-        <div>
-          <h2>Your servers</h2>
-          <p className="muted">
-            Current Discord access determines which workspaces you can manage.
-          </p>
-        </div>
-        <label className="search-field">
-          <Filter size={17} />
+      <ol className="how-it-works" aria-label="How Sparko setup works">
+        <li>
+          <span className="step-index">1</span>
+          <span>
+            <strong>Add Sparko</strong>
+            <small>Invite the bot to a server you manage.</small>
+          </span>
+        </li>
+        <li>
+          <span className="step-index">2</span>
+          <span>
+            <strong>Open its workspace</strong>
+            <small>Everything here is saved per server.</small>
+          </span>
+        </li>
+        <li>
+          <span className="step-index">3</span>
+          <span>
+            <strong>Follow guided setup</strong>
+            <small>Preview every change before it is applied.</small>
+          </span>
+        </li>
+      </ol>
+      {(query.data?.length ?? 0) > 6 && (
+        <label className="search-field server-search">
+          <Filter size={17} aria-hidden="true" />
           <input
             aria-label="Search your servers"
             placeholder="Find a server…"
@@ -88,7 +118,7 @@ export function ServerPickerPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-      </div>
+      )}
       {query.isPending ? (
         <LoadingState label="Fetching your Discord servers…" />
       ) : query.error ? (
@@ -97,56 +127,101 @@ export function ServerPickerPage() {
           retry={() => void query.refetch()}
         />
       ) : guilds?.length ? (
-        <div className="server-grid">
-          {guilds.map((guild) => (
-            <Card className="server-card" key={guild.id}>
-              <div className="row space-between">
-                <span className="server-avatar large">
-                  {guild.iconUrl ? (
-                    <img src={guild.iconUrl} alt="" />
-                  ) : (
-                    guild.name.slice(0, 1)
-                  )}
-                </span>
-                <Badge tone={guild.installed ? 'success' : 'neutral'}>
-                  {guild.installed ? 'Sparko installed' : 'Invite required'}
-                </Badge>
+        guildSections.map((section) => {
+          const list = guilds.filter(
+            (guild) => guildState(guild) === section.state,
+          );
+          if (!list.length) return null;
+          return (
+            <section
+              key={section.state}
+              className="server-section"
+              aria-labelledby={`servers-${section.state}`}
+            >
+              <div className="section-heading">
+                <div>
+                  <h2 id={`servers-${section.state}`}>
+                    {section.title} <span className="count">{list.length}</span>
+                  </h2>
+                  <p className="muted">{section.hint}</p>
+                </div>
               </div>
-              <h3>{guild.name}</h3>
-              <p>
-                {guild.manageable
-                  ? 'You can manage this server.'
-                  : 'Member access only.'}
-              </p>
-              {guild.manageable && guild.installed ? (
-                <Link
-                  to={`/dashboard/${guild.id}`}
-                  className="button button-secondary"
-                >
-                  Open workspace <ArrowRight size={16} />
-                </Link>
-              ) : guild.manageable && guild.installUrl ? (
-                <a href={guild.installUrl} className="button button-primary">
-                  Add Sparko <Plus size={16} />
-                </a>
-              ) : (
-                <Link
-                  to={`/servers/${guild.id}/me`}
-                  className="button button-secondary"
-                >
-                  Your member profile <ArrowRight size={16} />
-                </Link>
-              )}
-            </Card>
-          ))}
-        </div>
+              <div className="server-grid">
+                {list.map((guild) => (
+                  <Card className="server-card" key={guild.id}>
+                    <div className="row space-between">
+                      <span className="server-avatar large" aria-hidden="true">
+                        {guild.iconUrl ? (
+                          <img src={guild.iconUrl} alt="" />
+                        ) : (
+                          guild.name.slice(0, 1)
+                        )}
+                      </span>
+                      <Badge
+                        tone={
+                          section.state === 'ready'
+                            ? 'success'
+                            : section.state === 'install'
+                              ? 'warning'
+                              : 'neutral'
+                        }
+                      >
+                        {section.state === 'ready'
+                          ? 'Installed'
+                          : section.state === 'install'
+                            ? 'Not installed'
+                            : guild.installed
+                              ? 'Member'
+                              : 'Member · not installed'}
+                      </Badge>
+                    </div>
+                    <h3 className="wrap-anywhere">{guild.name}</h3>
+                    {section.state === 'ready' ? (
+                      <Link
+                        to={`/dashboard/${guild.id}`}
+                        className="button button-primary"
+                      >
+                        Open workspace <ArrowRight size={16} />
+                      </Link>
+                    ) : section.state === 'install' ? (
+                      guild.installUrl ? (
+                        <a
+                          href={guild.installUrl}
+                          className="button button-primary"
+                        >
+                          Add Sparko <Plus size={16} />
+                        </a>
+                      ) : (
+                        <p className="field-hint">
+                          Installation is unavailable right now. Try again later
+                          or contact Sparko support.
+                        </p>
+                      )
+                    ) : guild.installed ? (
+                      <Link
+                        to={`/servers/${guild.id}/me`}
+                        className="button button-secondary"
+                      >
+                        Your member profile <ArrowRight size={16} />
+                      </Link>
+                    ) : (
+                      <p className="field-hint">
+                        Ask a server manager to add Sparko.
+                      </p>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </section>
+          );
+        })
       ) : (
         <EmptyState
           title={search ? 'No matching servers' : 'No servers to show yet'}
           description={
             search
               ? 'Try a different server name.'
-              : 'Join a Discord server, then refresh this page. Owners, administrators, and delegated staff can manage their workspaces.'
+              : 'Join or create a Discord server, then refresh this list. Owners, administrators and delegated staff can manage their servers here.'
           }
           action={
             <Button variant="secondary" onClick={() => void query.refetch()}>
@@ -186,7 +261,7 @@ export function OverviewPage() {
     <>
       <PageHeading
         eyebrow="Server overview"
-        title={`A little spark for ${data.guild.name}.`}
+        title={data.guild.name}
         description="Your tools, activity, and next steps — all in one place."
         actions={
           <Link
@@ -468,7 +543,7 @@ export function SetupPage() {
     <>
       <PageHeading
         eyebrow="Guided setup"
-        title="Start with a purpose."
+        title="Guided setup"
         description="Choose your community’s goal. Review every configuration change before applying it."
       />
       <div className="setup-progress">

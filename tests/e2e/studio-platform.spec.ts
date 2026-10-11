@@ -22,11 +22,11 @@ async function openStudio(page: Page) {
   await page.goto('/dashboard');
   await page.getByRole('link', { name: 'Continue with Discord' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Make yourself at home.' }),
+    page.getByRole('heading', { name: 'Your servers', level: 1 }),
   ).toBeVisible({ timeout: 15000 });
   await page.goto(`/dashboard/${guild}/messages/studio`);
   await expect(
-    page.getByRole('heading', { name: 'Make it feel like your community.' }),
+    page.getByRole('heading', { name: 'Message Studio', level: 1 }),
   ).toBeVisible();
 }
 async function state(request: APIRequestContext) {

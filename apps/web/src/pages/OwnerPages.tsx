@@ -66,7 +66,7 @@ export function OwnerPage({
     <>
       <PageHeading
         eyebrow="Global operations"
-        title="Keep the whole fleet in view."
+        title="Owner console"
         description="Real service observations and narrowly scoped recovery tools. Global access is separate from server administration."
         actions={
           <Button

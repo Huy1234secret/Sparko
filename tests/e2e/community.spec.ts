@@ -18,7 +18,7 @@ async function login(page: Page) {
   await page.goto('/dashboard');
   await page.getByRole('link', { name: 'Continue with Discord' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Make yourself at home.' }),
+    page.getByRole('heading', { name: 'Your servers', level: 1 }),
   ).toBeVisible({ timeout: 15000 });
 }
 function localInput(date: Date) {

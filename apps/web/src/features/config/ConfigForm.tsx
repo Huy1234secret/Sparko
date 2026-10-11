@@ -1,6 +1,15 @@
 import type { ReactNode } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import { Badge, Button, Card, ErrorState, LoadingState } from '@sparko/ui';
+import {
+  Badge,
+  Card,
+  ConflictNotice,
+  ErrorState,
+  LoadingState,
+  Notice,
+  SaveBar,
+  configStatus,
+} from '@sparko/ui';
 import { ApiError, errorMessage, isRetryable } from '../../services/http';
 import { DraftGuard } from '../../hooks/useDraftGuard';
 import type { FeatureConfigController } from './useFeatureConfig';
@@ -19,8 +28,17 @@ export function ConfigForm({
   children: ReactNode;
   enableLabel?: string;
 }) {
-  const { query, save, submit, conflict, unmatched, reload, dirty } =
-    controller;
+  const {
+    query,
+    save,
+    submit,
+    conflict,
+    unmatched,
+    reload,
+    keepDraft,
+    rebasedOn,
+    dirty,
+  } = controller;
   if (query.isPending) return <LoadingState label="Loading settings…" />;
   if (query.error)
     return (
@@ -30,7 +48,7 @@ export function ConfigForm({
       />
     );
   const data = query.data;
-  const applied = data.revision === data.appliedRevision;
+  const status = configStatus(data.revision, data.appliedRevision);
   return (
     <form
       className="stack"
@@ -47,29 +65,16 @@ export function ConfigForm({
             <h2>{title}</h2>
             {description && <p className="muted">{description}</p>}
           </div>
-          <Badge
-            tone={
-              data.revision === 0 ? 'neutral' : applied ? 'success' : 'warning'
-            }
-          >
-            {data.revision === 0
-              ? 'Not configured'
-              : applied
-                ? 'Applied'
-                : 'Waiting for the bot'}
-          </Badge>
+          <Badge tone={status.tone}>{status.label}</Badge>
         </div>
         {data.missingPrerequisites.length > 0 && (
-          <div className="alert alert-warning" role="status">
-            <div>
-              <strong>Before this can run</strong>
-              <ul>
-                {data.missingPrerequisites.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          <Notice tone="warning" title="Before this can run">
+            <ul>
+              {data.missingPrerequisites.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </Notice>
         )}
         <label className="switch-row">
           <span>
@@ -81,21 +86,15 @@ export function ConfigForm({
       </Card>
       {children}
       {conflict ? (
-        <div className="alert alert-warning" role="alert">
-          <div>
-            <strong>These settings changed while you were editing.</strong>
-            <p>
-              Your draft is still here. Current revision:{' '}
-              {save.error instanceof ApiError
-                ? save.error.currentRevision
-                : 'unknown'}
-              .
-            </p>
-            <Button variant="secondary" type="button" onClick={reload}>
-              Discard draft and reload
-            </Button>
-          </div>
-        </div>
+        <ConflictNotice
+          currentRevision={
+            save.error instanceof ApiError
+              ? save.error.currentRevision
+              : undefined
+          }
+          onKeepMine={keepDraft}
+          onLoadLatest={reload}
+        />
       ) : save.error ? (
         <>
           <ErrorState
@@ -117,6 +116,11 @@ export function ConfigForm({
           )}
         </>
       ) : null}
+      {rebasedOn !== null && dirty && (
+        <Notice tone="info" title="Your changes are kept">
+          Saving now replaces version {rebasedOn} with your changes.
+        </Notice>
+      )}
       {save.isSuccess && save.data && !dirty && (
         <p className="save-feedback" role="status">
           <CheckCircle2 size={17} />
@@ -125,24 +129,12 @@ export function ConfigForm({
             : 'Settings saved. Waiting for the bot to apply them.'}
         </p>
       )}
-      <div className="save-bar">
-        <span>
-          {dirty
-            ? 'You have unsaved changes'
-            : `Saved revision ${data.revision}`}
-        </span>
-        <Button
-          variant="secondary"
-          type="button"
-          disabled={!dirty || save.isPending}
-          onClick={reload}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" busy={save.isPending} disabled={!dirty}>
-          Save changes
-        </Button>
-      </div>
+      <SaveBar
+        dirty={dirty}
+        saving={save.isPending}
+        savedLabel={status.saved}
+        onDiscard={reload}
+      />
     </form>
   );
 }

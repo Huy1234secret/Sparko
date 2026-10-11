@@ -21,12 +21,16 @@ import {
   Badge,
   Button,
   Card,
+  ConflictNotice,
+  configStatus,
   EmptyState,
   ErrorState,
   Field,
   Input,
   LoadingState,
+  Notice,
   PageHeading,
+  SaveBar,
 } from '@sparko/ui';
 import {
   getConfig,
@@ -139,6 +143,7 @@ export function TicketConfigPage() {
     defaultValues: defaults,
   });
   const [unmatchedErrors, setUnmatchedErrors] = useState<ApiFieldError[]>([]);
+  const [rebasedOn, setRebasedOn] = useState<number | null>(null);
   const fieldError = (path: string) =>
     (get(form.formState.errors, path) as { message?: string } | undefined)
       ?.message;
@@ -208,6 +213,7 @@ export function TicketConfigPage() {
     onMutate: () => setUnmatchedErrors([]),
     onError: (error) => setUnmatchedErrors(applyServerFieldErrors(form, error)),
     onSuccess: (result) => {
+      setRebasedOn(null);
       queryClient.setQueryData(['config', guildId, 'tickets'], result.data);
       form.reset(
         TicketConfigFormSchema.parse({ ...defaults, ...result.data.config }),
@@ -237,6 +243,14 @@ export function TicketConfigPage() {
         retry={() => void query.refetch()}
       />
     );
+  const discard = () => {
+    setRebasedOn(null);
+    save.reset();
+    void query.refetch().then((latest) => {
+      const config = (latest.data ?? query.data)?.config;
+      form.reset(TicketConfigFormSchema.parse({ ...defaults, ...config }));
+    });
+  };
   const conflict =
     save.error instanceof ApiError && save.error.code === 'REVISION_CONFLICT';
   return (
@@ -244,7 +258,7 @@ export function TicketConfigPage() {
       <DraftGuard dirty={dirty} />
       <PageHeading
         eyebrow="Tickets & support"
-        title="A good conversation starts here."
+        title="Ticket settings"
         description="Give members a private, organized path to your support team."
         actions={
           <Link
@@ -596,29 +610,20 @@ export function TicketConfigPage() {
             </label>
           </Card>
           {conflict ? (
-            <div className="alert alert-warning" role="alert">
-              <div>
-                <strong>These settings changed while you were editing.</strong>
-                <p>
-                  Your draft is still here. Current revision:{' '}
-                  {save.error instanceof ApiError
-                    ? save.error.currentRevision
-                    : 'unknown'}
-                  .
-                </p>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => {
-                    form.reset();
-                    void query.refetch();
-                    save.reset();
-                  }}
-                >
-                  Discard draft and reload
-                </Button>
-              </div>
-            </div>
+            <ConflictNotice
+              currentRevision={
+                save.error instanceof ApiError
+                  ? save.error.currentRevision
+                  : undefined
+              }
+              onKeepMine={() => {
+                save.reset();
+                void query.refetch().then((latest) => {
+                  if (latest.data) setRebasedOn(latest.data.revision);
+                });
+              }}
+              onLoadLatest={discard}
+            />
           ) : save.error ? (
             <>
               <ErrorState
@@ -657,34 +662,22 @@ export function TicketConfigPage() {
                 : 'Settings saved. Waiting for the bot to apply them.'}
             </p>
           )}
-          <div className="save-bar">
-            <span>
-              {dirty
-                ? 'You have unsaved changes'
-                : `Saved revision ${query.data?.revision ?? 0}`}
-            </span>
-            <div className="row">
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!dirty || save.isPending}
-                onClick={() =>
-                  query.data &&
-                  form.reset(
-                    TicketConfigFormSchema.parse({
-                      ...defaults,
-                      ...query.data.config,
-                    }),
-                  )
-                }
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!dirty} busy={save.isPending}>
-                Save changes
-              </Button>
-            </div>
-          </div>
+          {rebasedOn !== null && dirty && (
+            <Notice tone="info" title="Your changes are kept">
+              Saving now replaces version {rebasedOn} with your changes.
+            </Notice>
+          )}
+          <SaveBar
+            dirty={dirty}
+            saving={save.isPending}
+            savedLabel={
+              configStatus(
+                query.data?.revision ?? 0,
+                query.data?.appliedRevision ?? 0,
+              ).saved
+            }
+            onDiscard={discard}
+          />
         </form>
         <aside className="stack">
           <Card className="preview-card">
@@ -843,7 +836,7 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
     <>
       <PageHeading
         eyebrow={member ? 'Member portal' : 'Tickets & support'}
-        title={member ? 'Your conversations.' : 'The support inbox.'}
+        title={member ? 'Your tickets' : 'Ticket inbox'}
         description={
           member
             ? 'Your private tickets and their current status.'

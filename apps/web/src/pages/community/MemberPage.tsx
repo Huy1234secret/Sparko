@@ -568,7 +568,7 @@ export function MemberPage() {
     <>
       <PageHeading
         eyebrow="Member portal"
-        title="Your place in the community."
+        title="Your member profile"
         description="Your own progression, rewards and conversations in this server."
         actions={
           <Link
@@ -699,7 +699,7 @@ export function RankCardsPage() {
     <>
       <PageHeading
         eyebrow="Engagement"
-        title="Rank cards members are proud of."
+        title="Rank cards"
         description="Each member styles their own card. Sparko draws identity, level, XP and rank from server records, never from the member’s input."
         actions={
           <Link

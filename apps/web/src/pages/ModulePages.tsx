@@ -16,25 +16,20 @@ import {
   ReportSchema,
   AppealSchema,
 } from '@sparko/contracts';
-import {
-  ArrowRight,
-  CheckCircle2,
-  Plus,
-  Search,
-  Shield,
-  Sparkles,
-  Zap,
-} from 'lucide-react';
+import { ArrowRight, CheckCircle2, Plus, Search, Sparkles } from 'lucide-react';
 import {
   Badge,
   Button,
   Card,
+  ConflictNotice,
+  configStatus,
   EmptyState,
   ErrorState,
   Field,
   Input,
   LoadingState,
   PageHeading,
+  SaveBar,
 } from '@sparko/ui';
 import {
   getConfig,
@@ -53,6 +48,7 @@ import {
 import { ApiError, errorMessage } from '../services/http';
 import { RuntimeState } from '../components/AppShell';
 import { modules, groupNames, type ModuleDefinition } from '../content/modules';
+import { moduleIcon } from '../content/moduleIcons';
 import { DraftGuard } from '../hooks/useDraftGuard';
 import { useActionIdentity } from '../hooks/useActionIdentity';
 
@@ -262,8 +258,8 @@ export function ModuleIndexPage({ group }: { group?: string }) {
     <>
       <PageHeading
         eyebrow="Your server’s tools"
-        title={`${groupNames[selected] ?? humanize(selected)}, with purpose.`}
-        description="Enable the tools your community needs. Each page shows saved settings, runtime state, and real activity."
+        title={groupNames[selected] ?? humanize(selected)}
+        description="Choose a tool to set it up. Each tool stays off until you turn it on and save, and its page shows saved settings, whether the bot has applied them, and real activity."
       />
       <label className="search-field module-search">
         <Search size={17} />
@@ -279,30 +275,34 @@ export function ModuleIndexPage({ group }: { group?: string }) {
           const state = overview.data?.modules.find(
             (item) => item.id === module.id,
           );
+          const Icon = moduleIcon(module.slug);
+          const status = state?.enabled
+            ? configStatus(state.revision, state.appliedRevision)
+            : null;
           return (
-            <Card key={module.id} className="feature-card">
+            <Card key={module.id} className="feature-card module-card">
               <div className="row space-between">
-                <span className="icon-tile">
-                  {selected === 'safety' ? (
-                    <Shield size={22} />
-                  ) : (
-                    <Zap size={22} />
-                  )}
+                <span className="icon-tile" aria-hidden="true">
+                  <Icon size={22} />
                 </span>
-                <Badge tone={state?.enabled ? 'success' : 'neutral'}>
-                  {state?.enabled ? 'Enabled' : 'Not enabled'}
+                <Badge tone={status?.tone ?? 'neutral'}>
+                  {status ? status.label : 'Off'}
                 </Badge>
               </div>
-              <h3>{module.name}</h3>
-              <p>{module.description}</p>
-              <div className="feature-card-bottom">
+              <h3>
                 <Link
-                  className="text-link"
+                  className="card-link"
                   to={`/dashboard/${guildId}/${module.group}/${module.slug}`}
                 >
-                  Configure <ArrowRight size={15} />
+                  {module.name}
                 </Link>
-                {state && <small className="muted">r{state.revision}</small>}
+              </h3>
+              <p>{module.description}</p>
+              <div className="feature-card-bottom">
+                <span className="text-link" aria-hidden="true">
+                  {state?.enabled ? 'Manage' : 'Set up'}{' '}
+                  <ArrowRight size={15} />
+                </span>
               </div>
             </Card>
           );
@@ -738,62 +738,46 @@ export function ModulePage() {
                 />
               </details>
             </Card>
-            {save.error && (
-              <ErrorState
-                message={
-                  save.error instanceof ApiError &&
-                  save.error.code === 'REVISION_CONFLICT'
-                    ? `A newer revision exists (${save.error.currentRevision ?? 'unknown'}). Your local edits are retained.`
-                    : errorMessage(save.error)
-                }
-              />
-            )}{' '}
             {save.error instanceof ApiError &&
-              save.error.code === 'REVISION_CONFLICT' && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setDraft(null);
-                    setSaved('');
-                    void query.refetch();
-                    save.reset();
-                  }}
-                >
-                  Discard draft and reload
-                </Button>
-              )}
+            save.error.code === 'REVISION_CONFLICT' ? (
+              <ConflictNotice
+                currentRevision={save.error.currentRevision}
+                onKeepMine={() => {
+                  save.reset();
+                  void query.refetch();
+                }}
+                onLoadLatest={() => {
+                  setDraft(null);
+                  setSaved('');
+                  void query.refetch();
+                  save.reset();
+                }}
+              />
+            ) : (
+              save.error && <ErrorState message={errorMessage(save.error)} />
+            )}
             {save.data && !dirty && (
               <p className="save-feedback" role="status">
-                <CheckCircle2 size={16} />
+                <CheckCircle2 size={16} aria-hidden="true" />
                 {save.data.data.revision === save.data.data.appliedRevision
                   ? 'Saved and applied.'
                   : 'Settings saved. Waiting for the bot to apply them.'}
               </p>
             )}
-            <div className="save-bar">
-              <span>
-                {dirty
-                  ? 'You have unsaved changes'
-                  : `Saved revision ${query.data?.revision ?? 0}`}
-              </span>
-              <div className="row">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!dirty}
-                  onClick={() => {
-                    setDraft(query.data?.config ?? {});
-                    setSaved(JSON.stringify(query.data?.config ?? {}));
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" busy={save.isPending} disabled={!dirty}>
-                  Save changes
-                </Button>
-              </div>
-            </div>
+            <SaveBar
+              dirty={dirty}
+              saving={save.isPending}
+              savedLabel={
+                configStatus(
+                  query.data?.revision ?? 0,
+                  query.data?.appliedRevision ?? 0,
+                ).saved
+              }
+              onDiscard={() => {
+                setDraft(query.data?.config ?? {});
+                setSaved(JSON.stringify(query.data?.config ?? {}));
+              }}
+            />
           </form>
         )
       )}

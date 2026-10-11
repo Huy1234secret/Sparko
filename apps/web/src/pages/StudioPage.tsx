@@ -577,7 +577,7 @@ function StudioEditor() {
       <DraftGuard dirty={dirty || !!preservedDraft} />
       <PageHeading
         eyebrow="Messages & design"
-        title="Make it feel like your community."
+        title="Message Studio"
         description="Design once. Save a version. Publish a real message with a clear delivery state."
         actions={
           <div className="row">

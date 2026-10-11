@@ -38,7 +38,7 @@ export function WelcomePage() {
     <>
       <PageHeading
         eyebrow="Community"
-        title="Make the first minute count."
+        title="Welcome messages"
         description="Greet new members in a channel, by direct message, or both."
       />
       <ConfigForm
@@ -100,7 +100,7 @@ export function LeaveBoostPage() {
     <>
       <PageHeading
         eyebrow="Community"
-        title="Notice who comes and goes."
+        title="Leave & boost messages"
         description="Separate messages for members leaving and for new server boosts."
       />
       <ConfigForm
@@ -164,7 +164,7 @@ export function AutoRolesPage() {
     <>
       <PageHeading
         eyebrow="Community"
-        title="The right roles, automatically."
+        title="Automatic roles"
         description="Give roles when members join or boost. Sparko checks its role position before every change."
       />
       <ConfigForm
@@ -264,7 +264,7 @@ export function StarboardPage() {
     <>
       <PageHeading
         eyebrow="Community"
-        title="Let the best moments shine."
+        title="Starboard"
         description="Mirror messages that collect enough reactions. Each member’s vote counts once."
       />
       <ConfigForm

@@ -301,7 +301,7 @@ export function CountingPage() {
     <>
       <PageHeading
         eyebrow="Engagement"
-        title="One number at a time."
+        title="Counting"
         description="Set the rules for your counting channel and watch its progress."
       />
       <Tabs

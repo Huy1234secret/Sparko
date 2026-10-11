@@ -62,6 +62,7 @@ export function useFeatureConfig<
     onMutate: () => setUnmatched([]),
     onError: (error) => setUnmatched(applyServerFieldErrors(form, error)),
     onSuccess: (result) => {
+      setRebasedOn(null);
       queryClient.setQueryData(queryKey, result.data);
       form.reset(defaults(result.data.config) as never);
       void queryClient.invalidateQueries({ queryKey: ['overview', guildId] });
@@ -70,10 +71,20 @@ export function useFeatureConfig<
   const submit = form.handleSubmit((values) => save.mutate(values));
   const conflict =
     save.error instanceof ApiError && save.error.code === 'REVISION_CONFLICT';
+  const [rebasedOn, setRebasedOn] = useState<number | null>(null);
   const reload = () => {
-    form.reset(defaults(query.data?.config) as never);
+    setRebasedOn(null);
     save.reset();
-    void query.refetch();
+    void query.refetch().then((latest) => {
+      form.reset(defaults((latest.data ?? query.data)?.config) as never);
+    });
+  };
+  /** Keep the draft and save it next time over the newer revision. */
+  const keepDraft = () => {
+    save.reset();
+    void query.refetch().then((latest) => {
+      if (latest.data) setRebasedOn(latest.data.revision);
+    });
   };
   const shell: FeatureConfigController = {
     query,
@@ -82,6 +93,8 @@ export function useFeatureConfig<
     conflict,
     unmatched,
     reload,
+    keepDraft,
+    rebasedOn,
     dirty,
     enabledField: form.register('enabled' as Path<Input>),
   };
@@ -100,6 +113,9 @@ export type FeatureConfigController = {
   conflict: boolean;
   unmatched: ApiFieldError[];
   reload: () => void;
+  keepDraft: () => void;
+  /** Revision the kept draft will replace on the next save. */
+  rebasedOn: number | null;
   dirty: boolean;
   enabledField: UseFormRegisterReturn;
 };
