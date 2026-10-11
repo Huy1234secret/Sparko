@@ -247,8 +247,9 @@ export function PrivacyAccountPage() {
   const deletion = useMutation({
     mutationFn: () => requestDeletion(reason, identity('deletion', reason)),
     onSuccess: () => {
-      refresh();
       setDeletionOpen(false);
+      queryClient.clear();
+      window.location.assign('/?account=deleted');
     },
   });
   const revoke = useMutation({
@@ -307,7 +308,7 @@ export function PrivacyAccountPage() {
               </p>
               <Button variant="danger" onClick={() => setDeletionOpen(true)}>
                 <Trash2 size={15} />
-                Request account deletion
+                Delete account
               </Button>
               <Link
                 className="text-link"
@@ -389,11 +390,11 @@ export function PrivacyAccountPage() {
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
           <Dialog.Content className="dialog-content">
-            <Dialog.Title>Request account deletion?</Dialog.Title>
+            <Dialog.Title>Delete your account?</Dialog.Title>
             <Dialog.Description>
-              This creates a privacy request. Processing may retain records
-              required by the policy and server-owned history. Review the policy
-              before continuing.
+              This deletes your account identity, revokes your sessions, and
+              disables public profile sharing. Server business records and audit
+              history remain subject to their documented retention policies.
             </Dialog.Description>
             <Field label="Reason or details" htmlFor="deletion-reason">
               <textarea
@@ -418,7 +419,7 @@ export function PrivacyAccountPage() {
                 busy={deletion.isPending}
                 onClick={() => deletion.mutate()}
               >
-                Submit deletion request
+                Delete account and sign out
               </Button>
             </div>
           </Dialog.Content>

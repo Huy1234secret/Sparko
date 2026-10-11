@@ -55,6 +55,13 @@ function text(value: string): ReactNode {
       ),
     );
 }
+/** Owned asset references remain attachment:// in the compiled Discord payload. */
+function previewMediaUrl(value: string): string {
+  const asset = /^attachment:\/\/sparko-([a-zA-Z0-9-]+)\.png$/.exec(value);
+  return asset?.[1]
+    ? `/api/v1/public/assets/${encodeURIComponent(asset[1])}`
+    : value;
+}
 function renderComponent(input: unknown, key: string): ReactNode {
   const parsed = ComponentSchema.safeParse(input);
   if (!parsed.success) return null;
@@ -129,7 +136,7 @@ function renderComponent(input: unknown, key: string): ReactNode {
         <img
           key={key}
           className="discord-thumbnail"
-          src={item.media.url}
+          src={previewMediaUrl(item.media.url)}
           alt="Message thumbnail preview"
         />
       ) : null;
@@ -139,7 +146,7 @@ function renderComponent(input: unknown, key: string): ReactNode {
           {item.items?.map((image, i) => (
             <img
               key={i}
-              src={image.media.url}
+              src={previewMediaUrl(image.media.url)}
               alt={image.description ?? 'Message media preview'}
             />
           ))}
@@ -212,7 +219,7 @@ export function MessagePreview({
                 {embed.thumbnail && (
                   <img
                     className="discord-thumbnail"
-                    src={embed.thumbnail}
+                    src={previewMediaUrl(embed.thumbnail)}
                     alt="Embed thumbnail"
                   />
                 )}
@@ -225,7 +232,7 @@ export function MessagePreview({
                 {embed.image && (
                   <img
                     className="discord-image"
-                    src={embed.image}
+                    src={previewMediaUrl(embed.image)}
                     alt="Embed illustration"
                   />
                 )}

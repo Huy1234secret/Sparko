@@ -10,3 +10,7 @@
 - JSON/Lottie plays in browsers; Discord uses valid PNG/GIF/custom emoji/Unicode. Components V2 never combines content/embeds/poll/stickers.
 - Application credentials and live domain cutover are operator setup. Production never loads test/mock data. Support conversations remain global and separate from guild tickets.
 - Cloud-runtime skill read at skill://plugin_connector_1p_c5b7d5df5d7081918f2c4be5a633ed5d/cloud-environment-runtime/SKILL.md; no unavailable specialist skill claimed.
+- Native Prisma generation/migration is now the documented path. Forward migrations enforce same-guild balanced, immutable ledger entries and fenced OAuth refresh leases; no applied migration is rewritten.
+- OAuth refresh, asset storage and Discord delivery claim durable fenced ownership in short database transactions, perform external work outside those transactions, then conditionally commit the outcome. Ambiguous effects stay visible rather than silently repeating.
+- Browser acceptance uses actual OAuth/session/API/domain/bot/worker code with a controlled external Discord boundary and separate disposable database. Live Discord/provider evidence is tracked separately.
+- Uploaded static images are decoded under byte/pixel limits and re-encoded as metadata-free PNG. Pending and clean metadata both consume tenant storage quota; public sharing requires explicit acknowledgement. Private images cannot be used in public publications.

@@ -29,6 +29,7 @@ export const PublicationSchema = z
     messageId: z.string().nullable().optional(),
     templateVersionId: z.string().nullable().optional(),
     state: z.string(),
+    document: MessageDocumentSchema.optional(),
     revision: z.number(),
     appliedRevision: z.number(),
     test: z.boolean(),
@@ -39,6 +40,7 @@ export const PublicationSchema = z
     status: publication.state,
     deliveryStatus: publication.state,
   }));
+export type Publication = z.infer<typeof PublicationSchema>;
 export type Template = z.infer<typeof TemplateSchema>;
 export const getTemplates = (guild: string, signal?: AbortSignal) =>
   read(`/guilds/${guild}/templates`, z.array(TemplateSchema), signal);
@@ -141,5 +143,20 @@ export const retryOperation = (guild: string, id: string, key: string) =>
     `/guilds/${guild}/operations/${id}/retry`,
     {},
     z.unknown(),
+    key,
+  );
+
+export const updatePublication = (
+  guild: string,
+  publication: Publication,
+  document: MessageDocument,
+  replace: boolean,
+  key: string,
+) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/publications/${publication.id}/update`,
+    { expectedRevision: publication.revision, document, replace },
+    PublicationSchema,
     key,
   );

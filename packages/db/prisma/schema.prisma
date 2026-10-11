@@ -28,6 +28,9 @@ model OAuthCredential {
   encryptedToken String
   encryptedRefresh String
   expiresAt DateTime
+  revision Int @default(0)
+  refreshLeaseId String?
+  refreshLeaseUntil DateTime?
 }
 model OAuthState {
   id String @id

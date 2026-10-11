@@ -527,6 +527,11 @@ export function SetupPage() {
               {issue}
             </div>
           ))}
+          {preview.data.data.blockingIssues.map((issue) => (
+            <div className="alert alert-danger" key={issue}>
+              {issue}
+            </div>
+          ))}
           {preview.data.data.changes.length ? (
             preview.data.data.changes.map((change) => (
               <details className="diff-row" key={change.featureId}>
@@ -551,14 +556,16 @@ export function SetupPage() {
           )}
           <Button
             busy={apply.isPending}
-            disabled={preview.data.data.issues.length > 0 || apply.isSuccess}
+            disabled={
+              preview.data.data.blockingIssues.length > 0 || apply.isSuccess
+            }
             onClick={() => apply.mutate()}
           >
             {apply.isSuccess ? 'Settings saved' : 'Apply these settings'}
           </Button>
-          {preview.data.data.issues.length > 0 && (
+          {preview.data.data.blockingIssues.length > 0 && (
             <p className="field-hint">
-              Resolve the listed setup issues before applying this preset.
+              Resolve these prerequisites before applying this preset.
             </p>
           )}
         </section>

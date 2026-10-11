@@ -1,23 +1,335 @@
-import {z} from 'zod';
-import {TicketConfigSchema,DomainError} from '@sparko/contracts';
-import {json} from '@sparko/db';
-import {allowed} from '@sparko/policy';
-import {type DomainContext,type DomainRoute,jsonObject} from './core.js';
-export const ticketOpenSchema=z.object({categoryId:z.string().min(1),answers:z.record(z.string(),z.string().max(4000)).default({})});
-async function ticket(ctx:DomainContext,id:string,staff=false){const t=await ctx.tx.ticket.findFirst({where:{id,guildId:ctx.guildId}});if(!t)throw new DomainError('NOT_FOUND','This ticket is unavailable.',404);const config=TicketConfigSchema.parse(t.snapshot),isStaff=allowed(ctx.actor,'tickets.manage')||config.staffRoleIds.some(id=>ctx.actor.roles.includes(id));if(staff?!isStaff:!(isStaff||t.ownerId===ctx.actor.userId||t.participants.includes(ctx.actor.userId)))throw new DomainError('FORBIDDEN','This ticket is unavailable.',403);return t;}
-export async function openTicket(ctx:DomainContext,input:unknown){await ctx.requireFeature('tickets');const body=ticketOpenSchema.parse(input),saved=await ctx.tx.featureConfig.findUniqueOrThrow({where:{guildId_featureId:{guildId:ctx.guildId,featureId:'tickets'}}}),config=TicketConfigSchema.parse(saved.config),category=config.categories.find(c=>c.id===body.categoryId);if(!category)throw new DomainError('INVALID_INPUT','Choose a published ticket category.');for(const field of category.fields){const value=body.answers[field.id]??'';if((field.required&&!value.trim())||value.length>field.maxLength)throw new DomainError('INVALID_INPUT','Check your ticket answers.',400,{field:field.id});}if(Object.keys(body.answers).some(id=>!category.fields.some(f=>f.id===id)))throw new DomainError('INVALID_INPUT','An answer does not belong to this form.');const count=await ctx.tx.ticket.count({where:{guildId:ctx.guildId,ownerId:ctx.actor.userId,state:{notIn:['closed','failed']}}});if(count>=config.maxOpenPerMember)throw new DomainError('INVALID_INPUT','You have reached your open ticket limit.',409);const last=await ctx.tx.ticket.aggregate({where:{guildId:ctx.guildId},_max:{number:true}});const t=await ctx.tx.ticket.create({data:{guildId:ctx.guildId,number:(last._max.number??0)+1,ownerId:ctx.actor.userId,snapshot:json(config),answers:json(body.answers),participants:[ctx.actor.userId]}});await ctx.effect('ticket.create',{ticketId:t.id});return t;}
-export async function claimTicket(ctx:DomainContext,id:string,expectedRevision:number){const t=await ticket(ctx,id,true);if(t.revision!==expectedRevision||t.claimantId||!['open','awaiting_staff'].includes(t.state))throw new DomainError('REVISION_CONFLICT','This ticket was already changed or claimed.',409,{currentRevision:t.revision});return ctx.tx.ticket.update({where:{id:t.id},data:{claimantId:ctx.actor.userId,state:'claimed',revision:{increment:1}}});}
-export const ticketRoutes:DomainRoute[]=[
-{method:'GET',path:'/guilds/:guildId/tickets',capability:'member',handler:async ctx=>{const c=await ctx.tx.featureConfig.findUnique({where:{guildId_featureId:{guildId:ctx.guildId,featureId:'tickets'}}});const cfg=TicketConfigSchema.safeParse(c?.config),staff=allowed(ctx.actor,'tickets.read')||cfg.success&&cfg.data.staffRoleIds.some(id=>ctx.actor.roles.includes(id));return ctx.tx.ticket.findMany({where:{guildId:ctx.guildId,...(!staff?{OR:[{ownerId:ctx.actor.userId},{participants:{has:ctx.actor.userId}}]}:{})},orderBy:[{createdAt:'desc'},{id:'desc'}],take:100});}},
-{method:'POST',path:'/guilds/:guildId/tickets',capability:'member',schema:ticketOpenSchema,handler:async(ctx,input)=>openTicket(ctx,input)},
-{method:'POST',path:'/guilds/:guildId/tickets/:id/claim',capability:'member',schema:z.object({expectedRevision:z.number().int().min(1)}),handler:async(ctx,input,params)=>claimTicket(ctx,params['id']??'',z.object({expectedRevision:z.number()}).parse(input).expectedRevision)},
-{method:'POST',path:'/guilds/:guildId/tickets/:id/close',capability:'member',schema:z.object({expectedRevision:z.number().int().min(1),reason:z.string().min(1).max(1000)}),handler:async(ctx,input,params)=>{const body=z.object({expectedRevision:z.number(),reason:z.string()}).parse(input),t=await ticket(ctx,params['id']??'');if(t.revision!==body.expectedRevision||['closed','closing','creating'].includes(t.state))throw new DomainError('REVISION_CONFLICT','This ticket changed. Refresh before closing.',409);const changed=await ctx.tx.ticket.update({where:{id:t.id},data:{state:'closing',closeReason:body.reason,revision:{increment:1}}});await ctx.effect('ticket.capture',{ticketId:t.id});return changed;}},
-{method:'POST',path:'/guilds/:guildId/tickets/:id/participants',capability:'member',schema:z.object({expectedRevision:z.number().int().min(1),userId:z.string().regex(/^\d{17,20}$/),action:z.enum(['add','remove'])}),handler:async(ctx,input,params)=>{const body=z.object({expectedRevision:z.number(),userId:z.string(),action:z.enum(['add','remove'])}).parse(input),t=await ticket(ctx,params['id']??'',true);if(t.revision!==body.expectedRevision||body.userId===t.ownerId)throw new DomainError('REVISION_CONFLICT','This participant action is unavailable.',409);const participants=body.action==='add'?[...new Set([...t.participants,body.userId])]:t.participants.filter(id=>id!==body.userId);const changed=await ctx.tx.ticket.update({where:{id:t.id},data:{participants,revision:{increment:1}}});await ctx.effect('ticket.participants',{ticketId:t.id,userId:body.userId,desired:body.action==='add'});return changed;}},
-{method:'GET',path:'/guilds/:guildId/tickets/:id/transcripts',capability:'member',handler:async(ctx,_input,params)=>{const t=await ticket(ctx,params['id']??'');return ctx.tx.transcript.findMany({where:{guildId:ctx.guildId,ticketId:t.id,expiresAt:{gt:ctx.now}},select:{id:true,status:true,checksum:true,createdAt:true,expiresAt:true}});}},
-{method:'GET',path:'/guilds/:guildId/tickets/:id/transcripts/:assetId',capability:'member',handler:async(ctx,_input,params)=>{const t=await ticket(ctx,params['id']??''),transcript=await ctx.tx.transcript.findFirst({where:{id:params['assetId']??'',guildId:ctx.guildId,ticketId:t.id,expiresAt:{gt:ctx.now}}});if(!transcript)throw new DomainError('NOT_FOUND','This transcript is unavailable.',404);return {...transcript,messages:jsonObject(transcript.messages)};}}
+import { z } from 'zod';
+import { TicketConfigSchema, DomainError } from '@sparko/contracts';
+import { json } from '@sparko/db';
+import { allowed } from '@sparko/policy';
+import { type DomainContext, type DomainRoute, jsonObject } from './core.js';
+export const ticketOpenSchema = z.object({
+  categoryId: z.string().min(1),
+  answers: z.record(z.string(), z.string().max(4000)).default({}),
+});
+async function ticket(ctx: DomainContext, id: string, staff = false) {
+  const t = await ctx.tx.ticket.findFirst({
+    where: { id, guildId: ctx.guildId },
+  });
+  if (!t)
+    throw new DomainError('NOT_FOUND', 'This ticket is unavailable.', 404);
+  const config = TicketConfigSchema.parse(t.snapshot),
+    isStaff =
+      allowed(ctx.actor, 'tickets.manage') ||
+      config.staffRoleIds.some((id) => ctx.actor.roles.includes(id));
+  if (
+    staff
+      ? !isStaff
+      : !(
+          isStaff ||
+          allowed(ctx.actor, 'tickets.read') ||
+          t.ownerId === ctx.actor.userId ||
+          t.participants.includes(ctx.actor.userId)
+        )
+  )
+    throw new DomainError('FORBIDDEN', 'This ticket is unavailable.', 403);
+  return t;
+}
+export async function openTicket(ctx: DomainContext, input: unknown) {
+  await ctx.requireFeature('tickets');
+  const body = ticketOpenSchema.parse(input),
+    saved = await ctx.tx.featureConfig.findUniqueOrThrow({
+      where: {
+        guildId_featureId: { guildId: ctx.guildId, featureId: 'tickets' },
+      },
+    }),
+    config = TicketConfigSchema.parse(saved.config),
+    category = config.categories.find((c) => c.id === body.categoryId);
+  if (!category)
+    throw new DomainError(
+      'INVALID_INPUT',
+      'Choose a published ticket category.',
+    );
+  for (const field of category.fields) {
+    const value = body.answers[field.id] ?? '';
+    if ((field.required && !value.trim()) || value.length > field.maxLength)
+      throw new DomainError(
+        'INVALID_INPUT',
+        'Check your ticket answers.',
+        400,
+        { field: field.id },
+      );
+  }
+  if (
+    Object.keys(body.answers).some(
+      (id) => !category.fields.some((f) => f.id === id),
+    )
+  )
+    throw new DomainError(
+      'INVALID_INPUT',
+      'An answer does not belong to this form.',
+    );
+  const count = await ctx.tx.ticket.count({
+    where: {
+      guildId: ctx.guildId,
+      ownerId: ctx.actor.userId,
+      state: { notIn: ['closed', 'failed'] },
+    },
+  });
+  if (count >= config.maxOpenPerMember)
+    throw new DomainError(
+      'INVALID_INPUT',
+      'You have reached your open ticket limit.',
+      409,
+    );
+  const last = await ctx.tx.ticket.aggregate({
+    where: { guildId: ctx.guildId },
+    _max: { number: true },
+  });
+  const t = await ctx.tx.ticket.create({
+    data: {
+      guildId: ctx.guildId,
+      number: (last._max.number ?? 0) + 1,
+      ownerId: ctx.actor.userId,
+      snapshot: json(config),
+      answers: json(body.answers),
+      participants: [ctx.actor.userId],
+    },
+  });
+  await ctx.effect('ticket.create', { ticketId: t.id });
+  return t;
+}
+export async function claimTicket(
+  ctx: DomainContext,
+  id: string,
+  expectedRevision: number,
+) {
+  const t = await ticket(ctx, id, true);
+  if (
+    t.revision !== expectedRevision ||
+    t.claimantId ||
+    !['open', 'awaiting_staff'].includes(t.state)
+  )
+    throw new DomainError(
+      'REVISION_CONFLICT',
+      'This ticket was already changed or claimed.',
+      409,
+      { currentRevision: t.revision },
+    );
+  return ctx.tx.ticket.update({
+    where: { id: t.id },
+    data: {
+      claimantId: ctx.actor.userId,
+      state: 'claimed',
+      revision: { increment: 1 },
+    },
+  });
+}
+export const ticketRoutes: DomainRoute[] = [
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/tickets',
+    capability: 'member',
+    handler: async (ctx) => {
+      const staff =
+        allowed(ctx.actor, 'tickets.read') ||
+        allowed(ctx.actor, 'tickets.manage');
+      return ctx.tx.ticket.findMany({
+        where: {
+          guildId: ctx.guildId,
+          ...(!staff
+            ? {
+                OR: [
+                  { ownerId: ctx.actor.userId },
+                  { participants: { has: ctx.actor.userId } },
+                  ...ctx.actor.roles.map((roleId) => ({
+                    snapshot: {
+                      path: ['staffRoleIds'],
+                      array_contains: [roleId],
+                    },
+                  })),
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 100,
+      });
+    },
+  },
+  {
+    method: 'POST',
+    path: '/guilds/:guildId/tickets',
+    capability: 'member',
+    schema: ticketOpenSchema,
+    handler: async (ctx, input) => openTicket(ctx, input),
+  },
+  {
+    method: 'POST',
+    path: '/guilds/:guildId/tickets/:id/claim',
+    capability: 'member',
+    schema: z.object({ expectedRevision: z.number().int().min(1) }),
+    handler: async (ctx, input, params) =>
+      claimTicket(
+        ctx,
+        params['id'] ?? '',
+        z.object({ expectedRevision: z.number() }).parse(input)
+          .expectedRevision,
+      ),
+  },
+  {
+    method: 'POST',
+    path: '/guilds/:guildId/tickets/:id/close',
+    capability: 'member',
+    schema: z.object({
+      expectedRevision: z.number().int().min(1),
+      reason: z.string().min(1).max(1000),
+    }),
+    handler: async (ctx, input, params) => {
+      const body = z
+          .object({ expectedRevision: z.number(), reason: z.string() })
+          .parse(input),
+        t = await ticket(ctx, params['id'] ?? '');
+      if (
+        t.revision !== body.expectedRevision ||
+        ['closed', 'closing', 'creating'].includes(t.state)
+      )
+        throw new DomainError(
+          'REVISION_CONFLICT',
+          'This ticket changed. Refresh before closing.',
+          409,
+        );
+      const changed = await ctx.tx.ticket.update({
+        where: { id: t.id },
+        data: {
+          state: 'closing',
+          closeReason: body.reason,
+          revision: { increment: 1 },
+        },
+      });
+      await ctx.effect('ticket.capture', { ticketId: t.id });
+      return changed;
+    },
+  },
+  {
+    method: 'POST',
+    path: '/guilds/:guildId/tickets/:id/participants',
+    capability: 'member',
+    schema: z.object({
+      expectedRevision: z.number().int().min(1),
+      userId: z.string().regex(/^\d{17,20}$/),
+      action: z.enum(['add', 'remove']),
+    }),
+    handler: async (ctx, input, params) => {
+      const body = z
+          .object({
+            expectedRevision: z.number(),
+            userId: z.string(),
+            action: z.enum(['add', 'remove']),
+          })
+          .parse(input),
+        t = await ticket(ctx, params['id'] ?? '', true);
+      if (t.revision !== body.expectedRevision || body.userId === t.ownerId)
+        throw new DomainError(
+          'REVISION_CONFLICT',
+          'This participant action is unavailable.',
+          409,
+        );
+      const participants =
+        body.action === 'add'
+          ? [...new Set([...t.participants, body.userId])]
+          : t.participants.filter((id) => id !== body.userId);
+      const changed = await ctx.tx.ticket.update({
+        where: { id: t.id },
+        data: { participants, revision: { increment: 1 } },
+      });
+      await ctx.effect('ticket.participants', {
+        ticketId: t.id,
+        userId: body.userId,
+        desired: body.action === 'add',
+      });
+      return changed;
+    },
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/tickets/:id/transcripts',
+    capability: 'member',
+    handler: async (ctx, _input, params) => {
+      const t = await ticket(ctx, params['id'] ?? '');
+      return ctx.tx.transcript.findMany({
+        where: {
+          guildId: ctx.guildId,
+          ticketId: t.id,
+          expiresAt: { gt: ctx.now },
+        },
+        select: {
+          id: true,
+          status: true,
+          checksum: true,
+          createdAt: true,
+          expiresAt: true,
+        },
+      });
+    },
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/tickets/:id/transcripts/:assetId',
+    capability: 'member',
+    handler: async (ctx, _input, params) => {
+      const t = await ticket(ctx, params['id'] ?? ''),
+        transcript = await ctx.tx.transcript.findFirst({
+          where: {
+            id: params['assetId'] ?? '',
+            guildId: ctx.guildId,
+            ticketId: t.id,
+            expiresAt: { gt: ctx.now },
+          },
+        });
+      if (!transcript)
+        throw new DomainError(
+          'NOT_FOUND',
+          'This transcript is unavailable.',
+          404,
+        );
+      return { ...transcript, messages: jsonObject(transcript.messages) };
+    },
+  },
 ];
 ticketRoutes.push(
-{method:'GET',path:'/guilds/:guildId/tickets/categories',capability:'member',handler:async ctx=>{const c=await ctx.tx.featureConfig.findUnique({where:{guildId_featureId:{guildId:ctx.guildId,featureId:'tickets'}}});return c?TicketConfigSchema.parse(c.config).categories:[];}},
-{method:'GET',path:'/guilds/:guildId/tickets/:id',capability:'member',handler:async(ctx,_input,p)=>ticket(ctx,p['id']??'')},
-{method:'POST',path:'/guilds/:guildId/tickets/:id/release',capability:'member',schema:z.object({expectedRevision:z.number().int().min(1)}),handler:async(ctx,input,p)=>{const b=z.object({expectedRevision:z.number()}).parse(input),t=await ticket(ctx,p['id']??'',true);if(t.revision!==b.expectedRevision||!t.claimantId||t.state!=='claimed')throw new DomainError('REVISION_CONFLICT','This ticket changed.',409);return ctx.tx.ticket.update({where:{id:t.id},data:{claimantId:null,state:'open',revision:{increment:1}}});}}
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/tickets/categories',
+    capability: 'member',
+    handler: async (ctx) => {
+      const c = await ctx.tx.featureConfig.findUnique({
+        where: {
+          guildId_featureId: { guildId: ctx.guildId, featureId: 'tickets' },
+        },
+      });
+      return c ? TicketConfigSchema.parse(c.config).categories : [];
+    },
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/tickets/:id',
+    capability: 'member',
+    handler: async (ctx, _input, p) => ticket(ctx, p['id'] ?? ''),
+  },
+  {
+    method: 'POST',
+    path: '/guilds/:guildId/tickets/:id/release',
+    capability: 'member',
+    schema: z.object({ expectedRevision: z.number().int().min(1) }),
+    handler: async (ctx, input, p) => {
+      const b = z.object({ expectedRevision: z.number() }).parse(input),
+        t = await ticket(ctx, p['id'] ?? '', true);
+      if (
+        t.revision !== b.expectedRevision ||
+        !t.claimantId ||
+        t.state !== 'claimed'
+      )
+        throw new DomainError('REVISION_CONFLICT', 'This ticket changed.', 409);
+      return ctx.tx.ticket.update({
+        where: { id: t.id },
+        data: { claimantId: null, state: 'open', revision: { increment: 1 } },
+      });
+    },
+  },
 );

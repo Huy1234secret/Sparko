@@ -81,6 +81,8 @@ export const ConfigSchema = z.object({
   revision: z.number(),
   appliedRevision: z.number(),
   config: z.record(z.string(), z.unknown()),
+  setupState: z.enum(['configured', 'unconfigured']).optional(),
+  missingPrerequisites: z.array(z.string()).default([]),
 });
 export type FeatureConfig = z.infer<typeof ConfigSchema>;
 export const getGuilds = (signal?: AbortSignal) =>
@@ -119,6 +121,7 @@ export const SetupPreviewSchema = z.object({
     }),
   ),
   issues: z.array(z.string()).default([]),
+  blockingIssues: z.array(z.string()).default([]),
 });
 export const previewSetup = (guild: string, preset: string, key: string) =>
   mutate(

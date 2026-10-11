@@ -968,6 +968,16 @@ export async function ingestSafetyEvent(ctx: DomainContext, input: unknown) {
       joinedAt: event.joinedAt,
       accountCreatedAt: event.accountCreatedAt,
     };
+    // Delayed join observations cannot overwrite tenure from a later rejoin.
+    if (
+      existing &&
+      Date.parse(String(jsonObject(existing.data)['joinedAt'])) >
+        Date.parse(event.joinedAt)
+    )
+      return {
+        observed: true,
+        reason: 'A newer membership was already observed',
+      };
     if (existing)
       await updateRecord(
         ctx,
@@ -1027,9 +1037,16 @@ export async function ingestSafetyEvent(ctx: DomainContext, input: unknown) {
     const previous = Array.isArray(jsonObject(prior?.data)['events'])
       ? (jsonObject(prior?.data)['events'] as unknown[])
       : [];
-    const time = Date.parse(event.at);
-    if (Math.abs(time - ctx.now.getTime()) > 300000)
+    const eventTime = Date.parse(event.at);
+    if (Math.abs(eventTime - ctx.now.getTime()) > 300000)
       return { ignored: true, reason: 'stale event' };
+    const time = Math.max(
+      eventTime,
+      ...previous
+        .map(jsonObject)
+        .map((e) => Number(e['at']))
+        .filter(Number.isFinite),
+    );
     const normalized = event.content
         .normalize('NFKC')
         .toLocaleLowerCase()
@@ -1040,8 +1057,12 @@ export async function ingestSafetyEvent(ctx: DomainContext, input: unknown) {
       .filter(
         (e) => Number(e['at']) > time - 300000 && Number(e['at']) <= time,
       );
-    recent.push({ id: event.id, at: time, hash: contentHash });
-    const window = { events: recent.slice(-500) };
+    recent.push({ id: event.id, at: eventTime, hash: contentHash });
+    const window = {
+      events: recent
+        .sort((a, b) => Number(a['at']) - Number(b['at']))
+        .slice(-500),
+    };
     if (prior)
       await updateRecord(
         ctx,
@@ -1172,6 +1193,17 @@ export async function ingestSafetyEvent(ctx: DomainContext, input: unknown) {
     }
     return { results };
   }
+  if (
+    event.type === 'join' &&
+    array(cfg['trustedRoleIds']).some((r) => event.roleIds.includes(r))
+  )
+    return { trusted: true };
+  if (
+    event.type === 'destructive' &&
+    event.executorId &&
+    array(cfg['trustedMemberIds']).includes(event.executorId)
+  )
+    return { trusted: true };
   const windowSeconds = Number(cfg['windowSeconds']),
     kind = event.type === 'join' ? 'join' : 'destructive',
     recent = await ctx.tx.record.findMany({
@@ -1195,17 +1227,6 @@ export async function ingestSafetyEvent(ctx: DomainContext, input: unknown) {
   );
   if (recent.length + 1 < threshold)
     return { observed: true, count: recent.length + 1 };
-  if (
-    event.type === 'join' &&
-    array(cfg['trustedRoleIds']).some((r) => event.roleIds.includes(r))
-  )
-    return { trusted: true };
-  if (
-    event.type === 'destructive' &&
-    event.executorId &&
-    array(cfg['trustedMemberIds']).includes(event.executorId)
-  )
-    return { trusted: true };
   const incident = await createRecord(
     ctx,
     'safety_incident',

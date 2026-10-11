@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
-import { defaultTicketDocument } from '@sparko/messages';
+import { defaultTicketDocument, MessageDocumentSchema } from '@sparko/messages';
 import {
   ArrowLeft,
   ArrowRight,
@@ -39,6 +39,8 @@ import {
   getTicketCategories,
   getTickets,
   getTicket,
+  getTicketTranscripts,
+  getTicketTranscript,
   claimTicket,
   closeTicket,
   updateTicket,
@@ -69,6 +71,26 @@ const TicketConfigFormSchema = z.object({
   staffRoleIds: z.array(z.string()),
   maxOpenPerMember: z.number().int().min(1).max(10),
   requireTranscriptBeforeCleanup: z.boolean(),
+  categories: z
+    .array(
+      z.object({
+        id: z.string().regex(/^[a-z0-9-]{1,32}$/),
+        name: z.string().min(1).max(80),
+        description: z.string().max(500),
+        fields: z
+          .array(
+            z.object({
+              id: z.string().regex(/^[a-z0-9_-]{1,32}$/),
+              label: z.string().min(1).max(45),
+              required: z.boolean(),
+              maxLength: z.number().int().min(1).max(4000),
+            }),
+          )
+          .max(20),
+      }),
+    )
+    .min(1)
+    .max(10),
 });
 type TicketConfigForm = z.infer<typeof TicketConfigFormSchema>;
 const defaults: TicketConfigForm = {
@@ -79,6 +101,9 @@ const defaults: TicketConfigForm = {
   staffRoleIds: [],
   maxOpenPerMember: 1,
   requireTranscriptBeforeCleanup: true,
+  categories: [
+    { id: 'general', name: 'General support', description: '', fields: [] },
+  ],
 };
 export function TicketConfigPage() {
   const { guildId = '' } = useParams();
@@ -101,12 +126,48 @@ export function TicketConfigPage() {
   const publications = useQuery({
     queryKey: ['publications', guildId],
     queryFn: ({ signal }) => getPublications(guildId, signal),
+    refetchInterval: 2000,
   });
   const form = useForm<TicketConfigForm>({
     resolver: zodResolver(TicketConfigFormSchema),
     defaultValues: defaults,
   });
   const dirty = form.formState.isDirty;
+  const categories = form.watch('categories');
+  const panelDraft = MessageDocumentSchema.safeParse({
+    ...defaultTicketDocument,
+    blocks: [
+      {
+        type: 'container',
+        accentColor: 16436245,
+        children: [
+          { type: 'text', text: '## Sparko support' },
+          {
+            type: 'text',
+            text: 'Choose a topic to open a private conversation with the support team.',
+          },
+          ...Array.from(
+            { length: Math.ceil(categories.length / 5) },
+            (_, row) => ({
+              type: 'controls',
+              controls: categories
+                .slice(row * 5, row * 5 + 5)
+                .map((category) => ({
+                  type: 'button',
+                  key: 'ticket:' + category.id,
+                  label: category.name.slice(0, 80),
+                  style: 'primary',
+                  action: { type: 'ticket.create', categoryId: category.id },
+                })),
+            }),
+          ),
+        ],
+      },
+    ],
+  });
+  const panelDocument = panelDraft.success
+    ? panelDraft.data
+    : defaultTicketDocument;
   useEffect(() => {
     if (query.data && !dirty) {
       const values = TicketConfigFormSchema.parse({
@@ -146,7 +207,7 @@ export function TicketConfigPage() {
     mutationFn: () => {
       const body = {
         channelId: publishChannel,
-        document: defaultTicketDocument,
+        document: panelDocument,
         purpose: 'ticket-panel',
       };
       return publishMessage(guildId, body, identity('ticket-panel', body));
@@ -313,6 +374,174 @@ export function TicketConfigPage() {
             )}
           </Card>
           <Card>
+            <h2>Ticket topics and questions</h2>
+            <p className="muted">
+              Each topic becomes a persistent panel button. Questions open in
+              Discord before a ticket is created. Changes apply to new requests.
+            </p>
+            {categories.map((category, index) => (
+              <fieldset className="stack" key={index}>
+                <legend>Topic {index + 1}</legend>
+                <Field label="Topic name" htmlFor={'category-name-' + index}>
+                  <Input
+                    id={'category-name-' + index}
+                    {...form.register(`categories.${index}.name`)}
+                  />
+                </Field>
+                <Field
+                  label="Topic identifier"
+                  htmlFor={'category-id-' + index}
+                  hint="Lowercase letters, digits and hyphens. Keep an existing identifier to preserve its panel action."
+                >
+                  <Input
+                    id={'category-id-' + index}
+                    {...form.register(`categories.${index}.id`)}
+                  />
+                </Field>
+                <Field
+                  label="Topic description"
+                  htmlFor={'category-description-' + index}
+                >
+                  <textarea
+                    id={'category-description-' + index}
+                    {...form.register(`categories.${index}.description`)}
+                  />
+                </Field>
+                {category.fields.map((field, fieldIndex) => (
+                  <div className="card stack" key={fieldIndex}>
+                    <Field
+                      label="Question"
+                      htmlFor={`question-${index}-${fieldIndex}`}
+                    >
+                      <Input
+                        id={`question-${index}-${fieldIndex}`}
+                        {...form.register(
+                          `categories.${index}.fields.${fieldIndex}.label`,
+                        )}
+                      />
+                    </Field>
+                    <Field
+                      label="Answer identifier"
+                      htmlFor={`answer-id-${index}-${fieldIndex}`}
+                    >
+                      <Input
+                        id={`answer-id-${index}-${fieldIndex}`}
+                        {...form.register(
+                          `categories.${index}.fields.${fieldIndex}.id`,
+                        )}
+                      />
+                    </Field>
+                    <Field
+                      label="Answer length limit"
+                      htmlFor={`answer-limit-${index}-${fieldIndex}`}
+                    >
+                      <Input
+                        type="number"
+                        min={1}
+                        max={4000}
+                        id={`answer-limit-${index}-${fieldIndex}`}
+                        {...form.register(
+                          `categories.${index}.fields.${fieldIndex}.maxLength`,
+                          { valueAsNumber: true },
+                        )}
+                      />
+                    </Field>
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        {...form.register(
+                          `categories.${index}.fields.${fieldIndex}.required`,
+                        )}
+                      />
+                      Answer required
+                    </label>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() =>
+                        form.setValue(
+                          `categories.${index}.fields`,
+                          category.fields.filter(
+                            (_, position) => position !== fieldIndex,
+                          ),
+                          { shouldDirty: true },
+                        )
+                      }
+                    >
+                      Remove question
+                    </Button>
+                  </div>
+                ))}
+                <div className="row">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={category.fields.length >= 20}
+                    onClick={() =>
+                      form.setValue(
+                        `categories.${index}.fields`,
+                        [
+                          ...category.fields,
+                          {
+                            id: 'question-' + (category.fields.length + 1),
+                            label: 'How can we help?',
+                            required: true,
+                            maxLength: 1000,
+                          },
+                        ],
+                        { shouldDirty: true },
+                      )
+                    }
+                  >
+                    Add form question
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={categories.length <= 1}
+                    onClick={() =>
+                      form.setValue(
+                        'categories',
+                        categories.filter((_, position) => position !== index),
+                        { shouldDirty: true },
+                      )
+                    }
+                  >
+                    Remove topic
+                  </Button>
+                </div>
+              </fieldset>
+            ))}
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={categories.length >= 10}
+              onClick={() =>
+                form.setValue(
+                  'categories',
+                  [
+                    ...categories,
+                    {
+                      id: 'topic-' + (categories.length + 1),
+                      name: 'New topic',
+                      description: '',
+                      fields: [],
+                    },
+                  ],
+                  { shouldDirty: true },
+                )
+              }
+            >
+              Add ticket topic
+            </Button>
+            {form.formState.errors.categories && (
+              <p role="alert">
+                Check topic identifiers, names and question lengths before
+                saving.
+              </p>
+            )}
+          </Card>
+          <Card>
             <div className="row">
               <ShieldCheck className="brand-text" size={22} />
               <h2>Protect the conversation</h2>
@@ -402,7 +631,7 @@ export function TicketConfigPage() {
               <h2>Your ticket panel</h2>
               <Badge>Components V2</Badge>
             </div>
-            <MessagePreview document={defaultTicketDocument} />
+            <MessagePreview document={panelDocument} />
             <p className="field-hint">
               Publishing creates a persistent Discord message. Saving settings
               does not publish a panel.
@@ -453,7 +682,12 @@ export function TicketConfigPage() {
             {publish.data && (
               <div className="alert alert-success" role="status">
                 <p>
-                  {publish.data.data.deliveryStatus === 'delivered'
+                  {publications.data?.find(
+                    (item) => item.id === publish.data?.data.id,
+                  )?.state === 'applied' ||
+                  publications.data?.find(
+                    (item) => item.id === publish.data?.data.id,
+                  )?.state === 'published'
                     ? 'Your panel is published.'
                     : 'Publication saved. Waiting for Discord delivery.'}
                 </p>
@@ -763,6 +997,28 @@ export function TicketDetailPage() {
     queryFn: ({ signal }) => getTicket(guildId, ticketId, signal),
     refetchInterval: 10000,
   });
+  const transcripts = useQuery({
+    queryKey: ['ticket-transcripts', guildId, ticketId],
+    queryFn: ({ signal }) => getTicketTranscripts(guildId, ticketId, signal),
+    refetchInterval: 5000,
+  });
+  const download = useMutation({
+    mutationFn: (assetId: string) =>
+      getTicketTranscript(guildId, ticketId, assetId),
+    onSuccess: (transcript) => {
+      const blob = new Blob([JSON.stringify(transcript, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sparko-ticket-${query.data?.number ?? ticketId}-transcript.json`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+  });
   const action = useMutation({
     mutationFn: ({
       ticket,
@@ -864,7 +1120,13 @@ export function TicketDetailPage() {
         </Card>
         <Card className="metric">
           <p>Transcript</p>
-          <Badge>{ticket.transcriptStatus ?? 'Not captured'}</Badge>
+          <Badge>
+            {transcripts.isPending
+              ? 'Checking capture'
+              : transcripts.error
+                ? 'Capture status unavailable'
+                : (transcripts.data?.at(-1)?.status ?? 'Not captured')}
+          </Badge>
           <small>Capture is required before destructive cleanup</small>
         </Card>
       </div>
@@ -877,6 +1139,78 @@ export function TicketDetailPage() {
         >
           Continue in Discord <ExternalLink size={16} />
         </a>
+      )}
+      <Card>
+        <h2>Private transcripts</h2>
+        <p className="muted">
+          Only the ticket owner, its participants and authorized staff can
+          access these retained files.
+        </p>
+        {transcripts.error && (
+          <ErrorState
+            message={errorMessage(transcripts.error)}
+            retry={() => void transcripts.refetch()}
+          />
+        )}
+        {download.error && (
+          <ErrorState message={errorMessage(download.error)} />
+        )}
+        {transcripts.isPending ? (
+          <LoadingState label="Checking retained captures…" />
+        ) : transcripts.data?.length ? (
+          transcripts.data.map((transcript) => (
+            <div className="activity-row" key={transcript.id}>
+              <span>
+                <strong>
+                  {transcript.status === 'complete'
+                    ? 'Complete capture'
+                    : transcript.status === 'partial'
+                      ? 'Partial capture'
+                      : transcript.status.replaceAll('_', ' ')}
+                </strong>
+                <small>
+                  Captured {new Date(transcript.createdAt).toLocaleString()} ·
+                  Expires {new Date(transcript.expiresAt).toLocaleDateString()}
+                </small>
+                {transcript.status === 'partial' && (
+                  <p>
+                    Some history or content was unavailable. Unobserved
+                    deletions cannot be reconstructed.
+                  </p>
+                )}
+              </span>
+              <Button
+                variant="secondary"
+                busy={
+                  download.isPending && download.variables === transcript.id
+                }
+                onClick={() => download.mutate(transcript.id)}
+              >
+                Download transcript
+              </Button>
+            </div>
+          ))
+        ) : (
+          !transcripts.error && (
+            <p className="muted">
+              No retained transcript is available yet. Closing a ticket requests
+              a capture before cleanup.
+            </p>
+          )
+        )}
+      </Card>
+      {ticket.answers && Object.keys(ticket.answers).length > 0 && (
+        <Card>
+          <h2>Request details</h2>
+          <dl>
+            {Object.entries(ticket.answers).map(([question, answer]) => (
+              <div key={question}>
+                <dt>{question.replaceAll('-', ' ')}</dt>
+                <dd>{answer}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
       )}
       <Card>
         <h2>Conversation activity</h2>

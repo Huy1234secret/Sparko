@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Dialog from '@radix-ui/react-dialog';
 import { z } from 'zod';
 import {
-  ControlRowSchema,
   MessageDocumentSchema,
   compileMessage,
   convertMessageMode,
@@ -49,7 +48,10 @@ import {
   PageHeading,
 } from '@sparko/ui';
 import { MessagePreview, PREVIEW_CONTEXT } from '../components/MessagePreview';
-import { getChannels } from '../services/guilds';
+import { getChannels, getRoles } from '../services/guilds';
+import { ControlEditor } from '../components/ControlEditor';
+import { EmbedEditor } from '../components/EmbedEditor';
+import { GalleryPicker } from '../components/GalleryPicker';
 import {
   createTemplate,
   createVersion,
@@ -59,6 +61,8 @@ import {
   testMessage,
   archivePublication,
   type Template,
+  type Publication,
+  updatePublication,
 } from '../services/messages';
 import { ApiError, errorMessage } from '../services/http';
 import { useActionIdentity } from '../hooks/useActionIdentity';
@@ -119,10 +123,14 @@ export function StudioPage() {
   const [selected, setSelected] = useState<BlockPosition | null>({ top: 0 });
   const [template, setTemplate] = useState<Template | null>(null);
   const [channelId, setChannelId] = useState('');
+  const [editingPublication, setEditingPublication] =
+    useState<Publication | null>(null);
+  const [replacementOpen, setReplacementOpen] = useState(false);
   const [previewWidth, setPreviewWidth] = useState<'desktop' | 'mobile'>(
     'desktop',
   );
   const [inspector, setInspector] = useState(false);
+  const [mediaOpen, setMediaOpen] = useState(false);
   const [conversion, setConversion] = useState<MessageDocument['mode'] | null>(
     null,
   );
@@ -139,6 +147,10 @@ export function StudioPage() {
   const channels = useQuery({
     queryKey: ['channels', guildId],
     queryFn: ({ signal }) => getChannels(guildId, signal),
+  });
+  const roles = useQuery({
+    queryKey: ['roles', guildId],
+    queryFn: ({ signal }) => getRoles(guildId, signal),
   });
   const publications = useQuery({
     queryKey: ['publications', guildId],
@@ -210,6 +222,57 @@ export function StudioPage() {
         queryKey: ['publications', guildId],
       }),
   });
+  const updateLive = useMutation({
+    mutationFn: (replace: boolean) => {
+      if (!editingPublication) throw new Error('Choose a publication first.');
+      const body = {
+        id: editingPublication.id,
+        expectedRevision: editingPublication.revision,
+        document,
+        replace,
+      };
+      return updatePublication(
+        guildId,
+        editingPublication,
+        document,
+        replace,
+        identity('publication-update', body),
+      );
+    },
+    onSuccess: (result) => {
+      setEditingPublication(result.data);
+      setReplacementOpen(false);
+      void queryClient.invalidateQueries({
+        queryKey: ['publications', guildId],
+      });
+    },
+  });
+  let replacementRequired = false;
+  const publicationLosses: string[] = [];
+  if (editingPublication?.document) {
+    try {
+      if (editingPublication.document.mode !== document.mode) {
+        replacementRequired = true;
+        publicationLosses.push(
+          ...modeChangeLossReport(
+            editingPublication.document,
+            document.mode,
+          ).losses.map((loss) => loss.reason),
+        );
+      }
+      if (
+        JSON.stringify(getMessageActions(editingPublication.document)) !==
+        JSON.stringify(getMessageActions(document))
+      ) {
+        replacementRequired = true;
+        publicationLosses.push(
+          'Existing controls will be revoked; a replacement message receives new controls.',
+        );
+      }
+    } catch {
+      replacementRequired = true;
+    }
+  }
   const archive = useMutation({
     mutationFn: (id: string) =>
       archivePublication(
@@ -385,6 +448,10 @@ export function StudioPage() {
             >
               <Upload size={15} />
               Import
+            </Button>
+            <Button variant="secondary" onClick={() => setMediaOpen(true)}>
+              <ImagePlus size={15} />
+              Media library
             </Button>
             <Button
               variant="secondary"
@@ -575,150 +642,14 @@ export function StudioPage() {
               </div>
             </>
           ) : (
-            <div className="stack">
-              <Field
-                label="Content"
-                htmlFor="embed-content"
-                hint="Traditional messages can contain ordinary content. V2 messages use blocks."
-              >
-                <textarea
-                  id="embed-content"
-                  value={document.content ?? ''}
-                  onChange={(e) =>
-                    document.mode === 'embed' &&
-                    change({ ...document, content: e.target.value })
-                  }
-                />
-              </Field>
-              {document.embeds.map((embed, index) => (
-                <div className="stack embed-editor" key={index}>
-                  <Field label="Embed title" htmlFor={`embed-title-${index}`}>
-                    <Input
-                      id={`embed-title-${index}`}
-                      value={embed.title ?? ''}
-                      maxLength={256}
-                      onChange={(e) => {
-                        if (document.mode !== 'embed') return;
-                        const embeds = [...document.embeds];
-                        embeds[index] = { ...embed, title: e.target.value };
-                        change({ ...document, embeds });
-                      }}
-                    />
-                  </Field>
-                  <Field
-                    label="Description"
-                    htmlFor={`embed-description-${index}`}
-                  >
-                    <textarea
-                      id={`embed-description-${index}`}
-                      value={embed.description ?? ''}
-                      maxLength={4096}
-                      onChange={(e) => {
-                        if (document.mode !== 'embed') return;
-                        const embeds = [...document.embeds];
-                        embeds[index] = {
-                          ...embed,
-                          description: e.target.value,
-                        };
-                        change({ ...document, embeds });
-                      }}
-                    />
-                  </Field>
-                  <Field label="Accent color" htmlFor={`embed-color-${index}`}>
-                    <Input
-                      type="color"
-                      id={`embed-color-${index}`}
-                      value={`#${embed.color.toString(16).padStart(6, '0')}`}
-                      onChange={(e) => {
-                        if (document.mode !== 'embed') return;
-                        const embeds = [...document.embeds];
-                        embeds[index] = {
-                          ...embed,
-                          color: Number.parseInt(e.target.value.slice(1), 16),
-                        };
-                        change({ ...document, embeds });
-                      }}
-                    />
-                  </Field>
-                  <Field label="Footer" htmlFor={`embed-footer-${index}`}>
-                    <Input
-                      id={`embed-footer-${index}`}
-                      value={embed.footer?.text ?? ''}
-                      onChange={(e) => {
-                        if (document.mode !== 'embed') return;
-                        const embeds = [...document.embeds];
-                        embeds[index] = {
-                          ...embed,
-                          footer: { text: e.target.value },
-                        };
-                        change({ ...document, embeds });
-                      }}
-                    />
-                  </Field>
-                  <Field label="Image URL" htmlFor={`embed-image-${index}`}>
-                    <Input
-                      id={`embed-image-${index}`}
-                      value={embed.image ?? ''}
-                      onChange={(e) => {
-                        if (document.mode !== 'embed') return;
-                        const embeds = [...document.embeds];
-                        embeds[index] = { ...embed, image: e.target.value };
-                        change({ ...document, embeds });
-                      }}
-                    />
-                  </Field>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      if (document.mode !== 'embed') return;
-                      const embeds = [...document.embeds];
-                      embeds[index] = {
-                        ...embed,
-                        fields: [
-                          ...(embed.fields ?? []),
-                          {
-                            name: 'Field name',
-                            value: 'Field value',
-                            inline: false,
-                          },
-                        ],
-                      };
-                      change({ ...document, embeds });
-                    }}
-                  >
-                    Add embed field
-                  </Button>
-                  {embed.fields?.map((field, fieldIndex) => (
-                    <div key={fieldIndex} className="form-grid">
-                      <Input
-                        aria-label={`Field ${fieldIndex + 1} name`}
-                        value={field.name}
-                        onChange={(e) => {
-                          if (document.mode !== 'embed') return;
-                          const next = structuredClone(document);
-                          const target =
-                            next.embeds[index]?.fields?.[fieldIndex];
-                          if (target) target.name = e.target.value;
-                          change(next);
-                        }}
-                      />
-                      <Input
-                        aria-label={`Field ${fieldIndex + 1} value`}
-                        value={field.value}
-                        onChange={(e) => {
-                          if (document.mode !== 'embed') return;
-                          const next = structuredClone(document);
-                          const target =
-                            next.embeds[index]?.fields?.[fieldIndex];
-                          if (target) target.value = e.target.value;
-                          change(next);
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+            <EmbedEditor
+              document={document}
+              onChange={change}
+              resources={{
+                channels: channels.data ?? [],
+                roles: roles.data ?? [],
+              }}
+            />
           )}
         </section>
         <section className="studio-canvas">
@@ -960,79 +891,16 @@ export function StudioPage() {
                   />
                 </Field>
               )}
-              {current.type === 'controls' &&
-                current.controls.map((control, index) =>
-                  control.type === 'button' ? (
-                    <div className="stack" key={control.key}>
-                      <Field
-                        label="Button label"
-                        htmlFor={`button-label-${index}`}
-                      >
-                        <Input
-                          id={`button-label-${index}`}
-                          value={control.label}
-                          onChange={(e) => {
-                            const parsed = MessageDocumentSchema.safeParse(
-                              updateBlock(
-                                document,
-                                selected ?? { top: 0 },
-                                ControlRowSchema.parse({
-                                  ...current,
-                                  controls: current.controls.map((item, i) =>
-                                    i === index
-                                      ? { ...item, label: e.target.value }
-                                      : item,
-                                  ),
-                                }),
-                              ),
-                            );
-                            if (parsed.success) change(parsed.data);
-                          }}
-                        />
-                      </Field>
-                      {control.style === 'link' ? (
-                        <Field
-                          label="Destination URL"
-                          htmlFor={`button-url-${index}`}
-                        >
-                          <Input
-                            id={`button-url-${index}`}
-                            value={control.url}
-                            onChange={(e) => {
-                              const controls = current.controls.map(
-                                (item, i) =>
-                                  i === index &&
-                                  item.type === 'button' &&
-                                  item.style === 'link'
-                                    ? { ...item, url: e.target.value }
-                                    : item,
-                              );
-                              editBlock(
-                                ControlRowSchema.parse({
-                                  ...current,
-                                  controls,
-                                }),
-                              );
-                            }}
-                          />
-                        </Field>
-                      ) : (
-                        <div>
-                          <Badge>{control.action.type}</Badge>
-                          <p className="field-hint">
-                            Action configuration is validated with the message
-                            document. Actor permissions are checked again when
-                            used.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p key={control.key} className="muted">
-                      Select menu: {control.options.length} validated options
-                    </p>
-                  ),
-                )}
+              {current.type === 'controls' && (
+                <ControlEditor
+                  row={current}
+                  resources={{
+                    channels: channels.data ?? [],
+                    roles: roles.data ?? [],
+                  }}
+                  onChange={editBlock}
+                />
+              )}
             </Card>
           )}
           <Card>
@@ -1148,6 +1016,63 @@ export function StudioPage() {
                 Publish
               </Button>
             </div>
+            {editingPublication && (
+              <div className="stack">
+                <p className="field-hint">
+                  Editing publication in #
+                  {channels.data?.find(
+                    (channel) => channel.id === editingPublication.channelId,
+                  )?.name ?? editingPublication.channelId}
+                  , revision {editingPublication.revision}. Saving a draft and
+                  updating the live message are separate actions.
+                </p>
+                <Button
+                  variant="secondary"
+                  busy={updateLive.isPending}
+                  disabled={
+                    !!compiled.issues.length ||
+                    document.visibility === 'private'
+                  }
+                  onClick={() =>
+                    replacementRequired
+                      ? setReplacementOpen(true)
+                      : updateLive.mutate(false)
+                  }
+                >
+                  {replacementRequired
+                    ? 'Review replacement'
+                    : 'Update published message'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingPublication(null);
+                    updateLive.reset();
+                  }}
+                >
+                  Stop editing publication
+                </Button>
+                {updateLive.error && (
+                  <ErrorState
+                    message={
+                      updateLive.error instanceof ApiError &&
+                      updateLive.error.code === 'REVISION_CONFLICT'
+                        ? 'This publication changed. Your draft is retained. Refresh the inventory and reopen its latest snapshot before retrying.'
+                        : errorMessage(updateLive.error)
+                    }
+                  />
+                )}
+                {updateLive.data && (
+                  <p role="status">
+                    Publication update saved. Delivery{' '}
+                    {publications.data?.find(
+                      (item) => item.id === updateLive.data?.data.id,
+                    )?.state ?? updateLive.data.data.state}
+                    .
+                  </p>
+                )}
+              </div>
+            )}
             <p className="field-hint">
               {dirty
                 ? 'Save your draft before publishing.'
@@ -1162,7 +1087,11 @@ export function StudioPage() {
             )}
             {delivery.data && (
               <p className="save-feedback" role="status">
-                {delivery.data.data.deliveryStatus === 'delivered'
+                {['applied', 'published'].includes(
+                  publications.data?.find(
+                    (item) => item.id === delivery.data?.data.id,
+                  )?.state ?? delivery.data.data.state,
+                )
                   ? 'Discord delivery confirmed.'
                   : `Delivery ${delivery.data.data.deliveryStatus}. Your design is saved.`}
               </p>
@@ -1171,7 +1100,7 @@ export function StudioPage() {
         </aside>
       </div>
       {importError && <ErrorState message={importError} />}
-      <div className="overview-grid">
+      <div className="overview-grid studio-library">
         <Card>
           <h2>Your template library</h2>
           {templates.isPending ? (
@@ -1221,6 +1150,32 @@ export function StudioPage() {
                 </span>
                 <Badge>{publication.deliveryStatus}</Badge>
                 <Button
+                  variant="secondary"
+                  disabled={
+                    !publication.document ||
+                    ['archived', 'replaced'].includes(publication.state)
+                  }
+                  onClick={() => {
+                    if (!publication.document) return;
+                    if (
+                      dirty &&
+                      !window.confirm(
+                        'Discard your unsaved edits and open the published snapshot?',
+                      )
+                    )
+                      return;
+                    setDocument(structuredClone(publication.document));
+                    setSavedDocument(JSON.stringify(publication.document));
+                    setTemplate(null);
+                    setEditingPublication(publication);
+                    setChannelId(publication.channelId);
+                    setSelected({ top: 0 });
+                    updateLive.reset();
+                  }}
+                >
+                  Edit publication
+                </Button>
+                <Button
                   variant="ghost"
                   disabled={publication.status === 'archived'}
                   busy={archive.isPending}
@@ -1248,6 +1203,82 @@ export function StudioPage() {
           )}
         </Card>
       </div>
+      <Dialog.Root open={replacementOpen} onOpenChange={setReplacementOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="dialog-overlay" />
+          <Dialog.Content className="dialog-content">
+            <Dialog.Title>Replace this published message?</Dialog.Title>
+            <Dialog.Description>
+              The existing controls will stop working. Sparko will post a new
+              message in the same channel and preserve the old publication
+              history.
+            </Dialog.Description>
+            <ul>
+              {publicationLosses.map((loss, index) => (
+                <li key={index}>{loss}</li>
+              ))}
+            </ul>
+            {updateLive.error && (
+              <ErrorState message={errorMessage(updateLive.error)} />
+            )}
+            <div className="row">
+              <Button
+                variant="secondary"
+                onClick={() => setReplacementOpen(false)}
+              >
+                Keep current publication
+              </Button>
+              <Button
+                busy={updateLive.isPending}
+                onClick={() => updateLive.mutate(true)}
+              >
+                Replace published message
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      <Dialog.Root open={mediaOpen} onOpenChange={setMediaOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="dialog-overlay" />
+          <Dialog.Content className="dialog-content">
+            <Dialog.Title>Media library</Dialog.Title>
+            <Dialog.Description>
+              Add your own accessible images to this server’s saved message
+              designs.
+            </Dialog.Description>
+            <GalleryPicker
+              guildId={guildId}
+              onSelect={(asset) => {
+                if (document.mode === 'v2') {
+                  if (current?.type === 'gallery')
+                    editBlock({
+                      ...current,
+                      items: [
+                        ...current.items,
+                        { url: asset.url, alt: asset.alt },
+                      ],
+                    });
+                  else
+                    addBlock({
+                      type: 'gallery',
+                      items: [{ url: asset.url, alt: asset.alt }],
+                    });
+                } else {
+                  const next = structuredClone(document);
+                  if (next.embeds[0]) next.embeds[0].image = asset.url;
+                  else next.embeds.push({ color: 16436245, image: asset.url });
+                  change(next);
+                }
+                setMediaOpen(false);
+              }}
+            />
+            <Button variant="secondary" onClick={() => setMediaOpen(false)}>
+              Close library
+            </Button>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       <Dialog.Root
         open={!!conversion}
         onOpenChange={(open) => !open && setConversion(null)}

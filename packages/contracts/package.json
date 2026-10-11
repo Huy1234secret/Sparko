@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./economy": "./src/economy.ts"
+    "./economy": "./src/economy.ts",
+    "./providers": "./src/providers.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

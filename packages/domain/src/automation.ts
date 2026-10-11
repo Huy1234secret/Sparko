@@ -134,7 +134,11 @@ async function due(
   revision: number,
   at: Date,
 ) {
-  return ctx.effect('automation.due', { kind, id, revision }, at);
+  return ctx.effect(
+    'automation.due',
+    { kind, id, revision, dueAt: at.toISOString() },
+    at,
+  );
 }
 function pollDocument(
   id: string,
@@ -185,6 +189,44 @@ async function send(
     actorId: ctx.actor.userId,
     ...extra,
   });
+}
+async function revokeBirthdayRoles(ctx: DomainContext, birthdayId: string) {
+  const instances = await ctx.tx.record.findMany({
+    where: {
+      guildId: ctx.guildId,
+      kind: 'birthday_role',
+      ownerId: ctx.actor.userId,
+      state: { in: ['pending', 'active', 'applied'] },
+      data: { path: ['birthdayId'], equals: birthdayId },
+    },
+  });
+  for (const instance of instances) {
+    const data = jsonObject(instance.data),
+      pending = instance.state === 'pending';
+    const changed = await updateRecord(
+      ctx,
+      'birthday_role',
+      instance.id,
+      {
+        ...data,
+        revokedAt: ctx.now.toISOString(),
+      },
+      instance.revision,
+      pending ? 'cancelled' : 'expiring',
+    );
+    if (!pending)
+      await ctx.effect('automation.role', {
+        recordId: changed.id,
+        expectedRevision: changed.revision,
+        userId: changed.ownerId,
+        roleId: data['roleId'],
+        action: 'remove',
+        featureId: 'R38',
+        instanceId: changed.id,
+        onlyIfInstanceActive: true,
+        actorId: ctx.actor.userId,
+      });
+  }
 }
 export const automationRoutes: DomainRoute[] = [
   route('GET', '/polls', 'member', undefined, async (ctx) => {
@@ -366,6 +408,7 @@ export const automationRoutes: DomainRoute[] = [
           'R37',
           { type: 'channel', channelId: v.channelId },
           `${v.title}\n${v.description}\nStarts <t:${Math.floor(Date.parse(v.startsAt) / 1000)}:F> (${v.timezone}). RSVP in the Sparko member portal.`,
+          { expectedRevision: event.revision },
         );
       return event;
     },
@@ -647,6 +690,13 @@ export const automationRoutes: DomainRoute[] = [
           },
         },
       });
+    if (
+      old &&
+      Object.entries(v).some(
+        ([key, value]) => jsonObject(old.data)[key] !== value,
+      )
+    )
+      await revokeBirthdayRoles(ctx, old.id);
     const data = { ...v, nextAt: next.toISOString() },
       record = old
         ? await updateRecord(
@@ -671,7 +721,10 @@ export const automationRoutes: DomainRoute[] = [
         },
       },
     });
-    if (old) await ctx.tx.record.delete({ where: { id: old.id } });
+    if (old) {
+      await revokeBirthdayRoles(ctx, old.id);
+      await ctx.tx.record.delete({ where: { id: old.id } });
+    }
     return { deleted: !!old };
   }),
   route('GET', '/voice-rooms', 'member', undefined, (ctx) =>
@@ -1194,6 +1247,7 @@ const DueInput = z.object({
   ]),
   id: z.string().uuid(),
   revision: z.number().int().min(1),
+  dueAt: z.iso.datetime().optional(),
 });
 const dueFeature: Record<string, string> = {
   poll: 'R33',
@@ -1242,6 +1296,9 @@ export async function processAutomationDue(
       'closed',
       'completed',
       'failed',
+      'expired',
+      'expiring',
+      'reversed',
     ].includes(record.state)
   )
     return {
@@ -1249,9 +1306,52 @@ export async function processAutomationDue(
       reason: 'Cancelled, removed, completed, or superseded',
     };
   const feature = dueFeature[input.kind]!,
-    configuration = await cfg(ctx, feature),
+    configuration =
+      input.kind === 'birthday-role-expire'
+        ? jsonObject(
+            (
+              await ctx.tx.featureConfig.findUnique({
+                where: {
+                  guildId_featureId: {
+                    guildId: ctx.guildId,
+                    featureId: feature,
+                  },
+                },
+              })
+            )?.config,
+          )
+        : await cfg(ctx, feature),
     data = jsonObject(record.data),
     runKey = `${input.kind}:${record.id}:${record.revision}`;
+  const scheduledAt =
+    input.dueAt ??
+    (input.kind === 'poll'
+      ? data['endsAt']
+      : input.kind === 'event-start'
+        ? data['startsAt']
+        : input.kind === 'event-end'
+          ? data['endsAt']
+          : input.kind === 'event-reminder'
+            ? new Date(
+                Date.parse(String(data['startsAt'])) -
+                  Number(data['remindBeforeMinutes'] ?? 30) * 60000,
+              ).toISOString()
+            : input.kind === 'birthday-role-expire'
+              ? data['expiresAt']
+              : input.kind === 'workflow'
+                ? data['waitingUntil']
+                : input.kind === 'sticky'
+                  ? data['nextRepostAt']
+                  : data['nextAt']);
+  if (
+    typeof scheduledAt === 'string' &&
+    Date.parse(scheduledAt) > ctx.now.getTime()
+  )
+    throw new DomainError(
+      'SERVICE_UNAVAILABLE',
+      'This timer is not due yet. Retry at its scheduled time.',
+      503,
+    );
   const previous = await ctx.tx.record.findUnique({
     where: {
       guildId_kind_key: {
@@ -1331,7 +1431,12 @@ export async function processAutomationDue(
           feature,
           { type: 'dm' },
           `${event.title} starts <t:${Math.floor(Date.parse(event.startsAt) / 1000)}:R> (${event.timezone}).`,
-          { userId: rsvp.ownerId, runId: run.id },
+          {
+            userId: rsvp.ownerId,
+            runId: run.id,
+            expectedRevision: record.revision,
+            notAfter: event.startsAt,
+          },
         );
     }
   } else if (input.kind === 'reminder' || input.kind === 'schedule') {
@@ -1405,7 +1510,11 @@ export async function processAutomationDue(
           channelId: Snowflake.parse(configuration['channelId']),
         },
         `Happy birthday to <@${record.ownerId}>!`,
-        { userId: record.ownerId, runId: run.id },
+        {
+          userId: record.ownerId,
+          runId: run.id,
+          expectedRevision: updated.revision,
+        },
       );
     else
       await send(
@@ -1414,7 +1523,11 @@ export async function processAutomationDue(
         feature,
         { type: 'dm' },
         'Happy birthday! Your birthday is private unless you choose public sharing.',
-        { userId: record.ownerId, runId: run.id },
+        {
+          userId: record.ownerId,
+          runId: run.id,
+          expectedRevision: updated.revision,
+        },
       );
     if (birthday.visibility === 'public' && configuration['roleId']) {
       const instance = await createRecord(
@@ -1422,6 +1535,7 @@ export async function processAutomationDue(
         'birthday_role',
         {
           birthdayId: record.id,
+          birthdayRevision: updated.revision,
           userId: record.ownerId,
           roleId: configuration['roleId'],
           expiresAt: new Date(
@@ -1852,8 +1966,6 @@ export async function guardAutomationEffect(
   payload: unknown,
 ) {
   const p = jsonObject(payload);
-  if (typeof p['featureId'] === 'string')
-    await ctx.requireFeature(p['featureId']);
   if (typeof p['recordId'] !== 'string')
     throw new DomainError(
       'INVALID_INPUT',
@@ -1863,6 +1975,11 @@ export async function guardAutomationEffect(
     where: { guildId: ctx.guildId, id: p['recordId'] },
   });
   if (!record) return { deliver: false, reason: 'Source was removed' };
+  const cleanup =
+    p['action'] === 'remove' &&
+    ['birthday_role', 'invite_reward'].includes(record.kind);
+  if (typeof p['featureId'] === 'string' && !cleanup)
+    await ctx.requireFeature(p['featureId']);
   if (
     ['cancelled', 'disabled', 'failed', 'deleted'].includes(record.state) &&
     p['allowCancelled'] !== true
@@ -1873,6 +1990,11 @@ export async function guardAutomationEffect(
     record.revision !== p['expectedRevision']
   )
     return { deliver: false, reason: 'Superseded revision' };
+  if (
+    typeof p['notAfter'] === 'string' &&
+    Date.parse(p['notAfter']) <= ctx.now.getTime()
+  )
+    return { deliver: false, reason: 'Notification deadline passed' };
   if (
     p['allowCancelled'] === true &&
     (record.kind !== 'event' || record.state !== 'cancelled')
@@ -1898,6 +2020,65 @@ export async function guardAutomationEffect(
       ctx.now.getTime()
   )
     return { deliver: false, reason: 'Role assignment already expired' };
+  if (record.kind === 'birthday_role' && p['action'] === 'add') {
+    const data = jsonObject(record.data),
+      birthday = await ctx.tx.record.findFirst({
+        where: {
+          id: String(data['birthdayId']),
+          guildId: ctx.guildId,
+          kind: 'birthday',
+          state: 'active',
+        },
+      });
+    if (
+      !birthday ||
+      birthday.revision !== data['birthdayRevision'] ||
+      jsonObject(birthday.data)['visibility'] !== 'public'
+    )
+      return {
+        deliver: false,
+        reason: 'Birthday sharing was removed or changed',
+      };
+  }
+  if (
+    record.kind === 'birthday_role' &&
+    p['action'] === 'remove' &&
+    record.state !== 'expiring'
+  )
+    return {
+      deliver: false,
+      reason: 'Birthday role expiry was cancelled or already applied',
+    };
+  if (record.kind === 'invite_reward') {
+    const data = jsonObject(record.data);
+    if (
+      p['action'] === 'add' &&
+      !['pending', 'active', 'applied'].includes(record.state)
+    )
+      return { deliver: false, reason: 'Invite reward was reversed' };
+    if (p['action'] === 'remove') {
+      if (record.state !== 'reversed')
+        return {
+          deliver: false,
+          reason: 'Invite reward reversal was superseded',
+        };
+      const others = await ctx.tx.record.count({
+        where: {
+          guildId: ctx.guildId,
+          kind: 'invite_reward',
+          id: { not: record.id },
+          ownerId: record.ownerId,
+          state: { in: ['active', 'pending', 'applied'] },
+          data: { path: ['roleId'], equals: data['roleId'] as string },
+        },
+      });
+      if (others)
+        return {
+          deliver: false,
+          reason: 'Another earned invite reward still owns this role',
+        };
+    }
+  }
   if (
     record.kind === 'voice_room' &&
     typeof p['channelId'] === 'string' &&
@@ -1996,6 +2177,17 @@ export function attributeInvite(
     return {
       status: 'ambiguous' as const,
       reason: 'An invite disappeared between observations',
+    };
+  if (
+    input.after.some(
+      (current) =>
+        current.uses > 0 &&
+        !input.before.some((previous) => previous.code === current.code),
+    )
+  )
+    return {
+      status: 'ambiguous' as const,
+      reason: 'A newly observed invite already has uses',
     };
   const changed = input.after.filter((current) => {
     const previous = input.before.find((i) => i.code === current.code);
@@ -2314,7 +2506,7 @@ export async function ingestAutomationEvent(
     where: {
       guildId: ctx.guildId,
       kind: 'invite_reward',
-      state: { in: ['active', 'pending'] },
+      state: { in: ['active', 'pending', 'applied'] },
       data: { path: ['memberId'], equals: e.userId },
     },
     take: 100,
@@ -2339,7 +2531,7 @@ export async function ingestAutomationEvent(
           kind: 'invite_reward',
           id: { not: reward.id },
           ownerId: reward.ownerId,
-          state: { in: ['active', 'pending'] },
+          state: { in: ['active', 'pending', 'applied'] },
           data: { path: ['roleId'], equals: String(data['roleId']) },
         },
       });

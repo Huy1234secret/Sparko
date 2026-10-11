@@ -4,6 +4,7 @@ import {
   evaluateSafetyRule,
   safetyRoutes,
   createModerationCase,
+  ingestSafetyEvent,
   FormSchema,
 } from './safety.js';
 import {
@@ -190,6 +191,103 @@ function fixture() {
 }
 
 describe('deterministic safety filters and validation', () => {
+  it('preserves newer burst observations when an older message arrives late', async () => {
+    const f = fixture();
+    f.configurations['R27'] = {
+      enabled: true,
+      mode: 'observe',
+      rules: [
+        {
+          id: 'burst',
+          name: 'Burst',
+          kind: 'burst',
+          threshold: 3,
+          windowSeconds: 60,
+          cooldownSeconds: 1,
+        },
+      ],
+    };
+    f.ctx.now = new Date('2026-10-11T00:00:30Z');
+    const event = {
+      type: 'message',
+      id: '100000000000000010',
+      userId: other,
+      channelId: guild,
+      roleIds: [],
+      bot: false,
+      webhook: false,
+      content: 'One',
+      mentionCount: 0,
+      attachmentCount: 0,
+      at: '2026-10-11T00:00:20Z',
+    };
+    await ingestSafetyEvent(f.ctx, event);
+    await ingestSafetyEvent(f.ctx, {
+      ...event,
+      id: '100000000000000011',
+      at: '2026-10-11T00:00:10Z',
+    });
+    await ingestSafetyEvent(f.ctx, {
+      ...event,
+      id: '100000000000000012',
+      at: '2026-10-11T00:00:30Z',
+    });
+    expect(
+      f.records.find((r) => r.kind === 'safety_window')?.data,
+    ).toMatchObject({
+      events: expect.arrayContaining([
+        expect.objectContaining({ id: '100000000000000010' }),
+        expect.objectContaining({ id: '100000000000000011' }),
+        expect.objectContaining({ id: '100000000000000012' }),
+      ]),
+    });
+    expect(f.records.filter((r) => r.kind === 'safety_incident')).toHaveLength(
+      1,
+    );
+  });
+  it('excludes trusted joins from the raid count and never restores tenure from a delayed prior join', async () => {
+    const f = fixture();
+    f.configurations['R28'] = {
+      enabled: true,
+      joinThreshold: 2,
+      trustedRoleIds: [role],
+    };
+    const join = {
+      type: 'join',
+      id: 'trusted-join',
+      userId: other,
+      roleIds: [role],
+      bot: false,
+      joinedAt: f.ctx.now.toISOString(),
+      accountCreatedAt: '2025-01-01T00:00:00Z',
+    };
+    expect(await ingestSafetyEvent(f.ctx, join)).toMatchObject({
+      trusted: true,
+    });
+    expect(
+      await ingestSafetyEvent(f.ctx, {
+        ...join,
+        id: 'normal-join',
+        userId: user,
+        roleIds: [],
+      }),
+    ).toMatchObject({ count: 1 });
+    f.ctx.now = new Date('2026-10-11T00:01:00Z');
+    await ingestSafetyEvent(f.ctx, {
+      ...join,
+      id: 'new-membership',
+      joinedAt: f.ctx.now.toISOString(),
+    });
+    await ingestSafetyEvent(f.ctx, { ...join, id: 'delayed-old-join' });
+    expect(
+      f.records.find(
+        (r) => r.kind === 'member_observation' && r.ownerId === other,
+      )?.data,
+    ).toMatchObject({ joinedAt: f.ctx.now.toISOString() });
+    expect(f.records.filter((r) => r.kind === 'safety_incident')).toHaveLength(
+      0,
+    );
+  });
   it('tests multilingual literal matches without executing actions or interpreting regex', () => {
     const rule = SafetyRuleSchema.parse({
       id: 'keyword',
@@ -442,9 +540,125 @@ describe('time and authentic invite observations', () => {
       }).status,
     ).toBe('ambiguous');
   });
+  it('keeps a newly observed used invite ambiguous alongside a stable invite increase', () => {
+    expect(
+      attributeInvite({
+        ...invite,
+        after: [...invite.after, { code: 'new', uses: 1, inviterId: role }],
+      }).status,
+    ).toBe('ambiguous');
+    expect(
+      attributeInvite({
+        ...invite,
+        after: [...invite.after, { code: 'unused', uses: 0, inviterId: role }],
+      }).status,
+    ).toBe('confirmed');
+  });
 });
 
 describe('persisted automation and cancellation', () => {
+  it('does not consume an occurrence when a reminder timer arrives before its due time', async () => {
+    const f = fixture();
+    f.configurations['R66'] = { enabled: true };
+    const reminder = (await f.call(automationRoutes, 'POST', '/reminders', {
+      text: 'Future reminder',
+      destination: { type: 'dm' },
+      timezone: 'UTC',
+      dueAt: '2026-10-12T00:00:00Z',
+    })) as Entry;
+    await expect(
+      processAutomationDue(f.ctx, 'automation.due', {
+        kind: 'reminder',
+        id: reminder.id,
+        revision: reminder.revision,
+      }),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    expect(f.records.filter((r) => r.kind === 'automation_run')).toHaveLength(
+      0,
+    );
+    expect(f.records.find((r) => r.id === reminder.id)?.state).toBe('active');
+    expect(f.effects.filter((e) => e.type === 'automation.send')).toHaveLength(
+      0,
+    );
+  });
+  it('revokes an already queued public birthday announcement and role when sharing becomes private', async () => {
+    const f = fixture();
+    f.configurations['R38'] = {
+      enabled: true,
+      channelId: guild,
+      roleId: role,
+      hour: 9,
+    };
+    const birthday = (await f.call(automationRoutes, 'PUT', '/birthday', {
+      month: 10,
+      day: 11,
+      timezone: 'UTC',
+      visibility: 'public',
+    })) as Entry;
+    f.ctx.now = new Date('2026-10-11T09:00:00Z');
+    await processAutomationDue(f.ctx, 'automation.due', {
+      kind: 'birthday',
+      id: birthday.id,
+      revision: birthday.revision,
+    });
+    const queued = f.effects.filter((e) =>
+      ['automation.send', 'automation.role'].includes(e.type),
+    );
+    expect(queued).toHaveLength(2);
+    await f.call(automationRoutes, 'PUT', '/birthday', {
+      month: 10,
+      day: 11,
+      timezone: 'UTC',
+      visibility: 'private',
+    });
+    for (const effect of queued) {
+      expect(await guardAutomationEffect(f.ctx, effect.payload)).toMatchObject({
+        deliver: false,
+      });
+    }
+  });
+  it('blocks a queued invite grant after reversal and keeps a removal from revoking another earned reward', async () => {
+    const f = fixture();
+    f.configurations['R41'] = { enabled: true };
+    const reversed = await f.ctx.tx.record.create({
+      data: {
+        guildId: guild,
+        kind: 'invite_reward',
+        key: 'earned-one',
+        ownerId: user,
+        state: 'reversed',
+        data: { inviterId: user, roleId: role },
+      },
+    });
+    expect(
+      await guardAutomationEffect(f.ctx, {
+        recordId: reversed.id,
+        featureId: 'R41',
+        userId: user,
+        roleId: role,
+        action: 'add',
+      }),
+    ).toMatchObject({ deliver: false });
+    await f.ctx.tx.record.create({
+      data: {
+        guildId: guild,
+        kind: 'invite_reward',
+        key: 'earned-two',
+        ownerId: user,
+        state: 'active',
+        data: { inviterId: user, roleId: role },
+      },
+    });
+    expect(
+      await guardAutomationEffect(f.ctx, {
+        recordId: reversed.id,
+        featureId: 'R41',
+        userId: user,
+        roleId: role,
+        action: 'remove',
+      }),
+    ).toMatchObject({ deliver: false });
+  });
   it('rejects role-ineligible poll votes and out-of-range ballots', async () => {
     const f = fixture();
     f.configurations['R33'] = { enabled: true };

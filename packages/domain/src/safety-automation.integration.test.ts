@@ -20,6 +20,7 @@ import {
   processAutomationDue,
   completeAutomationEffect,
   nextRecurringInstant,
+  ingestAutomationEvent,
 } from './automation.js';
 const db = createDatabase(testDatabaseUrl()),
   platform = new Platform(db);
@@ -127,6 +128,252 @@ afterAll(async () => {
 });
 
 describe('real PostgreSQL safety/time transactions and authority', () => {
+  it('rolls back an early timer without consuming the later reminder occurrence', async () => {
+    const dueAt = future();
+    const reminder = (
+      await call(
+        actor(),
+        'POST',
+        '/reminders',
+        {
+          text: 'A future DM',
+          destination: { type: 'dm' },
+          timezone: 'UTC',
+          dueAt,
+        },
+        'future-reminder',
+      )
+    ).data as { id: string; revision: number };
+    await expect(
+      mutate(admin(), 'early-future-reminder', (ctx) =>
+        processAutomationDue(ctx, 'automation.due', {
+          kind: 'reminder',
+          id: reminder.id,
+          revision: reminder.revision,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    expect(
+      await db.record.count({ where: { guildId, kind: 'automation_run' } }),
+    ).toBe(0);
+    expect(
+      await db.operation.count({
+        where: { guildId, key: 'early-future-reminder' },
+      }),
+    ).toBe(0);
+    await mutate(admin(), 'due-future-reminder', (ctx) => {
+      ctx.now = new Date(Date.parse(dueAt) + 1000);
+      return processAutomationDue(ctx, 'automation.due', {
+        kind: 'reminder',
+        id: reminder.id,
+        revision: reminder.revision,
+      });
+    });
+    expect(
+      await db.outbox.count({ where: { guildId, type: 'automation.send' } }),
+    ).toBe(1);
+    expect(
+      (await db.record.findUniqueOrThrow({ where: { id: reminder.id } })).state,
+    ).toBe('completed');
+  });
+  it('stops queued public birthday effects and revokes an applied owned role when sharing becomes private', async () => {
+    await db.featureConfig.update({
+      where: { guildId_featureId: { guildId, featureId: 'R38' } },
+      data: { config: { enabled: true, channelId, roleId, hour: 9 } },
+    });
+    const birthday = (
+      await call(
+        actor(),
+        'PUT',
+        '/birthday',
+        {
+          month: 10,
+          day: 12,
+          timezone: 'UTC',
+          visibility: 'public',
+        },
+        'public-birthday',
+      )
+    ).data as { id: string; revision: number; data: { nextAt: string } };
+    await mutate(admin(), 'birthday-due', (ctx) => {
+      ctx.now = new Date(birthday.data.nextAt);
+      return processAutomationDue(ctx, 'automation.due', {
+        kind: 'birthday',
+        id: birthday.id,
+        revision: birthday.revision,
+      });
+    });
+    const queued = await db.outbox.findMany({
+      where: { guildId, type: { in: ['automation.send', 'automation.role'] } },
+    });
+    expect(queued).toHaveLength(2);
+    const instance = await db.record.findFirstOrThrow({
+      where: { guildId, kind: 'birthday_role' },
+    });
+    await db.record.update({
+      where: { id: instance.id },
+      data: {
+        state: 'applied',
+        data: json({ ...jsonObject(instance.data), roleAddedBySparko: true }),
+      },
+    });
+    await call(
+      actor(),
+      'PUT',
+      '/birthday',
+      { month: 10, day: 12, timezone: 'UTC', visibility: 'private' },
+      'private-birthday',
+    );
+    for (const work of queued)
+      expect(
+        await platform.read(admin(), (ctx) =>
+          guardAutomationEffect(ctx, work.payload),
+        ),
+      ).toMatchObject({ deliver: false });
+    const removal = await db.outbox.findFirstOrThrow({
+      where: {
+        guildId,
+        type: 'automation.role',
+        payload: { path: ['action'], equals: 'remove' },
+      },
+    });
+    expect(
+      await platform.read(admin(), (ctx) =>
+        guardAutomationEffect(ctx, removal.payload),
+      ),
+    ).toMatchObject({ deliver: true });
+    await db.featureConfig.update({
+      where: { guildId_featureId: { guildId, featureId: 'R38' } },
+      data: { config: { enabled: false } },
+    });
+    expect(
+      await platform.read(admin(), (ctx) =>
+        guardAutomationEffect(ctx, removal.payload),
+      ),
+    ).toMatchObject({ deliver: true });
+  });
+  it('fences already queued event reminders after a manager changes the start time', async () => {
+    const event = (
+      await call(
+        admin(),
+        'POST',
+        '/events',
+        {
+          title: 'Original time',
+          startsAt: future(1),
+          endsAt: future(2),
+          timezone: 'UTC',
+          capacity: 2,
+          remindBeforeMinutes: 60,
+        },
+        'event-original-time',
+      )
+    ).data as { id: string; revision: number };
+    await call(
+      actor(otherId),
+      'POST',
+      '/events/:id/rsvp',
+      { choice: 'attending' },
+      'event-attendee',
+      { id: event.id },
+    );
+    await mutate(admin(), 'event-reminder-original', (ctx) => {
+      ctx.now = new Date(Date.now() + 2000);
+      return processAutomationDue(ctx, 'automation.due', {
+        kind: 'event-reminder',
+        id: event.id,
+        revision: event.revision,
+      });
+    });
+    const notice = await db.outbox.findFirstOrThrow({
+      where: { guildId, type: 'automation.send' },
+    });
+    await call(
+      admin(),
+      'PUT',
+      '/events/:id',
+      {
+        expectedRevision: event.revision,
+        event: {
+          title: 'Changed time',
+          startsAt: future(3),
+          endsAt: future(4),
+          timezone: 'UTC',
+          capacity: 2,
+          remindBeforeMinutes: 60,
+        },
+      },
+      'event-new-time',
+      { id: event.id },
+    );
+    expect(
+      await platform.read(admin(), (ctx) =>
+        guardAutomationEffect(ctx, notice.payload),
+      ),
+    ).toMatchObject({ deliver: false });
+  });
+  it('reverses applied invite rewards and protects another earned instance from an obsolete queued removal', async () => {
+    await db.featureConfig.create({
+      data: {
+        guildId,
+        featureId: 'R41',
+        config: { enabled: true, reverseOnLeave: true },
+      },
+    });
+    const reward = await db.record.create({
+      data: {
+        guildId,
+        kind: 'invite_reward',
+        key: 'earned-applied',
+        ownerId: otherId,
+        state: 'applied',
+        data: {
+          memberId: userId,
+          inviterId: otherId,
+          roleId,
+          roleAddedBySparko: true,
+        },
+      },
+    });
+    await mutate(admin(), 'reward-member-left', (ctx) =>
+      ingestAutomationEvent(ctx, { type: 'leave', id: 'earned-left', userId }),
+    );
+    expect(
+      (await db.record.findUniqueOrThrow({ where: { id: reward.id } })).state,
+    ).toBe('reversed');
+    const removal = await db.outbox.findFirstOrThrow({
+      where: { guildId, type: 'automation.role' },
+    });
+    expect(
+      await platform.read(admin(), (ctx) =>
+        guardAutomationEffect(ctx, removal.payload),
+      ),
+    ).toMatchObject({ deliver: true });
+    await db.record.create({
+      data: {
+        guildId,
+        kind: 'invite_reward',
+        key: 'another-earned',
+        ownerId: otherId,
+        state: 'applied',
+        data: { inviterId: otherId, roleId },
+      },
+    });
+    expect(
+      await platform.read(admin(), (ctx) =>
+        guardAutomationEffect(ctx, removal.payload),
+      ),
+    ).toMatchObject({ deliver: false });
+    expect(
+      await platform.read(admin(), (ctx) =>
+        guardAutomationEffect(ctx, {
+          recordId: reward.id,
+          featureId: 'R41',
+          action: 'add',
+        }),
+      ),
+    ).toMatchObject({ deliver: false });
+  });
   it('serializes the final RSVP place and promotes exactly one waitlisted member after a departure', async () => {
     const created = await call(
       admin(),

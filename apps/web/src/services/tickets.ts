@@ -35,6 +35,34 @@ export const TicketSchema = z
     subject: `Support ticket #${ticket.number}`,
   }));
 export type Ticket = z.infer<typeof TicketSchema>;
+const TranscriptSummarySchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  checksum: z.string().nullable(),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+});
+export const getTicketTranscripts = (
+  guild: string,
+  id: string,
+  signal?: AbortSignal,
+) =>
+  read(
+    `/guilds/${guild}/tickets/${id}/transcripts`,
+    z.array(TranscriptSummarySchema),
+    signal,
+  );
+export const getTicketTranscript = (
+  guild: string,
+  id: string,
+  assetId: string,
+) =>
+  read(
+    `/guilds/${guild}/tickets/${id}/transcripts/${assetId}`,
+    TranscriptSummarySchema.extend({
+      messages: z.record(z.string(), z.unknown()),
+    }),
+  );
 export const getTickets = (guild: string, signal?: AbortSignal) =>
   read(`/guilds/${guild}/tickets`, z.array(TicketSchema), signal);
 export const getTicket = (guild: string, id: string, signal?: AbortSignal) =>

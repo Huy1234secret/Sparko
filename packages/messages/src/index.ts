@@ -158,7 +158,11 @@ export const ACTION_REGISTRY = Object.freeze({
     effect: 'persisted-role-desired-state',
     retry: 'persist-before-delivery',
   },
-  'role.menu': { capability: 'roles.self', effect: 'validated-role-selection', retry: 'desired-state' },
+  'role.menu': {
+    capability: 'roles.self',
+    effect: 'validated-role-selection',
+    retry: 'desired-state',
+  },
   'ticket.create': {
     capability: 'tickets.create',
     effect: 'private-ticket',

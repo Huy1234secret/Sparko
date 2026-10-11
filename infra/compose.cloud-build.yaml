@@ -1,0 +1,15 @@
+# Optional managed-cloud build overlay; never commits or embeds the session CA.
+services:
+  migrate:
+    build: { secrets: [proxy_ca] }
+  api:
+    build: { secrets: [proxy_ca] }
+  bot:
+    build: { secrets: [proxy_ca] }
+  worker:
+    build: { secrets: [proxy_ca] }
+  web:
+    build: { secrets: [proxy_ca] }
+secrets:
+  proxy_ca:
+    file: ${CODEX_PROXY_CERT:?Set the managed session CA path}

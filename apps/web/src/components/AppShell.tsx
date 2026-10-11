@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   Link,
   NavLink,
@@ -275,6 +275,7 @@ export function DashboardShell() {
   });
   const guild = guilds.data?.find((g) => g.id === guildId);
   const ui = useUi();
+  const mobileNavigationTrigger = useRef<HTMLButtonElement>(null);
   const query = useQueryClient();
   const exit = useMutation({
     mutationFn: () => logout(),
@@ -382,7 +383,13 @@ export function DashboardShell() {
       <Dialog.Root open={ui.sidebarOpen} onOpenChange={ui.setSidebarOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content className="sidebar mobile-sidebar">
+          <Dialog.Content
+            className="sidebar mobile-sidebar"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              mobileNavigationTrigger.current?.focus();
+            }}
+          >
             <Dialog.Title className="sr-only">
               Workspace navigation
             </Dialog.Title>
@@ -400,6 +407,7 @@ export function DashboardShell() {
         <header className="workspace-header">
           <div className="row">
             <button
+              ref={mobileNavigationTrigger}
               className="icon-button mobile-only"
               aria-label="Open navigation"
               onClick={() => ui.setSidebarOpen(true)}
