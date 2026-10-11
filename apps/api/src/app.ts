@@ -99,7 +99,10 @@ export async function createApp(options: {
   });
   await app.register(cookie);
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+  await app.register(rateLimit, {
+    max: config.API_RATE_LIMIT_PER_MINUTE,
+    timeWindow: '1 minute',
+  });
   await app.register(websocket, { options: { maxPayload: 8192 } });
   await app.register(swagger, {
     openapi: { info: { title: 'Sparko API', version: '1.0.0' } },

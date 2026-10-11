@@ -49,7 +49,10 @@ import {
 } from './discord.js';
 import { publicationFiles } from './attachments.js';
 import { DeliveryUncertainError } from './failure.js';
-import { archivedMessageComponents, publicationMatches } from './reconciliation.js';
+import {
+  archivedMessageComponents,
+  publicationMatches,
+} from './reconciliation.js';
 
 export type OutboxWork = {
   id: string;
@@ -432,17 +435,47 @@ export class EffectExecutor {
           publication.channelId,
           sendPermissions,
         );
-        const issuedIds = new Set(publication.controls.map((control) => control.id));
-        const message = await this.publicationMessage(work, publication, issuedIds, true);
+        const issuedIds = new Set(
+          publication.controls.map((control) => control.id),
+        );
+        const message = await this.publicationMessage(
+          work,
+          publication,
+          issuedIds,
+          true,
+        );
         if (!message) return;
-        if (message.author.id !== this.discord.botUserId || message.channel_id !== publication.channelId) throw new DomainError('FORBIDDEN', 'The tracked message is not owned by Sparko in this channel.', 403);
+        if (
+          message.author.id !== this.discord.botUserId ||
+          message.channel_id !== publication.channelId
+        )
+          throw new DomainError(
+            'FORBIDDEN',
+            'The tracked message is not owned by Sparko in this channel.',
+            403,
+          );
         await this.assertCurrent();
-        await this.db.publication.updateMany({ where: { id: publication.id, guildId: work.guildId, messageId: null }, data: { messageId: message.id } });
+        await this.db.publication.updateMany({
+          where: { id: publication.id, guildId: work.guildId, messageId: null },
+          data: { messageId: message.id },
+        });
         await this.discord.edit(publication.channelId, message.id, {
-          components: archivedMessageComponents(message, issuedIds, (message.flags ?? 0) & 32768 ? true : jsonObject(publication.document)['mode'] === 'v2'),
+          components: archivedMessageComponents(
+            message,
+            issuedIds,
+            (message.flags ?? 0) & 32768
+              ? true
+              : jsonObject(publication.document)['mode'] === 'v2',
+          ),
         });
       } catch (error) {
-        if (!(error instanceof DiscordAPIError && [10003, 10008].includes(Number(error.code)))) throw error;
+        if (
+          !(
+            error instanceof DiscordAPIError &&
+            [10003, 10008].includes(Number(error.code))
+          )
+        )
+          throw error;
       }
       return;
     }
@@ -542,7 +575,9 @@ export class EffectExecutor {
         await this.discord.edit(
           publication.channelId,
           messageId,
-          document.mode === 'embed' ? { ...payload, content: compiled.content ?? '' } : payload,
+          document.mode === 'embed'
+            ? { ...payload, content: compiled.content ?? '' }
+            : payload,
           files,
         );
     } else
@@ -594,20 +629,62 @@ export class EffectExecutor {
     issuedIds: ReadonlySet<string>,
     allowUnsent = false,
   ): Promise<DiscordMessage | null> {
-    if (publication.messageId) return this.discord.message(publication.channelId, publication.messageId);
-    const sources = await this.db.outbox.findMany({ where: { guildId: work.guildId, type: 'publication.send', payload: { path: ['publicationId'], equals: publication.id } }, select: { id: true, state: true } });
-    const attempts = await this.db.record.findMany({ where: { guildId: work.guildId, kind: 'delivery.attempt', key: { in: sources.map((source) => `${source.id}:send`) } } });
-    const knownIds = [...new Set(attempts.filter((attempt) => attempt.state === 'applied').map((attempt) => jsonObject(attempt.data)['messageId']).filter((id): id is string => typeof id === 'string'))];
-    if (knownIds.length > 1) throw new DeliveryUncertainError('Multiple original message identities require manual review before archive.');
-    if (knownIds[0]) return this.discord.message(publication.channelId, knownIds[0]);
-    const allRejected = sources.length > 0 && attempts.length === sources.length && attempts.every((attempt) => attempt.state === 'rejected');
-    const neverAttempted = sources.length > 0 && !attempts.length && sources.every((source) => ['pending', 'retry', 'blocked', 'dead'].includes(source.state));
+    if (publication.messageId)
+      return this.discord.message(publication.channelId, publication.messageId);
+    const sources = await this.db.outbox.findMany({
+      where: {
+        guildId: work.guildId,
+        type: 'publication.send',
+        payload: { path: ['publicationId'], equals: publication.id },
+      },
+      select: { id: true, state: true },
+    });
+    const attempts = await this.db.record.findMany({
+      where: {
+        guildId: work.guildId,
+        kind: 'delivery.attempt',
+        key: { in: sources.map((source) => `${source.id}:send`) },
+      },
+    });
+    const knownIds = [
+      ...new Set(
+        attempts
+          .filter((attempt) => attempt.state === 'applied')
+          .map((attempt) => jsonObject(attempt.data)['messageId'])
+          .filter((id): id is string => typeof id === 'string'),
+      ),
+    ];
+    if (knownIds.length > 1)
+      throw new DeliveryUncertainError(
+        'Multiple original message identities require manual review before archive.',
+      );
+    if (knownIds[0])
+      return this.discord.message(publication.channelId, knownIds[0]);
+    const allRejected =
+      sources.length > 0 &&
+      attempts.length === sources.length &&
+      attempts.every((attempt) => attempt.state === 'rejected');
+    const neverAttempted =
+      sources.length > 0 &&
+      !attempts.length &&
+      sources.every((source) =>
+        ['pending', 'retry', 'blocked', 'dead'].includes(source.state),
+      );
     if (allowUnsent && (allRejected || neverAttempted)) return null;
     const nonces = new Set(sources.map((source) => nonce(source.id)));
     const ids = [...issuedIds];
     const messages = await this.discord.messages(publication.channelId);
-    const matches = messages.filter((message) => message.author.id === this.discord.botUserId && (nonces.has(String(message.nonce)) || (ids.length > 0 && ids.every((id) => controlIds(message.components).includes(id)))));
-    if (matches.length !== 1 || !matches[0]) throw new DeliveryUncertainError('The original message could not be identified uniquely. Review Discord before retrying archive or republishing. No replacement was sent.');
+    const matches = messages.filter(
+      (message) =>
+        message.author.id === this.discord.botUserId &&
+        (nonces.has(String(message.nonce)) ||
+          (ids.length > 0 &&
+            ids.every((id) => controlIds(message.components).includes(id)))),
+    );
+    if (matches.length !== 1 || !matches[0])
+      throw new DeliveryUncertainError(
+        'The original message could not be identified uniquely. Review Discord before retrying archive or republishing. No replacement was sent.',
+      );
     return matches[0];
   }
 

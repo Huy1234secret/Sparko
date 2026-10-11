@@ -23,6 +23,7 @@ export function testConfig(database: string): Config {
     OWNER_USER_IDS: ADMIN,
     TRUST_PROXY: 'false',
     STORAGE_PATH: '.data/test',
+    API_RATE_LIMIT_PER_MINUTE: 300,
   };
 }
 export function fakeDiscord(): DiscordAdapter {

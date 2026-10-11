@@ -44,6 +44,8 @@ const db = createDatabase(target),
   config = testConfig(target);
 // API and worker share the same explicit disposable upload volume.
 config.STORAGE_PATH = '.data/browser-test';
+// One loopback client replays every journey back to back; keep the limiter on with suite headroom.
+config.API_RATE_LIMIT_PER_MINUTE = 5000;
 process.env['STORAGE_PATH'] = config.STORAGE_PATH;
 await db.guild.create({
   data: { id: GUILD_A, name: 'Test community', installed: true },

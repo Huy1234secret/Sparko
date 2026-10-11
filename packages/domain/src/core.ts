@@ -94,6 +94,11 @@ export function isTransactionConflict(error: unknown): boolean {
     )
   );
 }
+/**
+ * Serializable snapshots start before the guild advisory lock is granted, so a waiter can miss a
+ * concurrently committed operation with the same key. Its insert then fails; replay after retry.
+ */
+class OperationKeyRace extends Error {}
 export async function getRecord(ctx: DomainContext, kind: string, id: string) {
   const record = await ctx.tx.record.findFirst({
     where: { id, guildId: ctx.guildId, kind },
@@ -161,7 +166,8 @@ export class Platform {
         'INVALID_INPUT',
         'A stable idempotency key is required.',
       );
-    for (let attempt = 0; attempt < 8; attempt++)
+    const attempts = 10;
+    for (let attempt = 0; attempt < attempts; attempt++)
       try {
         return await this.db.$transaction(
           async (tx) => {
@@ -196,15 +202,21 @@ export class Platform {
                 );
               return { data: previous.result as T, operation: previous };
             }
-            const operation = await tx.operation.create({
-              data: {
-                guildId: actor.guildId,
-                actorId: actor.userId,
-                scope,
-                key,
-                requestHash,
-              },
-            });
+            const operation = await tx.operation
+              .create({
+                data: {
+                  guildId: actor.guildId,
+                  actorId: actor.userId,
+                  scope,
+                  key,
+                  requestHash,
+                },
+              })
+              .catch((error: unknown) => {
+                throw (error as { code?: unknown }).code === 'P2002'
+                  ? new OperationKeyRace()
+                  : error;
+              });
             const ctx = context(tx, actor, operation.id),
               data = await handler(ctx);
             const effects = await tx.outbox.count({
@@ -235,19 +247,22 @@ export class Platform {
           },
         );
       } catch (error) {
-        if (!isTransactionConflict(error)) throw error;
-        if (attempt >= 7)
+        if (
+          !isTransactionConflict(error) &&
+          !(error instanceof OperationKeyRace)
+        )
+          throw error;
+        if (attempt >= attempts - 1)
           throw new DomainError(
             'SERVICE_UNAVAILABLE',
             'The request is busy; retry with the same key.',
             503,
           );
-        // Retry only rolled-back transactions, outside locks, with bounded jitter.
+        // Retry only rolled-back transactions, outside locks. Proportional jitter keeps
+        // contending serializable transactions from retrying in lockstep.
+        const ceiling = Math.min(400, 15 * 2 ** attempt);
         await new Promise((resolve) =>
-          setTimeout(
-            resolve,
-            Math.min(250, 10 * 2 ** attempt) + Math.floor(Math.random() * 10),
-          ),
+          setTimeout(resolve, ceiling / 2 + Math.random() * (ceiling / 2)),
         );
       }
     throw new DomainError(

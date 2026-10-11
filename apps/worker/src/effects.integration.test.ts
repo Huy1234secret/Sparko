@@ -259,111 +259,332 @@ afterAll(async () => {
 });
 
 describe('PostgreSQL worker execution and recovery', () => {
-  it.each(['archived', 'replaced'])('preserves V2 display while cleaning up %s controls', async (state) => {
+  it.each(['archived', 'replaced'])(
+    'preserves V2 display while cleaning up %s controls',
+    async (state) => {
+      const action = { type: 'response.private', text: 'Saved response' };
+      const document = {
+        ...notice,
+        blocks: [
+          {
+            type: 'container',
+            accentColor: 123,
+            children: [
+              { type: 'text', text: 'Visible welcome' },
+              {
+                type: 'controls',
+                controls: [
+                  {
+                    type: 'button',
+                    key: 'row',
+                    label: 'Open',
+                    style: 'primary',
+                    action,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'section',
+            texts: ['Visible support details'],
+            accessory: {
+              type: 'button',
+              key: 'section',
+              label: 'Support',
+              style: 'secondary',
+              action,
+            },
+          },
+          {
+            type: 'gallery',
+            items: [
+              { url: 'https://example.com/welcome.png', alt: 'Welcome image' },
+            ],
+          },
+          {
+            type: 'controls',
+            controls: [
+              {
+                type: 'button',
+                key: 'link',
+                label: 'Website',
+                style: 'link',
+                url: 'https://example.com/',
+              },
+            ],
+          },
+        ],
+      };
+      const publication = await db.publication.create({
+        data: { guildId, channelId, document: json(document) },
+      });
+      const ids = {
+        row: `spk:ctl:row_${publication.id.replaceAll('-', '')}`,
+        section: `spk:ctl:section_${publication.id.replaceAll('-', '')}`,
+      };
+      await db.issuedControl.createMany({
+        data: Object.entries(ids).map(([key, id]) => ({
+          id,
+          guildId,
+          publicationId: publication.id,
+          key,
+          action: json(action),
+        })),
+      });
+      const send = await effect('publication.send', {
+        publicationId: publication.id,
+        revision: 1,
+      });
+      await processOutbox(db, discord, send.id);
+      expect(discord.messageStore).toHaveLength(1);
+      await db.publication.update({
+        where: { id: publication.id },
+        data: { state, revision: 2 },
+      });
+      await db.issuedControl.updateMany({
+        where: { publicationId: publication.id },
+        data: { revoked: true },
+      });
+      const archive = await effect('publication.archive', {
+        publicationId: publication.id,
+        revision: 2,
+      });
+      await processOutbox(db, discord, archive.id);
+      expect(
+        (await db.outbox.findUniqueOrThrow({ where: { id: archive.id } }))
+          .state,
+      ).toBe('applied');
+      expect(
+        await db.publication.findUniqueOrThrow({
+          where: { id: publication.id },
+        }),
+      ).toMatchObject({ state, revision: 2, appliedRevision: 1 });
+      expect(discord.editedPayloads).toHaveLength(1);
+      const components = discord.messageStore[0]!.components;
+      expect(components[0]).toEqual({
+        type: 17,
+        accent_color: 123,
+        components: [{ type: 10, content: 'Visible welcome' }],
+      });
+      expect(components[1]).toMatchObject({
+        type: 9,
+        components: [{ type: 10, content: 'Visible support details' }],
+        accessory: { custom_id: ids.section, disabled: true },
+      });
+      expect(components[2]).toMatchObject({
+        type: 12,
+        items: [
+          {
+            media: { url: 'https://example.com/welcome.png' },
+            description: 'Welcome image',
+          },
+        ],
+      });
+      expect(components[3]).toMatchObject({
+        type: 1,
+        components: [{ style: 5, url: 'https://example.com/' }],
+      });
+      expect(JSON.stringify(components)).not.toContain(ids.row);
+      expect(discord.sends).toBe(1);
+    },
+  );
+  it('recovers an ambiguous archived POST by revoked controls and fences the stale send', async () => {
     const action = { type: 'response.private', text: 'Saved response' };
     const document = {
       ...notice,
       blocks: [
-        { type: 'container', accentColor: 123, children: [
-          { type: 'text', text: 'Visible welcome' },
-          { type: 'controls', controls: [{ type: 'button', key: 'row', label: 'Open', style: 'primary', action }] },
-        ] },
-        { type: 'section', texts: ['Visible support details'], accessory: { type: 'button', key: 'section', label: 'Support', style: 'secondary', action } },
-        { type: 'gallery', items: [{ url: 'https://example.com/welcome.png', alt: 'Welcome image' }] },
-        { type: 'controls', controls: [{ type: 'button', key: 'link', label: 'Website', style: 'link', url: 'https://example.com/' }] },
+        ...notice.blocks,
+        {
+          type: 'controls',
+          controls: [
+            {
+              type: 'button',
+              key: 'open',
+              label: 'Open',
+              style: 'primary',
+              action,
+            },
+          ],
+        },
       ],
     };
-    const publication = await db.publication.create({ data: { guildId, channelId, document: json(document) } });
-    const ids = { row: `spk:ctl:row_${publication.id.replaceAll('-', '')}`, section: `spk:ctl:section_${publication.id.replaceAll('-', '')}` };
-    await db.issuedControl.createMany({ data: Object.entries(ids).map(([key, id]) => ({ id, guildId, publicationId: publication.id, key, action: json(action) })) });
-    const send = await effect('publication.send', { publicationId: publication.id, revision: 1 });
-    await processOutbox(db, discord, send.id);
-    expect(discord.messageStore).toHaveLength(1);
-    await db.publication.update({ where: { id: publication.id }, data: { state, revision: 2 } });
-    await db.issuedControl.updateMany({ where: { publicationId: publication.id }, data: { revoked: true } });
-    const archive = await effect('publication.archive', { publicationId: publication.id, revision: 2 });
-    await processOutbox(db, discord, archive.id);
-    expect((await db.outbox.findUniqueOrThrow({ where: { id: archive.id } })).state).toBe('applied');
-    expect(await db.publication.findUniqueOrThrow({ where: { id: publication.id } })).toMatchObject({ state, revision: 2, appliedRevision: 1 });
-    expect(discord.editedPayloads).toHaveLength(1);
-    const components = discord.messageStore[0]!.components;
-    expect(components[0]).toEqual({ type: 17, accent_color: 123, components: [{ type: 10, content: 'Visible welcome' }] });
-    expect(components[1]).toMatchObject({ type: 9, components: [{ type: 10, content: 'Visible support details' }], accessory: { custom_id: ids.section, disabled: true } });
-    expect(components[2]).toMatchObject({ type: 12, items: [{ media: { url: 'https://example.com/welcome.png' }, description: 'Welcome image' }] });
-    expect(components[3]).toMatchObject({ type: 1, components: [{ style: 5, url: 'https://example.com/' }] });
-    expect(JSON.stringify(components)).not.toContain(ids.row);
-    expect(discord.sends).toBe(1);
-  });
-  it('recovers an ambiguous archived POST by revoked controls and fences the stale send', async () => {
-    const action = { type: 'response.private', text: 'Saved response' };
-    const document = { ...notice, blocks: [...notice.blocks, { type: 'controls', controls: [{ type: 'button', key: 'open', label: 'Open', style: 'primary', action }] }] };
-    const publication = await db.publication.create({ data: { guildId, channelId, document: json(document) } });
+    const publication = await db.publication.create({
+      data: { guildId, channelId, document: json(document) },
+    });
     const controlId = `spk:ctl:open_${publication.id.replaceAll('-', '')}`;
-    await db.issuedControl.create({ data: { id: controlId, guildId, publicationId: publication.id, key: 'open', action: json(action) } });
-    const send = await effect('publication.send', { publicationId: publication.id, revision: 1 });
+    await db.issuedControl.create({
+      data: {
+        id: controlId,
+        guildId,
+        publicationId: publication.id,
+        key: 'open',
+        action: json(action),
+      },
+    });
+    const send = await effect('publication.send', {
+      publicationId: publication.id,
+      revision: 1,
+    });
     discord.failSendOnce = true;
     await processOutbox(db, discord, send.id);
-    expect((await db.outbox.findUniqueOrThrow({ where: { id: send.id } })).state).toBe('unknown');
-    expect((await db.publication.findUniqueOrThrow({ where: { id: publication.id } })).messageId).toBeNull();
+    expect(
+      (await db.outbox.findUniqueOrThrow({ where: { id: send.id } })).state,
+    ).toBe('unknown');
+    expect(
+      (
+        await db.publication.findUniqueOrThrow({
+          where: { id: publication.id },
+        })
+      ).messageId,
+    ).toBeNull();
     discord.messageStore[0]!.nonce = null;
-    await db.publication.update({ where: { id: publication.id }, data: { state: 'archived', revision: 2 } });
-    await db.issuedControl.update({ where: { id: controlId }, data: { revoked: true } });
-    const archive = await effect('publication.archive', { publicationId: publication.id, revision: 2 });
+    await db.publication.update({
+      where: { id: publication.id },
+      data: { state: 'archived', revision: 2 },
+    });
+    await db.issuedControl.update({
+      where: { id: controlId },
+      data: { revoked: true },
+    });
+    const archive = await effect('publication.archive', {
+      publicationId: publication.id,
+      revision: 2,
+    });
     await processOutbox(db, discord, archive.id);
-    expect((await db.outbox.findUniqueOrThrow({ where: { id: archive.id } })).state).toBe('applied');
-    expect(await db.publication.findUniqueOrThrow({ where: { id: publication.id } })).toMatchObject({ state: 'archived', revision: 2, messageId: discord.messageStore[0]!.id, appliedRevision: 0 });
-    expect(discord.messageStore[0]!.components).toEqual([{ type: 10, content: 'Welcome to this community.' }]);
+    expect(
+      (await db.outbox.findUniqueOrThrow({ where: { id: archive.id } })).state,
+    ).toBe('applied');
+    expect(
+      await db.publication.findUniqueOrThrow({ where: { id: publication.id } }),
+    ).toMatchObject({
+      state: 'archived',
+      revision: 2,
+      messageId: discord.messageStore[0]!.id,
+      appliedRevision: 0,
+    });
+    expect(discord.messageStore[0]!.components).toEqual([
+      { type: 10, content: 'Welcome to this community.' },
+    ]);
     await retry(send.id);
     await processOutbox(db, discord, send.id);
     expect(discord.sends).toBe(1);
     expect(discord.messageStore).toHaveLength(1);
   });
   it('leaves unidentified archived sends unknown instead of claiming cleanup succeeded', async () => {
-    const publication = await db.publication.create({ data: { guildId, channelId, document: json(notice) } });
-    const send = await effect('publication.send', { publicationId: publication.id, revision: 1 });
+    const publication = await db.publication.create({
+      data: { guildId, channelId, document: json(notice) },
+    });
+    const send = await effect('publication.send', {
+      publicationId: publication.id,
+      revision: 1,
+    });
     discord.failSendOnce = true;
     await processOutbox(db, discord, send.id);
     discord.messageStore = [];
-    await db.publication.update({ where: { id: publication.id }, data: { state: 'replaced', revision: 2 } });
-    const archive = await effect('publication.archive', { publicationId: publication.id, revision: 2 });
+    await db.publication.update({
+      where: { id: publication.id },
+      data: { state: 'replaced', revision: 2 },
+    });
+    const archive = await effect('publication.archive', {
+      publicationId: publication.id,
+      revision: 2,
+    });
     await processOutbox(db, discord, archive.id);
-    const job = await db.outbox.findUniqueOrThrow({ where: { id: archive.id } });
+    const job = await db.outbox.findUniqueOrThrow({
+      where: { id: archive.id },
+    });
     expect(job.state).toBe('unknown');
     expect(job.lastError).toContain('could not be identified');
-    expect(await db.publication.findUniqueOrThrow({ where: { id: publication.id } })).toMatchObject({ state: 'replaced', revision: 2, messageId: null });
+    expect(
+      await db.publication.findUniqueOrThrow({ where: { id: publication.id } }),
+    ).toMatchObject({ state: 'replaced', revision: 2, messageId: null });
     expect(discord.editedPayloads).toHaveLength(0);
     await retry(send.id);
     await processOutbox(db, discord, send.id);
     expect(discord.sends).toBe(1);
   });
-  it.each(['pending', 'rejected'])('safely completes archive for a %s send that never created a message', async (attemptState) => {
-    const publication = await db.publication.create({ data: { guildId, channelId, document: json(notice), state: 'archived', revision: 2 } });
-    const send = await effect('publication.send', { publicationId: publication.id, revision: 1 });
-    if (attemptState === 'rejected') {
-      await db.record.create({ data: { guildId, kind: 'delivery.attempt', key: `${send.id}:send`, state: 'rejected', data: {} } });
-      // The transport proved rejection even if a later unrelated failure made the job unknown.
-      await db.outbox.update({ where: { id: send.id }, data: { state: 'unknown' } });
-    }
-    const archive = await effect('publication.archive', { publicationId: publication.id, revision: 2 });
-    await processOutbox(db, discord, archive.id);
-    expect((await db.outbox.findUniqueOrThrow({ where: { id: archive.id } })).state).toBe('applied');
-    await retry(send.id);
-    await processOutbox(db, discord, send.id);
-    expect(discord.sends).toBe(0);
-    expect(discord.editedPayloads).toHaveLength(0);
-  });
+  it.each(['pending', 'rejected'])(
+    'safely completes archive for a %s send that never created a message',
+    async (attemptState) => {
+      const publication = await db.publication.create({
+        data: {
+          guildId,
+          channelId,
+          document: json(notice),
+          state: 'archived',
+          revision: 2,
+        },
+      });
+      const send = await effect('publication.send', {
+        publicationId: publication.id,
+        revision: 1,
+      });
+      if (attemptState === 'rejected') {
+        await db.record.create({
+          data: {
+            guildId,
+            kind: 'delivery.attempt',
+            key: `${send.id}:send`,
+            state: 'rejected',
+            data: {},
+          },
+        });
+        // The transport proved rejection even if a later unrelated failure made the job unknown.
+        await db.outbox.update({
+          where: { id: send.id },
+          data: { state: 'unknown' },
+        });
+      }
+      const archive = await effect('publication.archive', {
+        publicationId: publication.id,
+        revision: 2,
+      });
+      await processOutbox(db, discord, archive.id);
+      expect(
+        (await db.outbox.findUniqueOrThrow({ where: { id: archive.id } }))
+          .state,
+      ).toBe('applied');
+      await retry(send.id);
+      await processOutbox(db, discord, send.id);
+      expect(discord.sends).toBe(0);
+      expect(discord.editedPayloads).toHaveLength(0);
+    },
+  );
   it('explicitly clears prior embed message content when an updated design omits it', async () => {
-    const document = { schemaVersion: 1, mode: 'embed', name: 'Embed notice', content: 'Prior content', embeds: [{ title: 'Saved title' }] };
-    const publication = await db.publication.create({ data: { guildId, channelId, document: json(document) } });
-    const send = await effect('publication.send', { publicationId: publication.id, revision: 1 });
+    const document = {
+      schemaVersion: 1,
+      mode: 'embed',
+      name: 'Embed notice',
+      content: 'Prior content',
+      embeds: [{ title: 'Saved title' }],
+    };
+    const publication = await db.publication.create({
+      data: { guildId, channelId, document: json(document) },
+    });
+    const send = await effect('publication.send', {
+      publicationId: publication.id,
+      revision: 1,
+    });
     await processOutbox(db, discord, send.id);
     expect(discord.messageStore[0]!.content).toBe('Prior content');
     const { content: _content, ...next } = document;
-    await db.publication.update({ where: { id: publication.id }, data: { state: 'pending', revision: 2, document: json(next) } });
-    const update = await effect('publication.update', { publicationId: publication.id, revision: 2 });
+    await db.publication.update({
+      where: { id: publication.id },
+      data: { state: 'pending', revision: 2, document: json(next) },
+    });
+    const update = await effect('publication.update', {
+      publicationId: publication.id,
+      revision: 2,
+    });
     await processOutbox(db, discord, update.id);
-    expect((await db.outbox.findUniqueOrThrow({ where: { id: update.id } })).state).toBe('applied');
-    expect(discord.editedPayloads[0]).toMatchObject({ content: '', embeds: [{ title: 'Saved title' }] });
+    expect(
+      (await db.outbox.findUniqueOrThrow({ where: { id: update.id } })).state,
+    ).toBe('applied');
+    expect(discord.editedPayloads[0]).toMatchObject({
+      content: '',
+      embeds: [{ title: 'Saved title' }],
+    });
     expect(discord.messageStore[0]!.content).toBe('');
     expect(discord.sends).toBe(1);
   });
