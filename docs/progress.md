@@ -16,16 +16,11 @@ Work continues on `claude/amazing-maxwell-yonuhl`. It was built from the M2 cont
 | M3 Community                | Next                     | Backend substantial; typed UI and combined acceptance remain (findings below).                                                                                            |
 | M4–M9                       | In progress (partial)    | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
 
-## Verification record (delivered M2 source)
+## Verification record (delivered M3 source)
 
-Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0. Docker Hub returned HTTP 429, so the disposable services were local PostgreSQL **16** on `localhost:55432` (`sparko_test`, `sparko_browser_test`, `sparko_restore_test`) and Redis 7 on `localhost:56379` (DB 15). CI uses PostgreSQL 17.6/Redis 7.4.6 containers.
+Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (Docker Hub returned HTTP 429; CI uses PostgreSQL 17.6 / Redis 7.4.6). Results are recorded in the M3 PR description after the final run on the exact head.
 
-- `pnpm typecheck`, `lint`, `format:check`, `build` (19 prerendered routes, browser boundary) — pass.
-- `pnpm test` — **165/165** unit.
-- `pnpm test:integration` (empty disposable schema, five migrations) — **135/135** in 13 files.
-- `pnpm test:e2e` (separate browser database) — **7/7** journeys.
-- Desktop (1440×900) and mobile (390×844) screenshots of picker, overview, Studio, setup, analytics and ticket settings were inspected; the Studio mobile inspector width and `/messages/*` deep-link defects found were fixed.
-- Not run locally: production Compose validation (needs CI secrets env) and Docker image builds (registry rate limit). CI runs both.
+M2 was delivered with 165 unit / 135 integration / 7 browser tests; its PR CI run passed every required step including Compose validation and both images.
 
 All browser/integration tests use a controlled external Discord boundary. They do not prove live Discord acceptance.
 
@@ -35,16 +30,15 @@ All browser/integration tests use a controlled external Discord boundary. They d
 - Install Node 24.19.0 if the image has an older Node (the repo `engines` field requires it).
 - Never point reset-based tests at a non-disposable database; the runner enforces `*test` database names and Redis DB 15.
 
-## M3 review findings / next implementation plan
+## M3 outcome and remaining community limits
 
-Existing backend logic is substantial; generic record views do not fulfill its combined exit gate.
+Resolved: typed community services/pages; `/levels/me` member portal; single rank-card contract and API/`/level` parity with hidden-XP and max-level fixes; crate/counting/greeting/reward/role-menu workflows with histories and delivery errors; crate fallback/failure policy; configured designs; publish-after-delivery; shared privileged-role policy; module-wide channel/role preflight; suggestion/Q&A queues; giveaway detail/reroll/claims; starboard provenance; analytics gaps/units/coverage.
 
-- Add typed community services/pages. Current generic list transform loses crate claims and giveaway `myEntries`/`myWins`; `/members/me` is nonexistent, use `/levels/me`. Add usable opt-in leaderboard, own history/privacy/card preferences, bounded staff XP adjustment and role preview/confirm.
-- R12: one browser-safe card preference contract must align saved legacy `square`/background theme with renderer `rounded`/theme/hex color. Register server defaults, derive own-member render input from authoritative XP/rank, resolve only clean owned/same-guild public media, and use identical preparation/renderer for API PNG and `/level`. Renderer currently leaks actual progress percentage/bar when `showXp:false`; fix that and maximum-level behavior. No caller-supplied identity/XP or arbitrary media URL fetching.
-- Build complete crate/counting/greeting/reward/role-menu workflows and manager history/error DTOs. Crate fallback channels/failure policy are captured but not executed. Worker crate/giveaway/menu publications ignore configured documents; role menus become published before actual Discord delivery applies.
-- Community message delivery bypasses the validated publication pipeline for persistent controls/assets/fresh emoji/Embed/Attach checks/public visibility. Reuse that pipeline and retain delayed author authority. Share a role privilege policy: worker currently omits Manage Messages/Mention Everyone from the API mask. Community configs need scoped channel/role/document preflight, not ticket-only validation.
-- Add private-first suggestions/Q&A staff queues, decisions/history/vote changes/author resolution; giveaway create/eligibility/own entries/wins/claims/end/reroll/draw history; starboard provenance/mirror/deletion UI.
-- Analytics must preserve units/coverage, joins/leaves/voice/module metrics and actual null gaps; current chart can bridge missing collection intervals. Verify UI/API/Gateway/restarted-worker persistence together, including duplicate XP/claims/draws and permission failures.
+Still open (tracked for later milestones): rank cards do not render avatars/backgrounds; community message XP, counting and starboard depend on live Gateway observation; leaderboards show user IDs (no stored display names).
+
+## Next concrete action
+
+M4 — complete staff/ticket/forms/reports/moderation interfaces, scheduled lock/ban expiry, anti-nuke variants/restoration, verification and hierarchy diagnostics. Start by listing safety routes in `packages/domain/src/safety.ts`, compare with the generic module pages, and build typed workspaces using `apps/web/src/features/config` like M3.
 
 ## Later exact gaps / external prerequisites
 
