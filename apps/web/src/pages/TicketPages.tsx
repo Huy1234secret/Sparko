@@ -21,12 +21,16 @@ import {
   Badge,
   Button,
   Card,
+  ConflictNotice,
+  configStatus,
   EmptyState,
   ErrorState,
   Field,
   Input,
   LoadingState,
+  Notice,
   PageHeading,
+  SaveBar,
 } from '@sparko/ui';
 import {
   getConfig,
@@ -55,6 +59,7 @@ import {
 } from '../services/http';
 import { applyServerFieldErrors } from '../services/formErrors';
 import { RuntimeState } from '../components/AppShell';
+import { TicketStatusBadge } from '../components/TicketStatus';
 import { MessagePreview } from '../components/MessagePreview';
 import { DraftGuard } from '../hooks/useDraftGuard';
 import { useActionIdentity } from '../hooks/useActionIdentity';
@@ -139,6 +144,7 @@ export function TicketConfigPage() {
     defaultValues: defaults,
   });
   const [unmatchedErrors, setUnmatchedErrors] = useState<ApiFieldError[]>([]);
+  const [rebasedOn, setRebasedOn] = useState<number | null>(null);
   const fieldError = (path: string) =>
     (get(form.formState.errors, path) as { message?: string } | undefined)
       ?.message;
@@ -208,6 +214,7 @@ export function TicketConfigPage() {
     onMutate: () => setUnmatchedErrors([]),
     onError: (error) => setUnmatchedErrors(applyServerFieldErrors(form, error)),
     onSuccess: (result) => {
+      setRebasedOn(null);
       queryClient.setQueryData(['config', guildId, 'tickets'], result.data);
       form.reset(
         TicketConfigFormSchema.parse({ ...defaults, ...result.data.config }),
@@ -237,6 +244,14 @@ export function TicketConfigPage() {
         retry={() => void query.refetch()}
       />
     );
+  const discard = () => {
+    setRebasedOn(null);
+    save.reset();
+    void query.refetch().then((latest) => {
+      const config = (latest.data ?? query.data)?.config;
+      form.reset(TicketConfigFormSchema.parse({ ...defaults, ...config }));
+    });
+  };
   const conflict =
     save.error instanceof ApiError && save.error.code === 'REVISION_CONFLICT';
   return (
@@ -244,7 +259,7 @@ export function TicketConfigPage() {
       <DraftGuard dirty={dirty} />
       <PageHeading
         eyebrow="Tickets & support"
-        title="A good conversation starts here."
+        title="Ticket settings"
         description="Give members a private, organized path to your support team."
         actions={
           <Link
@@ -596,29 +611,20 @@ export function TicketConfigPage() {
             </label>
           </Card>
           {conflict ? (
-            <div className="alert alert-warning" role="alert">
-              <div>
-                <strong>These settings changed while you were editing.</strong>
-                <p>
-                  Your draft is still here. Current revision:{' '}
-                  {save.error instanceof ApiError
-                    ? save.error.currentRevision
-                    : 'unknown'}
-                  .
-                </p>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => {
-                    form.reset();
-                    void query.refetch();
-                    save.reset();
-                  }}
-                >
-                  Discard draft and reload
-                </Button>
-              </div>
-            </div>
+            <ConflictNotice
+              currentRevision={
+                save.error instanceof ApiError
+                  ? save.error.currentRevision
+                  : undefined
+              }
+              onKeepMine={() => {
+                save.reset();
+                void query.refetch().then((latest) => {
+                  if (latest.data) setRebasedOn(latest.data.revision);
+                });
+              }}
+              onLoadLatest={discard}
+            />
           ) : save.error ? (
             <>
               <ErrorState
@@ -657,34 +663,22 @@ export function TicketConfigPage() {
                 : 'Settings saved. Waiting for the bot to apply them.'}
             </p>
           )}
-          <div className="save-bar">
-            <span>
-              {dirty
-                ? 'You have unsaved changes'
-                : `Saved revision ${query.data?.revision ?? 0}`}
-            </span>
-            <div className="row">
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!dirty || save.isPending}
-                onClick={() =>
-                  query.data &&
-                  form.reset(
-                    TicketConfigFormSchema.parse({
-                      ...defaults,
-                      ...query.data.config,
-                    }),
-                  )
-                }
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!dirty} busy={save.isPending}>
-                Save changes
-              </Button>
-            </div>
-          </div>
+          {rebasedOn !== null && dirty && (
+            <Notice tone="info" title="Your changes are kept">
+              Saving now replaces version {rebasedOn} with your changes.
+            </Notice>
+          )}
+          <SaveBar
+            dirty={dirty}
+            saving={save.isPending}
+            savedLabel={
+              configStatus(
+                query.data?.revision ?? 0,
+                query.data?.appliedRevision ?? 0,
+              ).saved
+            }
+            onDiscard={discard}
+          />
         </form>
         <aside className="stack">
           <Card className="preview-card">
@@ -843,7 +837,7 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
     <>
       <PageHeading
         eyebrow={member ? 'Member portal' : 'Tickets & support'}
-        title={member ? 'Your conversations.' : 'The support inbox.'}
+        title={member ? 'Your tickets' : 'Ticket inbox'}
         description={
           member
             ? 'Your private tickets and their current status.'
@@ -868,18 +862,31 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
         }
       />
       <div className="table-toolbar">
-        <div className="tabs" aria-label="Ticket status">
-          {['active', 'closed', 'all'].map((tab) => (
-            <button
-              key={tab}
-              aria-pressed={filter === tab}
-              className={filter === tab ? 'active' : ''}
-              onClick={() => setFilter(tab)}
-            >
-              {tab[0]?.toUpperCase()}
-              {tab.slice(1)}
-            </button>
-          ))}
+        <div className="tabs" role="group" aria-label="Show tickets">
+          {(['active', 'closed', 'all'] as const).map((tab) => {
+            const count = query.data?.filter((ticket) =>
+              tab === 'all'
+                ? true
+                : tab === 'closed'
+                  ? ticket.status === 'closed'
+                  : ticket.status !== 'closed',
+            ).length;
+            return (
+              <button
+                key={tab}
+                aria-pressed={filter === tab}
+                className={filter === tab ? 'active' : ''}
+                onClick={() => setFilter(tab)}
+              >
+                {tab === 'active'
+                  ? 'Active'
+                  : tab === 'closed'
+                    ? 'Closed'
+                    : 'All'}
+                {count !== undefined && <span className="count"> {count}</span>}
+              </button>
+            );
+          })}
         </div>
         <Input
           aria-label="Search tickets"
@@ -897,13 +904,13 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
         />
       ) : records?.length ? (
         <div className="card table-wrap">
-          <table>
+          <table className="responsive-table">
             <thead>
               <tr>
                 <th>Conversation</th>
                 <th>Status</th>
-                <th>Owner</th>
-                <th>Created</th>
+                <th>Opened by</th>
+                <th>Opened</th>
                 <th>
                   <span className="sr-only">Open</span>
                 </th>
@@ -924,16 +931,18 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
                       </span>
                     </Link>
                   </td>
-                  <td>
-                    <Badge
-                      tone={ticket.status === 'closed' ? 'neutral' : 'success'}
-                    >
-                      {ticket.status.replaceAll('_', ' ')}
-                    </Badge>
+                  <td data-label="Status">
+                    <TicketStatusBadge status={ticket.status} />
                   </td>
-                  <td>{ticket.creatorId}</td>
-                  <td>{new Date(ticket.createdAt).toLocaleDateString()}</td>
-                  <td>
+                  <td data-label="Opened by" className="mono wrap-anywhere">
+                    {ticket.creatorId}
+                  </td>
+                  <td data-label="Opened">
+                    <time dateTime={ticket.createdAt}>
+                      {new Date(ticket.createdAt).toLocaleDateString()}
+                    </time>
+                  </td>
+                  <td className="row-link">
                     <Link
                       aria-label={`Open ticket ${ticket.number}`}
                       to={`/dashboard/${guildId}/support/tickets/${ticket.id}`}
@@ -1047,6 +1056,39 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
     </>
   );
 }
+const nextSteps: Record<
+  string,
+  { tone: 'info' | 'success' | 'danger'; title: string; text: string }
+> = {
+  open: {
+    tone: 'info',
+    title: 'Next: claim this ticket',
+    text: 'Claiming tells the team you are handling it. You can release it later.',
+  },
+  claimed: {
+    tone: 'info',
+    title: 'Next: help the member, then close',
+    text: 'Reply in Discord. When it is resolved, close the ticket with a reason.',
+  },
+  closed: {
+    tone: 'success',
+    title: 'This ticket is closed',
+    text: 'Its private transcript is listed below when capture finishes.',
+  },
+  capture_failed: {
+    tone: 'danger',
+    title: 'Transcript capture failed',
+    text: 'The Discord channel was kept so no history is lost. Review the channel, then close the ticket again to retry capture.',
+  },
+};
+function TicketNextStep({ status }: { status: string }) {
+  const step = nextSteps[status];
+  return step ? (
+    <Notice tone={step.tone} title={step.title}>
+      {step.text}
+    </Notice>
+  ) : null;
+}
 export function TicketDetailPage() {
   const { guildId = '', ticketId = '' } = useParams();
   const queryClient = useQueryClient();
@@ -1137,7 +1179,7 @@ export function TicketDetailPage() {
       <PageHeading
         eyebrow={`Ticket #${ticket.number}`}
         title={ticket.subject}
-        description={`Created ${new Date(ticket.createdAt).toLocaleString()} · Saved revision ${ticket.revision}`}
+        description={`Opened ${new Date(ticket.createdAt).toLocaleString()}`}
         actions={
           <>
             {ticket.status === 'open' && (
@@ -1165,19 +1207,32 @@ export function TicketDetailPage() {
           </>
         }
       />
-      {action.error && <ErrorState message={errorMessage(action.error)} />}
+      {action.error && !closeOpen && (
+        <ErrorState message={errorMessage(action.error)} />
+      )}
+      {action.isSuccess && (
+        <p className="save-feedback" role="status">
+          <CheckCircle2 size={17} aria-hidden="true" />
+          {ticket.status === 'claimed'
+            ? 'You claimed this ticket.'
+            : ticket.status === 'open'
+              ? 'Ticket released for another staff member.'
+              : 'Ticket closed. Sparko is capturing its transcript.'}
+        </p>
+      )}
+      <TicketNextStep status={ticket.status} />
       <div className="metric-grid">
         <Card className="metric">
           <p>Status</p>
-          <Badge>{ticket.status.replaceAll('_', ' ')}</Badge>
-          <small>Current persisted lifecycle</small>
+          <TicketStatusBadge status={ticket.status} />
+          <small>Updated by Discord and staff actions</small>
         </Card>
         <Card className="metric">
-          <p>Assigned staff</p>
-          <strong className="small-value">
-            {ticket.claimantId ?? 'Unassigned'}
+          <p>Claimed by</p>
+          <strong className="small-value mono wrap-anywhere">
+            {ticket.claimantId ?? 'Nobody yet'}
           </strong>
-          <small>Exclusive claim is checked by the server</small>
+          <small>Only one staff member can claim a ticket at a time</small>
         </Card>
         <Card className="metric">
           <p>Transcript</p>
@@ -1295,13 +1350,19 @@ export function TicketDetailPage() {
           <Dialog.Content className="dialog-content">
             <Dialog.Title>Close ticket #{ticket.number}?</Dialog.Title>
             <Dialog.Description>
-              Close this conversation with a clear reason. If required
-              transcript capture fails, the Discord resource will be retained.
+              Sparko saves a private transcript first. If that fails, the
+              Discord channel is kept so nothing is lost.
             </Dialog.Description>
-            <Field label="Closure reason" htmlFor="closure-reason">
+            <Field
+              label="Reason for closing"
+              htmlFor="closure-reason"
+              required
+              hint={`At least 3 characters. ${1000 - reason.length} characters left.`}
+            >
               <textarea
                 id="closure-reason"
                 maxLength={1000}
+                required
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />

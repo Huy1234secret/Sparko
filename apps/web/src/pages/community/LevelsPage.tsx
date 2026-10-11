@@ -19,6 +19,7 @@ import {
   PageHeading,
 } from '@sparko/ui';
 import { useFeatureConfig } from '../../features/config/useFeatureConfig';
+import { LiveEventsNotice } from '../../features/config/LiveEventsNotice';
 import { ConfigForm } from '../../features/config/ConfigForm';
 import { Tabs } from '../../features/config/Tabs';
 import {
@@ -663,9 +664,10 @@ export function LevelsPage({ defaultTab }: { defaultTab?: string }) {
     <>
       <PageHeading
         eyebrow="Engagement"
-        title="Progress that feels earned."
+        title="Levels & XP"
         description="Set how members earn XP, what each level is worth, and which roles reward progress."
       />
+      <LiveEventsNotice what="XP is awarded" events="new messages" />
       <Tabs
         defaultTab={defaultTab}
         tabs={[

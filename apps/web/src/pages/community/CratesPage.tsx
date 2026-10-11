@@ -527,7 +527,7 @@ export function CratesPage() {
     <>
       <PageHeading
         eyebrow="Engagement"
-        title="A little surprise in the chat."
+        title="XP crates"
         description="Configure crate rewards, drop them by hand or on a schedule, and see exactly what was claimed."
       />
       <Tabs

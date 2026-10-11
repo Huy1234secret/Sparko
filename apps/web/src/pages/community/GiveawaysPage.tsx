@@ -457,7 +457,7 @@ export function GiveawaysPage() {
     <>
       <PageHeading
         eyebrow="Engagement"
-        title="Fair giveaways, start to finish."
+        title="Giveaways"
         description="Create giveaways with clear rules, watch entries, and keep every draw on record."
       />
       <Tabs

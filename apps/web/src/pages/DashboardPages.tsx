@@ -3,14 +3,20 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
-  ArrowUpRight,
   Check,
   CheckCircle2,
   ChevronRight,
+  Circle,
+  Gamepad2,
+  GraduationCap,
+  LifeBuoy,
+  Palette,
+  SlidersHorizontal,
+  Sun,
   Clock3,
-  ExternalLink,
   Filter,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Ticket,
@@ -24,19 +30,47 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  Notice,
   PageHeading,
+  Advanced,
 } from '@sparko/ui';
+import { featureLabel, settingChanges } from '../features/setup/diff';
 import {
   getGuilds,
   getOverview,
+  type Guild,
   previewSetup,
   applySetup,
 } from '../services/guilds';
 import { errorMessage } from '../services/http';
 import { getTickets } from '../services/tickets';
+import { getPublications, type Publication } from '../services/messages';
+import { AnimatedIcon } from '@sparko/assets';
+import { motionPreference, useUi } from '../state/ui';
+import { TicketStatusBadge } from '../components/TicketStatus';
 import { useActionIdentity } from '../hooks/useActionIdentity';
 import { Metric, RuntimeState } from '../components/AppShell';
 
+type GuildState = 'ready' | 'install' | 'member';
+const guildState = (guild: Guild): GuildState =>
+  guild.manageable ? (guild.installed ? 'ready' : 'install') : 'member';
+const guildSections: { state: GuildState; title: string; hint: string }[] = [
+  {
+    state: 'ready',
+    title: 'Ready to manage',
+    hint: 'Sparko is installed and your Discord permissions let you manage it.',
+  },
+  {
+    state: 'install',
+    title: 'Add Sparko to start',
+    hint: 'You can manage these servers, but Sparko is not in them yet. Adding it opens Discord so you can review the permissions it asks for.',
+  },
+  {
+    state: 'member',
+    title: 'Member access',
+    hint: 'Managing a server needs the Manage Server permission or a staff role delegated in Sparko. You can still open your member profile.',
+  },
+];
 export function ServerPickerPage() {
   const [search, setSearch] = useState('');
   const query = useQuery({
@@ -51,36 +85,45 @@ export function ServerPickerPage() {
     <>
       <PageHeading
         eyebrow="Your workspace"
-        title="Make yourself at home."
-        description="Choose a server to give your community its next little spark."
+        title="Your servers"
+        description="Choose a server to manage. The list follows your current Discord access."
+        actions={
+          <Button
+            variant="secondary"
+            busy={query.isFetching && !query.isPending}
+            onClick={() => void query.refetch()}
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            Refresh list
+          </Button>
+        }
       />
-      <div className="workspace-welcome">
-        <div>
-          <span className="eyebrow">A clearer way to run your community</span>
-          <h2>Good tools. Great connections.</h2>
-          <p>
-            Configure with confidence, make your messages your own, and keep an
-            eye on what matters.
-          </p>
-          <Link className="text-link" to="/docs">
-            A quick tour of Sparko <ArrowUpRight size={16} />
-          </Link>
-        </div>
-        <div className="welcome-art" aria-hidden="true">
-          <Zap fill="currentColor" size={88} />
-          <span className="art-spark spark-one">✦</span>
-          <span className="art-spark spark-two">✦</span>
-        </div>
-      </div>
-      <div className="section-heading">
-        <div>
-          <h2>Your servers</h2>
-          <p className="muted">
-            Current Discord access determines which workspaces you can manage.
-          </p>
-        </div>
-        <label className="search-field">
-          <Filter size={17} />
+      <ol className="how-it-works" aria-label="How Sparko setup works">
+        <li>
+          <span className="step-index">1</span>
+          <span>
+            <strong>Add Sparko</strong>
+            <small>Invite the bot to a server you manage.</small>
+          </span>
+        </li>
+        <li>
+          <span className="step-index">2</span>
+          <span>
+            <strong>Open its workspace</strong>
+            <small>Everything here is saved per server.</small>
+          </span>
+        </li>
+        <li>
+          <span className="step-index">3</span>
+          <span>
+            <strong>Follow guided setup</strong>
+            <small>Preview every change before it is applied.</small>
+          </span>
+        </li>
+      </ol>
+      {(query.data?.length ?? 0) > 6 && (
+        <label className="search-field server-search">
+          <Filter size={17} aria-hidden="true" />
           <input
             aria-label="Search your servers"
             placeholder="Find a server…"
@@ -88,7 +131,7 @@ export function ServerPickerPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-      </div>
+      )}
       {query.isPending ? (
         <LoadingState label="Fetching your Discord servers…" />
       ) : query.error ? (
@@ -97,56 +140,101 @@ export function ServerPickerPage() {
           retry={() => void query.refetch()}
         />
       ) : guilds?.length ? (
-        <div className="server-grid">
-          {guilds.map((guild) => (
-            <Card className="server-card" key={guild.id}>
-              <div className="row space-between">
-                <span className="server-avatar large">
-                  {guild.iconUrl ? (
-                    <img src={guild.iconUrl} alt="" />
-                  ) : (
-                    guild.name.slice(0, 1)
-                  )}
-                </span>
-                <Badge tone={guild.installed ? 'success' : 'neutral'}>
-                  {guild.installed ? 'Sparko installed' : 'Invite required'}
-                </Badge>
+        guildSections.map((section) => {
+          const list = guilds.filter(
+            (guild) => guildState(guild) === section.state,
+          );
+          if (!list.length) return null;
+          return (
+            <section
+              key={section.state}
+              className="server-section"
+              aria-labelledby={`servers-${section.state}`}
+            >
+              <div className="section-heading">
+                <div>
+                  <h2 id={`servers-${section.state}`}>
+                    {section.title} <span className="count">{list.length}</span>
+                  </h2>
+                  <p className="muted">{section.hint}</p>
+                </div>
               </div>
-              <h3>{guild.name}</h3>
-              <p>
-                {guild.manageable
-                  ? 'You can manage this server.'
-                  : 'Member access only.'}
-              </p>
-              {guild.manageable && guild.installed ? (
-                <Link
-                  to={`/dashboard/${guild.id}`}
-                  className="button button-secondary"
-                >
-                  Open workspace <ArrowRight size={16} />
-                </Link>
-              ) : guild.manageable && guild.installUrl ? (
-                <a href={guild.installUrl} className="button button-primary">
-                  Add Sparko <Plus size={16} />
-                </a>
-              ) : (
-                <Link
-                  to={`/servers/${guild.id}/me`}
-                  className="button button-secondary"
-                >
-                  Your member profile <ArrowRight size={16} />
-                </Link>
-              )}
-            </Card>
-          ))}
-        </div>
+              <div className="server-grid">
+                {list.map((guild) => (
+                  <Card className="server-card" key={guild.id}>
+                    <div className="row space-between">
+                      <span className="server-avatar large" aria-hidden="true">
+                        {guild.iconUrl ? (
+                          <img src={guild.iconUrl} alt="" />
+                        ) : (
+                          guild.name.slice(0, 1)
+                        )}
+                      </span>
+                      <Badge
+                        tone={
+                          section.state === 'ready'
+                            ? 'success'
+                            : section.state === 'install'
+                              ? 'warning'
+                              : 'neutral'
+                        }
+                      >
+                        {section.state === 'ready'
+                          ? 'Installed'
+                          : section.state === 'install'
+                            ? 'Not installed'
+                            : guild.installed
+                              ? 'Member'
+                              : 'Member · not installed'}
+                      </Badge>
+                    </div>
+                    <h3 className="wrap-anywhere">{guild.name}</h3>
+                    {section.state === 'ready' ? (
+                      <Link
+                        to={`/dashboard/${guild.id}`}
+                        className="button button-primary"
+                      >
+                        Open workspace <ArrowRight size={16} />
+                      </Link>
+                    ) : section.state === 'install' ? (
+                      guild.installUrl ? (
+                        <a
+                          href={guild.installUrl}
+                          className="button button-primary"
+                        >
+                          Add Sparko <Plus size={16} />
+                        </a>
+                      ) : (
+                        <p className="field-hint">
+                          Installation is unavailable right now. Try again later
+                          or contact Sparko support.
+                        </p>
+                      )
+                    ) : guild.installed ? (
+                      <Link
+                        to={`/servers/${guild.id}/me`}
+                        className="button button-secondary"
+                      >
+                        Your member profile <ArrowRight size={16} />
+                      </Link>
+                    ) : (
+                      <p className="field-hint">
+                        Ask a server manager to add Sparko.
+                      </p>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            </section>
+          );
+        })
       ) : (
         <EmptyState
           title={search ? 'No matching servers' : 'No servers to show yet'}
           description={
             search
               ? 'Try a different server name.'
-              : 'Join a Discord server, then refresh this page. Owners, administrators, and delegated staff can manage their workspaces.'
+              : 'Join or create a Discord server, then refresh this list. Owners, administrators and delegated staff can manage their servers here.'
           }
           action={
             <Button variant="secondary" onClick={() => void query.refetch()}>
@@ -156,6 +244,14 @@ export function ServerPickerPage() {
         />
       )}
     </>
+  );
+}
+/** A delivered, non-test message carrying a ticket-create control. */
+export function isLiveTicketPanel(publication: Publication) {
+  return (
+    !publication.test &&
+    ['applied', 'published'].includes(publication.state) &&
+    JSON.stringify(publication.document ?? {}).includes('"ticket.create"')
   );
 }
 export function OverviewPage() {
@@ -170,6 +266,12 @@ export function OverviewPage() {
     queryFn: ({ signal }) => getTickets(guildId, signal),
     retry: false,
   });
+  const publications = useQuery({
+    queryKey: ['publications', guildId],
+    queryFn: ({ signal }) => getPublications(guildId, signal),
+    retry: false,
+  });
+  const iconMotion = useUi((state) => motionPreference(state.motion));
   if (query.isPending)
     return <LoadingState label="Opening your server workspace…" />;
   if (query.error)
@@ -182,11 +284,51 @@ export function OverviewPage() {
   if (!query.data) return null;
   const data = query.data;
   const enabled = data.modules.filter((m) => m.enabled);
+  const base = `/dashboard/${guildId}`;
+  const ticketsOn = enabled.some((m) => m.id === 'tickets');
+  const steps = [
+    {
+      title: 'Sparko is connected',
+      done: data.bot.online,
+      doneText: 'The bot is online and applying saved settings.',
+      todoText:
+        'The bot is offline. You can still save settings; Discord changes wait until it reconnects.',
+      to: undefined,
+      action: '',
+    },
+    {
+      title: 'Choose a setup goal',
+      done: enabled.length > 0,
+      doneText: `${enabled.length} tool${enabled.length === 1 ? '' : 's'} turned on.`,
+      todoText: 'Pick a goal and preview every change before it is saved.',
+      to: `${base}/setup`,
+      action: 'Start guided setup',
+    },
+    {
+      title: 'Set up tickets',
+      done: ticketsOn,
+      doneText: 'Members can open private support tickets.',
+      todoText: 'Choose your support team and the questions members answer.',
+      to: `${base}/support/tickets/config`,
+      action: 'Configure tickets',
+    },
+    {
+      title: 'Publish the ticket panel',
+      done: !!publications.data?.some(isLiveTicketPanel),
+      doneText: 'Your panel is live in Discord.',
+      todoText:
+        'Post the panel to a channel so members can find it. Saving settings alone does not post anything.',
+      to: `${base}/support/tickets/config`,
+      action: 'Publish the panel',
+    },
+  ];
+  const nextStep = steps.find((step) => !step.done && step.to);
+  const allDone = steps.every((step) => step.done);
   return (
     <>
       <PageHeading
         eyebrow="Server overview"
-        title={`A little spark for ${data.guild.name}.`}
+        title={data.guild.name}
         description="Your tools, activity, and next steps — all in one place."
         actions={
           <Link
@@ -233,7 +375,11 @@ export function OverviewPage() {
               key={metric.id}
               label={metric.label}
               value={
-                metric.value === null ? '—' : metric.value.toLocaleString()
+                metric.value === null ? (
+                  <span className="small-value">Not collected yet</span>
+                ) : (
+                  metric.value.toLocaleString()
+                )
               }
               detail={`${metric.period} · ${metric.coverage}`}
             />
@@ -247,26 +393,55 @@ export function OverviewPage() {
         )}
       </div>
       <div className="overview-grid">
-        <section className="card next-step">
-          <span className="icon-tile">
-            <Ticket size={22} />
-          </span>
-          <p className="eyebrow">A helpful next step</p>
-          <h2>
-            {data.modules.some((m) => m.id === 'tickets' && m.enabled)
-              ? 'Make support feel personal.'
-              : 'Give every question a home.'}
-          </h2>
-          <p>
-            Set up a private ticket panel, choose your support team, and publish
-            a clear way for members to reach you.
-          </p>
-          <Link
-            className="button button-primary"
-            to={`/dashboard/${guildId}/support/tickets/config`}
-          >
-            Configure tickets <ArrowRight size={16} />
-          </Link>
+        <section className="card" aria-labelledby="getting-started">
+          <div className="section-heading">
+            <div>
+              <h2 id="getting-started">Getting started</h2>
+              <p className="muted">
+                {steps.filter((step) => step.done).length} of {steps.length}{' '}
+                done
+              </p>
+            </div>
+            {allDone && (
+              <AnimatedIcon
+                name="setup-success"
+                state="active"
+                motion={iconMotion}
+                size={40}
+                label="Setup complete"
+              />
+            )}
+          </div>
+          <ol className="checklist">
+            {steps.map((step) => (
+              <li key={step.title} className={step.done ? 'done' : 'todo'}>
+                {step.done ? (
+                  <CheckCircle2 size={20} aria-hidden="true" />
+                ) : (
+                  <Circle size={20} aria-hidden="true" />
+                )}
+                <div>
+                  <strong>
+                    {step.title}
+                    <span className="sr-only">
+                      {step.done ? ' (done)' : ' (to do)'}
+                    </span>
+                  </strong>
+                  <small>{step.done ? step.doneText : step.todoText}</small>
+                  {!step.done && step.to && step === nextStep && (
+                    <Link className="button button-primary" to={step.to}>
+                      {step.action} <ArrowRight size={16} />
+                    </Link>
+                  )}
+                  {!step.done && step.to && step !== nextStep && (
+                    <Link className="text-link" to={step.to}>
+                      {step.action} <ArrowRight size={15} />
+                    </Link>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
         <section className="card">
           <div className="section-heading">
@@ -292,7 +467,8 @@ export function OverviewPage() {
             </div>
           ) : (
             <EmptyState
-              title="Start with what you need"
+              compact
+              title="No tools turned on yet"
               description="Modules stay off until you configure them. Guided setup explains the changes before saving."
               action={
                 <Link className="text-link" to={`/dashboard/${guildId}/setup`}>
@@ -337,12 +513,14 @@ export function OverviewPage() {
                     {new Date(ticket.createdAt).toLocaleDateString()}
                   </small>
                 </span>
-                <Badge>{ticket.status.replaceAll('_', ' ')}</Badge>
+                <TicketStatusBadge status={ticket.status} />
               </Link>
             ))
           ) : (
             <EmptyState
-              title="A quiet inbox"
+              compact
+              icon={Ticket}
+              title="No tickets yet"
               description="New Discord tickets will appear here after your panel is published."
             />
           )}
@@ -374,6 +552,8 @@ export function OverviewPage() {
             ))
           ) : (
             <EmptyState
+              compact
+              icon={Clock3}
               title="Nothing waiting"
               description="Pending bot deliveries and scheduled operations appear here."
             />
@@ -387,7 +567,7 @@ export function OverviewPage() {
             className="text-link"
             to={`/dashboard/${guildId}/insights/audit`}
           >
-            Audit log <ExternalLink size={14} />
+            Audit log <ArrowRight size={14} />
           </Link>
         </div>
         {data.activity.length ? (
@@ -415,41 +595,42 @@ const presets = [
     id: 'small-community',
     title: 'Small community',
     detail: 'A warm welcome, suggestions, and a clear support path.',
-    icon: '☀',
+    icon: Sun,
   },
   {
     id: 'gaming',
     title: 'Gaming',
     detail: 'Community progression, counting, and engagement tools.',
-    icon: '⌘',
+    icon: Gamepad2,
   },
   {
     id: 'support',
     title: 'Support',
     detail: 'Private tickets and organized staff workflows.',
-    icon: '↗',
+    icon: LifeBuoy,
   },
   {
     id: 'creator',
     title: 'Creator',
     detail: 'Welcome new fans and collect their ideas.',
-    icon: '✦',
+    icon: Palette,
   },
   {
     id: 'study',
     title: 'Study group',
     detail: 'Focused community spaces and helpful reminders.',
-    icon: '⌁',
+    icon: GraduationCap,
   },
   {
     id: 'custom',
     title: 'Build your own',
     detail: 'Start quietly and configure each tool yourself.',
-    icon: '+',
+    icon: SlidersHorizontal,
   },
 ];
 export function SetupPage() {
   const { guildId = '' } = useParams();
+  const iconMotion = useUi((state) => motionPreference(state.motion));
   const [preset, setPreset] = useState('support');
   const identity = useActionIdentity();
   const query = useQueryClient();
@@ -467,21 +648,32 @@ export function SetupPage() {
   return (
     <>
       <PageHeading
-        eyebrow="Guided setup"
-        title="Start with a purpose."
-        description="Choose your community’s goal. Review every configuration change before applying it."
+        eyebrow="Three steps"
+        title="Guided setup"
+        description="Choose your community’s goal, review exactly what changes, then apply it. Nothing is saved until you apply."
       />
-      <div className="setup-progress">
-        <span className="active">
-          <span>1</span>Choose a goal
-        </span>
-        <span className={preview.isSuccess ? 'active' : ''}>
-          <span>2</span>Review changes
-        </span>
-        <span className={apply.isSuccess ? 'active' : ''}>
-          <span>3</span>Configure & publish
-        </span>
-      </div>
+      <ol className="setup-progress" aria-label="Setup progress">
+        {[
+          { label: 'Choose a goal', done: preview.isSuccess },
+          { label: 'Review changes', done: apply.isSuccess },
+          { label: 'Configure & publish', done: false },
+        ].map((step, index, all) => {
+          const current = all.findIndex((item) => !item.done) === index;
+          return (
+            <li
+              key={step.label}
+              className={step.done || current ? 'active' : ''}
+              aria-current={current ? 'step' : undefined}
+            >
+              <span aria-hidden="true">
+                {step.done ? <Check size={14} /> : index + 1}
+              </span>
+              {step.label}
+              {step.done && <span className="sr-only"> (done)</span>}
+            </li>
+          );
+        })}
+      </ol>
       <div className="preset-grid">
         {presets.map((item) => (
           <button
@@ -494,10 +686,14 @@ export function SetupPage() {
               apply.reset();
             }}
           >
-            <span className="preset-icon">{item.icon}</span>
+            <span className="preset-icon" aria-hidden="true">
+              <item.icon size={22} />
+            </span>
             <strong>{item.title}</strong>
             <p>{item.detail}</p>
-            {preset === item.id && <Check className="preset-check" size={19} />}
+            {preset === item.id && (
+              <Check className="preset-check" size={19} aria-hidden="true" />
+            )}
           </button>
         ))}
       </div>
@@ -520,37 +716,65 @@ export function SetupPage() {
                 or publish messages.
               </p>
             </div>
-            <Badge>{preset}</Badge>
+            <Badge>{presets.find((item) => item.id === preset)?.title}</Badge>
           </div>
           {preview.data.data.issues.map((issue) => (
-            <div className="alert alert-warning" key={issue}>
+            <Notice tone="warning" key={issue} title="Check before applying">
               {issue}
-            </div>
+            </Notice>
           ))}
           {preview.data.data.blockingIssues.map((issue) => (
-            <div className="alert alert-danger" key={issue}>
+            <Notice tone="danger" key={issue} title="Needs fixing first">
               {issue}
-            </div>
+            </Notice>
           ))}
           {preview.data.data.changes.length ? (
-            preview.data.data.changes.map((change) => (
-              <details className="diff-row" key={change.featureId}>
-                <summary>
-                  {change.featureId}
-                  <Badge>Configuration change</Badge>
-                </summary>
-                <div className="diff-grid">
-                  <div>
-                    <h4>Current</h4>
-                    <pre>{JSON.stringify(change.before, null, 2)}</pre>
-                  </div>
-                  <div>
-                    <h4>Proposed</h4>
-                    <pre>{JSON.stringify(change.after, null, 2)}</pre>
-                  </div>
-                </div>
-              </details>
-            ))
+            preview.data.data.changes.map((change) => {
+              const rows = settingChanges(change.before, change.after);
+              return (
+                <section className="diff-row" key={change.featureId}>
+                  <h3>{featureLabel(change.featureId)}</h3>
+                  {rows.length ? (
+                    <div className="table-wrap">
+                      <table className="diff-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Setting</th>
+                            <th scope="col">Now</th>
+                            <th scope="col">After applying</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((row) => (
+                            <tr key={row.setting}>
+                              <th scope="row">{row.setting}</th>
+                              <td>{row.before}</td>
+                              <td>
+                                <strong>{row.after}</strong>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="muted">No visible setting changes.</p>
+                  )}
+                  <Advanced summary="Technical details">
+                    <div className="diff-grid">
+                      <div>
+                        <h4>Current</h4>
+                        <pre>{JSON.stringify(change.before, null, 2)}</pre>
+                      </div>
+                      <div>
+                        <h4>Proposed</h4>
+                        <pre>{JSON.stringify(change.after, null, 2)}</pre>
+                      </div>
+                    </div>
+                  </Advanced>
+                </section>
+              );
+            })
           ) : (
             <p className="muted">This preset has no configuration changes.</p>
           )}
@@ -572,8 +796,13 @@ export function SetupPage() {
       )}
       {apply.error && <ErrorState message={errorMessage(apply.error)} />}
       {apply.data && (
-        <div className="alert alert-success" role="status">
-          <CheckCircle2 size={21} />
+        <div className="alert alert-success setup-done" role="status">
+          <AnimatedIcon
+            name="setup-success"
+            state="active"
+            motion={iconMotion}
+            size={44}
+          />
           <div>
             <strong>
               Settings saved
@@ -585,12 +814,20 @@ export function SetupPage() {
               Finish ticket configuration with your actual channels and staff
               roles, then publish your panel.
             </p>
-            <Link
-              className="text-link"
-              to={`/dashboard/${guildId}/support/tickets/config`}
-            >
-              Continue to tickets <ArrowRight size={15} />
-            </Link>
+            <div className="row wrap">
+              <Link
+                className="button button-primary"
+                to={`/dashboard/${guildId}/support/tickets/config`}
+              >
+                Continue to tickets <ArrowRight size={15} />
+              </Link>
+              <Link
+                className="button button-ghost"
+                to={`/dashboard/${guildId}`}
+              >
+                Back to overview
+              </Link>
+            </div>
           </div>
         </div>
       )}

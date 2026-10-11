@@ -34,3 +34,6 @@ export const useUi = create<UiState>()(
     },
   ),
 );
+/** Map the saved motion setting to the animation library's preference. */
+export const motionPreference = (motion: UiState['motion']) =>
+  motion === 'reduced' ? 'off' : motion === 'full' ? 'on' : 'system';

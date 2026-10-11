@@ -4,21 +4,26 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 
 ## Resume checkpoint
 
-Work continues on `claude/amazing-maxwell-yonuhl`. It was built from the M2 continuation `claude/zen-noether-1w2xai` (`1da2342`, worker repairs + idempotency race fix) with `main` (`ad6e1f1`, M1 merge) merged in. Run `git log --oneline -5` and `git status` before editing. Each completed milestone is delivered as a PR from this branch into `main`, merged after CI passes on the exact head, then the branch continues from the merged result.
+- `main` contains M1–M3 ([PR #2](https://github.com/Huy1234secret/Sparko/pull/2), [PR #3](https://github.com/Huy1234secret/Sparko/pull/3), [PR #4](https://github.com/Huy1234secret/Sparko/pull/4)) and the vendored project skills ([PR #5](https://github.com/Huy1234secret/Sparko/pull/5)).
+- The UI/UX pass over M1–M3 is delivered from `claude/clever-lovelace-b5a124` (see `docs/milestones/ui-pass.md` and `design-system/sparko/MASTER.md`).
+- Partial M4 work is preserved on `claude/amazing-maxwell-yonuhl` (`cafe717`, five commits beyond `8108330`: timed bans/locks, typed moderation and forms workspaces, contracts, paused handoff). It continues on top of the merged UI pass.
+- Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head.
 
 ## Milestone / PR state
 
-| Milestone                   | State                    | Evidence / next gate                                                                                                                                                      |
-| --------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0 Foundation               | **Merged**               | [PR #1](https://github.com/Huy1234secret/Sparko/pull/1); main CI passed.                                                                                                  |
-| M1 Identity / first tickets | **Merged**               | [PR #2](https://github.com/Huy1234secret/Sparko/pull/2) at `ad6e1f1`; [main CI run 38131958193](https://github.com/Huy1234secret/Sparko/actions/runs/38131958193) passed. |
-| M2 Message platform         | **Complete locally; PR** | All local gates pass (below). See `docs/milestones/m2.md`. PR/CI recorded on delivery.                                                                                    |
-| M3 Community                | Next                     | Backend substantial; typed UI and combined acceptance remain (findings below).                                                                                            |
-| M4–M9                       | In progress (partial)    | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
+| Milestone                   | State           | Evidence / next gate                                                                                                                                                      |
+| --------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0 Foundation               | **Merged**      | [PR #1](https://github.com/Huy1234secret/Sparko/pull/1); main CI passed.                                                                                                  |
+| M1 Identity / first tickets | **Merged**      | [PR #2](https://github.com/Huy1234secret/Sparko/pull/2) at `ad6e1f1`; [main CI run 38131958193](https://github.com/Huy1234secret/Sparko/actions/runs/38131958193) passed. |
+| M2 Message platform         | **Merged**      | [PR #3](https://github.com/Huy1234secret/Sparko/pull/3) (`338bd6a`). See `docs/milestones/m2.md`.                                                                         |
+| M3 Community                | **Merged**      | [PR #4](https://github.com/Huy1234secret/Sparko/pull/4) (`8108330`). See `docs/milestones/m3.md`.                                                                         |
+| UI/UX pass over M1–M3       | **PR**          | `docs/milestones/ui-pass.md`; PR and CI recorded on merge.                                                                                                                |
+| M4 Staff, forms and safety  | In progress     | Partial on `claude/amazing-maxwell-yonuhl`; resumes after the UI pass merges.                                                                                             |
+| M5–M9                       | Partial backend | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
 
-## Verification record (delivered M3 source)
+## Verification record (UI pass source)
 
-Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (Docker Hub returned HTTP 429; CI uses PostgreSQL 17.6 / Redis 7.4.6). Results are recorded in the M3 PR description after the final run on the exact head.
+Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 214 unit, 142 PostgreSQL integration and 14 browser tests pass.
 
 M2 was delivered with 165 unit / 135 integration / 7 browser tests; its PR CI run passed every required step including Compose validation and both images.
 
@@ -38,7 +43,7 @@ Still open (tracked for later milestones): rank cards do not render avatars/back
 
 ## Next concrete action
 
-M4 — complete staff/ticket/forms/reports/moderation interfaces, scheduled lock/ban expiry, anti-nuke variants/restoration, verification and hierarchy diagnostics. Start by listing safety routes in `packages/domain/src/safety.ts`, compare with the generic module pages, and build typed workspaces using `apps/web/src/features/config` like M3.
+Merge the UI pass, merge `main` into the M4 work, then M4 — add FormsPage tests and complete staff/ticket/forms/reports/moderation interfaces, scheduled lock/ban expiry, anti-nuke variants/restoration, verification and hierarchy diagnostics. Start by listing safety routes in `packages/domain/src/safety.ts`, compare with the generic module pages, and build typed workspaces using `apps/web/src/features/config` like M3.
 
 ## Later exact gaps / external prerequisites
 

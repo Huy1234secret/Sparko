@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFieldArray } from 'react-hook-form';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -16,6 +16,7 @@ import {
 } from '@sparko/ui';
 import { Metric } from '../../components/AppShell';
 import { useFeatureConfig } from '../../features/config/useFeatureConfig';
+import { LiveEventsNotice } from '../../features/config/LiveEventsNotice';
 import { ConfigForm } from '../../features/config/ConfigForm';
 import { Tabs } from '../../features/config/Tabs';
 import {
@@ -55,6 +56,7 @@ function CountingSettings({ guildId }: { guildId: string }) {
           label="Counting channel"
           guildId={guildId}
         />
+
         <div className="form-grid">
           <NumberField
             form={form}
@@ -221,7 +223,12 @@ function CountingStatus({ guildId }: { guildId: string }) {
       ) : (
         <EmptyState
           title="No counts yet"
-          description="State appears after the first number is counted in the configured channel."
+          description="Progress appears after the first number is counted. Turn counting on and choose its channel in Settings."
+          action={
+            <Link className="text-link" to="?tab=settings">
+              Open counting settings
+            </Link>
+          }
         />
       )}
       <Card>
@@ -301,8 +308,13 @@ export function CountingPage() {
     <>
       <PageHeading
         eyebrow="Engagement"
-        title="One number at a time."
+        title="Counting"
         description="Set the rules for your counting channel and watch its progress."
+      />
+      <LiveEventsNotice
+        what="Counts are checked"
+        events="new messages"
+        intent="Message Content"
       />
       <Tabs
         tabs={[

@@ -19,7 +19,7 @@ async function login(page: Page) {
   await page.goto('/dashboard');
   await page.getByRole('link', { name: 'Continue with Discord' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Make yourself at home.' }),
+    page.getByRole('heading', { name: 'Your servers', level: 1 }),
   ).toBeVisible({ timeout: 15000 });
 }
 
@@ -111,10 +111,11 @@ test('OAuth, pending settings, publication, restart-safe bot control, private ti
   await page.goto(`/dashboard/${guild}/support/tickets`);
   await page.getByRole('link', { name: 'Open ticket 1' }).click();
   await page.getByRole('button', { name: 'Claim ticket' }).click();
-  await expect(page.getByText('claimed', { exact: true })).toBeVisible();
+  await expect(page.getByText('You claimed this ticket.')).toBeVisible();
+  await expect(page.getByText('Claimed', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close ticket', exact: true }).click();
   await page
-    .getByLabel('Closure reason')
+    .getByLabel(/Reason for closing/)
     .fill('Resolved in the browser acceptance journey');
   await page.getByRole('button', { name: 'Close this ticket' }).focus();
   await page.keyboard.press('Enter');
@@ -127,7 +128,8 @@ test('OAuth, pending settings, publication, restart-safe bot control, private ti
     })
     .toBe('closed');
   await page.reload();
-  await expect(page.getByText('closed', { exact: true })).toBeVisible();
+  await expect(page.getByText('This ticket is closed')).toBeVisible();
+  await expect(page.getByText('Closed', { exact: true })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Download transcript' }),
   ).toBeVisible();
@@ -154,7 +156,7 @@ test('mobile navigation and Studio retain keyboard focus with reduced motion', a
   await login(page);
   await page.goto(`/dashboard/${guild}/messages/studio`);
   await expect(
-    page.getByRole('heading', { name: 'Make it feel like your community.' }),
+    page.getByRole('heading', { name: 'Message Studio', level: 1 }),
   ).toBeVisible();
   const mobileLayout = await page.evaluate(() => ({
     width: window.innerWidth,

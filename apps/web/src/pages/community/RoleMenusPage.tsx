@@ -299,7 +299,7 @@ export function RoleMenusPage() {
     <>
       <PageHeading
         eyebrow="Community"
-        title="Let members choose their place."
+        title="Self-service roles"
         description="Publish role pickers with exclusive groups, limits and optional expiry."
       />
       <Tabs

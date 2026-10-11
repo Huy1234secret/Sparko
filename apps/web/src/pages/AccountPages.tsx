@@ -49,8 +49,8 @@ export function AccountPage() {
     <>
       <PageHeading
         eyebrow="Your account"
-        title={`Your space, ${session.data?.user?.username ?? 'member'}.`}
-        description="Your personal preferences and product support stay separate from server settings."
+        title="Your account"
+        description={`Signed in as ${session.data?.user?.username ?? 'a Discord member'}. Your personal preferences and product support stay separate from server settings.`}
       />
       <div className="feature-grid">
         {[
@@ -127,7 +127,7 @@ export function PreferencesPage() {
       <DraftGuard dirty={form.formState.isDirty} />
       <PageHeading
         eyebrow="Your account"
-        title="A workspace that feels like you."
+        title="Preferences"
         description="These preferences follow your account. Server configuration has its own timezone and settings."
       />
       <form
@@ -272,7 +272,7 @@ export function PrivacyAccountPage() {
     <>
       <PageHeading
         eyebrow="Your account"
-        title="Your data deserves care."
+        title="Privacy & data"
         description="Review retention, request a copy of your own records, and manage account access."
       />
       <div className="overview-grid">
@@ -464,7 +464,7 @@ export function ProductSupportPage() {
     <>
       <PageHeading
         eyebrow="Your account"
-        title="A little help from Sparko."
+        title="Product support"
         description="Product support is private to you and authorized global support staff. It is separate from your server’s tickets."
       />
       <div className="editor-layout">

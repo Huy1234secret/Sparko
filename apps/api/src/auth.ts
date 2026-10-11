@@ -304,15 +304,24 @@ export function createAuth(
       return reply.redirect(url.toString());
     });
     app.get('/api/v1/auth/discord/callback', async (req, reply) => {
+      // Browser navigation: failures return to the sign-in page with a reason
+      // instead of a raw API error. No session is created on any failure.
+      const fail = (reason: 'cancelled' | 'expired' | 'failed') => {
+        reply.clearCookie('sparko_oauth', { path: '/' });
+        return reply.redirect(`/dashboard?signin=${reason}`);
+      };
       const q = z
-          .object({ code: z.string(), state: z.string() })
+          .object({
+            code: z.string().optional(),
+            state: z.string().optional(),
+            error: z.string().optional(),
+          })
           .parse(req.query),
         verifier = req.cookies['sparko_oauth'];
-      if (!verifier)
-        throw new DomainError(
-          'INVALID_INPUT',
-          'This login attempt expired. Start again.',
-        );
+      if (q.error)
+        return fail(q.error === 'access_denied' ? 'cancelled' : 'failed');
+      if (!q.code || !q.state) return fail('failed');
+      if (!verifier) return fail('expired');
       const state = await db.oAuthState.findUnique({
         where: { id: digest(q.state) },
       });
@@ -321,21 +330,21 @@ export function createAuth(
         state.expiresAt < new Date() ||
         state.verifierHash !== digest(verifier)
       )
-        throw new DomainError(
-          'INVALID_INPUT',
-          'This login attempt is invalid.',
-        );
+        return fail('expired');
       const deleted = await db.oAuthState.deleteMany({
         where: { id: state.id, verifierHash: digest(verifier) },
       });
-      if (deleted.count !== 1)
-        throw new DomainError(
-          'INVALID_INPUT',
-          'This login attempt was already used.',
-        );
-      const token = await discord.exchange(q.code),
-        user = await discord.user(token.access_token),
-        sid = randomBytes(32).toString('base64url'),
+      if (deleted.count !== 1) return fail('expired');
+      let token: Awaited<ReturnType<typeof discord.exchange>>,
+        user: Awaited<ReturnType<typeof discord.user>>;
+      try {
+        token = await discord.exchange(q.code);
+        user = await discord.user(token.access_token);
+      } catch (error) {
+        req.log.warn({ err: error }, 'Discord OAuth exchange failed');
+        return fail('failed');
+      }
+      const sid = randomBytes(32).toString('base64url'),
         csrfToken = randomBytes(32).toString('base64url');
       await db.$transaction(async (tx) => {
         await tx.user.upsert({

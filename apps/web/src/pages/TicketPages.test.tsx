@@ -83,7 +83,7 @@ describe('ticket configuration and publication', () => {
   it('distinguishes saved settings from applied runtime and blocks publishing a dirty form', async () => {
     const user = userEvent.setup();
     renderConfig();
-    expect(await screen.findByText('Pending runtime')).toBeVisible();
+    expect(await screen.findByText('Waiting for the bot')).toBeVisible();
     const save = screen.getByRole('button', { name: 'Save changes' });
     expect(save).toBeDisabled();
     await user.selectOptions(
@@ -120,10 +120,29 @@ describe('ticket configuration and publication', () => {
     await user.type(input, '2');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
-      await screen.findByText('These settings changed while you were editing.'),
+      await screen.findByText(
+        'Someone saved these settings while you were editing.',
+      ),
     ).toBeVisible();
     expect(input).toHaveValue(2);
-    expect(screen.getByText(/Current revision: 4/)).toBeVisible();
+    expect(screen.getByText(/saved version is now 4/)).toBeVisible();
+    // Keeping the draft loads the newer revision and saves over it next time.
+    vi.mocked(getConfig).mockResolvedValue({
+      ...structuredClone(saved),
+      revision: 4,
+      appliedRevision: 4,
+    });
+    vi.mocked(saveConfig).mockClear();
+    vi.mocked(saveConfig).mockRejectedValue(new Error('stop'));
+    await user.click(screen.getByRole('button', { name: 'Keep my changes' }));
+    expect(
+      await screen.findByText(/replaces version 4 with your changes/),
+    ).toBeVisible();
+    expect(input).toHaveValue(2);
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(vi.mocked(saveConfig).mock.calls[0]?.[2]).toMatchObject({
+      expectedRevision: 4,
+    });
   });
   it('reports committed pending delivery without inventing a Discord publication', async () => {
     const user = userEvent.setup();
@@ -146,7 +165,7 @@ describe('ticket configuration and publication', () => {
       },
     });
     renderConfig();
-    await screen.findByText('Pending runtime');
+    await screen.findByText('Waiting for the bot');
     await user.selectOptions(
       screen.getByLabelText('Publish destination'),
       '123456789012345670',
