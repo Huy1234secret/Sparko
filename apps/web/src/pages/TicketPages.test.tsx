@@ -1,0 +1,185 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TicketConfigPage } from './TicketPages';
+import {
+  getChannels,
+  getConfig,
+  getRoles,
+  saveConfig,
+} from '../services/guilds';
+import { getPublications, publishMessage } from '../services/messages';
+import { ApiError } from '../services/http';
+
+vi.mock('../services/guilds', () => ({
+  getChannels: vi.fn(),
+  getConfig: vi.fn(),
+  getRoles: vi.fn(),
+  saveConfig: vi.fn(),
+}));
+vi.mock('../services/messages', () => ({
+  getPublications: vi.fn(),
+  publishMessage: vi.fn(),
+}));
+const saved = {
+  missingPrerequisites: [],
+  featureId: 'tickets',
+  revision: 3,
+  appliedRevision: 2,
+  config: {
+    enabled: true,
+    timezone: 'Asia/Ho_Chi_Minh',
+    categoryChannelId: '123456789012345678',
+    staffRoleIds: [],
+    maxOpenPerMember: 1,
+    requireTranscriptBeforeCleanup: true,
+    categories: [
+      { id: 'general', name: 'General support', description: '', fields: [] },
+    ],
+  },
+};
+function renderConfig() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/dashboard/:guildId/support/tickets/config',
+        element: <TicketConfigPage />,
+      },
+    ],
+    {
+      initialEntries: ['/dashboard/123456789012345679/support/tickets/config'],
+    },
+  );
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+beforeEach(() => {
+  vi.mocked(getConfig).mockResolvedValue(structuredClone(saved));
+  vi.mocked(getChannels).mockResolvedValue([
+    { id: '123456789012345678', name: 'Support', type: 4 },
+    { id: '123456789012345670', name: 'support-panel', type: 0 },
+  ]);
+  vi.mocked(getRoles).mockResolvedValue([]);
+  vi.mocked(getPublications).mockResolvedValue([]);
+});
+afterEach(() => {
+  cleanup();
+  vi.resetAllMocks();
+});
+describe('ticket configuration and publication', () => {
+  it('distinguishes saved settings from applied runtime and blocks publishing a dirty form', async () => {
+    const user = userEvent.setup();
+    renderConfig();
+    expect(await screen.findByText('Pending runtime')).toBeVisible();
+    const save = screen.getByRole('button', { name: 'Save changes' });
+    expect(save).toBeDisabled();
+    await user.selectOptions(
+      screen.getByLabelText('Publish destination'),
+      '123456789012345670',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Publish ticket panel' }),
+    ).toBeEnabled();
+    await user.clear(screen.getByLabelText('Open tickets per member'));
+    await user.type(screen.getByLabelText('Open tickets per member'), '2');
+    expect(save).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Publish ticket panel' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText('Save your settings before publishing.'),
+    ).toBeVisible();
+  });
+  it('retains local changes when another editor saved a newer revision', async () => {
+    const user = userEvent.setup();
+    vi.mocked(saveConfig).mockRejectedValue(
+      new ApiError(
+        'Settings changed.',
+        'REVISION_CONFLICT',
+        409,
+        'request-conflict',
+        4,
+      ),
+    );
+    renderConfig();
+    const input = await screen.findByLabelText('Open tickets per member');
+    await user.clear(input);
+    await user.type(input, '2');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText('These settings changed while you were editing.'),
+    ).toBeVisible();
+    expect(input).toHaveValue(2);
+    expect(screen.getByText(/Current revision: 4/)).toBeVisible();
+  });
+  it('reports committed pending delivery without inventing a Discord publication', async () => {
+    const user = userEvent.setup();
+    vi.mocked(publishMessage).mockResolvedValue({
+      data: {
+        id: 'publication-test',
+        channelId: '123456789012345670',
+        state: 'pending',
+        status: 'pending',
+        deliveryStatus: 'pending',
+        revision: 1,
+        appliedRevision: 0,
+        test: false,
+        createdAt: '2026-10-11T00:00:00Z',
+      },
+      operation: {
+        id: 'op-test',
+        businessStatus: 'committed',
+        deliveryStatus: 'pending',
+      },
+    });
+    renderConfig();
+    await screen.findByText('Pending runtime');
+    await user.selectOptions(
+      screen.getByLabelText('Publish destination'),
+      '123456789012345670',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Publish ticket panel' }),
+    );
+    expect(
+      await screen.findByText(
+        'Publication saved. Waiting for Discord delivery.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.queryByText('Your panel is published.'),
+    ).not.toBeInTheDocument();
+  });
+  it('preserves a mutation identity when the same save is retried after a network timeout', async () => {
+    const user = userEvent.setup();
+    vi.mocked(saveConfig).mockRejectedValue(
+      new ApiError('Unable to reach Sparko.', 'ECONNABORTED', 0),
+    );
+    renderConfig();
+    const input = await screen.findByLabelText('Open tickets per member');
+    await user.clear(input);
+    await user.type(input, '2');
+    const button = screen.getByRole('button', { name: 'Save changes' });
+    await user.click(button);
+    await screen.findByText('Unable to reach Sparko.');
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    await waitFor(() => expect(saveConfig).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(saveConfig).mock.calls[0]?.[3]).toBe(
+      vi.mocked(saveConfig).mock.calls[1]?.[3],
+    );
+  });
+});

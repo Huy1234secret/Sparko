@@ -1,0 +1,88 @@
+name: Checks
+on:
+  push:
+    branches: [main, 'sparko/**']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          {
+            POSTGRES_USER: sparko,
+            POSTGRES_PASSWORD: sparko,
+            POSTGRES_DB: sparko_test,
+          }
+        ports: ['55432:5432']
+        options: --health-cmd "pg_isready -U sparko -d sparko_test" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7.4.6-bookworm
+        ports: ['56379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      NODE_ENV: test
+      APP_VERSION: ci
+      PUBLIC_APP_URL: http://localhost:5173
+      DISCORD_REDIRECT_URI: http://localhost:5173/api/v1/auth/discord/callback
+      DATABASE_URL: postgresql://sparko:sparko@localhost:55432/sparko_test
+      TEST_DATABASE_URL: postgresql://sparko:sparko@localhost:55432/sparko_test
+      REDIS_URL: redis://localhost:56379/15
+      TEST_REDIS_URL: redis://localhost:56379/15
+      SESSION_SECRET: ci-only-disposable-session-secret-32-characters
+      TOKEN_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24.19.0 }
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.25.0 }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm db:migrate
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:integration
+      - name: Create separate browser database
+        run: |
+          node --input-type=module <<'JS'
+          import { Client } from 'pg';
+          const client = new Client({connectionString: process.env.TEST_DATABASE_URL});
+          await client.connect();
+          await client.query('CREATE DATABASE sparko_browser_test OWNER sparko');
+          await client.end();
+          JS
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Select installed browser
+        run: node --input-type=module -e "import {chromium} from '@playwright/test'; import {appendFileSync} from 'node:fs'; appendFileSync(process.env.GITHUB_ENV, 'CHROMIUM_PATH=' + chromium.executablePath() + '\n');"
+      - run: pnpm test:e2e
+        env:
+          {
+            TEST_DATABASE_URL: 'postgresql://sparko:sparko@localhost:55432/sparko_browser_test',
+          }
+      - name: Validate production Compose
+        run: docker compose -f infra/compose.prod.yaml config --quiet
+        env:
+          POSTGRES_PASSWORD: ci-disposable-password
+          PUBLIC_APP_URL: https://panel.coin-sprite.com
+          DISCORD_REDIRECT_URI: https://panel.coin-sprite.com/api/v1/auth/discord/callback
+      - run: docker build -f infra/Dockerfile --target runtime -t sparko-runtime:ci .
+      - run: docker build -f infra/Dockerfile --target web -t sparko-web:ci .
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          {
+            name: browser-failure-report,
+            path: 'playwright-report/',
+            retention-days: 7,
+          }

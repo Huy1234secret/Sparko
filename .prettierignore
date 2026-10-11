@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+SPARKO_ANTIGRAVITY_FROM_SCRATCH_GPT61_ULTRA.md
+**/generated/
+**/dist/
+
+packages/assets/media/
