@@ -15,6 +15,7 @@ import {
 import { RoleMenusPage } from './RoleMenusPage';
 import { SubmissionsPage } from './SubmissionsPage';
 import { ModerationPage } from '../safety/ModerationPage';
+import { FormsPage } from '../safety/FormsPage';
 
 /** Typed module pages; modules not listed here still use the generic page. */
 const typedPages: Record<string, ComponentType> = {
@@ -31,6 +32,7 @@ const typedPages: Record<string, ComponentType> = {
   'community/questions': () => <SubmissionsPage kind="questions" />,
   'community/starboard': StarboardPage,
   'safety/moderation': ModerationPage,
+  'support/forms': FormsPage,
   'engagement/reward-roles': () => <LevelsPage defaultTab="rewards" />,
 };
 export function ModuleRouter() {

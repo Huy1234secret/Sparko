@@ -41,14 +41,14 @@ export const FormSchema = z
       .default(['Review']),
     decisionRoleId: Snowflake.optional(),
   })
-  .refine(
-    (v) => new Set(v.fields.map((f) => f.id)).size === v.fields.length,
-    'Field identifiers must be unique',
-  )
-  .refine(
-    (v) => new Set(v.stages).size === v.stages.length,
-    'Review stages must be unique',
-  );
+  .refine((v) => new Set(v.fields.map((f) => f.id)).size === v.fields.length, {
+    message: 'Field identifiers must be unique',
+    path: ['fields'],
+  })
+  .refine((v) => new Set(v.stages).size === v.stages.length, {
+    message: 'Review stages must be unique',
+    path: ['stages'],
+  });
 export const SafetyRuleSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9_-]{1,32}$/),
