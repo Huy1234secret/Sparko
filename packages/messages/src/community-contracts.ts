@@ -247,3 +247,41 @@ export const AnalyticsQuery = z
       Date.parse(v.to) - Date.parse(v.from) <= 93 * 86_400_000,
     'Use a positive range of at most 93 days',
   );
+
+const LegacyShape = { square: 'rounded' } as const;
+/**
+ * Member rank-card preferences, shared by the browser, API PNG route and the
+ * Discord `/level` command. Earlier saved values used `square` for the avatar
+ * shape and `background: dark|light` for the theme; both are normalized here.
+ */
+export const RankCardPreferencesSchema = z.preprocess(
+  (raw) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const value = { ...(raw as Record<string, unknown>) };
+    if (value['avatarShape'] === 'square')
+      value['avatarShape'] = LegacyShape.square;
+    if (
+      value['theme'] === undefined &&
+      (value['background'] === 'dark' || value['background'] === 'light')
+    )
+      value['theme'] = value['background'];
+    delete value['background'];
+    return value;
+  },
+  z.object({
+    accent: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex colour such as #FACC15.')
+      .default('#FACC15'),
+    avatarShape: z.enum(['circle', 'rounded']).default('circle'),
+    layout: z.enum(['wide', 'compact']).default('wide'),
+    theme: z.enum(['dark', 'light']).default('dark'),
+    showXp: z.boolean().default(true),
+    showRank: z.boolean().default(true),
+  }),
+);
+export type RankCardPreferences = z.output<typeof RankCardPreferencesSchema>;
+export const LevelPreferencesSchema = z.object({
+  publicProfile: z.boolean(),
+  card: RankCardPreferencesSchema,
+});

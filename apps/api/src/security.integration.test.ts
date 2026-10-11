@@ -1192,3 +1192,88 @@ describe('field-level validation errors', () => {
     expect(await ticketRevision()).toBe(before);
   });
 });
+describe('member rank card', () => {
+  it('renders the actor’s own card from server state and saved preferences', async () => {
+    await db.record.deleteMany({
+      where: { guildId: GUILD, kind: 'level.profile' },
+    });
+    // A legacy preference shape saved before the shared contract existed.
+    await db.record.createMany({
+      data: [
+        {
+          guildId: GUILD,
+          kind: 'level.profile',
+          key: MEMBER,
+          ownerId: MEMBER,
+          data: json({
+            xp: 120,
+            publicProfile: false,
+            card: { avatarShape: 'square', background: 'light' },
+          }),
+        },
+        {
+          guildId: GUILD,
+          kind: 'level.profile',
+          key: ADMIN,
+          ownerId: ADMIN,
+          data: json({ xp: 900, publicProfile: false, card: {} }),
+        },
+      ],
+    });
+    const me = await app.inject({
+      method: 'GET',
+      url: `/api/v1/guilds/${GUILD}/levels/me`,
+      headers: headers(MEMBER),
+    });
+    expect(me.statusCode).toBe(200);
+    expect(
+      me.json<{ data: { profile: { card: unknown; rank: number } } }>().data
+        .profile,
+    ).toMatchObject({
+      rank: 2,
+      card: { avatarShape: 'rounded', theme: 'light', showXp: true },
+    });
+    const shown = await app.inject({
+      method: 'GET',
+      url: `/api/v1/guilds/${GUILD}/levels/me/card.png`,
+      headers: headers(MEMBER),
+    });
+    expect(shown.statusCode).toBe(200);
+    expect(shown.headers['content-type']).toBe('image/png');
+    expect(shown.headers['cache-control']).toContain('no-store');
+    expect(
+      decodeURIComponent(String(shown.headers['x-rank-summary'])),
+    ).toContain('120 XP');
+    const saved = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/guilds/${GUILD}/levels/preferences`,
+      headers: headers(MEMBER, 'rank-card-private'),
+      payload: {
+        publicProfile: false,
+        card: { showXp: false, showRank: false, accent: '#22C55E' },
+      },
+    });
+    expect(saved.statusCode).toBe(200);
+    const hidden = await app.inject({
+      method: 'GET',
+      url: `/api/v1/guilds/${GUILD}/levels/me/card.png`,
+      headers: headers(MEMBER),
+    });
+    const summary = decodeURIComponent(
+      String(hidden.headers['x-rank-summary']),
+    );
+    expect(summary).not.toMatch(/XP|Rank/);
+    expect(hidden.rawPayload.equals(shown.rawPayload)).toBe(false);
+    const invalid = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/guilds/${GUILD}/levels/preferences`,
+      headers: headers(MEMBER, 'rank-card-invalid'),
+      payload: { publicProfile: false, card: { accent: 'yellow' } },
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(
+      invalid.json<{ error: { fieldErrors: { path: string }[] } }>().error
+        .fieldErrors[0]?.path,
+    ).toBe('card.accent');
+  });
+});

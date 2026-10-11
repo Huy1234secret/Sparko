@@ -27,8 +27,8 @@ import {
   claimCrate,
   claimTicket,
   enterGiveaway,
-  getLevelProfile,
   invokeCustomCommand,
+  rankCardInput,
   jsonObject,
   openTicket,
   selectRoleMenu,
@@ -349,18 +349,10 @@ export class BotRuntime {
           return;
         }
         if (name === 'level') {
-          const profile = await this.platform.read(actor, (ctx) =>
-            getLevelProfile(ctx, actor.userId),
+          const input = await this.platform.read(actor, (ctx) =>
+            rankCardInput(ctx, actor.userId, interaction.user.displayName),
           );
-          const next = profile.nextLevelXp ?? profile.xp + 1;
-          const card = await renderRankCard({
-            memberName: interaction.user.displayName,
-            level: profile.level,
-            totalXp: profile.xp,
-            xpIntoLevel: Math.max(0, profile.xp - profile.previousLevelXp),
-            xpForNextLevel: Math.max(1, next - profile.previousLevelXp),
-            showRank: false,
-          });
+          const card = await renderRankCard(input);
           await interaction.editReply({
             content: card.summary,
             files: [{ attachment: card.buffer, name: 'sparko-rank.png' }],
@@ -370,7 +362,7 @@ export class BotRuntime {
         }
         if (name === 'leaderboard') {
           await response.send(
-            `View privacy-approved server progression: ${this.config.PUBLIC_APP_URL}/servers/${actor.guildId}/me/leaderboard`,
+            `View privacy-approved server progression: ${this.config.PUBLIC_APP_URL}/servers/${actor.guildId}/me#leaderboard`,
           );
           return;
         }

@@ -22,6 +22,7 @@ import {
   providerConfigSchemas,
   multiServerPlan,
   publicWidget,
+  rankCardInput,
   type ProviderTransport,
   type DomainRoute,
 } from '@sparko/domain';
@@ -44,6 +45,7 @@ import {
 } from './publication-resources.js';
 import { registerAssetRoutes } from './assets.js';
 import { discordAdapter, type DiscordAdapter } from './discord.js';
+import { renderRankCard } from '@sparko/rendering';
 const presets = [
   'small-community',
   'gaming',
@@ -774,6 +776,22 @@ export async function createApp(options: {
           db.featureConfig.findMany({ where: { guildId: actor.guildId } }),
       ),
     };
+  });
+  // The member's own card, built from server state exactly like Discord `/level`.
+  app.get('/api/v1/guilds/:guildId/levels/me/card.png', async (req, reply) => {
+    const { guildId } = z.object({ guildId: z.string() }).parse(req.params);
+    const actor = await auth.actor(req, guildId, 'member');
+    const user = await db.user.findUnique({ where: { id: actor.userId } });
+    const input = await platform.read(actor, (ctx) =>
+      rankCardInput(ctx, actor.userId, user?.username ?? 'Member'),
+    );
+    const card = await renderRankCard(input);
+    return reply
+      .header('content-type', 'image/png')
+      .header('cache-control', 'private, no-store')
+      .header('etag', '"' + card.hash + '"')
+      .header('x-rank-summary', encodeURIComponent(card.summary))
+      .send(card.buffer);
   });
   app.get('/api/v1/public/widgets/:guildId/:type', async (req) => {
     const p = z
