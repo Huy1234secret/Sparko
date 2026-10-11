@@ -98,6 +98,19 @@ export const ReplySchema = z.object({
   excludedRoleIds: roleIds,
   cooldownSeconds: z.number().int().min(5).max(86400).default(60),
 });
+/** NFKC, case-insensitive matching shared by the bot and the dashboard tester. */
+export function replyMatches(
+  rule: Pick<z.infer<typeof ReplySchema>, 'match' | 'pattern'>,
+  message: string,
+) {
+  const content = message.normalize('NFKC').toLocaleLowerCase(),
+    pattern = rule.pattern.trim().normalize('NFKC').toLocaleLowerCase();
+  return rule.match === 'exact'
+    ? content === pattern
+    : rule.match === 'contains'
+      ? content.includes(pattern)
+      : content.startsWith(pattern);
+}
 export const StickySchema = z.object({
   channelId: Snowflake,
   templateVersionId: z.string().uuid(),

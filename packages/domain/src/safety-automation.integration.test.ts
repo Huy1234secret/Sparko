@@ -376,6 +376,77 @@ describe('real PostgreSQL safety/time transactions and authority', () => {
       ),
     ).toMatchObject({ deliver: false });
   });
+  it('lists invite rewards only to analytics readers within their own server', async () => {
+    for (const [target, key] of [
+      [guildId, 'here'],
+      [otherGuildId, 'elsewhere'],
+    ] as const)
+      await db.record.create({
+        data: {
+          guildId: target,
+          kind: 'invite_reward',
+          key,
+          ownerId: otherId,
+          state: 'applied',
+          data: { memberId: userId, inviterId: otherId, roleId },
+        },
+      });
+    const rewards = (
+      await call(admin(), 'GET', '/invite-rewards', undefined, 'rewards-read')
+    ).data as { key: string }[];
+    expect(rewards.map((row) => row.key)).toEqual(['here']);
+    await expect(
+      call(
+        actor(otherId),
+        'GET',
+        '/invite-rewards',
+        undefined,
+        'rewards-member',
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+  it('matches auto replies case- and width-insensitively with one shared rule', async () => {
+    const reply = (
+      await call(
+        admin(),
+        'POST',
+        '/replies',
+        {
+          name: 'Rules',
+          match: 'contains',
+          pattern: 'rules',
+          text: 'See #rules',
+        },
+        'reply-create',
+      )
+    ).data as { id: string };
+    const message = (id: string, content: string) =>
+      mutate(admin(), `reply-${id}`, (ctx) =>
+        ingestAutomationEvent(ctx, {
+          type: 'message',
+          id,
+          userId: otherId,
+          channelId,
+          content,
+          roleIds: [],
+          bot: false,
+          webhook: false,
+          at: new Date().toISOString(),
+        }),
+      );
+    await message('723456789012345671', 'hello there');
+    expect(
+      await db.outbox.count({ where: { guildId, type: 'automation.send' } }),
+    ).toBe(0);
+    await message('723456789012345672', 'Where are the ＲＵＬＥＳ?');
+    const sent = await db.outbox.findFirstOrThrow({
+      where: { guildId, type: 'automation.send' },
+    });
+    expect(jsonObject(sent.payload)).toMatchObject({
+      recordId: reply.id,
+      text: 'See #rules',
+    });
+  });
   it('serializes the final RSVP place and promotes exactly one waitlisted member after a departure', async () => {
     const created = await call(
       admin(),

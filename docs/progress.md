@@ -5,7 +5,8 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 ## Resume checkpoint
 
 - `main` contains M1–M3 ([PR #2](https://github.com/Huy1234secret/Sparko/pull/2), [PR #3](https://github.com/Huy1234secret/Sparko/pull/3), [PR #4](https://github.com/Huy1234secret/Sparko/pull/4)), the vendored project skills ([PR #5](https://github.com/Huy1234secret/Sparko/pull/5)) and the UI/UX pass ([PR #6](https://github.com/Huy1234secret/Sparko/pull/6), `3303fbe`).
-- M4 is delivered from `claude/clever-lovelace-b5a124`. It merged the paused M4 branch `claude/amazing-maxwell-yonuhl` (`cafe717`, kept intact on the remote) onto the UI pass. See `docs/milestones/m4.md`.
+- M4 merged ([PR #7](https://github.com/Huy1234secret/Sparko/pull/7), `396bfdd`). It merged the paused M4 branch `claude/amazing-maxwell-yonuhl` (`cafe717`, kept intact on the remote) onto the UI pass. See `docs/milestones/m4.md`.
+- M5 is delivered from `claude/clever-lovelace-b5a124`, restarted from `396bfdd`. See `docs/milestones/m5.md`.
 - Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head; the next milestone restarts the working branch from the merged `main`.
 
 ## Milestone / PR state
@@ -17,13 +18,13 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 | M2 Message platform         | **Merged**      | [PR #3](https://github.com/Huy1234secret/Sparko/pull/3) (`338bd6a`). See `docs/milestones/m2.md`.                                                                         |
 | M3 Community                | **Merged**      | [PR #4](https://github.com/Huy1234secret/Sparko/pull/4) (`8108330`). See `docs/milestones/m3.md`.                                                                         |
 | UI/UX pass over M1–M3       | **Merged**      | [PR #6](https://github.com/Huy1234secret/Sparko/pull/6) (`3303fbe`). See `docs/milestones/ui-pass.md`.                                                                    |
-| M4 Safety/support expansion | **PR**          | All local gates pass. See `docs/milestones/m4.md`; PR and CI recorded on merge.                                                                                           |
-| M5 Time and automation      | Next            | Backend substantial (`docs/safety-automation.md`); typed UI and combined acceptance remain.                                                                               |
+| M4 Safety/support expansion | **Merged**      | [PR #7](https://github.com/Huy1234secret/Sparko/pull/7) (`396bfdd`). See `docs/milestones/m4.md`.                                                                         |
+| M5 Time and automation      | **PR**          | All local gates pass. See `docs/milestones/m5.md`; PR and CI recorded on merge.                                                                                           |
 | M6–M9                       | Partial backend | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
 
-## Verification record (M4 source)
+## Verification record (M5 source)
 
-Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 233 unit, 152 PostgreSQL integration and 16 browser tests pass.
+Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 251 unit, 154 PostgreSQL integration and 19 browser tests pass.
 
 All browser/integration tests use a controlled external Discord boundary. They do not prove live Discord acceptance.
 
@@ -45,13 +46,19 @@ Resolved: typed moderation (timed bans/locks), forms and staged review, reports/
 
 Still open: automatic waiting-for-member transitions on member replies and every Gateway-driven safety signal need live observation; staff availability is self-reported; anti-nuke never punishes automatically or recreates deleted resources (by design).
 
+## M5 outcome and remaining time/automation limits
+
+Resolved: typed workspaces for polls, events/RSVP, reminders, birthdays, temporary voice, invite tracking and rewards, scheduled messages, auto replies, sticky messages, workflows (typed step builder with an engine-rule dry run, no JSON) and custom commands; member-side voting, RSVP, reminders, birthday and voice-room controls in the member profile; zone-aware time editing that matches the server's DST rules; `GET /invite-rewards`; one shared auto-reply matcher.
+
+Still open: fresh role eligibility at waitlist promotion; ambiguous voice-room creation reconciliation; every Gateway-driven automation (messages, joins, voice, invites) and command registration need live observation; lists show Discord user IDs rather than display names.
+
 ## Next concrete action
 
-Merge M4, restart the working branch from `main`, then M5: typed time and automation workspaces on the shared design system and their combined browser journey. That covers polls, events and RSVP, reminders, birthdays, temporary voice, invite tracking and rewards, schedules, auto replies, sticky messages, workflows and custom commands. Start from the routes in `docs/safety-automation.md` and the generic module pages, and build typed pages the same way as M3/M4 (`apps/web/src/features/config`).
+Merge M5, restart the working branch from `main`, then M6: persist owner feature policy separately and enforce shared plan/prerequisite/runtime gates in direct Gateway, workflow and worker paths (see the M6 line below and `docs/feature-traceability.md`).
 
 ## Later exact gaps / external prerequisites
 
-M4–M5: full staff/ticket/forms/safety/time UI; timed lock/ban expiry; full anti-nuke response/restoration; fresh waitlist eligibility; ambiguous temporary-voice creation reconciliation; workflow recovery. Invite ambiguity stays unknown rather than fabricated.
+M4–M5 (delivered; residual): full anti-nuke response/restoration (by design unsupported); fresh waitlist eligibility; ambiguous temporary-voice creation reconciliation. Invite ambiguity stays unknown rather than fabricated.
 
 M6: persist owner feature policy separately; enforce shared plan/prerequisite/runtime gates in direct Gateway/workflow/worker paths while allowing cleanup/refunds/privacy maintenance. Uniform plan limits, delegated resource discovery, `/account/billing` route, support-only owner navigation/read scopes, support replies/attachments/status, grants, privacy export kinds and commercial lifecycle UI remain.
 

@@ -18,9 +18,12 @@ type FormProps<T extends FieldValues> = {
   label: string;
   hint?: string;
 };
+/** A field's message; list-level messages (field arrays) sit under `root`. */
 export function fieldError(form: UseFormReturn<FieldValues>, name: string) {
-  return (get(form.formState.errors, name) as { message?: string } | undefined)
-    ?.message;
+  const error = get(form.formState.errors, name) as
+    | { message?: string; root?: { message?: string } }
+    | undefined;
+  return error?.message ?? error?.root?.message;
 }
 const fieldId = (name: string) => 'cfg-' + name.replace(/\W+/g, '-');
 
