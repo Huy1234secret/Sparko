@@ -2545,6 +2545,12 @@ td {
     display: flex;
     flex-direction: column;
   }
+  .studio-layout > aside > .card {
+    align-self: stretch;
+  }
+  .block-add .field {
+    width: 100%;
+  }
   .studio-toolbar {
     flex-wrap: wrap;
   }

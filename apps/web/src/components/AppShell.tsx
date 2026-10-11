@@ -259,7 +259,12 @@ const nav = [
   { label: 'Community', path: '/community', icon: Users },
   { label: 'Tickets & support', path: '/support/tickets', icon: Ticket },
   { label: 'Safety', path: '/safety', icon: Shield },
-  { label: 'Message Studio', path: '/messages/studio', icon: MessageSquare },
+  {
+    label: 'Message Studio',
+    path: '/messages/studio',
+    icon: MessageSquare,
+    group: '/messages/',
+  },
   { label: 'Automation', path: '/automations', icon: Bell },
   { label: 'Insights', path: '/insights/analytics', icon: BarChart3 },
   { label: 'Server settings', path: '/settings', icon: Settings },
@@ -309,11 +314,17 @@ export function DashboardShell() {
       <nav className="sidebar-nav" aria-label="Workspace navigation">
         <p className="nav-label">WORKSPACE</p>
         {guildId ? (
-          nav.map(({ label, path, icon: Icon }) => (
+          nav.map(({ label, path, icon: Icon, group }) => (
             <NavLink
               key={path}
               to={`/dashboard/${guildId}${path}`}
               end={path === ''}
+              className={({ isActive }) =>
+                isActive ||
+                (group && pathname.startsWith(`/dashboard/${guildId}${group}`))
+                  ? 'active'
+                  : ''
+              }
               onClick={() => ui.setSidebarOpen(false)}
             >
               <Icon size={18} />

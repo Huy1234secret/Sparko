@@ -330,4 +330,34 @@ describe('Studio draft ownership', () => {
     expect(newSave?.[1]).toMatchObject({ id: otherTemplate.id, revision: 4 });
     expect(newSave?.[2].name).toBe('Other server template revised');
   });
+  it('deep links focus the publication inventory inside the same Studio', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/dashboard/:guildId/messages/publications',
+          element: <StudioPage section="publications" />,
+        },
+      ],
+      { initialEntries: [`/dashboard/${guildId}/messages/publications`] },
+    );
+    dispose.push(() => {
+      router.dispose();
+      client.clear();
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Publication inventory' })
+          .parentElement,
+      ).toHaveFocus(),
+    );
+    expect(screen.getByLabelText('Design name')).toBeVisible();
+  });
 });

@@ -121,7 +121,7 @@ export function TemplateLibrary({
   };
   return (
     <>
-      <Card>
+      <Card id="template-library" tabIndex={-1}>
         <h2>Your template library</h2>
         {pending ? (
           <LoadingState />

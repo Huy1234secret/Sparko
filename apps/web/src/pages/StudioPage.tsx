@@ -135,8 +135,21 @@ function PublicationFeedback({ publication }: { publication: Publication }) {
   );
 }
 
-export function StudioPage() {
+export function StudioPage({
+  section,
+}: {
+  /** Deep link to the template library or publication inventory. */
+  section?: 'templates' | 'publications' | undefined;
+} = {}) {
   const { guildId = '' } = useParams();
+  useEffect(() => {
+    if (!section) return;
+    const target = window.document.getElementById(
+      section === 'templates' ? 'template-library' : 'publication-inventory',
+    );
+    target?.scrollIntoView?.({ block: 'start' });
+    target?.focus({ preventScroll: true });
+  }, [section, guildId]);
   return <StudioEditor key={guildId} />;
 }
 
@@ -1533,7 +1546,7 @@ function StudioEditor() {
           }}
           dirty={dirty}
         />
-        <Card>
+        <Card id="publication-inventory" tabIndex={-1}>
           <h2>Publication inventory</h2>
           {publications.data?.length ? (
             publications.data.map((publication) => (

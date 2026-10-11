@@ -130,11 +130,11 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'dashboard/:guildId/messages/templates',
-                element: <Studio />,
+                element: <Studio section="templates" />,
               },
               {
                 path: 'dashboard/:guildId/messages/publications',
-                element: <Studio />,
+                element: <Studio section="publications" />,
               },
               {
                 path: 'dashboard/:guildId/insights/analytics',
