@@ -21,7 +21,7 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: '../../node_modules/.bin/vite --host 127.0.0.1',
+      command: 'pnpm exec vite --host 127.0.0.1',
       env: { SPARKO_E2E: 'true' },
       cwd: 'apps/web',
       url: 'http://localhost:5173',
