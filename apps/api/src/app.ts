@@ -526,6 +526,68 @@ export async function createApp(options: {
           },
     };
   });
+  /**
+   * Every channel or role a setting names must exist in this server now.
+   * Keys ending in ChannelId(s)/RoleId(s), at any depth, are checked so new
+   * modules are covered without per-feature code.
+   */
+  async function assertConfigReferences(guildId: string, config: unknown) {
+    const channels: { path: string; id: string }[] = [],
+      roles: { path: string; id: string }[] = [];
+    function visit(value: unknown, path: string[]): void {
+      if (Array.isArray(value))
+        return value.forEach((item, index) =>
+          visit(item, [...path, String(index)]),
+        );
+      if (!value || typeof value !== 'object') return;
+      for (const [key, item] of Object.entries(value)) {
+        const target = /channelIds?$/i.test(key)
+          ? channels
+          : /roleIds?$/i.test(key)
+            ? roles
+            : null;
+        if (target && typeof item === 'string')
+          target.push({ path: [...path, key].join('.'), id: item });
+        else if (target && Array.isArray(item))
+          item.forEach((id, index) => {
+            if (typeof id === 'string')
+              target.push({
+                path: [...path, key, String(index)].join('.'),
+                id,
+              });
+          });
+        else if (key !== 'document' && !key.endsWith('Document'))
+          visit(item, [...path, key]);
+      }
+    }
+    visit(config, []);
+    if (!channels.length && !roles.length) return;
+    const [known, knownRoles] = await Promise.all([
+      channels.length ? discord.channels(guildId) : Promise.resolve([]),
+      roles.length ? discord.roles(guildId) : Promise.resolve([]),
+    ]);
+    const fieldErrors = [
+      ...channels
+        .filter((ref) => !known.some((channel) => channel.id === ref.id))
+        .map((ref) => ({
+          path: ref.path,
+          message: 'This channel no longer exists or Sparko cannot see it.',
+        })),
+      ...roles
+        .filter((ref) => !knownRoles.some((role) => role.id === ref.id))
+        .map((ref) => ({
+          path: ref.path,
+          message: 'This role no longer exists in the server.',
+        })),
+    ];
+    if (fieldErrors.length)
+      throw new DomainError(
+        'INVALID_INPUT',
+        'A selected channel or role is unavailable.',
+        400,
+        { fieldErrors },
+      );
+  }
   app.put('/api/v1/guilds/:guildId/features/:featureId/config', async (req) => {
     const mutationSession = await auth.csrf(req);
     const p = z
@@ -542,6 +604,7 @@ export async function createApp(options: {
         })
         .parse(req.body),
       cfg = schema.parse(body.config);
+    if (p.featureId !== 'tickets') await assertConfigReferences(p.guildId, cfg);
     if (p.featureId === 'tickets') {
       const tc = TicketConfigSchema.parse(cfg),
         roles = await discord.roles(p.guildId),

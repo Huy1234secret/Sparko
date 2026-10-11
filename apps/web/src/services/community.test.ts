@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ConfigSchema } from './guilds';
 import {
   CrateDropSchema,
   GiveawayRecordSchema,
@@ -79,5 +80,22 @@ describe('typed community records', () => {
     });
     expect(row.votes?.score).toBe(2);
     expect(row.data.decisions[0]?.status).toBe('planned');
+  });
+  it('accepts prerequisites reported with their setting path', () => {
+    expect(
+      ConfigSchema.parse({
+        featureId: 'R19',
+        revision: 1,
+        appliedRevision: 1,
+        config: {},
+        missingPrerequisites: [
+          { path: 'channelId', message: 'Choose a channel.' },
+          'Enable the Server Members intent.',
+        ],
+      }).missingPrerequisites,
+    ).toEqual([
+      'channelId: Choose a channel.',
+      'Enable the Server Members intent.',
+    ]);
   });
 });

@@ -1299,3 +1299,37 @@ describe('role resources', () => {
     expect(roles.find((role) => role.id === BOT)?.assignable).toBe(false);
   });
 });
+describe('module configuration references', () => {
+  it('names each unknown channel or role at its exact setting path', async () => {
+    const where = {
+      guildId_featureId: { guildId: GUILD, featureId: 'R09' },
+    };
+    const before =
+      (await db.featureConfig.findUnique({ where }))?.revision ?? 0;
+    const result = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/guilds/${GUILD}/features/R09/config`,
+      headers: headers(ADMIN, 'reference-preflight'),
+      payload: {
+        expectedRevision: before,
+        config: {
+          enabled: true,
+          excludedRoleIds: [STAFF_A, '911111111111111198'],
+          channelMultipliers: [
+            { channelId: '911111111111111197', multiplier: 2 },
+          ],
+        },
+      },
+    });
+    expect(result.statusCode).toBe(400);
+    expect(
+      result
+        .json<{ error: { fieldErrors: { path: string }[] } }>()
+        .error.fieldErrors.map((item) => item.path)
+        .sort(),
+    ).toEqual(['channelMultipliers.0.channelId', 'excludedRoleIds.1']);
+    expect((await db.featureConfig.findUnique({ where }))?.revision ?? 0).toBe(
+      before,
+    );
+  });
+});

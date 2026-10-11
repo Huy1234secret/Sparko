@@ -617,6 +617,18 @@ export class EffectExecutor {
       },
       data: { state: 'applied', appliedRevision: publication.revision },
     });
+    // A module record waiting on this delivery should open now, not after
+    // its 30-second retry for a still-pending publication.
+    if (applied.count)
+      await this.db.outbox.updateMany({
+        where: {
+          guildId: work.guildId,
+          type: 'community.publication.applied',
+          state: 'retry',
+          payload: { path: ['publicationId'], equals: publication.id },
+        },
+        data: { dueAt: new Date() },
+      });
     if (!applied.count) {
       const current = await this.db.publication.findFirst({
         where: { id: publication.id, guildId: work.guildId },

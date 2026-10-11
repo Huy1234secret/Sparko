@@ -1350,8 +1350,18 @@ describe('PostgreSQL worker execution and recovery', () => {
       expect(
         (await db.record.findUniqueOrThrow({ where: { id: menu.id } })).state,
       ).toBe('publishing');
+      const waiting = await db.outbox.findUniqueOrThrow({
+        where: { id: applied.id },
+      });
+      expect(waiting.dueAt.getTime()).toBeGreaterThan(Date.now() + 20_000);
       await processOutbox(db, discord, (await pending('publication.send')).id);
-      await retry(applied.id);
+      // The applied delivery wakes the waiting check instead of leaving the
+      // menu in "publishing" for the rest of the retry delay.
+      expect(
+        (
+          await db.outbox.findUniqueOrThrow({ where: { id: applied.id } })
+        ).dueAt.getTime(),
+      ).toBeLessThanOrEqual(Date.now());
       await processOutbox(db, discord, applied.id);
       const published = await db.record.findUniqueOrThrow({
         where: { id: menu.id },

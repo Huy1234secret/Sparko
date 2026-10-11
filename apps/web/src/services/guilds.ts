@@ -84,7 +84,19 @@ export const ConfigSchema = z.object({
   appliedRevision: z.number(),
   config: z.record(z.string(), z.unknown()),
   setupState: z.enum(['configured', 'unconfigured']).optional(),
-  missingPrerequisites: z.array(z.string()).default([]),
+  // The API reports each unmet requirement with the setting it belongs to.
+  missingPrerequisites: z
+    .array(
+      z.union([
+        z.string(),
+        z
+          .object({ path: z.string(), message: z.string() })
+          .transform((item) =>
+            item.path ? `${item.path}: ${item.message}` : item.message,
+          ),
+      ]),
+    )
+    .default([]),
 });
 export type FeatureConfig = z.infer<typeof ConfigSchema>;
 export const getGuilds = (signal?: AbortSignal) =>
