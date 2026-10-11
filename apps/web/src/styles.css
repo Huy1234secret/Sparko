@@ -3631,3 +3631,25 @@ textarea[aria-invalid='true'] {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.team-panel {
+  margin-bottom: 22px;
+}
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 8px;
+}
+.team-grid h3 {
+  margin-top: 0;
+}
+.sla-list {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.sla-list li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}

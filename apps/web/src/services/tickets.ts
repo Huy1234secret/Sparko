@@ -17,6 +17,10 @@ export const TicketSchema = z
     answers: z.record(z.string(), z.string()).optional(),
     participants: z.array(z.string()).default([]),
     transcriptStatus: z.string().nullable().optional(),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+    claimedAt: z.string().nullable().optional(),
+    remindedAt: z.string().nullable().optional(),
+    escalatedAt: z.string().nullable().optional(),
     events: z
       .array(
         z.object({
@@ -126,3 +130,45 @@ export const updateTicket = (
     TicketSchema,
     key,
   );
+
+export type TicketPriority = Ticket['priority'];
+export const StaffMemberSchema = z.object({
+  userId: z.string(),
+  status: z.enum(['available', 'away', 'off']),
+  note: z.string(),
+  updatedAt: z.string(),
+  claimed: z.number(),
+});
+export type StaffMember = z.infer<typeof StaffMemberSchema>;
+export const getTicketStaff = (guild: string, signal?: AbortSignal) =>
+  read(`/guilds/${guild}/tickets/staff`, z.array(StaffMemberSchema), signal);
+export const setMyAvailability = (
+  guild: string,
+  body: { status: StaffMember['status']; note: string },
+  key: string,
+) =>
+  mutate(
+    'put',
+    `/guilds/${guild}/tickets/staff/me`,
+    body,
+    z.object({ status: z.string() }).loose(),
+    key,
+  );
+export const TicketMetricsSchema = z.object({
+  windowDays: z.number(),
+  definitions: z.object({ firstClaim: z.string(), resolution: z.string() }),
+  open: z.number(),
+  unclaimed: z.number(),
+  urgent: z.number(),
+  opened: z.number(),
+  closed: z.number(),
+  escalated: z.number(),
+  medianFirstClaimMinutes: z.number().nullable(),
+  medianResolutionMinutes: z.number().nullable(),
+  staff: z.array(
+    z.object({ userId: z.string(), claimed: z.number(), closed: z.number() }),
+  ),
+});
+export type TicketMetrics = z.infer<typeof TicketMetricsSchema>;
+export const getTicketMetrics = (guild: string, signal?: AbortSignal) =>
+  read(`/guilds/${guild}/tickets/metrics`, TicketMetricsSchema, signal);

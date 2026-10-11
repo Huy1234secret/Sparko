@@ -1106,6 +1106,97 @@ describe('PostgreSQL worker execution and recovery', () => {
     expect(discord.sends).toBe(1);
     expect(discord.messageStore).toHaveLength(1);
   });
+  it('reminds and escalates an unclaimed ticket once, and stays quiet after a claim', async () => {
+    const staffRole = '423456789012345678';
+    const escalationRole = '423456789012345679';
+    const snapshot = TicketConfigSchema.parse({
+      enabled: true,
+      staffRoleIds: [staffRole],
+      workflow: {
+        reminderMinutes: 15,
+        escalationMinutes: 60,
+        escalationRoleId: escalationRole,
+      },
+    });
+    const ticket = await db.ticket.create({
+      data: {
+        guildId,
+        number: 7,
+        ownerId,
+        participants: [ownerId],
+        snapshot: json(snapshot),
+        answers: {},
+        state: 'open',
+        channelId,
+      },
+    });
+    const sendsBefore = discord.sends;
+    const bodies: unknown[] = [];
+    const send = discord.send.bind(discord);
+    discord.send = (id, body, key) => {
+      bodies.push(body);
+      return send(id, body, key);
+    };
+    const reminder = await effect('ticket.sla', {
+      ticketId: ticket.id,
+      stage: 'reminder',
+    });
+    await processOutbox(db, discord, reminder.id);
+    await processOutbox(db, discord, reminder.id);
+    expect(discord.sends).toBe(sendsBefore + 1);
+    const sent = bodies.at(-1) as {
+      content?: string;
+      allowed_mentions?: { roles?: string[] };
+    };
+    expect(sent.content).toContain(`<@&${staffRole}>`);
+    expect(sent.allowed_mentions?.roles).toEqual([staffRole]);
+    const reminded = await db.ticket.findUniqueOrThrow({
+      where: { id: ticket.id },
+    });
+    expect(reminded.remindedAt).not.toBeNull();
+    expect(reminded.priority).toBe('normal');
+    const escalation = await effect('ticket.sla', {
+      ticketId: ticket.id,
+      stage: 'escalation',
+    });
+    await processOutbox(db, discord, escalation.id);
+    const escalated = await db.ticket.findUniqueOrThrow({
+      where: { id: ticket.id },
+    });
+    expect(escalated.priority).toBe('high');
+    expect(escalated.escalatedAt).not.toBeNull();
+    expect(escalated.revision).toBe(reminded.revision + 1);
+    expect((bodies.at(-1) as { content?: string }).content).toContain(
+      `<@&${escalationRole}>`,
+    );
+    discord.send = send;
+
+    // A claimed ticket ignores a late timer.
+    const claimed = await db.ticket.create({
+      data: {
+        guildId,
+        number: 8,
+        ownerId,
+        participants: [ownerId],
+        snapshot: json(snapshot),
+        answers: {},
+        state: 'claimed',
+        claimantId: '523456789012345678',
+        channelId: '623456789012345678',
+      },
+    });
+    const late = await effect('ticket.sla', {
+      ticketId: claimed.id,
+      stage: 'escalation',
+    });
+    const sends = discord.sends;
+    await processOutbox(db, discord, late.id);
+    expect(discord.sends).toBe(sends);
+    expect(
+      (await db.ticket.findUniqueOrThrow({ where: { id: claimed.id } }))
+        .priority,
+    ).toBe('normal');
+  });
   it('reconciles a tracked accepted message without sending again after a response loss', async () => {
     const work = await effect('community.message', {
       featureId: 'R19',

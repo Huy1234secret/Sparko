@@ -89,6 +89,7 @@ export function isResourceCreation(type: string): boolean {
     'publication.update',
     'ticket.create',
     'ticket.welcome',
+    'ticket.sla',
     'community.message',
     'community.crate.publish',
     'community.giveaway.publish',

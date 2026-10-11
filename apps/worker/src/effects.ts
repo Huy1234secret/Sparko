@@ -208,6 +208,65 @@ export class EffectExecutor {
       );
       return;
     }
+    if (work.type === 'ticket.sla') {
+      const stage = z.enum(['reminder', 'escalation']).parse(p['stage']);
+      const ticket = await this.db.ticket.findFirst({
+        where: { id: ID.parse(p['ticketId']), guildId: work.guildId },
+      });
+      // Claimed, closed or not-yet-created tickets need no nudge.
+      if (
+        !ticket?.channelId ||
+        ticket.claimantId ||
+        !['open', 'awaiting_staff'].includes(ticket.state) ||
+        (stage === 'reminder' ? ticket.remindedAt : ticket.escalatedAt)
+      )
+        return;
+      const { workflow, staffRoleIds } = TicketConfigSchema.parse(
+        ticket.snapshot,
+      );
+      const roles =
+        stage === 'escalation' && workflow.escalationRoleId
+          ? [workflow.escalationRoleId]
+          : staffRoleIds;
+      const waited =
+        stage === 'reminder'
+          ? workflow.reminderMinutes
+          : workflow.escalationMinutes;
+      await this.discord.channelPermissions(
+        work.guildId,
+        ticket.channelId,
+        sendPermissions,
+      );
+      // The tracked send is idempotent per job, so a retry never posts twice.
+      await this.sendTracked(work, ticket.channelId, {
+        content:
+          `${roles.map((id) => `<@&${id}>`).join(' ')} Ticket #${ticket.number} has waited ${waited ?? '?'} minutes without a staff member.${stage === 'escalation' ? ' It is now high priority.' : ''}`.slice(
+            0,
+            2000,
+          ),
+        allowed_mentions: { parse: [], roles },
+      });
+      await this.db.ticket.updateMany({
+        where: {
+          id: ticket.id,
+          claimantId: null,
+          ...(stage === 'reminder'
+            ? { remindedAt: null }
+            : { escalatedAt: null }),
+        },
+        data:
+          stage === 'reminder'
+            ? { remindedAt: new Date() }
+            : {
+                escalatedAt: new Date(),
+                ...(['low', 'normal'].includes(ticket.priority)
+                  ? { priority: 'high' }
+                  : {}),
+                revision: { increment: 1 },
+              },
+      });
+      return;
+    }
     if (work.type === 'ticket.cleanup') {
       const ticket = await this.db.ticket.findFirst({
         where: { id: ID.parse(p['ticketId']), guildId: work.guildId },
