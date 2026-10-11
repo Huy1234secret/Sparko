@@ -2915,7 +2915,9 @@ export class EffectExecutor {
         work,
         channelId,
         textPayload(
-          `Sparko ${String(p['kind'])}: ${record.state}. ${String(data['reason'] ?? last['reason'] ?? 'Open your permitted dashboard record for details.')}`,
+          p['kind'] === 'case'
+            ? `Sparko moderation case #${String(data['number'])} (${String(data['action'])}): ${String(data['reason'] ?? '')}\nIf you think this was a mistake, you can appeal it from your member profile on the Sparko dashboard.`
+            : `Sparko ${String(p['kind'])}: ${record.state}. ${String(data['reason'] ?? last['reason'] ?? 'Open your permitted dashboard record for details.')}`,
         ),
       );
       return;

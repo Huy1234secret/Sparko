@@ -477,6 +477,32 @@ export const safetyRoutes: DomainRoute[] = [
       return updated;
     },
   ),
+  // A member's own cases, for appeals. Private notes and staff notes stay hidden.
+  formRoute('GET', '/cases/mine', 'member', undefined, async (ctx) => {
+    const [cases, appeals] = await Promise.all([
+      list(ctx, 'moderation_case'),
+      list(ctx, 'appeal'),
+    ]);
+    const appealed = new Set(
+      appeals.map((appeal) => String(jsonObject(appeal.data)['caseId'])),
+    );
+    return cases
+      .filter((row) => jsonObject(row.data)['action'] !== 'note')
+      .map((row) => {
+        const data = jsonObject(row.data);
+        return {
+          id: row.id,
+          number: Number(data['number']),
+          action: String(data['action']),
+          reason: String(data['reason'] ?? ''),
+          state: row.state,
+          createdAt: row.createdAt,
+          appealed: appealed.has(row.id),
+          appealable:
+            ['active', 'applied'].includes(row.state) && !appealed.has(row.id),
+        };
+      });
+  }),
   formRoute('GET', '/cases', 'moderation.read', undefined, async (ctx) => {
     const cases = await list(ctx, 'moderation_case', true);
     // Show what Discord actually did: a pending case may be blocked or failed.

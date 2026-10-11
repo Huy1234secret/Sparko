@@ -364,3 +364,68 @@ export function DocumentField<T extends FieldValues>({
     />
   );
 }
+/** One role; with `assigns`, roles Sparko cannot grant are listed but disabled. */
+export function RoleField<T extends FieldValues>({
+  form,
+  name,
+  label,
+  hint,
+  guildId,
+  assigns = false,
+  placeholder = 'Choose a role',
+}: FormProps<T> & {
+  guildId: string;
+  assigns?: boolean;
+  placeholder?: string;
+}) {
+  const roles = useRoles(guildId);
+  const id = fieldId(name);
+  return (
+    <Field
+      label={label}
+      htmlFor={id}
+      hint={hint}
+      error={fieldError(form as never, name)}
+    >
+      <Controller
+        control={form.control}
+        name={name}
+        render={({ field }) => (
+          <select
+            id={id}
+            value={(field.value as string | undefined) ?? ''}
+            onChange={(event) =>
+              field.onChange(event.target.value || undefined)
+            }
+            onBlur={field.onBlur}
+            ref={field.ref}
+            disabled={roles.isPending}
+          >
+            <option value="">
+              {roles.isPending ? 'Loading roles…' : placeholder}
+            </option>
+            {roles.data
+              ?.filter((role) => !role.managed && role.id !== guildId)
+              .map((role) => (
+                <option
+                  key={role.id}
+                  value={role.id}
+                  disabled={
+                    assigns &&
+                    (role.privileged === true || role.assignable === false)
+                  }
+                >
+                  {role.name}
+                  {assigns && role.privileged
+                    ? ' — has moderator permissions'
+                    : assigns && role.assignable === false
+                      ? ' — above Sparko’s role'
+                      : ''}
+                </option>
+              ))}
+          </select>
+        )}
+      />
+    </Field>
+  );
+}

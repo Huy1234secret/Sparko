@@ -165,3 +165,211 @@ export const reviewApplication = (
     z.unknown(),
     key,
   );
+
+// Reports and appeals
+const IntakeHistorySchema = z
+  .array(
+    z.object({
+      decision: z.string(),
+      reason: z.string(),
+      reviewerId: z.string(),
+      at: z.string(),
+    }),
+  )
+  .default([]);
+export const ReportRecordSchema = record(
+  z
+    .object({
+      subject: z.string(),
+      targetId: z.string().optional(),
+      description: z.string(),
+      evidence: z.array(z.string()).default([]),
+      history: IntakeHistorySchema,
+    })
+    .loose(),
+);
+export const AppealRecordSchema = record(
+  z
+    .object({
+      caseId: z.string(),
+      description: z.string(),
+      history: IntakeHistorySchema,
+    })
+    .loose(),
+);
+export type ReportRecord = z.infer<typeof ReportRecordSchema>;
+export type AppealRecord = z.infer<typeof AppealRecordSchema>;
+export type IntakeKind = 'report' | 'appeal';
+export const getIntake = (
+  guild: string,
+  kind: IntakeKind,
+  signal?: AbortSignal,
+) =>
+  read(
+    `/guilds/${guild}/${kind}s`,
+    z.array(kind === 'report' ? ReportRecordSchema : AppealRecordSchema),
+    signal,
+  ) as Promise<(ReportRecord | AppealRecord)[]>;
+export const submitReport = (
+  guild: string,
+  body: {
+    subject: string;
+    targetId?: string;
+    description: string;
+    evidence: string[];
+  },
+  key: string,
+) => mutate('post', `/guilds/${guild}/reports`, body, ReportRecordSchema, key);
+export const submitAppeal = (
+  guild: string,
+  body: { caseId: string; description: string },
+  key: string,
+) => mutate('post', `/guilds/${guild}/appeals`, body, AppealRecordSchema, key);
+export const decideIntake = (
+  guild: string,
+  kind: IntakeKind,
+  id: string,
+  body: {
+    expectedRevision: number;
+    decision: 'investigating' | 'accepted' | 'rejected' | 'closed';
+    reason: string;
+  },
+  key: string,
+) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/${kind}s/${id}/decision`,
+    body,
+    z.unknown(),
+    key,
+  );
+
+// Automod, raid guard and anti-nuke incidents
+export const IncidentRecordSchema = record(
+  z
+    .object({
+      feature: z.string(),
+      userId: z.string().optional(),
+      channelId: z.string().optional(),
+      ruleId: z.string().optional(),
+      detail: z.string().optional(),
+      plannedAction: z.string().optional(),
+      mode: z.string().optional(),
+      burstCount: z.number().optional(),
+      attribution: z.string().optional(),
+      recoveryLimits: z.string().optional(),
+      event: z
+        .object({
+          type: z.string(),
+          action: z.string().optional(),
+          resourceId: z.string().optional(),
+          executorId: z.string().optional(),
+          userId: z.string().optional(),
+        })
+        .loose()
+        .optional(),
+      recovery: z
+        .object({
+          actorId: z.string(),
+          reason: z.string(),
+          at: z.string(),
+          policy: z.string(),
+        })
+        .optional(),
+    })
+    .loose(),
+);
+export type IncidentRecord = z.infer<typeof IncidentRecordSchema>;
+export const getIncidents = (guild: string, signal?: AbortSignal) =>
+  read(
+    `/guilds/${guild}/safety/incidents`,
+    z.array(IncidentRecordSchema),
+    signal,
+  );
+export const recoverIncident = (
+  guild: string,
+  id: string,
+  body: { expectedRevision: number; reason: string },
+  key: string,
+) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/safety/incidents/${id}/recover`,
+    body,
+    IncidentRecordSchema,
+    key,
+  );
+export const RuleTestResultSchema = z.object({
+  matched: z.boolean(),
+  detail: z.string(),
+  plannedAction: z.string().nullable(),
+  simulation: z.literal(true),
+});
+export const testSafetyRule = (
+  guild: string,
+  body: {
+    rule: unknown;
+    message: {
+      content: string;
+      mentionCount: number;
+      attachmentCount: number;
+      recentCount: number;
+      duplicateCount: number;
+    };
+  },
+  key: string,
+) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/safety/test`,
+    body,
+    RuleTestResultSchema,
+    key,
+  );
+
+// Member verification
+export const VerificationChallengeSchema = z.object({
+  id: z.string().optional(),
+  challenge: z.string().optional(),
+  question: z.string().optional(),
+  rulesVersion: z.number(),
+  rulesText: z.string(),
+});
+export const startVerification = (guild: string, key: string) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/verification/challenge`,
+    {},
+    VerificationChallengeSchema,
+    key,
+  );
+export const completeVerification = (
+  guild: string,
+  body: {
+    rulesVersion: number;
+    acknowledge: true;
+    challengeId?: string;
+    answer?: string;
+  },
+  key: string,
+) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/verification/verify`,
+    body,
+    z.object({ state: z.string() }).loose(),
+    key,
+  );
+export const MyCaseSchema = z.object({
+  id: z.string(),
+  number: z.number(),
+  action: z.string(),
+  reason: z.string(),
+  state: z.string(),
+  createdAt: z.string(),
+  appealed: z.boolean(),
+  appealable: z.boolean(),
+});
+export type MyCase = z.infer<typeof MyCaseSchema>;
+export const getMyCases = (guild: string, signal?: AbortSignal) =>
+  read(`/guilds/${guild}/cases/mine`, z.array(MyCaseSchema), signal);

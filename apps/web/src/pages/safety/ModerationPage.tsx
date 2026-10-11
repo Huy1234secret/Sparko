@@ -563,7 +563,7 @@ export function ModerationPage() {
     <>
       <PageHeading
         eyebrow="Safety"
-        title="Every action, on the record."
+        title="Moderation"
         description="Numbered cases with reasons. Sparko rechecks permissions and role position before it acts, and reports what Discord actually did."
       />
       <Tabs
