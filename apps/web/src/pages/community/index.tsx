@@ -14,6 +14,15 @@ import {
 } from './CommunitySettingsPages';
 import { RoleMenusPage } from './RoleMenusPage';
 import { SubmissionsPage } from './SubmissionsPage';
+import { ModerationPage } from '../safety/ModerationPage';
+import { FormsPage } from '../safety/FormsPage';
+import { ReportsPage } from '../safety/ReportsPage';
+import { VerificationPage } from '../safety/VerificationPage';
+import {
+  AntiNukePage,
+  AutomodPage,
+  RaidGuardPage,
+} from '../safety/ProtectionPages';
 
 /** Typed module pages; modules not listed here still use the generic page. */
 const typedPages: Record<string, ComponentType> = {
@@ -29,6 +38,13 @@ const typedPages: Record<string, ComponentType> = {
   'community/suggestions': () => <SubmissionsPage kind="suggestions" />,
   'community/questions': () => <SubmissionsPage kind="questions" />,
   'community/starboard': StarboardPage,
+  'safety/moderation': ModerationPage,
+  'support/forms': FormsPage,
+  'safety/reports': ReportsPage,
+  'safety/verification': VerificationPage,
+  'safety/automod': AutomodPage,
+  'safety/raid-guard': RaidGuardPage,
+  'safety/anti-nuke': AntiNukePage,
   'engagement/reward-roles': () => <LevelsPage defaultTab="rewards" />,
 };
 export function ModuleRouter() {

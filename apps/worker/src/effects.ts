@@ -11,6 +11,7 @@ import {
   openTicket,
   processAutomationDue,
   processSafetyDue,
+  PunishmentExpirySchema,
   publishDocument,
   runCommunityJob,
   canExpireTimeout,
@@ -205,6 +206,65 @@ export class EffectExecutor {
           `Ticket #${ticket.number} is open. Your request is visible only to permitted support participants.\nStaff: use /ticket claim. Use /ticket close with a reason to request capture and closure.`,
         ),
       );
+      return;
+    }
+    if (work.type === 'ticket.sla') {
+      const stage = z.enum(['reminder', 'escalation']).parse(p['stage']);
+      const ticket = await this.db.ticket.findFirst({
+        where: { id: ID.parse(p['ticketId']), guildId: work.guildId },
+      });
+      // Claimed, closed or not-yet-created tickets need no nudge.
+      if (
+        !ticket?.channelId ||
+        ticket.claimantId ||
+        !['open', 'awaiting_staff'].includes(ticket.state) ||
+        (stage === 'reminder' ? ticket.remindedAt : ticket.escalatedAt)
+      )
+        return;
+      const { workflow, staffRoleIds } = TicketConfigSchema.parse(
+        ticket.snapshot,
+      );
+      const roles =
+        stage === 'escalation' && workflow.escalationRoleId
+          ? [workflow.escalationRoleId]
+          : staffRoleIds;
+      const waited =
+        stage === 'reminder'
+          ? workflow.reminderMinutes
+          : workflow.escalationMinutes;
+      await this.discord.channelPermissions(
+        work.guildId,
+        ticket.channelId,
+        sendPermissions,
+      );
+      // The tracked send is idempotent per job, so a retry never posts twice.
+      await this.sendTracked(work, ticket.channelId, {
+        content:
+          `${roles.map((id) => `<@&${id}>`).join(' ')} Ticket #${ticket.number} has waited ${waited ?? '?'} minutes without a staff member.${stage === 'escalation' ? ' It is now high priority.' : ''}`.slice(
+            0,
+            2000,
+          ),
+        allowed_mentions: { parse: [], roles },
+      });
+      await this.db.ticket.updateMany({
+        where: {
+          id: ticket.id,
+          claimantId: null,
+          ...(stage === 'reminder'
+            ? { remindedAt: null }
+            : { escalatedAt: null }),
+        },
+        data:
+          stage === 'reminder'
+            ? { remindedAt: new Date() }
+            : {
+                escalatedAt: new Date(),
+                ...(['low', 'normal'].includes(ticket.priority)
+                  ? { priority: 'high' }
+                  : {}),
+                revision: { increment: 1 },
+              },
+      });
       return;
     }
     if (work.type === 'ticket.cleanup') {
@@ -2652,7 +2712,107 @@ export class EffectExecutor {
     });
   }
 
+  /**
+   * End a timed ban or lock after rechecking that the same instance is still
+   * current and that Discord still shows it. A manual unban/unlock found in
+   * Discord is recorded as superseded instead of being repeated.
+   */
+  private async clearPunishment(work: OutboxWork, p: Record<string, unknown>) {
+    const input = PunishmentExpirySchema.parse(p);
+    const punishment = await this.record(
+      work.guildId,
+      p['punishmentId'],
+      'safety.punishment',
+    );
+    const data = jsonObject(punishment.data);
+    if (
+      data['activeCaseId'] !== input.caseId ||
+      data['instanceId'] !== input.instanceId ||
+      !['active', 'expiring'].includes(punishment.state)
+    )
+      return;
+    const supersede = () =>
+      this.db.record.update({
+        where: { id: punishment.id },
+        data: { state: 'superseded' },
+      });
+    const [guild, roles, bot] = await Promise.all([
+      this.discord.guild(work.guildId),
+      this.discord.roles(work.guildId),
+      this.discord.member(work.guildId, this.discord.botUserId),
+    ]);
+    const reason = 'Temporary action ended (Sparko case schedule).';
+    if (input.kind === 'ban') {
+      assertPermissions(
+        effectivePermissions(guild, roles, bot),
+        PermissionFlagsBits.BanMembers,
+        'Sparko needs Ban Members to end this ban.',
+      );
+      try {
+        await this.discord.rest.get(
+          Routes.guildBan(work.guildId, input.subjectId),
+        );
+      } catch (error) {
+        if (error instanceof DiscordAPIError && Number(error.code) === 10026) {
+          await supersede();
+          return;
+        }
+        throw error;
+      }
+      await this.discord.rest.delete(
+        Routes.guildBan(work.guildId, input.subjectId),
+        { reason },
+      );
+    } else {
+      const scope = await this.discord.channelPermissions(
+        work.guildId,
+        input.subjectId,
+        PermissionFlagsBits.ManageChannels | PermissionFlagsBits.ManageRoles,
+      );
+      const everyone = scope.channel.permission_overwrites.find(
+        (overwrite) => overwrite.type === 0 && overwrite.id === work.guildId,
+      );
+      if (
+        !everyone ||
+        (BigInt(everyone.deny) & PermissionFlagsBits.SendMessages) === 0n
+      ) {
+        await supersede();
+        return;
+      }
+      await this.discord.rest.put(
+        Routes.channelPermission(input.subjectId, work.guildId),
+        {
+          body: {
+            type: 0,
+            allow: everyone.allow,
+            deny: (
+              BigInt(everyone.deny) & ~PermissionFlagsBits.SendMessages
+            ).toString(),
+          },
+          reason,
+        },
+      );
+    }
+    await this.db.record.update({
+      where: { id: punishment.id },
+      data: { state: 'expired' },
+    });
+    await this.db.record.updateMany({
+      where: { id: input.caseId, guildId: work.guildId },
+      data: { state: 'expired' },
+    });
+  }
   private async safety(work: OutboxWork, p: Record<string, unknown>) {
+    if (work.type === 'safety.punishment.expire') {
+      await this.transaction(work, (ctx) =>
+        processSafetyDue(ctx, work.type, p),
+      );
+      return;
+    }
+    if (work.type === 'safety.punishment.clear') {
+      await this.clearPunishment(work, p);
+      return;
+    }
     if (work.type === 'safety.timeout.expire') {
       await this.transaction(work, (ctx) =>
         processSafetyDue(ctx, work.type, p),
@@ -2814,7 +2974,9 @@ export class EffectExecutor {
         work,
         channelId,
         textPayload(
-          `Sparko ${String(p['kind'])}: ${record.state}. ${String(data['reason'] ?? last['reason'] ?? 'Open your permitted dashboard record for details.')}`,
+          p['kind'] === 'case'
+            ? `Sparko moderation case #${String(data['number'])} (${String(data['action'])}): ${String(data['reason'] ?? '')}\nIf you think this was a mistake, you can appeal it from your member profile on the Sparko dashboard.`
+            : `Sparko ${String(p['kind'])}: ${record.state}. ${String(data['reason'] ?? last['reason'] ?? 'Open your permitted dashboard record for details.')}`,
         ),
       );
       return;
@@ -3106,6 +3268,67 @@ export class EffectExecutor {
           }),
         },
       });
+      // Timed bans and locks get an instance and an expiry timer; any other
+      // ban/unban or lock/unlock replaces the previous instance.
+      const subjectId = ['ban', 'unban'].includes(input.action)
+        ? input.targetId
+        : ['lock', 'unlock'].includes(input.action)
+          ? input.channelId
+          : undefined;
+      if (subjectId) {
+        const kind = ['ban', 'unban'].includes(input.action) ? 'ban' : 'lock';
+        const expiresAt =
+          ['ban', 'lock'].includes(input.action) && input.durationSeconds
+            ? new Date(
+                Date.parse(String(data['requestedAt'])) +
+                  input.durationSeconds * 1000,
+              ).toISOString()
+            : null;
+        const state = expiresAt
+          ? 'active'
+          : ['unban', 'unlock'].includes(input.action)
+            ? 'cleared'
+            : 'permanent';
+        const punishmentData = json({
+          activeCaseId: record.id,
+          instanceId: work.id,
+          expiresAt,
+        });
+        await ctx.tx.record.upsert({
+          where: {
+            guildId_kind_key: {
+              guildId: work.guildId,
+              kind: 'safety.punishment',
+              key: `${kind}:${subjectId}`,
+            },
+          },
+          create: {
+            guildId: work.guildId,
+            kind: 'safety.punishment',
+            key: `${kind}:${subjectId}`,
+            ownerId: input.targetId ?? null,
+            state,
+            data: punishmentData,
+          },
+          update: {
+            state,
+            data: punishmentData,
+            revision: { increment: 1 },
+          },
+        });
+        if (expiresAt)
+          await ctx.effect(
+            'safety.punishment.expire',
+            {
+              kind,
+              subjectId,
+              caseId: record.id,
+              instanceId: work.id,
+              expiresAt,
+            },
+            new Date(expiresAt),
+          );
+      }
       if (appliedTimeoutUntil && input.targetId) {
         await ctx.tx.record.upsert({
           where: {

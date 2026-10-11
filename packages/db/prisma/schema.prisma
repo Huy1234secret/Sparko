@@ -206,6 +206,10 @@ model Ticket {
   answers Json
   participants String[]
   closeReason String?
+  priority String @default("normal")
+  claimedAt DateTime?
+  remindedAt DateTime?
+  escalatedAt DateTime?
   createdAt DateTime @default(now())
   closedAt DateTime?
   @@unique([guildId, number])

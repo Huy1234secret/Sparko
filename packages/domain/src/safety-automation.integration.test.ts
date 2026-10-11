@@ -615,6 +615,52 @@ describe('real PostgreSQL safety/time transactions and authority', () => {
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
+  it('shows members their own appealable cases without private notes', async () => {
+    const moderator = {
+      ...actor(otherId),
+      capabilities: ['moderation.execute'],
+    };
+    await call(
+      moderator,
+      'POST',
+      '/cases',
+      { action: 'note', targetId: userId, reason: 'Private staff context' },
+      'case-note',
+    );
+    const warning = (
+      await call(
+        moderator,
+        'POST',
+        '/cases',
+        { action: 'warn', targetId: userId, reason: 'Spam in general' },
+        'case-warn',
+      )
+    ).data as { id: string };
+    const mine = (await call(actor(), 'GET', '/cases/mine', {}, 'unused'))
+      .data as {
+      id: string;
+      action: string;
+      reason: string;
+      appealable: boolean;
+    }[];
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({ id: warning.id, action: 'warn' });
+    expect(JSON.stringify(mine)).not.toContain('Private staff context');
+    expect(
+      (await call(actor(otherId), 'GET', '/cases/mine', {}, 'unused')).data,
+    ).toEqual([]);
+    expect(
+      (
+        await call(
+          actor(userId, otherGuildId),
+          'GET',
+          '/cases/mine',
+          {},
+          'unused',
+        )
+      ).data,
+    ).toEqual([]);
+  });
   it('freezes form versions in applications and allows exactly one final review under concurrency', async () => {
     const form = (
       await call(

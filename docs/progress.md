@@ -4,10 +4,9 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 
 ## Resume checkpoint
 
-- `main` contains M1–M3 ([PR #2](https://github.com/Huy1234secret/Sparko/pull/2), [PR #3](https://github.com/Huy1234secret/Sparko/pull/3), [PR #4](https://github.com/Huy1234secret/Sparko/pull/4)) and the vendored project skills ([PR #5](https://github.com/Huy1234secret/Sparko/pull/5)).
-- The UI/UX pass over M1–M3 is delivered from `claude/clever-lovelace-b5a124` (see `docs/milestones/ui-pass.md` and `design-system/sparko/MASTER.md`).
-- Partial M4 work is preserved on `claude/amazing-maxwell-yonuhl` (`cafe717`, five commits beyond `8108330`: timed bans/locks, typed moderation and forms workspaces, contracts, paused handoff). It continues on top of the merged UI pass.
-- Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head.
+- `main` contains M1–M3 ([PR #2](https://github.com/Huy1234secret/Sparko/pull/2), [PR #3](https://github.com/Huy1234secret/Sparko/pull/3), [PR #4](https://github.com/Huy1234secret/Sparko/pull/4)), the vendored project skills ([PR #5](https://github.com/Huy1234secret/Sparko/pull/5)) and the UI/UX pass ([PR #6](https://github.com/Huy1234secret/Sparko/pull/6), `3303fbe`).
+- M4 is delivered from `claude/clever-lovelace-b5a124`. It merged the paused M4 branch `claude/amazing-maxwell-yonuhl` (`cafe717`, kept intact on the remote) onto the UI pass. See `docs/milestones/m4.md`.
+- Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head; the next milestone restarts the working branch from the merged `main`.
 
 ## Milestone / PR state
 
@@ -17,15 +16,14 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 | M1 Identity / first tickets | **Merged**      | [PR #2](https://github.com/Huy1234secret/Sparko/pull/2) at `ad6e1f1`; [main CI run 38131958193](https://github.com/Huy1234secret/Sparko/actions/runs/38131958193) passed. |
 | M2 Message platform         | **Merged**      | [PR #3](https://github.com/Huy1234secret/Sparko/pull/3) (`338bd6a`). See `docs/milestones/m2.md`.                                                                         |
 | M3 Community                | **Merged**      | [PR #4](https://github.com/Huy1234secret/Sparko/pull/4) (`8108330`). See `docs/milestones/m3.md`.                                                                         |
-| UI/UX pass over M1–M3       | **PR**          | `docs/milestones/ui-pass.md`; PR and CI recorded on merge.                                                                                                                |
-| M4 Staff, forms and safety  | In progress     | Partial on `claude/amazing-maxwell-yonuhl`; resumes after the UI pass merges.                                                                                             |
-| M5–M9                       | Partial backend | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
+| UI/UX pass over M1–M3       | **Merged**      | [PR #6](https://github.com/Huy1234secret/Sparko/pull/6) (`3303fbe`). See `docs/milestones/ui-pass.md`.                                                                    |
+| M4 Safety/support expansion | **PR**          | All local gates pass. See `docs/milestones/m4.md`; PR and CI recorded on merge.                                                                                           |
+| M5 Time and automation      | Next            | Backend substantial (`docs/safety-automation.md`); typed UI and combined acceptance remain.                                                                               |
+| M6–M9                       | Partial backend | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
 
-## Verification record (UI pass source)
+## Verification record (M4 source)
 
-Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 214 unit, 142 PostgreSQL integration and 14 browser tests pass.
-
-M2 was delivered with 165 unit / 135 integration / 7 browser tests; its PR CI run passed every required step including Compose validation and both images.
+Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 233 unit, 152 PostgreSQL integration and 16 browser tests pass.
 
 All browser/integration tests use a controlled external Discord boundary. They do not prove live Discord acceptance.
 
@@ -41,9 +39,15 @@ Resolved: typed community services/pages; `/levels/me` member portal; single ran
 
 Still open (tracked for later milestones): rank cards do not render avatars/backgrounds; community message XP, counting and starboard depend on live Gateway observation; leaderboards show user IDs (no stored display names).
 
+## M4 outcome and remaining safety/support limits
+
+Resolved: typed moderation (timed bans/locks), forms and staged review, reports/appeals with member intake, verification settings and member flow, auto moderation rules with a no-effect tester, raid guard and anti-nuke incidents with recorded manual recovery, ticket priority/assignment/availability/waiting-for-member/participants, SLA reminder and escalation timers, staff metrics, and in-page transcript search.
+
+Still open: automatic waiting-for-member transitions on member replies and every Gateway-driven safety signal need live observation; staff availability is self-reported; anti-nuke never punishes automatically or recreates deleted resources (by design).
+
 ## Next concrete action
 
-Merge the UI pass, merge `main` into the M4 work, then M4 — add FormsPage tests and complete staff/ticket/forms/reports/moderation interfaces, scheduled lock/ban expiry, anti-nuke variants/restoration, verification and hierarchy diagnostics. Start by listing safety routes in `packages/domain/src/safety.ts`, compare with the generic module pages, and build typed workspaces using `apps/web/src/features/config` like M3.
+Merge M4, restart the working branch from `main`, then M5: typed time and automation workspaces on the shared design system and their combined browser journey. That covers polls, events and RSVP, reminders, birthdays, temporary voice, invite tracking and rewards, schedules, auto replies, sticky messages, workflows and custom commands. Start from the routes in `docs/safety-automation.md` and the generic module pages, and build typed pages the same way as M3/M4 (`apps/web/src/features/config`).
 
 ## Later exact gaps / external prerequisites
 

@@ -11,6 +11,7 @@ describe('durable delivery recovery decisions', () => {
     for (const type of [
       'ticket.create',
       'ticket.welcome',
+      'ticket.sla',
       'control.channel.response',
       'community.starboard.sync',
       'provider.announcement',

@@ -34,9 +34,10 @@ export function useFeatureConfig<
   });
   const defaults = (stored: unknown): Input => {
     const parsed = schema.safeParse(stored ?? {});
-    return (parsed.success
-      ? parsed.data
-      : schema.parse({})) as unknown as Input;
+    if (parsed.success) return parsed.data as unknown as Input;
+    // Schemas with required fields (a role, rules text) have no empty default.
+    const empty = schema.safeParse({});
+    return (empty.success ? empty.data : (stored ?? {})) as unknown as Input;
   };
   const form = useForm<Input, unknown, Output>({
     resolver: zodResolver(schema as never),

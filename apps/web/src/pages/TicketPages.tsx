@@ -60,6 +60,13 @@ import {
 import { applyServerFieldErrors } from '../services/formErrors';
 import { RuntimeState } from '../components/AppShell';
 import { TicketStatusBadge } from '../components/TicketStatus';
+import { TranscriptViewer } from '../components/TranscriptViewer';
+import {
+  PriorityBadge,
+  TeamPanel,
+  TicketStaffControls,
+  priorities,
+} from './TicketStaff';
 import { MessagePreview } from '../components/MessagePreview';
 import { DraftGuard } from '../hooks/useDraftGuard';
 import { useActionIdentity } from '../hooks/useActionIdentity';
@@ -82,6 +89,19 @@ const TicketConfigFormSchema = z.object({
   staffRoleIds: z.array(z.string()),
   maxOpenPerMember: z.number().int().min(1).max(10),
   requireTranscriptBeforeCleanup: z.boolean(),
+  workflow: z
+    .object({
+      reminderMinutes: z.number().int().min(5).max(10080).nullable(),
+      escalationMinutes: z.number().int().min(5).max(10080).nullable(),
+      escalationRoleId: z.string(),
+    })
+    .refine(
+      (v) =>
+        v.reminderMinutes === null ||
+        v.escalationMinutes === null ||
+        v.escalationMinutes > v.reminderMinutes,
+      { message: 'Escalate after the reminder.', path: ['escalationMinutes'] },
+    ),
   categories: z
     .array(
       z.object({
@@ -112,10 +132,25 @@ const defaults: TicketConfigForm = {
   staffRoleIds: [],
   maxOpenPerMember: 1,
   requireTranscriptBeforeCleanup: true,
+  workflow: {
+    reminderMinutes: null,
+    escalationMinutes: null,
+    escalationRoleId: '',
+  },
   categories: [
     { id: 'general', name: 'General support', description: '', fields: [] },
   ],
 };
+/** Saved settings as form values; older saves have no workflow section. */
+const toForm = (config: Record<string, unknown> | undefined) =>
+  TicketConfigFormSchema.parse({
+    ...defaults,
+    ...config,
+    workflow: {
+      ...defaults.workflow,
+      ...(config?.['workflow'] as object | undefined),
+    },
+  });
 export function TicketConfigPage() {
   const { guildId = '' } = useParams();
   const identity = useActionIdentity();
@@ -186,10 +221,7 @@ export function TicketConfigPage() {
     : defaultTicketDocument;
   useEffect(() => {
     if (query.data && !dirty) {
-      const values = TicketConfigFormSchema.parse({
-        ...defaults,
-        ...query.data.config,
-      });
+      const values = toForm(query.data.config);
       form.reset(values);
       setPublishChannel((current) => current || values.panelChannelId);
     }
@@ -202,6 +234,10 @@ export function TicketConfigPage() {
           ...query.data?.config,
           ...config,
           categoryChannelId: config.categoryChannelId || undefined,
+          workflow: {
+            ...config.workflow,
+            escalationRoleId: config.workflow.escalationRoleId || undefined,
+          },
         },
       };
       return saveConfig(
@@ -216,9 +252,7 @@ export function TicketConfigPage() {
     onSuccess: (result) => {
       setRebasedOn(null);
       queryClient.setQueryData(['config', guildId, 'tickets'], result.data);
-      form.reset(
-        TicketConfigFormSchema.parse({ ...defaults, ...result.data.config }),
-      );
+      form.reset(toForm(result.data.config));
       void queryClient.invalidateQueries({ queryKey: ['overview', guildId] });
     },
   });
@@ -249,7 +283,7 @@ export function TicketConfigPage() {
     save.reset();
     void query.refetch().then((latest) => {
       const config = (latest.data ?? query.data)?.config;
-      form.reset(TicketConfigFormSchema.parse({ ...defaults, ...config }));
+      form.reset(toForm(config));
     });
   };
   const conflict =
@@ -591,6 +625,72 @@ export function TicketConfigPage() {
             )}
           </Card>
           <Card>
+            <h2>When nobody answers</h2>
+            <p className="muted">
+              Timers start when a ticket opens and stop as soon as a staff
+              member claims it. Leave a field empty to turn that step off.
+              Changes apply to new tickets.
+            </p>
+            <div className="form-grid">
+              <Field
+                label="Remind staff after (minutes)"
+                htmlFor="ticket-reminder"
+                hint="Posts in the ticket and mentions your support roles."
+                error={fieldError('workflow.reminderMinutes')}
+              >
+                <Input
+                  id="ticket-reminder"
+                  type="number"
+                  inputMode="numeric"
+                  min={5}
+                  placeholder="Off"
+                  {...form.register('workflow.reminderMinutes', {
+                    setValueAs: (value: string | number | null) =>
+                      value === '' || value === null ? null : Number(value),
+                  })}
+                />
+              </Field>
+              <Field
+                label="Escalate after (minutes)"
+                htmlFor="ticket-escalation"
+                hint="Raises the ticket to high priority and mentions the escalation role."
+                error={fieldError('workflow.escalationMinutes')}
+              >
+                <Input
+                  id="ticket-escalation"
+                  type="number"
+                  inputMode="numeric"
+                  min={5}
+                  placeholder="Off"
+                  {...form.register('workflow.escalationMinutes', {
+                    setValueAs: (value: string | number | null) =>
+                      value === '' || value === null ? null : Number(value),
+                  })}
+                />
+              </Field>
+              <Field
+                label="Escalation role (optional)"
+                htmlFor="ticket-escalation-role"
+                hint="Without one, escalation mentions your support roles."
+                error={fieldError('workflow.escalationRoleId')}
+              >
+                <select
+                  id="ticket-escalation-role"
+                  {...form.register('workflow.escalationRoleId')}
+                >
+                  <option value="">Support roles</option>
+                  {roles.data
+                    ?.filter((role) => !role.managed && role.id !== guildId)
+                    .map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            </div>
+          </Card>
+          <Card>
             <div className="row">
               <ShieldCheck className="brand-text" size={22} />
               <h2>Protect the conversation</h2>
@@ -833,6 +933,10 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
         : ticket.status !== 'closed') &&
       ticket.subject.toLowerCase().includes(search.toLowerCase()),
   );
+  // Most urgent first; ties keep the newest-first order from the server.
+  records?.sort(
+    (a, b) => priorities[a.priority].rank - priorities[b.priority].rank,
+  );
   return (
     <>
       <PageHeading
@@ -861,6 +965,7 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
           </>
         }
       />
+      {!member && <TeamPanel guildId={guildId} />}
       <div className="table-toolbar">
         <div className="tabs" role="group" aria-label="Show tickets">
           {(['active', 'closed', 'all'] as const).map((tab) => {
@@ -909,6 +1014,7 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
               <tr>
                 <th>Conversation</th>
                 <th>Status</th>
+                <th>Priority</th>
                 <th>Opened by</th>
                 <th>Opened</th>
                 <th>
@@ -933,6 +1039,9 @@ export function TicketInboxPage({ member = false }: { member?: boolean }) {
                   </td>
                   <td data-label="Status">
                     <TicketStatusBadge status={ticket.status} />
+                  </td>
+                  <td data-label="Priority">
+                    <PriorityBadge priority={ticket.priority} />
                   </td>
                   <td data-label="Opened by" className="mono wrap-anywhere">
                     {ticket.creatorId}
@@ -1094,6 +1203,7 @@ export function TicketDetailPage() {
   const queryClient = useQueryClient();
   const identity = useActionIdentity();
   const [closeOpen, setCloseOpen] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const query = useQuery({
     queryKey: ['ticket', guildId, ticketId],
@@ -1221,6 +1331,9 @@ export function TicketDetailPage() {
         </p>
       )}
       <TicketNextStep status={ticket.status} />
+      {ticket.priority !== 'normal' && (
+        <PriorityBadge priority={ticket.priority} />
+      )}
       <div className="metric-grid">
         <Card className="metric">
           <p>Status</p>
@@ -1246,6 +1359,7 @@ export function TicketDetailPage() {
           <small>Capture is required before destructive cleanup</small>
         </Card>
       </div>
+      <TicketStaffControls guildId={guildId} ticket={ticket} />
       {ticket.channelId && (
         <a
           className="button button-secondary"
@@ -1275,35 +1389,54 @@ export function TicketDetailPage() {
           <LoadingState label="Checking retained captures…" />
         ) : transcripts.data?.length ? (
           transcripts.data.map((transcript) => (
-            <div className="activity-row" key={transcript.id}>
-              <span>
-                <strong>
-                  {transcript.status === 'complete'
-                    ? 'Complete capture'
-                    : transcript.status === 'partial'
-                      ? 'Partial capture'
-                      : transcript.status.replaceAll('_', ' ')}
-                </strong>
-                <small>
-                  Captured {new Date(transcript.createdAt).toLocaleString()} ·
-                  Expires {new Date(transcript.expiresAt).toLocaleDateString()}
-                </small>
-                {transcript.status === 'partial' && (
-                  <p>
-                    Some history or content was unavailable. Unobserved
-                    deletions cannot be reconstructed.
-                  </p>
-                )}
-              </span>
-              <Button
-                variant="secondary"
-                busy={
-                  download.isPending && download.variables === transcript.id
-                }
-                onClick={() => download.mutate(transcript.id)}
-              >
-                Download transcript
-              </Button>
+            <div key={transcript.id}>
+              <div className="activity-row">
+                <span>
+                  <strong>
+                    {transcript.status === 'complete'
+                      ? 'Complete capture'
+                      : transcript.status === 'partial'
+                        ? 'Partial capture'
+                        : transcript.status.replaceAll('_', ' ')}
+                  </strong>
+                  <small>
+                    Captured {new Date(transcript.createdAt).toLocaleString()} ·
+                    Expires{' '}
+                    {new Date(transcript.expiresAt).toLocaleDateString()}
+                  </small>
+                  {transcript.status === 'partial' && (
+                    <p>
+                      Some history or content was unavailable. Unobserved
+                      deletions cannot be reconstructed.
+                    </p>
+                  )}
+                </span>
+                <Button
+                  variant="secondary"
+                  busy={
+                    download.isPending && download.variables === transcript.id
+                  }
+                  onClick={() => download.mutate(transcript.id)}
+                >
+                  Download transcript
+                </Button>
+                <Button
+                  variant="ghost"
+                  aria-expanded={viewing === transcript.id}
+                  onClick={() =>
+                    setViewing(viewing === transcript.id ? null : transcript.id)
+                  }
+                >
+                  {viewing === transcript.id ? 'Hide' : 'Read and search'}
+                </Button>
+              </div>
+              {viewing === transcript.id && (
+                <TranscriptViewer
+                  guildId={guildId}
+                  ticketId={ticketId}
+                  transcriptId={transcript.id}
+                />
+              )}
             </div>
           ))
         ) : (

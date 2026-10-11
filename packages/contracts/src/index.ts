@@ -27,6 +27,36 @@ export const TicketConfigSchema = z.object({
   staffRoleIds: z.array(Snowflake).max(20).default([]),
   categoryChannelId: Snowflake.optional(),
   requireTranscriptBeforeCleanup: z.boolean().default(true),
+  /** Timers start when a ticket opens and stop once staff claim it. */
+  workflow: z
+    .object({
+      reminderMinutes: z
+        .number()
+        .int()
+        .min(5)
+        .max(10080)
+        .nullable()
+        .default(null),
+      escalationMinutes: z
+        .number()
+        .int()
+        .min(5)
+        .max(10080)
+        .nullable()
+        .default(null),
+      escalationRoleId: Snowflake.optional(),
+    })
+    .refine(
+      (v) =>
+        v.reminderMinutes === null ||
+        v.escalationMinutes === null ||
+        v.escalationMinutes > v.reminderMinutes,
+      {
+        message: 'Escalate after the reminder',
+        path: ['escalationMinutes'],
+      },
+    )
+    .default({ reminderMinutes: null, escalationMinutes: null }),
   categories: z
     .array(
       z.object({
@@ -53,6 +83,11 @@ export const TicketConfigSchema = z.object({
     ]),
 });
 export type TicketConfig = z.infer<typeof TicketConfigSchema>;
+export const TicketPrioritySchema = z.enum(['low', 'normal', 'high', 'urgent']);
+export const StaffAvailabilitySchema = z.object({
+  status: z.enum(['available', 'away', 'off']),
+  note: z.string().trim().max(200).default(''),
+});
 export const ErrorCodes = [
   'UNAUTHENTICATED',
   'FORBIDDEN',

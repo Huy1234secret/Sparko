@@ -20,6 +20,7 @@ import {
   Notice,
   PageHeading,
 } from '@sparko/ui';
+import { ReportsAndAppealsCard, VerifyCard } from '../safety/MemberSafety';
 import { Metric, useSession } from '../../components/AppShell';
 import {
   claimCrate,
@@ -686,6 +687,10 @@ export function MemberPage() {
             />
           )}
         </Card>
+      </div>
+      <div className="overview-grid" id="safety">
+        <VerifyCard guildId={guildId} />
+        <ReportsAndAppealsCard guildId={guildId} />
       </div>
     </>
   );

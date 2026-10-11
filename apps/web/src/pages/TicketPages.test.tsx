@@ -286,3 +286,37 @@ describe('ticket configuration and publication', () => {
     ).toBeVisible();
   });
 });
+describe('ticket staff workflow settings', () => {
+  it('requires escalation after the reminder and saves both timers', async () => {
+    const user = userEvent.setup();
+    vi.mocked(saveConfig).mockResolvedValue({
+      data: { ...saved, revision: 4 },
+    } as never);
+    renderConfig();
+    const reminder = await screen.findByLabelText(/Remind staff after/);
+    const escalation = screen.getByLabelText(/Escalate after/);
+    await user.type(reminder, '30');
+    await user.type(escalation, '20');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText('Escalate after the reminder.'),
+    ).toBeVisible();
+    expect(saveConfig).not.toHaveBeenCalled();
+    await user.clear(escalation);
+    await user.type(escalation, '90');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(saveConfig).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(saveConfig).mock.calls[0]?.[2]).toMatchObject({
+      config: {
+        workflow: { reminderMinutes: 30, escalationMinutes: 90 },
+      },
+    });
+    expect(
+      (
+        vi.mocked(saveConfig).mock.calls[0]?.[2] as unknown as {
+          config: { workflow: Record<string, unknown> };
+        }
+      ).config.workflow['escalationRoleId'],
+    ).toBeUndefined();
+  });
+});
