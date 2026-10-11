@@ -206,10 +206,16 @@ export const RoleMenuSchema = z
   })
   .refine(
     (v) =>
-      v.minSelections <= v.maxSelections &&
-      v.maxSelections <= v.options.length &&
-      new Set(v.options.map((o) => o.roleId)).size === v.options.length,
-    'Invalid role menu selection limits or duplicate roles',
+      v.minSelections <= v.maxSelections && v.maxSelections <= v.options.length,
+    {
+      message:
+        'Maximum picks must be at least the minimum and no more than the number of roles.',
+      path: ['maxSelections'],
+    },
+  )
+  .refine(
+    (v) => new Set(v.options.map((o) => o.roleId)).size === v.options.length,
+    { message: 'Each role can appear only once.', path: ['options'] },
   );
 
 export const EligibilitySchema = z.object({

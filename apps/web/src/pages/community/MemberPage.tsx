@@ -27,8 +27,12 @@ import {
   getLeaderboard,
   getMyLevel,
   getMyRankCard,
+  getSubmissions,
   giveawayAction,
   saveLevelPreferences,
+  submissionAction,
+  submit,
+  type SubmissionKind,
 } from '../../services/community';
 import { errorMessage } from '../../services/http';
 import { useActionIdentity } from '../../hooks/useActionIdentity';
@@ -371,6 +375,173 @@ function Rewards({ guildId }: { guildId: string }) {
   );
 }
 
+function Voice({
+  guildId,
+  kind,
+  me,
+}: {
+  guildId: string;
+  kind: SubmissionKind;
+  me: string;
+}) {
+  const identity = useActionIdentity();
+  const queryClient = useQueryClient();
+  const [content, setContent] = useState('');
+  const [visibility, setVisibility] = useState<'private' | 'public'>('private');
+  const [round, setRound] = useState(0);
+  const list = useQuery({
+    queryKey: [kind, guildId, 'member'],
+    queryFn: ({ signal }) => getSubmissions(guildId, kind, false, signal),
+  });
+  const refresh = () =>
+    void queryClient.invalidateQueries({ queryKey: [kind, guildId] });
+  const send = useMutation({
+    mutationFn: () => {
+      const body = { content: content.trim(), visibility };
+      return submit(
+        guildId,
+        kind,
+        body,
+        identity('submit', { kind, body, round }),
+      );
+    },
+    onSuccess: () => {
+      setContent('');
+      setRound((value) => value + 1);
+      refresh();
+    },
+  });
+  const act = useMutation({
+    mutationFn: (input: {
+      id: string;
+      action: 'vote' | 'resolve';
+      body: Record<string, unknown>;
+    }) =>
+      submissionAction(
+        guildId,
+        kind,
+        input.id,
+        input.action,
+        input.body,
+        identity('voice', input),
+      ),
+    onSuccess: refresh,
+  });
+  const noun = kind === 'suggestions' ? 'suggestion' : 'question';
+  return (
+    <div className="stack">
+      <form
+        className="stack"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (content.trim()) send.mutate();
+        }}
+      >
+        <Field label={`Your ${noun}`} htmlFor={`${kind}-content`}>
+          <textarea
+            id={`${kind}-content`}
+            value={content}
+            maxLength={4000}
+            onChange={(event) => setContent(event.target.value)}
+          />
+        </Field>
+        <Field
+          label="Who can see it"
+          htmlFor={`${kind}-visibility`}
+          hint="Private items are visible only to you and staff. Public posting must be enabled by the server."
+        >
+          <select
+            id={`${kind}-visibility`}
+            value={visibility}
+            onChange={(event) =>
+              setVisibility(event.target.value as 'private' | 'public')
+            }
+          >
+            <option value="private">Only me and staff</option>
+            <option value="public">Everyone in the server</option>
+          </select>
+        </Field>
+        {send.error && <ErrorState message={errorMessage(send.error)} />}
+        <Button type="submit" disabled={!content.trim()} busy={send.isPending}>
+          Send {noun}
+        </Button>
+      </form>
+      {list.isPending ? (
+        <LoadingState />
+      ) : list.error ? (
+        <ErrorState message={errorMessage(list.error)} />
+      ) : list.data.length ? (
+        list.data.map((row) => {
+          const mine = row.ownerId === me;
+          return (
+            <div className="activity-row" key={row.id}>
+              <span>
+                <strong>{row.data.content.slice(0, 160)}</strong>
+                <small>
+                  {mine ? 'Yours' : 'Public'} · {row.state}
+                  {row.data.decisions.at(-1)
+                    ? ` · ${row.data.decisions.at(-1)!.reason}`
+                    : ''}
+                  {row.data.answers.at(-1)
+                    ? ` · Answer: ${row.data.answers.at(-1)!.content}`
+                    : ''}
+                </small>
+              </span>
+              {kind === 'suggestions' && row.votes && !mine && (
+                <span className="row">
+                  <Button
+                    variant={row.votes.myVote === 1 ? 'primary' : 'secondary'}
+                    aria-pressed={row.votes.myVote === 1}
+                    onClick={() =>
+                      act.mutate({
+                        id: row.id,
+                        action: 'vote',
+                        body: { value: row.votes!.myVote === 1 ? 0 : 1 },
+                      })
+                    }
+                  >
+                    👍 {row.votes.positive}
+                  </Button>
+                  <Button
+                    variant={row.votes.myVote === -1 ? 'primary' : 'secondary'}
+                    aria-pressed={row.votes.myVote === -1}
+                    onClick={() =>
+                      act.mutate({
+                        id: row.id,
+                        action: 'vote',
+                        body: { value: row.votes!.myVote === -1 ? 0 : -1 },
+                      })
+                    }
+                  >
+                    👎 {row.votes.negative}
+                  </Button>
+                </span>
+              )}
+              {kind === 'questions' && mine && row.state === 'answered' && (
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    act.mutate({
+                      id: row.id,
+                      action: 'resolve',
+                      body: { expectedRevision: row.revision },
+                    })
+                  }
+                >
+                  This answered it
+                </Button>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <p className="muted">Nothing yet.</p>
+      )}
+      {act.error && <ErrorState message={errorMessage(act.error)} />}
+    </div>
+  );
+}
+
 export function MemberPage() {
   const { guildId = '' } = useParams();
   const session = useSession();
@@ -463,6 +634,24 @@ export function MemberPage() {
         </Card>
       </div>
       <Rewards guildId={guildId} />
+      <div className="overview-grid">
+        <Card>
+          <h2>Suggestions</h2>
+          <Voice
+            guildId={guildId}
+            kind="suggestions"
+            me={session.data?.user?.id ?? ''}
+          />
+        </Card>
+        <Card>
+          <h2>Questions</h2>
+          <Voice
+            guildId={guildId}
+            kind="questions"
+            me={session.data?.user?.id ?? ''}
+          />
+        </Card>
+      </div>
       <div className="overview-grid">
         <Card id="leaderboard">
           <h2>Leaderboard</h2>

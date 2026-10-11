@@ -13,8 +13,10 @@ import {
   getLeaderboard,
   getMyLevel,
   getMyRankCard,
+  getSubmissions,
   giveawayAction,
   saveLevelPreferences,
+  submit,
 } from '../../services/community';
 
 vi.mock('../../services/community', () => ({
@@ -24,8 +26,11 @@ vi.mock('../../services/community', () => ({
   getLeaderboard: vi.fn(),
   getMyLevel: vi.fn(),
   getMyRankCard: vi.fn(),
+  getSubmissions: vi.fn(async () => []),
   giveawayAction: vi.fn(),
   saveLevelPreferences: vi.fn(),
+  submissionAction: vi.fn(),
+  submit: vi.fn(),
 }));
 vi.mock('../../components/AppShell', () => ({
   useSession: () => ({ data: { user: { id: '123456789012345601' } } }),
@@ -68,6 +73,7 @@ function renderPage() {
   );
 }
 beforeEach(() => {
+  vi.mocked(getSubmissions).mockResolvedValue([]);
   globalThis.URL.createObjectURL = vi.fn(() => 'blob:card');
   globalThis.URL.revokeObjectURL = vi.fn();
   vi.mocked(getMyLevel).mockResolvedValue({
@@ -212,5 +218,27 @@ describe('member portal', () => {
       ['give-1', 'entry'],
       ['give-0', 'claim'],
     ]);
+  });
+  it('submits a private suggestion and rotates the request key afterwards', async () => {
+    const user = userEvent.setup();
+    vi.mocked(submit).mockResolvedValue({ data: {} as never });
+    renderPage();
+    const box = await screen.findByLabelText('Your suggestion');
+    await user.type(box, 'Add a music channel');
+    await user.click(screen.getByRole('button', { name: 'Send suggestion' }));
+    await waitFor(() =>
+      expect(submit).toHaveBeenCalledWith(
+        guildId,
+        'suggestions',
+        { content: 'Add a music channel', visibility: 'private' },
+        expect.any(String),
+      ),
+    );
+    await waitFor(() => expect(box).toHaveValue(''));
+    await user.type(box, 'Add a music channel');
+    await user.click(screen.getByRole('button', { name: 'Send suggestion' }));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
+    const keys = vi.mocked(submit).mock.calls.map((call) => call[3]);
+    expect(keys[0]).not.toBe(keys[1]);
   });
 });

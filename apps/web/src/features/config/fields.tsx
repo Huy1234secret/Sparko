@@ -286,7 +286,12 @@ export function DocumentField<T extends FieldValues>({
   label,
   hint,
   guildId,
-}: FormProps<T> & { guildId: string }) {
+  context,
+}: FormProps<T> & {
+  guildId: string;
+  /** Only designs whose tokens make sense for this event are offered. */
+  context?: 'member' | 'level' | 'giveaway' | undefined;
+}) {
   const templates = useQuery({
     queryKey: ['templates', guildId],
     queryFn: ({ signal }) => getTemplates(guildId, signal),
@@ -333,11 +338,20 @@ export function DocumentField<T extends FieldValues>({
                       ? 'Loading designs…'
                       : 'Default Sparko message'}
                 </option>
-                {templates.data?.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    Use “{template.name}”
-                  </option>
-                ))}
+                {templates.data
+                  ?.filter(
+                    (template) =>
+                      !context ||
+                      !template.document ||
+                      ['generic', context].includes(
+                        template.document.tokenContext,
+                      ),
+                  )
+                  .map((template) => (
+                    <option key={template.id} value={template.id}>
+                      Use “{template.name}”
+                    </option>
+                  ))}
                 {current && (
                   <option value="__clear">Use the default message</option>
                 )}
