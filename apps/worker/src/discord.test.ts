@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DiscordRest } from './discord.js';
+import { DiscordRest, assertRoleAssignable } from './discord.js';
 import { DeliveryUncertainError } from './failure.js';
 
 describe('per-execution REST fence', () => {
@@ -42,5 +42,35 @@ describe('per-execution REST fence', () => {
       .scoped(async () => undefined)
       .addRole('guild', 'member', 'role');
     expect(discord.changes).toBe(2);
+  });
+});
+describe('role assignment safety', () => {
+  const guild = { id: 'g', name: 'Guild', owner_id: 'owner' };
+  const bot = { user: { id: 'bot', username: 'bot' }, roles: ['bot-role'] };
+  const roles = (permissions: string) => [
+    {
+      id: 'g',
+      name: 'everyone',
+      position: 0,
+      permissions: '0',
+      managed: false,
+    },
+    {
+      id: 'bot-role',
+      name: 'bot',
+      position: 5,
+      permissions: String(0x10000000n),
+      managed: false,
+    },
+    { id: 'target', name: 'target', position: 1, permissions, managed: false },
+  ];
+  it('refuses roles with Manage Messages or Mention Everyone like the API does', () => {
+    for (const permissions of [String(0x2000n), String(0x20000n)])
+      expect(() =>
+        assertRoleAssignable(guild, roles(permissions), bot, 'target'),
+      ).toThrow('Privileged roles');
+    expect(assertRoleAssignable(guild, roles('0'), bot, 'target').id).toBe(
+      'target',
+    );
   });
 });

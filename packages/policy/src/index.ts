@@ -46,3 +46,28 @@ export function isAdministrator(owner: boolean, permissions: string) {
     return false;
   }
 }
+
+/**
+ * Discord permissions that make a role unsafe to hand out through public
+ * self-service or automation: Administrator, Kick, Ban, Manage Channels,
+ * Manage Server, Manage Messages, Mention Everyone, Manage Roles, Manage
+ * Webhooks and Moderate Members. API preflight and worker delivery share it.
+ */
+export const PRIVILEGED_ROLE_PERMISSIONS =
+  0x8n |
+  0x2n |
+  0x4n |
+  0x10n |
+  0x20n |
+  0x2000n |
+  0x20000n |
+  0x10000000n |
+  0x20000000n |
+  0x10000000000n;
+export function isPrivilegedRole(permissions: string | bigint): boolean {
+  try {
+    return (BigInt(permissions) & PRIVILEGED_ROLE_PERMISSIONS) !== 0n;
+  } catch {
+    return true;
+  }
+}
