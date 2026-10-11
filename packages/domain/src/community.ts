@@ -13,6 +13,8 @@ import {
   SubmissionConfigSchema,
   StarboardConfigSchema,
   AnalyticsConfigSchema,
+  LevelPreferencesSchema,
+  RankCardPreferencesSchema,
   CreateCrateSchema,
   CrateScheduleSchema,
   RoleMenuSchema,
@@ -35,6 +37,8 @@ export {
   StarboardConfigSchema,
   AnalyticsConfigSchema,
   communityConfigSchemas,
+  LevelPreferencesSchema,
+  RankCardPreferencesSchema,
   CreateCrateSchema,
   CrateScheduleSchema,
   RoleMenuSchema,
@@ -212,6 +216,52 @@ export async function getLevelProfile(ctx: DomainContext, userId: string) {
         : (profile.xp - previousLevelXp) / (nextLevelXp - previousLevelXp),
     revision: row?.revision ?? 0,
     textSummary: `Level ${level}. ${profile.xp} XP.${nextLevelXp === null ? ' Maximum level reached.' : ` ${nextLevelXp - profile.xp} XP to the next level.`}`,
+  };
+}
+/** Rank among every member profile in this server (1 = most XP). */
+export async function levelRank(ctx: DomainContext, xp: number) {
+  const ahead = await ctx.tx.record.count({
+    where: {
+      guildId: ctx.guildId,
+      kind: 'level.profile',
+      data: { path: ['xp'], gt: xp },
+    },
+  });
+  return ahead + 1;
+}
+/**
+ * Renderer input for a member's own rank card. Identity, XP, level and rank
+ * always come from server state; only presentation comes from preferences.
+ * Shared by the API PNG route and the Discord `/level` command.
+ */
+export async function rankCardInput(
+  ctx: DomainContext,
+  userId: string,
+  memberName: string,
+) {
+  const profile = await getLevelProfile(ctx, userId),
+    card = RankCardPreferencesSchema.parse(profile.card),
+    maxLevel = profile.nextLevelXp === null,
+    span = maxLevel ? 1 : profile.nextLevelXp! - profile.previousLevelXp;
+  return {
+    memberName: memberName.trim().slice(0, 64) || 'Member',
+    level: profile.level,
+    totalXp: profile.xp,
+    xpIntoLevel: maxLevel
+      ? 1
+      : Math.min(span, Math.max(0, profile.xp - profile.previousLevelXp)),
+    xpForNextLevel: Math.max(1, span),
+    rank:
+      card.showRank && profile.revision
+        ? await levelRank(ctx, profile.xp)
+        : null,
+    theme: card.theme,
+    layout: card.layout,
+    avatarShape: card.avatarShape,
+    accent: card.accent,
+    showXp: card.showXp,
+    showRank: card.showRank,
+    maxLevel,
   };
 }
 export async function reconcileRewardRoles(
@@ -2220,30 +2270,77 @@ export const communityRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/levels/me',
     capability: 'member',
-    handler: async (ctx) => ({
-      profile: await getLevelProfile(ctx, ctx.actor.userId),
-      history: await ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'level.history',
-          ownerId: ctx.actor.userId,
+    handler: async (ctx) => {
+      const profile = await getLevelProfile(ctx, ctx.actor.userId);
+      return {
+        profile: {
+          ...profile,
+          card: RankCardPreferencesSchema.parse(profile.card),
+          // No recorded XP means no position yet, not first place.
+          rank: profile.revision ? await levelRank(ctx, profile.xp) : null,
         },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }),
-    }),
+        history: await ctx.tx.record.findMany({
+          where: {
+            guildId: ctx.guildId,
+            kind: 'level.history',
+            ownerId: ctx.actor.userId,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        }),
+      };
+    },
   },
   {
     method: 'GET',
     path: '/guilds/:guildId/levels',
     capability: 'community.manage',
-    handler: async (ctx) => ({
-      profiles: await ctx.tx.record.findMany({
-        where: { guildId: ctx.guildId, kind: 'level.profile' },
-        orderBy: { updatedAt: 'desc' },
-        take: 100,
-      }),
-    }),
+    handler: async (ctx) => {
+      const cfg = await config(ctx, 'R09', LevelConfigSchema),
+        rows = await ctx.tx.record.findMany({
+          where: { guildId: ctx.guildId, kind: 'level.profile' },
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
+        });
+      return {
+        profiles: rows.map((row) => {
+          const profile = ProfileSchema.parse(row.data);
+          return {
+            userId: row.ownerId ?? row.key,
+            xp: profile.xp,
+            level: levelFromXp(
+              profile.xp,
+              cfg.baseXp,
+              cfg.growthXp,
+              cfg.maxLevel,
+            ),
+            publicProfile: profile.publicProfile,
+            lastMessageAt: profile.lastMessageAt ?? null,
+            updatedAt: row.updatedAt.toISOString(),
+          };
+        }),
+      };
+    },
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/levels/members/:userId',
+    capability: 'community.manage',
+    handler: async (ctx, _input, params) => {
+      const userId = Snowflake.parse(params['userId']);
+      return {
+        profile: await getLevelProfile(ctx, userId),
+        history: await ctx.tx.record.findMany({
+          where: {
+            guildId: ctx.guildId,
+            kind: 'level.history',
+            ownerId: userId,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        }),
+      };
+    },
   },
   {
     method: 'GET',
@@ -2272,25 +2369,9 @@ export const communityRoutes: DomainRoute[] = [
     method: 'PUT',
     path: '/guilds/:guildId/levels/preferences',
     capability: 'member',
-    schema: z.object({
-      publicProfile: z.boolean(),
-      card: z.object({
-        accent: z
-          .string()
-          .regex(/^#[0-9a-fA-F]{6}$/)
-          .default('#FACC15'),
-        avatarShape: z.enum(['circle', 'square']).default('circle'),
-        layout: z.enum(['compact', 'wide']).default('wide'),
-        background: z.enum(['dark', 'light']).default('dark'),
-      }),
-    }),
+    schema: LevelPreferencesSchema,
     handler: async (ctx, input) => {
-      const prefs = z
-          .object({
-            publicProfile: z.boolean(),
-            card: z.record(z.string(), z.unknown()),
-          })
-          .parse(input),
+      const prefs = LevelPreferencesSchema.parse(input),
         old = await getLevelProfile(ctx, ctx.actor.userId);
       return save(
         ctx,
@@ -2394,6 +2475,23 @@ export const communityRoutes: DomainRoute[] = [
     capability: 'community.manage',
     schema: CreateCrateSchema.omit({ scheduleKey: true }),
     handler: async (ctx, input) => createCrateDrop(ctx, input),
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/crates/history',
+    capability: 'community.manage',
+    handler: async (ctx) => ({
+      drops: await ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'crate.drop' },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      claims: await ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'crate.claim' },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+    }),
   },
   {
     method: 'GET',
@@ -2520,6 +2618,28 @@ export const communityRoutes: DomainRoute[] = [
   },
   {
     method: 'GET',
+    path: '/guilds/:guildId/counting/resets',
+    capability: 'community.manage',
+    handler: async (ctx) =>
+      ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'counting.reset' },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/role-menus/manage',
+    capability: 'community.manage',
+    handler: async (ctx) =>
+      ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'role.menu' },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+  },
+  {
+    method: 'GET',
     path: '/guilds/:guildId/role-menus',
     capability: 'member',
     handler: async (ctx) =>
@@ -2607,6 +2727,30 @@ export const communityRoutes: DomainRoute[] = [
         new Date(rules.endsAt),
       );
       return row;
+    },
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/giveaways/:id',
+    capability: 'community.manage',
+    handler: async (ctx, _input, params) => {
+      const giveaway = await getRecord(ctx, 'giveaway', Id.parse(params['id']));
+      const related = (kind: string) =>
+        ctx.tx.record.findMany({
+          where: {
+            guildId: ctx.guildId,
+            kind,
+            data: { path: ['giveawayId'], equals: giveaway.id },
+          },
+          orderBy: { createdAt: 'asc' },
+          take: 1000,
+        });
+      const [entries, draws, winners] = await Promise.all([
+        related('giveaway.entry'),
+        related('giveaway.draw'),
+        related('giveaway.winner'),
+      ]);
+      return { giveaway, entries, draws, winners };
     },
   },
   {

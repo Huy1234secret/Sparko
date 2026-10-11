@@ -22,6 +22,7 @@ import {
   providerConfigSchemas,
   multiServerPlan,
   publicWidget,
+  rankCardInput,
   type ProviderTransport,
   type DomainRoute,
 } from '@sparko/domain';
@@ -32,7 +33,12 @@ import {
   commandRegistry,
   type Actor,
 } from '@sparko/contracts';
-import { requireGlobal, guildCapabilities, allowed } from '@sparko/policy';
+import {
+  requireGlobal,
+  guildCapabilities,
+  allowed,
+  isPrivilegedRole,
+} from '@sparko/policy';
 import type { Config } from '@sparko/config';
 import { createAuth, requireActiveSession } from './auth.js';
 import { registerAccountRoutes } from './account.js';
@@ -44,6 +50,7 @@ import {
 } from './publication-resources.js';
 import { registerAssetRoutes } from './assets.js';
 import { discordAdapter, type DiscordAdapter } from './discord.js';
+import { renderRankCard } from '@sparko/rendering';
 const presets = [
   'small-community',
   'gaming',
@@ -324,7 +331,44 @@ export async function createApp(options: {
         'You cannot select resources in this server.',
         403,
       );
-    return { data: await discord.roles(guildId) };
+    const roles = await discord.roles(guildId);
+    // Hierarchy and privilege are computed here so every role picker can
+    // explain why a role cannot be granted, using the shared policy.
+    const botRoles = await (
+      discord.botUser
+        ? discord.botUser().then((user) => user.id)
+        : Promise.resolve(config.DISCORD_CLIENT_ID)
+    )
+      .then((id) => (id ? discord.member(guildId, id) : null))
+      .then((member) => member?.roles ?? null)
+      .catch(() => null);
+    const highest =
+      botRoles === null
+        ? null
+        : Math.max(
+            0,
+            ...roles
+              .filter((role) => botRoles.includes(role.id))
+              .map((role) => role.position),
+          );
+    return {
+      data: roles.map((role) => {
+        const privileged = isPrivilegedRole(role.permissions);
+        return {
+          ...role,
+          privileged,
+          ...(highest === null
+            ? {}
+            : {
+                assignable:
+                  !role.managed &&
+                  role.id !== guildId &&
+                  !privileged &&
+                  role.position < highest,
+              }),
+        };
+      }),
+    };
   });
   app.get('/api/v1/guilds/:guildId/resources/emojis', async (req) => {
     const { guildId } = z.object({ guildId: z.string() }).parse(req.params),
@@ -482,6 +526,68 @@ export async function createApp(options: {
           },
     };
   });
+  /**
+   * Every channel or role a setting names must exist in this server now.
+   * Keys ending in ChannelId(s)/RoleId(s), at any depth, are checked so new
+   * modules are covered without per-feature code.
+   */
+  async function assertConfigReferences(guildId: string, config: unknown) {
+    const channels: { path: string; id: string }[] = [],
+      roles: { path: string; id: string }[] = [];
+    function visit(value: unknown, path: string[]): void {
+      if (Array.isArray(value))
+        return value.forEach((item, index) =>
+          visit(item, [...path, String(index)]),
+        );
+      if (!value || typeof value !== 'object') return;
+      for (const [key, item] of Object.entries(value)) {
+        const target = /channelIds?$/i.test(key)
+          ? channels
+          : /roleIds?$/i.test(key)
+            ? roles
+            : null;
+        if (target && typeof item === 'string')
+          target.push({ path: [...path, key].join('.'), id: item });
+        else if (target && Array.isArray(item))
+          item.forEach((id, index) => {
+            if (typeof id === 'string')
+              target.push({
+                path: [...path, key, String(index)].join('.'),
+                id,
+              });
+          });
+        else if (key !== 'document' && !key.endsWith('Document'))
+          visit(item, [...path, key]);
+      }
+    }
+    visit(config, []);
+    if (!channels.length && !roles.length) return;
+    const [known, knownRoles] = await Promise.all([
+      channels.length ? discord.channels(guildId) : Promise.resolve([]),
+      roles.length ? discord.roles(guildId) : Promise.resolve([]),
+    ]);
+    const fieldErrors = [
+      ...channels
+        .filter((ref) => !known.some((channel) => channel.id === ref.id))
+        .map((ref) => ({
+          path: ref.path,
+          message: 'This channel no longer exists or Sparko cannot see it.',
+        })),
+      ...roles
+        .filter((ref) => !knownRoles.some((role) => role.id === ref.id))
+        .map((ref) => ({
+          path: ref.path,
+          message: 'This role no longer exists in the server.',
+        })),
+    ];
+    if (fieldErrors.length)
+      throw new DomainError(
+        'INVALID_INPUT',
+        'A selected channel or role is unavailable.',
+        400,
+        { fieldErrors },
+      );
+  }
   app.put('/api/v1/guilds/:guildId/features/:featureId/config', async (req) => {
     const mutationSession = await auth.csrf(req);
     const p = z
@@ -498,6 +604,7 @@ export async function createApp(options: {
         })
         .parse(req.body),
       cfg = schema.parse(body.config);
+    if (p.featureId !== 'tickets') await assertConfigReferences(p.guildId, cfg);
     if (p.featureId === 'tickets') {
       const tc = TicketConfigSchema.parse(cfg),
         roles = await discord.roles(p.guildId),
@@ -774,6 +881,22 @@ export async function createApp(options: {
           db.featureConfig.findMany({ where: { guildId: actor.guildId } }),
       ),
     };
+  });
+  // The member's own card, built from server state exactly like Discord `/level`.
+  app.get('/api/v1/guilds/:guildId/levels/me/card.png', async (req, reply) => {
+    const { guildId } = z.object({ guildId: z.string() }).parse(req.params);
+    const actor = await auth.actor(req, guildId, 'member');
+    const user = await db.user.findUnique({ where: { id: actor.userId } });
+    const input = await platform.read(actor, (ctx) =>
+      rankCardInput(ctx, actor.userId, user?.username ?? 'Member'),
+    );
+    const card = await renderRankCard(input);
+    return reply
+      .header('content-type', 'image/png')
+      .header('cache-control', 'private, no-store')
+      .header('etag', '"' + card.hash + '"')
+      .header('x-rank-summary', encodeURIComponent(card.summary))
+      .send(card.buffer);
   });
   app.get('/api/v1/public/widgets/:guildId/:type', async (req) => {
     const p = z

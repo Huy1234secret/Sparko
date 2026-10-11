@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import sharp, { type OverlayOptions } from 'sharp';
 import { z } from 'zod';
 
-export const RANK_RENDERER_VERSION = 'sparko-rank-1.0.0';
+export const RANK_RENDERER_VERSION = 'sparko-rank-1.1.0';
 export const RANK_FONT_SHA256 =
   '57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e';
 const fontPath = fileURLToPath(
@@ -30,6 +30,8 @@ export const RankCardInputSchema = z
     badges: z.array(z.string().min(1).max(24)).max(3).default([]),
     showXp: z.boolean().default(true),
     showRank: z.boolean().default(true),
+    /** The member has reached the configured maximum level; no next threshold exists. */
+    maxLevel: z.boolean().default(false),
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -136,10 +138,15 @@ export function rankCardTextSummary(input: unknown): string {
     value.memberName,
     `Level ${value.level}`,
     ...(value.showRank && value.rank ? [`Rank ${value.rank}`] : []),
+    ...(value.maxLevel ? ['Maximum level reached'] : []),
     ...(value.showXp
       ? [
           `${value.totalXp.toLocaleString('en-US')} XP`,
-          `${value.xpIntoLevel.toLocaleString('en-US')} of ${value.xpForNextLevel.toLocaleString('en-US')} XP toward the next level`,
+          ...(value.maxLevel
+            ? []
+            : [
+                `${value.xpIntoLevel.toLocaleString('en-US')} of ${value.xpForNextLevel.toLocaleString('en-US')} XP toward the next level`,
+              ]),
         ]
       : []),
     ...value.badges,
@@ -188,9 +195,11 @@ export async function renderRankCard(
   const ink = dark ? '#FAFAF5' : '#1C1917';
   const secondary = dark ? '#D6D3D1' : '#57534E';
   const progressWidth = width - 250;
-  const progress = Math.round(
-    (progressWidth * value.xpIntoLevel) / value.xpForNextLevel,
-  );
+  // Hidden XP must not leak through the bar length either.
+  const progress = value.maxLevel
+    ? progressWidth
+    : Math.round((progressWidth * value.xpIntoLevel) / value.xpForNextLevel);
+  const bar = value.showXp || value.maxLevel;
   const base = Buffer.from(
     `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect width="${width}" height="${height}" rx="24" fill="${rgbaColor(background)}"/></svg>`,
   );
@@ -201,7 +210,7 @@ export async function renderRankCard(
       top: 0,
       left: 0,
     });
-  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect x="198" y="20" width="${width - 216}" height="224" rx="16" fill="${dark ? '#1C1C19' : '#FFFCF3'}"/><rect x="0" y="0" width="8" height="${height}" fill="${value.accent}"/><rect x="214" y="188" width="${progressWidth}" height="16" rx="8" fill="${dark ? '#44443C' : '#E7E5E4'}"/><rect x="214" y="188" width="${progress}" height="16" rx="8" fill="${value.accent}"/></svg>`;
+  const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><rect x="198" y="20" width="${width - 216}" height="224" rx="16" fill="${dark ? '#1C1C19' : '#FFFCF3'}"/><rect x="0" y="0" width="8" height="${height}" fill="${value.accent}"/>${bar ? `<rect x="214" y="188" width="${progressWidth}" height="16" rx="8" fill="${dark ? '#44443C' : '#E7E5E4'}"/><rect x="214" y="188" width="${progress}" height="16" rx="8" fill="${value.accent}"/>` : ''}</svg>`;
   layers.push({ input: Buffer.from(svg), top: 0, left: 0 });
   if (media.avatar)
     layers.push({
@@ -258,10 +267,14 @@ export async function renderRankCard(
   );
   const badges = value.badges.join('  •  ');
   if (badges) label(badges, 15, 214, 128, secondary, width - 250);
-  const progressLabel = value.showXp
-    ? `${value.xpIntoLevel.toLocaleString('en-US')} / ${value.xpForNextLevel.toLocaleString('en-US')} XP`
-    : `${Math.round((value.xpIntoLevel / value.xpForNextLevel) * 100)}% to next level`;
-  label(progressLabel, 15, 214, 214, secondary, width - 250);
+  const progressLabel = value.maxLevel
+    ? value.showXp
+      ? `Maximum level · ${value.totalXp.toLocaleString('en-US')} XP`
+      : 'Maximum level reached'
+    : value.showXp
+      ? `${value.xpIntoLevel.toLocaleString('en-US')} / ${value.xpForNextLevel.toLocaleString('en-US')} XP`
+      : null;
+  if (progressLabel) label(progressLabel, 15, 214, 214, secondary, width - 250);
   const buffer = await sharp(base)
     .composite(layers)
     .png({ compressionLevel: 9, adaptiveFiltering: false, palette: false })

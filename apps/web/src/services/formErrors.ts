@@ -7,7 +7,7 @@ import { ApiError, type ApiFieldError } from './http';
  * caller can show them in a summary instead of silently dropping them.
  */
 export function applyServerFieldErrors<T extends FieldValues>(
-  form: UseFormReturn<T>,
+  form: Pick<UseFormReturn<T>, 'getValues' | 'setError'>,
   error: unknown,
 ): ApiFieldError[] {
   if (!(error instanceof ApiError)) return [];

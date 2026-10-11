@@ -10,18 +10,7 @@ import { requireCapability } from '@sparko/policy';
 import type { PrismaClient } from '@sparko/db';
 import type { Config } from '@sparko/config';
 import type { DiscordAdapter } from './discord.js';
-
-const privilegedRolePermissions =
-  8n |
-  2n |
-  4n |
-  16n |
-  32n |
-  8192n |
-  131072n |
-  268435456n |
-  536870912n |
-  1099511627776n;
+import { isPrivilegedRole } from '@sparko/policy';
 
 function attachmentReferences(document: MessageDocument) {
   const attachments = new Set<string>();
@@ -238,7 +227,7 @@ export async function validatePublicationResources(
       !role ||
       role.id === actor.guildId ||
       role.managed ||
-      (BigInt(role.permissions) & privilegedRolePermissions) !== 0n
+      isPrivilegedRole(role.permissions)
     )
       throw new DomainError(
         'FORBIDDEN',

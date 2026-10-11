@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { z } from 'zod';
 import { DomainError, type Actor } from '@sparko/contracts';
+import { isPrivilegedRole } from '@sparko/policy';
 import type { PrismaClient } from '@sparko/db';
 
 export const DiscordGuildSchema = z.object({
@@ -155,16 +156,7 @@ export function assertRoleAssignable(
       'Move Sparko’s role above the configured role, then try again.',
       403,
     );
-  const privileged =
-    PermissionFlagsBits.Administrator |
-    PermissionFlagsBits.ManageGuild |
-    PermissionFlagsBits.ManageRoles |
-    PermissionFlagsBits.ManageChannels |
-    PermissionFlagsBits.BanMembers |
-    PermissionFlagsBits.KickMembers |
-    PermissionFlagsBits.ManageWebhooks |
-    PermissionFlagsBits.ModerateMembers;
-  if ((BigInt(role.permissions) & privileged) !== 0n)
+  if (isPrivilegedRole(role.permissions))
     throw new DomainError(
       'FORBIDDEN',
       'Privileged roles cannot be assigned through public automation.',

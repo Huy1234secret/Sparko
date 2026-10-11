@@ -2734,3 +2734,84 @@ td {
     max-height: 200px;
   }
 }
+.module-tabs {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.module-tabs button {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.repeat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+.curve-table td,
+.curve-table th {
+  padding: 6px 10px;
+  text-align: left;
+}
+.status-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 600px) {
+  .repeat-row {
+    grid-template-columns: 1fr;
+  }
+}
+.progress {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--subtle);
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  border-radius: inherit;
+}
+.rank-card {
+  margin: 0;
+}
+.rank-card img {
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+.button-reset {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.button-reset[aria-pressed='true'] {
+  background: var(--brand-soft);
+  border-radius: 10px;
+}
+.card h2 > svg,
+.card h3 > svg {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-right: 6px;
+}
+.card h3 {
+  margin-top: 18px;
+}
+.card > .button + h3,
+.card > button + h3 {
+  margin-top: 22px;
+}
+fieldset > legend {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}

@@ -79,4 +79,31 @@ describe('authoritative rank renderer', () => {
     expect((await sharp(result.buffer).metadata()).height).toBe(260);
     expect(result.summary).toContain('<span');
   });
+  it('renders identical pixels for different progress when XP is hidden', async () => {
+    const low = await renderRankCard({
+      ...input,
+      xpIntoLevel: 10,
+      showXp: false,
+    });
+    const high = await renderRankCard({
+      ...input,
+      xpIntoLevel: 390,
+      showXp: false,
+    });
+    expect(low.buffer.equals(high.buffer)).toBe(true);
+    const shown = await renderRankCard({ ...input, xpIntoLevel: 10 });
+    expect(shown.buffer.equals(low.buffer)).toBe(false);
+  });
+  it('states the maximum level instead of inventing a next threshold', async () => {
+    const card = await renderRankCard({
+      ...input,
+      maxLevel: true,
+      xpIntoLevel: 1,
+      xpForNextLevel: 1,
+    });
+    expect(card.summary).toBe(
+      'Sparko member · Level 3 · Rank 2 · Maximum level reached · 750 XP',
+    );
+    expect(card.summary).not.toContain('toward the next level');
+  });
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,7 +14,6 @@ import {
   Shield,
   Ticket,
   Trash2,
-  Trophy,
 } from 'lucide-react';
 import {
   Badge,
@@ -36,11 +35,10 @@ import {
   createSupport,
   getSessions,
   revokeSession,
-  getMember,
 } from '../services/account';
 import { errorMessage, isRetryable } from '../services/http';
 import { applyServerFieldErrors } from '../services/formErrors';
-import { Metric, useSession } from '../components/AppShell';
+import { useSession } from '../components/AppShell';
 import { useUi } from '../state/ui';
 import { useActionIdentity } from '../hooks/useActionIdentity';
 import { DraftGuard } from '../hooks/useDraftGuard';
@@ -548,131 +546,6 @@ export function ProductSupportPage() {
           )}
         </Card>
       </div>
-    </>
-  );
-}
-export function MemberProfilePage() {
-  const { guildId = '' } = useParams();
-  const query = useQuery({
-    queryKey: ['member', guildId],
-    queryFn: ({ signal }) => getMember(guildId, signal),
-  });
-  if (query.isPending)
-    return <LoadingState label="Opening your member profile…" />;
-  if (query.error)
-    return (
-      <ErrorState
-        message={errorMessage(query.error)}
-        retry={() => void query.refetch()}
-      />
-    );
-  if (!query.data) return null;
-  const member = query.data;
-  return (
-    <>
-      <PageHeading
-        eyebrow="Member portal"
-        title="Your place in the community."
-        description="Your own progression, rewards, and conversations. Every action uses current server permissions."
-        actions={
-          <Link
-            className="button button-secondary"
-            to={`/servers/${guildId}/tickets`}
-          >
-            <Ticket size={16} />
-            Your tickets
-          </Link>
-        }
-      />
-      <div className="metric-grid">
-        <Metric
-          label="Level"
-          value={member.level}
-          detail="Derived from recorded XP"
-        />
-        <Metric
-          label="Lifetime XP"
-          value={member.xp}
-          detail="Observed eligible Discord activity"
-        />
-        <Metric
-          label="Server rank"
-          value={member.rank ?? '—'}
-          detail={
-            member.rank === null
-              ? 'Ranking unavailable'
-              : 'Current progression ranking'
-          }
-        />
-      </div>
-      <div className="overview-grid">
-        <Card>
-          <h2>Your achievements</h2>
-          {member.achievements.length ? (
-            member.achievements.map((item) => (
-              <div className="activity-row" key={item.id}>
-                <Trophy size={20} />
-                <span>
-                  <strong>{item.name}</strong>
-                  <small>
-                    Earned {new Date(item.earnedAt).toLocaleDateString()}
-                  </small>
-                </span>
-              </div>
-            ))
-          ) : (
-            <EmptyState
-              title="Your story is just starting"
-              description="Achievements appear when the server’s configured milestones are reached."
-            />
-          )}
-        </Card>
-        <Card>
-          <h2>Your inventory</h2>
-          {member.inventory.length ? (
-            member.inventory.map((item) => (
-              <div className="activity-row" key={item.id}>
-                <span>{item.name}</span>
-                <Badge>× {item.quantity}</Badge>
-              </div>
-            ))
-          ) : (
-            <EmptyState
-              title="Room for something good"
-              description="Purchased and awarded items will appear here after they’re recorded."
-            />
-          )}
-        </Card>
-      </div>
-      <Card>
-        <h2>XP history</h2>
-        {member.history.length ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Activity</th>
-                  <th>XP change</th>
-                  <th>Recorded</th>
-                </tr>
-              </thead>
-              <tbody>
-                {member.history.map((event) => (
-                  <tr key={event.id}>
-                    <td>{event.source}</td>
-                    <td>{event.amount}</td>
-                    <td>{new Date(event.createdAt).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="muted">
-            No eligible XP events have been recorded for you yet.
-          </p>
-        )}
-      </Card>
     </>
   );
 }

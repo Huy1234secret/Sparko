@@ -39,7 +39,10 @@ export const LevelConfigSchema = z
     announcementChannelId: Snowflake.optional(),
     announcement: Document,
   })
-  .refine((v) => v.maxXp >= v.minXp, 'Maximum XP must be at least minimum XP');
+  .refine((v) => v.maxXp >= v.minXp, {
+    message: 'Maximum XP must be at least minimum XP',
+    path: ['maxXp'],
+  });
 const RewardRoleSchema = z.object({
   level: z.number().int().min(1).max(1000),
   roleId: Snowflake,
@@ -69,7 +72,10 @@ export const CrateConfigSchema = z
             maxXp: XpAmount,
             document: Document,
           })
-          .refine((v) => v.maxXp >= v.minXp, 'Invalid crate XP range'),
+          .refine((v) => v.maxXp >= v.minXp, {
+            message: 'Maximum XP must be at least minimum XP',
+            path: ['maxXp'],
+          }),
       )
       .min(1)
       .max(30)
@@ -200,10 +206,16 @@ export const RoleMenuSchema = z
   })
   .refine(
     (v) =>
-      v.minSelections <= v.maxSelections &&
-      v.maxSelections <= v.options.length &&
-      new Set(v.options.map((o) => o.roleId)).size === v.options.length,
-    'Invalid role menu selection limits or duplicate roles',
+      v.minSelections <= v.maxSelections && v.maxSelections <= v.options.length,
+    {
+      message:
+        'Maximum picks must be at least the minimum and no more than the number of roles.',
+      path: ['maxSelections'],
+    },
+  )
+  .refine(
+    (v) => new Set(v.options.map((o) => o.roleId)).size === v.options.length,
+    { message: 'Each role can appear only once.', path: ['options'] },
   );
 
 export const EligibilitySchema = z.object({
@@ -247,3 +259,41 @@ export const AnalyticsQuery = z
       Date.parse(v.to) - Date.parse(v.from) <= 93 * 86_400_000,
     'Use a positive range of at most 93 days',
   );
+
+const LegacyShape = { square: 'rounded' } as const;
+/**
+ * Member rank-card preferences, shared by the browser, API PNG route and the
+ * Discord `/level` command. Earlier saved values used `square` for the avatar
+ * shape and `background: dark|light` for the theme; both are normalized here.
+ */
+export const RankCardPreferencesSchema = z.preprocess(
+  (raw) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const value = { ...(raw as Record<string, unknown>) };
+    if (value['avatarShape'] === 'square')
+      value['avatarShape'] = LegacyShape.square;
+    if (
+      value['theme'] === undefined &&
+      (value['background'] === 'dark' || value['background'] === 'light')
+    )
+      value['theme'] = value['background'];
+    delete value['background'];
+    return value;
+  },
+  z.object({
+    accent: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex colour such as #FACC15.')
+      .default('#FACC15'),
+    avatarShape: z.enum(['circle', 'rounded']).default('circle'),
+    layout: z.enum(['wide', 'compact']).default('wide'),
+    theme: z.enum(['dark', 'light']).default('dark'),
+    showXp: z.boolean().default(true),
+    showRank: z.boolean().default(true),
+  }),
+);
+export type RankCardPreferences = z.output<typeof RankCardPreferencesSchema>;
+export const LevelPreferencesSchema = z.object({
+  publicProfile: z.boolean(),
+  card: RankCardPreferencesSchema,
+});

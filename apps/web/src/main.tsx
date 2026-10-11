@@ -30,7 +30,6 @@ import {
   PreferencesPage,
   PrivacyAccountPage,
   ProductSupportPage,
-  MemberProfilePage,
 } from './pages/AccountPages';
 import {
   HomePage,
@@ -57,13 +56,18 @@ const ModuleIndex = lazy(() =>
   })),
 );
 const Module = lazy(() =>
-  import('./pages/ModulePages').then((module) => ({
-    default: module.ModulePage,
+  import('./pages/community').then((module) => ({
+    default: module.ModuleRouter,
   })),
 );
 const Analytics = lazy(() =>
-  import('./pages/ModulePages').then((module) => ({
+  import('./pages/community/AnalyticsPage').then((module) => ({
     default: module.AnalyticsPage,
+  })),
+);
+const MemberPortal = lazy(() =>
+  import('./pages/community/MemberPage').then((module) => ({
+    default: module.MemberPage,
   })),
 );
 const Owner = lazy(() =>
@@ -149,7 +153,7 @@ export const router = createBrowserRouter([
               { path: 'account/preferences', element: <PreferencesPage /> },
               { path: 'account/privacy', element: <PrivacyAccountPage /> },
               { path: 'account/support', element: <ProductSupportPage /> },
-              { path: 'servers/:guildId/me', element: <MemberProfilePage /> },
+              { path: 'servers/:guildId/me', element: <MemberPortal /> },
               {
                 path: 'servers/:guildId/tickets',
                 element: <TicketInboxPage member />,

@@ -1285,4 +1285,228 @@ describe('PostgreSQL worker execution and recovery', () => {
     ).toBe('delivered');
     expect(await db.ledgerTransaction.count({ where: { guildId } })).toBe(0);
   });
+  describe('community publications', () => {
+    const fallbackChannel = '933456789012345690';
+    const pending = (type: string) =>
+      db.outbox.findFirstOrThrow({
+        where: { guildId, type, state: { in: ['pending', 'retry'] } },
+      });
+    async function denySendIn(id: string) {
+      discord.botPermissions =
+        PermissionFlagsBits.ViewChannel |
+        PermissionFlagsBits.SendMessages |
+        PermissionFlagsBits.ReadMessageHistory |
+        PermissionFlagsBits.EmbedLinks;
+      discord.channelsStore = discord.channelsStore.map((channel) =>
+        channel.id === id
+          ? {
+              ...channel,
+              permission_overwrites: [
+                {
+                  id: botRole,
+                  type: 0,
+                  allow: '0',
+                  deny: PermissionFlagsBits.SendMessages.toString(),
+                },
+              ],
+            }
+          : channel,
+      );
+    }
+    it('keeps a role menu publishing until Discord applies its configured design', async () => {
+      const menu = await db.record.create({
+        data: {
+          guildId,
+          kind: 'role.menu',
+          key: 'menu-a',
+          ownerId,
+          state: 'publishing',
+          data: json({
+            name: 'Pick a colour',
+            channelId,
+            document: notice,
+            options: [
+              {
+                roleId,
+                label: 'Member',
+                requiredRoleIds: [],
+                blockedRoleIds: [],
+              },
+            ],
+            minSelections: 0,
+            maxSelections: 1,
+          }),
+        },
+      });
+      const publish = await effect('community.role-menu.publish', {
+        menuId: menu.id,
+      });
+      await processOutbox(db, discord, publish.id);
+      expect(
+        (await db.record.findUniqueOrThrow({ where: { id: menu.id } })).state,
+      ).toBe('publishing');
+      const applied = await pending('community.publication.applied');
+      await processOutbox(db, discord, applied.id);
+      expect(
+        (await db.record.findUniqueOrThrow({ where: { id: menu.id } })).state,
+      ).toBe('publishing');
+      const waiting = await db.outbox.findUniqueOrThrow({
+        where: { id: applied.id },
+      });
+      expect(waiting.dueAt.getTime()).toBeGreaterThan(Date.now() + 20_000);
+      await processOutbox(db, discord, (await pending('publication.send')).id);
+      // The applied delivery wakes the waiting check instead of leaving the
+      // menu in "publishing" for the rest of the retry delay.
+      expect(
+        (
+          await db.outbox.findUniqueOrThrow({ where: { id: applied.id } })
+        ).dueAt.getTime(),
+      ).toBeLessThanOrEqual(Date.now());
+      await processOutbox(db, discord, applied.id);
+      const published = await db.record.findUniqueOrThrow({
+        where: { id: menu.id },
+      });
+      expect(published.state).toBe('published');
+      expect(published.data).toMatchObject({ publicationState: 'applied' });
+      const message = JSON.stringify(discord.messageStore[0]);
+      expect(message).toContain('Welcome to this community.');
+      expect(message).toContain('"type":3');
+      expect(message).toContain('"value":"' + roleId + '"');
+    });
+    it('posts a crate in the first usable fallback channel', async () => {
+      discord.channelsStore.push({
+        id: fallbackChannel,
+        guild_id: guildId,
+        name: 'fallback',
+        type: 0,
+        permission_overwrites: [],
+      });
+      await denySendIn(channelId);
+      await db.featureConfig.create({
+        data: {
+          guildId,
+          featureId: 'R10',
+          config: json({
+            enabled: true,
+            fallbackChannelIds: [fallbackChannel],
+          }),
+        },
+      });
+      const drop = await db.record.create({
+        data: {
+          guildId,
+          kind: 'crate.drop',
+          key: 'drop-a',
+          ownerId,
+          state: 'publishing',
+          data: json({
+            type: {
+              id: 'spark',
+              name: 'Spark crate',
+              weight: 1,
+              minXp: 1,
+              maxXp: 2,
+            },
+            channelId,
+            expiresAt: new Date(Date.now() + 600000).toISOString(),
+            capacity: 1,
+            claims: 0,
+            preview: false,
+            failurePolicy: 'retry',
+          }),
+        },
+      });
+      const publish = await effect('community.crate.publish', {
+        dropId: drop.id,
+      });
+      await processOutbox(db, discord, publish.id);
+      const publication = await db.publication.findFirstOrThrow({
+        where: { guildId },
+      });
+      expect(publication.channelId).toBe(fallbackChannel);
+      expect(
+        (await db.record.findUniqueOrThrow({ where: { id: drop.id } })).data,
+      ).toMatchObject({ channelId: fallbackChannel });
+    });
+    it('records a skipped crate when no channel is usable instead of retrying', async () => {
+      await denySendIn(channelId);
+      const drop = await db.record.create({
+        data: {
+          guildId,
+          kind: 'crate.drop',
+          key: 'drop-b',
+          ownerId,
+          state: 'publishing',
+          data: json({
+            type: {
+              id: 'spark',
+              name: 'Spark crate',
+              weight: 1,
+              minXp: 1,
+              maxXp: 2,
+            },
+            channelId,
+            expiresAt: new Date(Date.now() + 600000).toISOString(),
+            capacity: 1,
+            claims: 0,
+            preview: false,
+            failurePolicy: 'skip',
+          }),
+        },
+      });
+      const publish = await effect('community.crate.publish', {
+        dropId: drop.id,
+      });
+      await processOutbox(db, discord, publish.id);
+      const failed = await db.record.findUniqueOrThrow({
+        where: { id: drop.id },
+      });
+      expect(failed.state).toBe('failed');
+      expect(failed.data).toMatchObject({
+        publicationState: 'failed',
+        deliveryError: expect.stringContaining('No crate channel is usable'),
+      });
+      expect(await db.publication.count({ where: { guildId } })).toBe(0);
+      expect(discord.sends).toBe(0);
+    });
+    it('reports a giveaway whose delivery is blocked instead of waiting forever', async () => {
+      await denySendIn(channelId);
+      const giveaway = await db.record.create({
+        data: {
+          guildId,
+          kind: 'giveaway',
+          key: 'giveaway-a',
+          ownerId,
+          state: 'publishing',
+          data: json({
+            prize: 'Sticker pack',
+            channelId,
+            endsAt: new Date(Date.now() + 600000).toISOString(),
+            winnerCount: 1,
+          }),
+        },
+      });
+      await processOutbox(
+        db,
+        discord,
+        (
+          await effect('community.giveaway.publish', {
+            giveawayId: giveaway.id,
+          })
+        ).id,
+      );
+      await processOutbox(db, discord, (await pending('publication.send')).id);
+      await processOutbox(
+        db,
+        discord,
+        (await pending('community.publication.applied')).id,
+      );
+      const failed = await db.record.findUniqueOrThrow({
+        where: { id: giveaway.id },
+      });
+      expect(failed.state).toBe('failed');
+      expect(failed.data).toMatchObject({ publicationState: 'failed' });
+      expect(discord.sends).toBe(0);
+    });
+  });
 });
