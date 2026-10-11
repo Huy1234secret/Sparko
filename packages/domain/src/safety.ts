@@ -86,6 +86,92 @@ async function config(ctx: DomainContext, id: string) {
     )?.config,
   );
 }
+export type PreparedApplicationForm = {
+  formId: string;
+  version: number;
+  revision: number;
+  form: z.infer<typeof FormSchema>;
+};
+/** Unfinished intake may use only the current published immutable version. */
+export async function prepareApplicationForm(
+  ctx: DomainContext,
+  formId: string,
+  expectedVersion?: number,
+): Promise<PreparedApplicationForm> {
+  await ctx.requireFeature('R25');
+  const record = await getRecord(ctx, 'form', formId),
+    data = jsonObject(record.data);
+  if (record.state !== 'published')
+    throw new DomainError(
+      'INVALID_INPUT',
+      'This form is not published. Open its current published form.',
+    );
+  const version = z.number().int().min(1).parse(data['publishedVersion']);
+  if (
+    expectedVersion !== undefined &&
+    z.number().int().min(1).parse(expectedVersion) !== version
+  )
+    throw new DomainError(
+      'REVISION_CONFLICT',
+      'This form changed. Open its current published version before submitting.',
+      409,
+      { currentVersion: version },
+    );
+  const versions = Array.isArray(data['versions']) ? data['versions'] : [],
+    published = versions.find(
+      (candidate) => jsonObject(candidate)['number'] === version,
+    ),
+    snapshot = FormSchema.parse(jsonObject(published)['form']);
+  eligible(ctx, snapshot.requiredRoleIds, snapshot.blockedRoleIds);
+  const prior = await ctx.tx.record.count({
+    where: {
+      guildId: ctx.guildId,
+      kind: 'application',
+      ownerId: ctx.actor.userId,
+      data: { path: ['formId'], equals: record.id },
+    },
+  });
+  if (prior >= snapshot.maxSubmissions)
+    throw new DomainError(
+      'RATE_LIMITED',
+      'You reached this form’s submission limit.',
+      429,
+    );
+  return {
+    formId: record.id,
+    version,
+    revision: record.revision,
+    form: snapshot,
+  };
+}
+/** The caller supplies the platform mutation identity; ownership comes from ctx. */
+export async function submitApplication(
+  ctx: DomainContext,
+  input: { formId: string; version?: number; answers: Record<string, string> },
+) {
+  const body = z
+      .object({
+        formId: z.string().min(1),
+        version: z.number().int().min(1).optional(),
+        answers: submit.shape.answers,
+      })
+      .parse(input),
+    prepared = await prepareApplicationForm(ctx, body.formId, body.version);
+  validateAnswers(prepared.form, body.answers);
+  return createRecord(
+    ctx,
+    'application',
+    {
+      formId: prepared.formId,
+      version: prepared.version,
+      snapshot: prepared.form,
+      answers: body.answers,
+      stage: 0,
+      history: [],
+    },
+    { state: 'submitted' },
+  );
+}
 export async function createModerationCase(
   ctx: DomainContext,
   input: z.infer<typeof caseInput>,
@@ -263,48 +349,11 @@ export const safetyRoutes: DomainRoute[] = [
     '/forms/:id/submissions',
     'member',
     submit,
-    async (ctx, input, p) => {
-      await ctx.requireFeature('R25');
-      const form = await getRecord(ctx, 'form', p['id']!),
-        data = jsonObject(form.data);
-      if (form.state !== 'published')
-        throw new DomainError('INVALID_INPUT', 'This form is not published.');
-      const versions = Array.isArray(data['versions']) ? data['versions'] : [],
-        version = versions.find(
-          (v) => jsonObject(v)['number'] === data['publishedVersion'],
-        ),
-        snapshot = FormSchema.parse(jsonObject(version)['form']);
-      eligible(ctx, snapshot.requiredRoleIds, snapshot.blockedRoleIds);
-      const prior = await ctx.tx.record.count({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'application',
-          ownerId: ctx.actor.userId,
-          data: { path: ['formId'], equals: form.id },
-        },
-      });
-      if (prior >= snapshot.maxSubmissions)
-        throw new DomainError(
-          'RATE_LIMITED',
-          'You reached this form’s submission limit.',
-          429,
-        );
-      const answers = submit.parse(input).answers;
-      validateAnswers(snapshot, answers);
-      return createRecord(
-        ctx,
-        'application',
-        {
-          formId: form.id,
-          version: data['publishedVersion'],
-          snapshot,
-          answers,
-          stage: 0,
-          history: [],
-        },
-        { state: 'submitted' },
-      );
-    },
+    async (ctx, input, p) =>
+      submitApplication(ctx, {
+        formId: p['id']!,
+        answers: submit.parse(input).answers,
+      }),
   ),
   formRoute('GET', '/applications', 'member', undefined, (ctx) =>
     list(ctx, 'application', allowed(ctx.actor, 'forms.review')),

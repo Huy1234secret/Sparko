@@ -89,6 +89,9 @@ app.post('/__test/restart-bot', async () => {
   return { restarted: true };
 });
 app.get('/__test/state', async () => ({
+  templates: await db.template.findMany({
+    include: { versions: { orderBy: { number: 'desc' } } },
+  }),
   tickets: await db.ticket.findMany(),
   publications: await db.publication.findMany(),
   outbox: await db.outbox.findMany(),
@@ -96,6 +99,15 @@ app.get('/__test/state', async () => ({
   messages: rest.messageStore,
   uploadedFiles: rest.uploadedFiles,
 }));
+app.post('/__test/discord/writes', async (req) => {
+  rest.failWrites = z.object({ fail: z.boolean() }).parse(req.body).fail;
+  return { fail: rest.failWrites };
+});
+app.post('/__test/discord/messages/:id/delete', async (req) => {
+  const { id } = z.object({ id: z.string() }).parse(req.params);
+  rest.messageStore = rest.messageStore.filter((message) => message.id !== id);
+  return { deleted: id };
+});
 app.post('/__test/discord/ticket', async (req, reply) => {
   const input = z
     .object({

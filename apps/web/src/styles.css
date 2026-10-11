@@ -2700,3 +2700,31 @@ td {
 .studio-library .activity-row > span {
   min-width: 0;
 }
+.studio-library .template-row {
+  flex-wrap: wrap;
+}
+.template-history-dialog {
+  width: min(1000px, calc(100vw - 32px));
+  max-width: 1000px;
+}
+.template-history-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 22px;
+  margin: 20px 0;
+}
+.template-history-layout nav {
+  max-height: 55vh;
+  overflow: auto;
+}
+.row.wrap {
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .template-history-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .template-history-layout nav {
+    max-height: 200px;
+  }
+}

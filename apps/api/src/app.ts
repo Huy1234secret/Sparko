@@ -38,7 +38,10 @@ import { createAuth, requireActiveSession } from './auth.js';
 import { registerAccountRoutes } from './account.js';
 import { registerProviderCallbacks } from './providers.js';
 import { registerGrantRoutes } from './grants.js';
-import { validatePublicationResources } from './publication-resources.js';
+import {
+  validatePublicationResources,
+  validateTemplateResources,
+} from './publication-resources.js';
 import { registerAssetRoutes } from './assets.js';
 import { discordAdapter, type DiscordAdapter } from './discord.js';
 const presets = [
@@ -319,6 +322,40 @@ export async function createApp(options: {
         403,
       );
     return { data: await discord.roles(guildId) };
+  });
+  app.get('/api/v1/guilds/:guildId/resources/emojis', async (req) => {
+    const { guildId } = z.object({ guildId: z.string() }).parse(req.params),
+      actor = await auth.actor(req, guildId);
+    if (
+      ![
+        'config.manage',
+        'templates.edit',
+        'messages.publish',
+        'community.manage',
+        'automation.manage',
+      ].some((capability) => allowed(actor, capability))
+    )
+      throw new DomainError(
+        'FORBIDDEN',
+        'You cannot select resources in this server.',
+        403,
+      );
+    const botId = discord.botUser
+        ? (await discord.botUser()).id
+        : config.DISCORD_CLIENT_ID,
+      [emojis, bot] = await Promise.all([
+        discord.emojis(guildId),
+        discord.member(guildId, botId),
+      ]);
+    return {
+      data: emojis.map((emoji) => ({
+        ...emoji,
+        available:
+          emoji.available &&
+          (!emoji.roles.length ||
+            emoji.roles.some((id) => id === guildId || bot.roles.includes(id))),
+      })),
+    };
   });
   app.get('/api/v1/guilds/:guildId/overview', async (req) => {
     const { guildId } = z.object({ guildId: z.string() }).parse(req.params),
@@ -606,6 +643,39 @@ export async function createApp(options: {
             params['guildId'] ?? '',
             route.capability,
           );
+        if (
+          route.method === 'POST' &&
+          (route.path.endsWith('/templates') ||
+            route.path.endsWith('/templates/:id/versions'))
+        )
+          await validateTemplateResources(
+            db,
+            actor,
+            jsonObject(req.body)['document'],
+          );
+        if (
+          route.method === 'POST' &&
+          (route.path.endsWith('/templates/:id/duplicate') ||
+            route.path.endsWith('/templates/:id/restore'))
+        ) {
+          const body = jsonObject(route.schema?.parse(req.body) ?? req.body),
+            version = await db.templateVersion.findFirst({
+              where: {
+                id: String(
+                  body[
+                    route.path.endsWith('/duplicate')
+                      ? 'sourceVersionId'
+                      : 'versionId'
+                  ],
+                ),
+                templateId: params['id'] ?? '',
+                template: { guildId: actor.guildId, archived: false },
+              },
+            });
+          if (!version)
+            throw new DomainError('NOT_FOUND', 'Version unavailable.', 404);
+          await validateTemplateResources(db, actor, version.document);
+        }
         if (
           route.path.endsWith('/messages/publish') ||
           route.path.endsWith('/messages/test') ||

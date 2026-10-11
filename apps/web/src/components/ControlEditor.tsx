@@ -1,17 +1,242 @@
-import { useEffect, useState, useId } from 'react';
+import { useEffect, useState, useId, useRef } from 'react';
 import {
   ActionSchema,
   ControlRowSchema,
+  EmojiSchema,
   type MessageAction,
   type MessageBlock,
+  type MessageControl,
 } from '@sparko/messages';
 import { Button, Field, Input } from '@sparko/ui';
 
 type Row = Extract<MessageBlock, { type: 'controls' }>;
-type Resources = {
+export type ControlEditorResources = {
   channels: { id: string; name: string }[];
   roles: { id: string; name: string }[];
+  emojis?: {
+    id: string;
+    name: string;
+    animated: boolean;
+    available?: boolean;
+  }[];
 };
+type Emoji = Extract<MessageControl, { type: 'button' }>['emoji'];
+type EmojiDraft = {
+  mode: 'none' | 'unicode' | 'custom';
+  unicode: string;
+  id: string;
+  name: string;
+  animated: boolean;
+  fallback: string;
+};
+function emojiDraft(emoji: Emoji): EmojiDraft {
+  return {
+    mode: !emoji ? 'none' : 'id' in emoji ? 'custom' : 'unicode',
+    unicode: emoji && !('id' in emoji) ? emoji.name : '',
+    id: emoji && 'id' in emoji ? emoji.id : '',
+    name: emoji && 'id' in emoji ? emoji.name : '',
+    animated: emoji && 'id' in emoji ? (emoji.animated ?? false) : false,
+    fallback: emoji && 'id' in emoji ? (emoji.fallback ?? '') : '',
+  };
+}
+function EmojiEditor({
+  emoji,
+  onChange,
+  resources,
+  id,
+  label,
+}: {
+  emoji: Emoji;
+  onChange: (next: Emoji) => void;
+  resources: ControlEditorResources;
+  id: string;
+  label: string;
+}) {
+  const [draft, setDraft] = useState(() => emojiDraft(emoji));
+  const [issues, setIssues] = useState<string[]>([]);
+  const [saved, setSaved] = useState(false);
+  const previous = useRef(JSON.stringify(emoji));
+  useEffect(() => {
+    const signature = JSON.stringify(emoji);
+    if (signature !== previous.current) {
+      previous.current = signature;
+      setDraft(emojiDraft(emoji));
+      setIssues([]);
+    }
+  }, [emoji]);
+  const edit = (next: Partial<EmojiDraft>) => {
+    setDraft((current) => ({ ...current, ...next }));
+    setSaved(false);
+  };
+  function apply() {
+    if (draft.mode === 'none') {
+      onChange(undefined);
+      setIssues([]);
+      setSaved(true);
+      return;
+    }
+    if (draft.mode === 'custom') {
+      if (!draft.fallback.trim()) {
+        setIssues(['Choose a Unicode fallback for this custom emoji.']);
+        return;
+      }
+      const fallback = EmojiSchema.options[0].safeParse({
+        name: draft.fallback.trim(),
+      });
+      if (!fallback.success) {
+        setIssues(['The fallback must be a Unicode emoji, such as 🎫.']);
+        return;
+      }
+    }
+    const parsed =
+      draft.mode === 'unicode'
+        ? EmojiSchema.options[0].safeParse({ name: draft.unicode.trim() })
+        : EmojiSchema.options[1].safeParse({
+            id: draft.id.trim(),
+            name: draft.name.trim(),
+            animated: draft.animated,
+            fallback: draft.fallback.trim(),
+          });
+    if (!parsed.success) {
+      setIssues(
+        parsed.error.issues.map(
+          (issue) =>
+            `${issue.path.length ? `${issue.path.join('.')}: ` : ''}${issue.message}`,
+        ),
+      );
+      return;
+    }
+    onChange(parsed.data);
+    setIssues([]);
+    setSaved(true);
+  }
+  return (
+    <fieldset className="stack">
+      <legend>{label} emoji</legend>
+      <Field label={`${label} emoji type`} htmlFor={`${id}-type`}>
+        <select
+          id={`${id}-type`}
+          value={draft.mode}
+          onChange={(e) => {
+            const mode = e.target.value;
+            if (mode === 'none' || mode === 'unicode' || mode === 'custom') {
+              edit({ mode });
+              setIssues([]);
+            }
+          }}
+        >
+          <option value="none">No emoji</option>
+          <option value="unicode">Unicode emoji</option>
+          <option value="custom">Custom Discord emoji</option>
+        </select>
+      </Field>
+      {draft.mode === 'unicode' && (
+        <Field
+          label={`${label} Unicode emoji`}
+          htmlFor={`${id}-unicode`}
+          hint="Paste an emoji character rather than an icon name."
+        >
+          <Input
+            id={`${id}-unicode`}
+            maxLength={16}
+            value={draft.unicode}
+            onChange={(e) => edit({ unicode: e.target.value })}
+          />
+        </Field>
+      )}
+      {draft.mode === 'custom' && (
+        <>
+          {resources.emojis && (
+            <Field
+              label={`${label} server emoji`}
+              htmlFor={`${id}-server`}
+              hint="Choose a real emoji from this server or enter its Discord ID below."
+            >
+              <select
+                id={`${id}-server`}
+                value={
+                  resources.emojis.some((item) => item.id === draft.id)
+                    ? draft.id
+                    : ''
+                }
+                onChange={(e) => {
+                  const selected = resources.emojis?.find(
+                    (item) => item.id === e.target.value,
+                  );
+                  if (selected)
+                    edit({
+                      id: selected.id,
+                      name: selected.name,
+                      animated: selected.animated,
+                    });
+                }}
+              >
+                <option value="">Choose a server emoji</option>
+                {resources.emojis.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                    {item.animated ? ' (animated)' : ''}
+                    {item.available === false ? ' (unavailable)' : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <Field
+            label={`${label} custom emoji ID`}
+            htmlFor={`${id}-custom-id`}
+            hint="Copy the emoji ID from Discord. Availability is checked when publishing."
+          >
+            <Input
+              id={`${id}-custom-id`}
+              inputMode="numeric"
+              maxLength={20}
+              value={draft.id}
+              onChange={(e) => edit({ id: e.target.value })}
+            />
+          </Field>
+          <Field
+            label={`${label} custom emoji name`}
+            htmlFor={`${id}-custom-name`}
+          >
+            <Input
+              id={`${id}-custom-name`}
+              maxLength={32}
+              value={draft.name}
+              onChange={(e) => edit({ name: e.target.value })}
+            />
+          </Field>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={draft.animated}
+              onChange={(e) => edit({ animated: e.target.checked })}
+            />
+            {label} custom emoji is animated
+          </label>
+          <Field
+            label={`${label} Unicode fallback`}
+            htmlFor={`${id}-fallback`}
+            hint="Required. This Unicode emoji is used if the custom emoji becomes unavailable."
+          >
+            <Input
+              id={`${id}-fallback`}
+              required
+              maxLength={16}
+              value={draft.fallback}
+              onChange={(e) => edit({ fallback: e.target.value })}
+            />
+          </Field>
+        </>
+      )}
+      {issues.length > 0 && <p role="alert">{issues.join(' ')}</p>}
+      {saved && <p role="status">Emoji applied to this design.</p>}
+      <Button variant="secondary" onClick={apply}>
+        Apply {label.toLowerCase()} emoji
+      </Button>
+    </fieldset>
+  );
+}
 const actionLabels: Record<MessageAction['type'], string> = {
   'response.private': 'Reply privately',
   'response.channel': 'Reply in a channel',
@@ -43,7 +268,7 @@ function ActionEditor({
 }: {
   action: MessageAction;
   onChange: (next: MessageAction) => void;
-  resources: Resources;
+  resources: ControlEditorResources;
   id: string;
 }) {
   const [draft, setDraft] = useState<Record<string, unknown>>({ ...action });
@@ -146,10 +371,12 @@ export function ControlEditor({
   row,
   onChange,
   resources,
+  singleButton = false,
 }: {
   row: Row;
   onChange: (next: Row) => void;
-  resources: Resources;
+  resources: ControlEditorResources;
+  singleButton?: boolean;
 }) {
   const prefix = useId();
   const changeControls = (controls: Row['controls'][number][]) => {
@@ -197,6 +424,18 @@ export function ControlEditor({
                   }
                 />
               </Field>
+              <EmojiEditor
+                id={`${prefix}-button-emoji-${index}`}
+                label={`Button ${index + 1}`}
+                emoji={control.emoji}
+                resources={resources}
+                onChange={(emoji) => {
+                  const next = { ...control };
+                  if (emoji) next.emoji = emoji;
+                  else delete next.emoji;
+                  update(index, next);
+                }}
+              />
               <Field
                 label="Button style"
                 htmlFor={`${prefix}-control-style-${index}`}
@@ -211,6 +450,10 @@ export function ControlEditor({
                         type: 'button',
                         key: control.key,
                         label: control.label,
+                        ...(control.emoji ? { emoji: control.emoji } : {}),
+                        ...(control.disabled === undefined
+                          ? {}
+                          : { disabled: control.disabled }),
                         style: 'link',
                         url: 'https://panel.coin-sprite.com/dashboard',
                       });
@@ -224,6 +467,10 @@ export function ControlEditor({
                         type: 'button',
                         key: control.key,
                         label: control.label,
+                        ...(control.emoji ? { emoji: control.emoji } : {}),
+                        ...(control.disabled === undefined
+                          ? {}
+                          : { disabled: control.disabled }),
                         style,
                         action:
                           control.style === 'link'
@@ -346,6 +593,23 @@ export function ControlEditor({
                       }
                     />
                   </Field>
+                  <EmojiEditor
+                    id={`${prefix}-option-emoji-${index}-${position}`}
+                    label={`Option ${position + 1}`}
+                    emoji={option.emoji}
+                    resources={resources}
+                    onChange={(emoji) => {
+                      const next = { ...option };
+                      if (emoji) next.emoji = emoji;
+                      else delete next.emoji;
+                      update(index, {
+                        ...control,
+                        options: control.options.map((item, i) =>
+                          i === position ? next : item,
+                        ),
+                      });
+                    }}
+                  />
                   <Button
                     variant="secondary"
                     disabled={control.options.length <= 1}
@@ -398,68 +662,72 @@ export function ControlEditor({
             />
             Disable this control
           </label>
-          <Button
-            variant="secondary"
-            disabled={row.controls.length <= 1}
-            onClick={() =>
-              changeControls(
-                row.controls.filter((_, position) => position !== index),
-              )
-            }
-          >
-            Remove control
-          </Button>
+          {!singleButton && (
+            <Button
+              variant="secondary"
+              disabled={row.controls.length <= 1}
+              onClick={() =>
+                changeControls(
+                  row.controls.filter((_, position) => position !== index),
+                )
+              }
+            >
+              Remove control
+            </Button>
+          )}
         </fieldset>
       ))}
-      <div className="row">
-        <Button
-          variant="secondary"
-          disabled={
-            row.controls.length >= 5 ||
-            row.controls.some((control) => control.type === 'select')
-          }
-          onClick={() =>
-            changeControls([
-              ...row.controls,
-              {
-                type: 'button',
-                key: 'button-' + crypto.randomUUID().slice(0, 8),
-                label: 'New button',
-                style: 'secondary',
-                action: {
-                  type: 'response.private',
-                  text: 'Your action is saved.',
+      {!singleButton && (
+        <div className="row">
+          <Button
+            variant="secondary"
+            disabled={
+              row.controls.length >= 5 ||
+              row.controls.some((control) => control.type === 'select')
+            }
+            onClick={() =>
+              changeControls([
+                ...row.controls,
+                {
+                  type: 'button',
+                  key: 'button-' + crypto.randomUUID().slice(0, 8),
+                  label: 'New button',
+                  style: 'secondary',
+                  action: {
+                    type: 'response.private',
+                    text: 'Your action is saved.',
+                  },
                 },
-              },
-            ])
-          }
-        >
-          Add button
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() =>
-            changeControls([
-              {
-                type: 'select',
-                key: 'select-' + crypto.randomUUID().slice(0, 8),
-                placeholder: 'Choose an option',
-                minValues: 1,
-                maxValues: 1,
-                action: {
-                  type: 'response.private',
-                  text: 'Your choice is saved.',
+              ])
+            }
+          >
+            Add button
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              changeControls([
+                {
+                  type: 'select',
+                  key: 'select-' + crypto.randomUUID().slice(0, 8),
+                  placeholder: 'Choose an option',
+                  minValues: 1,
+                  maxValues: 1,
+                  action: {
+                    type: 'response.private',
+                    text: 'Your choice is saved.',
+                  },
+                  options: [{ label: 'First choice', value: '0' }],
                 },
-                options: [{ label: 'First choice', value: '0' }],
-              },
-            ])
-          }
-        >
-          {row.controls.length
-            ? 'Use a select menu instead'
-            : 'Add select menu'}
-        </Button>
-      </div>
+              ])
+            }
+          >
+            {row.controls.length
+              ? 'Use a select menu instead'
+              : 'Add select menu'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

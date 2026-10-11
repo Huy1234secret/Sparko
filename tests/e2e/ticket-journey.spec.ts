@@ -72,8 +72,10 @@ test('OAuth, pending settings, publication, restart-safe bot control, private ti
       const state = await (
         await request.get('http://localhost:3001/__test/state')
       ).json();
-      const publication = state.publications.find((record: { state: string }) =>
-        ['applied', 'published'].includes(record.state),
+      const publication = state.publications.find(
+        (record: { state: string; document: { name: string } }) =>
+          record.state === 'applied' &&
+          record.document.name === 'Support ticket panel',
       );
       publicationId = publication?.id ?? '';
       return publicationId;
@@ -195,6 +197,18 @@ test('Studio applies compatible edits and replaces changed control meaning delib
 }) => {
   await login(page);
   await page.goto(`/dashboard/${guild}/messages/studio`);
+  const before = await (
+    await request.get('http://localhost:3001/__test/state')
+  ).json();
+  const original = before.publications.find(
+    (record: { state: string; document: { name: string } }) =>
+      record.state === 'applied' &&
+      record.document.name === 'Support ticket panel',
+  );
+  expect(original).toBeTruthy();
+  const originalIds = new Set(
+    before.publications.map((record: { id: string }) => record.id),
+  );
   await page.getByRole('button', { name: 'Edit publication' }).first().click();
   await page.getByRole('button', { name: /^Text ## Sparko support/ }).click();
   await page
@@ -207,7 +221,9 @@ test('Studio applies compatible edits and replaces changed control meaning delib
       const state = await (
         await request.get('http://localhost:3001/__test/state')
       ).json();
-      return state.publications[0]?.appliedRevision;
+      return state.publications.find(
+        (record: { id: string }) => record.id === original.id,
+      )?.appliedRevision;
     })
     .toBe(2);
   await page.getByRole('button', { name: 'Controls', exact: true }).click();
@@ -233,26 +249,26 @@ test('Studio applies compatible edits and replaces changed control meaning delib
       const state = await (
         await request.get('http://localhost:3001/__test/state')
       ).json();
+      const replacements = state.publications.filter(
+        (record: { id: string }) => !originalIds.has(record.id),
+      );
       return {
-        total: state.publications.length,
-        applied: state.publications.filter(
-          (item: { state: string }) => item.state === 'applied',
-        ).length,
-        replaced: state.publications.filter(
-          (item: { state: string }) => item.state === 'replaced',
-        ).length,
+        originalState: state.publications.find(
+          (record: { id: string }) => record.id === original.id,
+        )?.state,
+        replacements: replacements.length,
+        replacementState: replacements[0]?.state,
       };
     })
-    .toEqual({ total: 2, applied: 1, replaced: 1 });
+    .toEqual({
+      originalState: 'replaced',
+      replacements: 1,
+      replacementState: 'applied',
+    });
   const state = await (
     await request.get('http://localhost:3001/__test/state')
   ).json();
-  expect(state.publications).toHaveLength(2);
-  expect(
-    state.publications.some(
-      (item: { state: string }) => item.state === 'replaced',
-    ),
-  ).toBeTruthy();
+  expect(state.publications).toHaveLength(before.publications.length + 1);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: test.info().outputPath('studio-desktop.png'),

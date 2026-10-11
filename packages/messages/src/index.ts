@@ -1,5 +1,6 @@
 import { z } from 'zod';
 export * from './forms.js';
+export * from './resources.js';
 
 /** Protocol limits verified against Discord's component and message references. */
 export const DISCORD_LIMITS = Object.freeze({

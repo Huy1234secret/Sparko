@@ -13,6 +13,8 @@ import {
   ingestSafetyEvent,
   processSafetyDue,
   canExpireTimeout,
+  prepareApplicationForm,
+  submitApplication,
 } from './safety.js';
 import {
   automationRoutes,
@@ -700,6 +702,208 @@ describe('real PostgreSQL safety/time transactions and authority', () => {
     expect(updated.revision).toBe(2);
     expect(
       await db.outbox.count({ where: { guildId, type: 'safety.notify' } }),
+    ).toBe(1);
+  });
+  it('uses current eligibility, actor ownership and serialized caps for persistent application intake', async () => {
+    const draft = (
+      await call(
+        admin(),
+        'POST',
+        '/forms',
+        {
+          form: {
+            name: 'Choose a team',
+            requiredRoleIds: [roleId],
+            blockedRoleIds: [thirdId],
+            maxSubmissions: 1,
+            fields: [
+              {
+                id: 'team',
+                label: 'Your team',
+                choices: ['Community', 'Support'],
+                maxLength: 30,
+              },
+            ],
+          },
+        },
+        'intake-create',
+      )
+    ).data as { id: string };
+    await call(
+      admin(),
+      'POST',
+      '/forms/:id/publish',
+      { expectedRevision: 1 },
+      'intake-publish',
+      { id: draft.id },
+    );
+    const eligible = { ...actor(otherId), roles: [roleId] },
+      prepared = await platform.read(eligible, (ctx) =>
+        prepareApplicationForm(ctx, draft.id),
+      );
+    expect(prepared.version).toBe(1);
+    expect(prepared.form.fields[0]?.choices).toEqual(['Community', 'Support']);
+    const input = {
+        formId: draft.id,
+        version: prepared.version,
+        answers: { team: 'Support' },
+      },
+      submitWith = (who: Actor, key: string, body = input) =>
+        platform.mutate(who, 'application.form.intake', key, body, (ctx) =>
+          submitApplication(ctx, body),
+        );
+    await expect(submitWith(actor(otherId), 'lost-role')).rejects.toMatchObject(
+      { code: 'FORBIDDEN' },
+    );
+    await expect(
+      submitWith({ ...eligible, roles: [roleId, thirdId] }, 'blocked-role'),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(
+      submitWith(eligible, 'invented-choice', {
+        ...input,
+        answers: { team: 'Administrator' },
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(
+      await db.operation.count({
+        where: { guildId, scope: 'application.form.intake' },
+      }),
+    ).toBe(0);
+    const results = await Promise.allSettled(
+      ['first', 'second'].map((key) => submitWith(eligible, key)),
+    );
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.find((result) => result.status === 'rejected'),
+    ).toMatchObject({ reason: { code: 'RATE_LIMITED' } });
+    const winner = results.findIndex((result) => result.status === 'fulfilled'),
+      replay = await submitWith(eligible, ['first', 'second'][winner]!);
+    expect(
+      await db.record.count({ where: { guildId, kind: 'application' } }),
+    ).toBe(1);
+    expect((replay.data as { ownerId: string }).ownerId).toBe(otherId);
+    const another = await submitWith(
+      { ...actor(thirdId), roles: [roleId] },
+      ['first', 'second'][winner]!,
+    );
+    expect((another.data as { ownerId: string }).ownerId).toBe(thirdId);
+    expect(
+      (await call(actor(otherId), 'GET', '/applications', {}, 'read-own')).data,
+    ).toHaveLength(1);
+    expect(
+      (await call(actor(userId), 'GET', '/applications', {}, 'read-unrelated'))
+        .data,
+    ).toEqual([]);
+  });
+  it('rejects stale, unpublished and foreign form intake while preserving earlier immutable snapshots', async () => {
+    const draft = (
+      await call(
+        admin(),
+        'POST',
+        '/forms',
+        {
+          form: {
+            name: 'Original form',
+            maxSubmissions: 2,
+            fields: [{ id: 'why', label: 'Why join?' }],
+          },
+        },
+        'versioned-intake-create',
+      )
+    ).data as { id: string };
+    const published = (
+      await call(
+        admin(),
+        'POST',
+        '/forms/:id/publish',
+        { expectedRevision: 1 },
+        'versioned-intake-publish',
+        { id: draft.id },
+      )
+    ).data as { revision: number };
+    const prepared = await platform.read(actor(otherId), (ctx) =>
+        prepareApplicationForm(ctx, draft.id),
+      ),
+      input = {
+        formId: draft.id,
+        version: prepared.version,
+        answers: { why: 'Help members' },
+      };
+    const original = await platform.mutate(
+      actor(otherId),
+      'application.form.intake',
+      'original-submission',
+      input,
+      (ctx) => submitApplication(ctx, input),
+    );
+    await call(
+      admin(),
+      'PUT',
+      '/forms/:id',
+      {
+        expectedRevision: published.revision,
+        form: {
+          name: 'Replacement form',
+          fields: [{ id: 'different', label: 'New question' }],
+        },
+      },
+      'versioned-intake-edit',
+      { id: draft.id },
+    );
+    await expect(
+      mutate(actor(thirdId), 'unpublished-intake', (ctx) =>
+        submitApplication(ctx, input),
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    await call(
+      admin(),
+      'POST',
+      '/forms/:id/publish',
+      { expectedRevision: published.revision + 1 },
+      'versioned-intake-republish',
+      { id: draft.id },
+    );
+    await expect(
+      mutate(actor(thirdId), 'stale-intake', (ctx) =>
+        submitApplication(ctx, input),
+      ),
+    ).rejects.toMatchObject({
+      code: 'REVISION_CONFLICT',
+      details: { currentVersion: 2 },
+    });
+    expect(prepared.form.name).toBe('Original form');
+    const stored = await db.record.findUniqueOrThrow({
+      where: { id: (original.data as { id: string }).id },
+    });
+    expect(jsonObject(stored.data)['version']).toBe(1);
+    expect(jsonObject(jsonObject(stored.data)['snapshot'])['name']).toBe(
+      'Original form',
+    );
+    await db.featureConfig.create({
+      data: {
+        guildId: otherGuildId,
+        featureId: 'R25',
+        config: { enabled: true },
+      },
+    });
+    await expect(
+      platform.read(actor(otherId, otherGuildId), (ctx) =>
+        prepareApplicationForm(ctx, draft.id),
+      ),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await db.featureConfig.update({
+      where: { guildId_featureId: { guildId, featureId: 'R25' } },
+      data: { config: { enabled: false } },
+    });
+    await expect(
+      platform.read(actor(otherId), (ctx) =>
+        prepareApplicationForm(ctx, draft.id),
+      ),
+    ).rejects.toMatchObject({ code: 'FEATURE_DISABLED' });
+    expect(
+      await db.record.count({ where: { guildId, kind: 'application' } }),
     ).toBe(1);
   });
   it('runs simulations and observed Gateway matches without creating punishments', async () => {

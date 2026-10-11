@@ -93,6 +93,20 @@ export const getChannels = (guild: string, signal?: AbortSignal) =>
   read(`/guilds/${guild}/resources/channels`, z.array(ChannelSchema), signal);
 export const getRoles = (guild: string, signal?: AbortSignal) =>
   read(`/guilds/${guild}/resources/roles`, z.array(RoleSchema), signal);
+export const getEmojis = (guild: string, signal?: AbortSignal) =>
+  read(
+    `/guilds/${guild}/resources/emojis`,
+    z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        animated: z.boolean(),
+        available: z.boolean(),
+        roles: z.array(z.string()),
+      }),
+    ),
+    signal,
+  );
 export const getConfig = (
   guild: string,
   feature: string,

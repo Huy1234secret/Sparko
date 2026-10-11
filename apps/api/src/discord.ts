@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { REST, Routes } from 'discord.js';
+import { DiscordAPIError, REST, Routes } from 'discord.js';
 import { DomainError } from '@sparko/contracts';
 export const OAuthToken = z.object({
   access_token: z.string(),
@@ -23,7 +23,30 @@ export const ChannelSchema = z.object({
   name: z.string(),
   type: z.number(),
   parent_id: z.string().nullable().optional(),
+  permission_overwrites: z
+    .array(
+      z.object({
+        id: z.string(),
+        type: z.number(),
+        allow: z.string(),
+        deny: z.string(),
+      }),
+    )
+    .optional(),
 });
+export const GuildEmojiSchema = z
+  .object({
+    id: z.string().regex(/^[1-9][0-9]{16,19}$/),
+    name: z.string().min(1).nullable(),
+    animated: z.boolean().default(false),
+    available: z.boolean().default(true),
+    roles: z.array(z.string()).default([]),
+  })
+  .transform((emoji) => ({
+    ...emoji,
+    name: emoji.name ?? 'emoji',
+    available: emoji.available && emoji.name !== null,
+  }));
 export const RoleSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -41,6 +64,7 @@ export interface DiscordAdapter {
   member(guildId: string, userId: string): Promise<{ roles: string[] }>;
   channels(guildId: string): Promise<z.infer<typeof ChannelSchema>[]>;
   roles(guildId: string): Promise<z.infer<typeof RoleSchema>[]>;
+  emojis(guildId: string): Promise<z.infer<typeof GuildEmojiSchema>[]>;
 }
 export function discordAdapter(
   clientId: string,
@@ -49,6 +73,28 @@ export function discordAdapter(
   botToken: string,
 ): DiscordAdapter {
   const rest = new REST({ version: '10', timeout: 10000 }).setToken(botToken);
+  async function botRead(path: `/${string}`) {
+    try {
+      return await rest.get(path);
+    } catch (error) {
+      if (
+        error instanceof DiscordAPIError &&
+        [50001, 50013].includes(Number(error.code))
+      )
+        throw new DomainError(
+          'MISSING_PERMISSION',
+          'Sparko cannot access the selected Discord resources. Restore its permissions and retry.',
+          403,
+        );
+      if (error instanceof DiscordAPIError && error.status === 404)
+        throw new DomainError(
+          'NOT_FOUND',
+          'The selected Discord resource is no longer available.',
+          404,
+        );
+      throw error;
+    }
+  }
   async function oauth(body: URLSearchParams) {
     if (!clientId || !secret)
       throw new DomainError(
@@ -85,7 +131,7 @@ export function discordAdapter(
   }
   return {
     botUser: async () =>
-      z.object({ id: z.string() }).parse(await rest.get(Routes.user('@me'))),
+      z.object({ id: z.string() }).parse(await botRead(Routes.user('@me'))),
     exchange: (code) =>
       oauth(
         new URLSearchParams({
@@ -111,10 +157,12 @@ export function discordAdapter(
     member: async (g, u) =>
       z
         .object({ roles: z.array(z.string()) })
-        .parse(await rest.get(Routes.guildMember(g, u))),
+        .parse(await botRead(Routes.guildMember(g, u))),
     channels: async (g) =>
-      z.array(ChannelSchema).parse(await rest.get(Routes.guildChannels(g))),
+      z.array(ChannelSchema).parse(await botRead(Routes.guildChannels(g))),
     roles: async (g) =>
-      z.array(RoleSchema).parse(await rest.get(Routes.guildRoles(g))),
+      z.array(RoleSchema).parse(await botRead(Routes.guildRoles(g))),
+    emojis: async (g) =>
+      z.array(GuildEmojiSchema).parse(await botRead(Routes.guildEmojis(g))),
   };
 }

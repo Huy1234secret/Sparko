@@ -22,7 +22,7 @@ export async function purgeExpiredPrivatePayloads(
 ): Promise<void> {
   await db.record.deleteMany({
     where: {
-      kind: { in: ['ai.request', 'ticket.form'] },
+      kind: { in: ['ai.request', 'ticket.form', 'application.form'] },
       data: { path: ['expiresAt'], lte: now.toISOString() },
     },
   });
