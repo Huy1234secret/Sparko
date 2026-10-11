@@ -4,6 +4,7 @@ import type {
   InputHTMLAttributes,
   ReactNode,
 } from 'react';
+import { cloneElement, isValidElement } from 'react';
 import { AlertCircle, Inbox, LoaderCircle } from 'lucide-react';
 
 export function Button({
@@ -57,13 +58,29 @@ export function Field({
   children: ReactNode;
   htmlFor: string;
 }) {
+  const hintId = hint ? htmlFor + '-hint' : undefined;
+  const errorId = error ? htmlFor + '-error' : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+  const control = isValidElement<{
+    'aria-invalid'?: boolean | undefined;
+    'aria-describedby'?: string | undefined;
+  }>(children)
+    ? cloneElement(children, {
+        'aria-invalid': error ? true : undefined,
+        'aria-describedby': describedBy,
+      })
+    : children;
   return (
     <div className="field">
       <label htmlFor={htmlFor}>{label}</label>
-      {children}
-      {hint && <p className="field-hint">{hint}</p>}
+      {control}
+      {hint && (
+        <p className="field-hint" id={hintId}>
+          {hint}
+        </p>
+      )}
       {error && (
-        <p className="field-error" role="alert">
+        <p className="field-error" id={errorId} role="alert">
           {error}
         </p>
       )}
@@ -112,7 +129,7 @@ export function ErrorState({
         <strong>{message}</strong>
         {code && <p className="muted">Reference: {code}</p>}
         {retry && (
-          <Button variant="secondary" onClick={retry}>
+          <Button type="button" variant="secondary" onClick={retry}>
             Try again
           </Button>
         )}

@@ -38,7 +38,8 @@ import {
   revokeSession,
   getMember,
 } from '../services/account';
-import { errorMessage } from '../services/http';
+import { errorMessage, isRetryable } from '../services/http';
+import { applyServerFieldErrors } from '../services/formErrors';
 import { Metric, useSession } from '../components/AppShell';
 import { useUi } from '../state/ui';
 import { useActionIdentity } from '../hooks/useActionIdentity';
@@ -115,6 +116,7 @@ export function PreferencesPage() {
   const save = useMutation({
     mutationFn: (preferences: z.infer<typeof PreferencesSchema>) =>
       savePreferences(preferences, identity('preferences', preferences)),
+    onError: (error) => applyServerFieldErrors(form, error),
     onSuccess: (result) => {
       form.reset(result.data);
       ui.setTheme(result.data.theme);
@@ -201,7 +203,17 @@ export function PreferencesPage() {
             />
           </label>
         </Card>
-        {save.error && <ErrorState message={errorMessage(save.error)} />}
+        {save.error && (
+          <ErrorState
+            message={errorMessage(save.error)}
+            retry={
+              isRetryable(save.error)
+                ? () =>
+                    void form.handleSubmit((values) => save.mutate(values))()
+                : undefined
+            }
+          />
+        )}
         {save.isSuccess && (
           <p className="save-feedback" role="status">
             Preferences saved.

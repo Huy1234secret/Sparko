@@ -1134,3 +1134,61 @@ describe('API security against real PostgreSQL', () => {
     ).toBe(401);
   });
 });
+describe('field-level validation errors', () => {
+  const ticketRevision = async () =>
+    (
+      await db.featureConfig.findUnique({
+        where: { guildId_featureId: { guildId: GUILD, featureId: 'tickets' } },
+      })
+    )?.revision ?? 0;
+  it('names each unavailable ticket channel or role without saving', async () => {
+    const before = await ticketRevision();
+    const result = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/guilds/${GUILD}/features/tickets/config`,
+      headers: headers(ADMIN, 'field-errors-resources'),
+      payload: {
+        expectedRevision: before,
+        config: {
+          enabled: true,
+          categoryChannelId: CHANNEL,
+          staffRoleIds: ['911111111111111199'],
+        },
+      },
+    });
+    expect(result.statusCode).toBe(400);
+    const body = result.json<{
+      error: {
+        code: string;
+        fieldErrors: { path: string }[];
+        retryable: boolean;
+      };
+    }>();
+    expect(body.error.code).toBe('INVALID_INPUT');
+    expect(body.error.retryable).toBe(false);
+    expect(body.error.fieldErrors.map((item) => item.path).sort()).toEqual([
+      'categoryChannelId',
+      'staffRoleIds',
+    ]);
+    expect(await ticketRevision()).toBe(before);
+  });
+  it('reports schema violations relative to the submitted settings', async () => {
+    const before = await ticketRevision();
+    const result = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/guilds/${GUILD}/features/tickets/config`,
+      headers: headers(ADMIN, 'field-errors-schema'),
+      payload: {
+        expectedRevision: before,
+        config: { enabled: true, maxOpenPerMember: 500 },
+      },
+    });
+    expect(result.statusCode).toBe(400);
+    expect(
+      result
+        .json<{ error: { fieldErrors: { path: string }[] } }>()
+        .error.fieldErrors.map((item) => item.path),
+    ).toContain('maxOpenPerMember');
+    expect(await ticketRevision()).toBe(before);
+  });
+});

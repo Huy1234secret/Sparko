@@ -13,17 +13,29 @@ const ErrorSchema = z.object({
   }),
   requestId: z.string().optional(),
 });
+export interface ApiFieldError {
+  /** Dot-separated path relative to the submitted resource, e.g. `categories.0.name`. */
+  path: string;
+  message: string;
+}
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly requestId: string | undefined;
   readonly currentRevision: number | undefined;
+  readonly fieldErrors: readonly ApiFieldError[];
+  /** True when repeating the same request (with the same idempotency key) may succeed. */
+  readonly retryable: boolean;
   constructor(
     message: string,
     code: string,
     status: number,
     requestId?: string,
     currentRevision?: number,
+    options: {
+      fieldErrors?: readonly ApiFieldError[] | undefined;
+      retryable?: boolean | undefined;
+    } = {},
   ) {
     super(message);
     this.name = 'ApiError';
@@ -31,7 +43,12 @@ export class ApiError extends Error {
     this.status = status;
     this.requestId = requestId;
     this.currentRevision = currentRevision;
+    this.fieldErrors = options.fieldErrors ?? [];
+    this.retryable = options.retryable ?? false;
   }
+}
+export function isRetryable(error: unknown) {
+  return error instanceof ApiError && error.retryable;
 }
 let csrfToken: string | null = null;
 export function setCsrfToken(token: string | null) {
@@ -65,17 +82,28 @@ http.interceptors.response.use(
             error.response?.status ?? 0,
             parsed.data.requestId,
             parsed.data.error.currentRevision,
+            {
+              fieldErrors: parsed.data.error.fieldErrors,
+              retryable: parsed.data.error.retryable,
+            },
           ),
         );
+      const cancelled = error.code === 'ERR_CANCELED';
+      const status = error.response?.status ?? 0;
       return Promise.reject(
         new ApiError(
-          error.code === 'ERR_CANCELED'
+          cancelled
             ? 'Request cancelled.'
             : error.response
               ? 'The service returned an unexpected response. Try again.'
               : 'Unable to reach Sparko. Check your connection and try again.',
           error.code ?? 'SERVICE_UNAVAILABLE',
-          error.response?.status ?? 0,
+          status,
+          undefined,
+          undefined,
+          // Lost connections and gateway failures are safe to repeat because
+          // mutations reuse their idempotency key; client errors are not.
+          { retryable: !cancelled && (status === 0 || status >= 500) },
         ),
       );
     }

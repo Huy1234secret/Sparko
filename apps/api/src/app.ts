@@ -502,14 +502,26 @@ export async function createApp(options: {
       const tc = TicketConfigSchema.parse(cfg),
         roles = await discord.roles(p.guildId),
         channels = await discord.channels(p.guildId);
+      const fieldErrors: { path: string; message: string }[] = [];
+      if (tc.staffRoleIds.some((id) => !roles.some((r) => r.id === id)))
+        fieldErrors.push({
+          path: 'staffRoleIds',
+          message: 'A selected staff role no longer exists. Reselect roles.',
+        });
       if (
-        tc.staffRoleIds.some((id) => !roles.some((r) => r.id === id)) ||
-        (tc.categoryChannelId &&
-          !channels.some((c) => c.id === tc.categoryChannelId && c.type === 4))
+        tc.categoryChannelId &&
+        !channels.some((c) => c.id === tc.categoryChannelId && c.type === 4)
       )
+        fieldErrors.push({
+          path: 'categoryChannelId',
+          message: 'Choose a Discord category the bot can see.',
+        });
+      if (fieldErrors.length)
         throw new DomainError(
           'INVALID_INPUT',
           'A selected channel or role is unavailable.',
+          400,
+          { fieldErrors },
         );
     }
     return platform.mutate(
