@@ -41,7 +41,13 @@ import {
   UserRound,
   type LucideIcon,
 } from 'lucide-react';
-import { Breadcrumbs, ErrorState, LoadingState, Badge } from '@sparko/ui';
+import {
+  Breadcrumbs,
+  ErrorState,
+  LoadingState,
+  Badge,
+  Notice,
+} from '@sparko/ui';
 import { getSession, loginUrl, logout } from '../services/session';
 import { getGuilds, type Guild } from '../services/guilds';
 import { groupNames, modules } from '../content/modules';
@@ -221,9 +227,25 @@ export function PublicShell() {
     </div>
   );
 }
+const signinProblems: Record<string, { title: string; text: string }> = {
+  cancelled: {
+    title: 'Sign-in was cancelled',
+    text: 'Discord did not share your account because the request was declined. Nothing was changed.',
+  },
+  expired: {
+    title: 'That sign-in attempt expired',
+    text: 'Sign-in links work once and for a few minutes. Start again below.',
+  },
+  failed: {
+    title: 'Discord did not finish signing you in',
+    text: 'This is usually temporary. Try again in a moment.',
+  },
+};
 export function RequireSession() {
   const session = useSession();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const problem =
+    signinProblems[new URLSearchParams(search).get('signin') ?? ''];
   if (session.isPending) return <LoadingState label="Checking your session…" />;
   if (session.error)
     return (
@@ -238,7 +260,14 @@ export function RequireSession() {
     return (
       <div className="auth-gate">
         <Logo />
-        <span className="empty-icon">
+        {problem && (
+          <div role="alert" className="auth-problem">
+            <Notice tone="warning" title={problem.title}>
+              {problem.text}
+            </Notice>
+          </div>
+        )}
+        <span className="empty-icon" aria-hidden="true">
           <Shield size={30} />
         </span>
         <p className="eyebrow">Your community starts here</p>
@@ -597,6 +626,10 @@ export function DashboardShell() {
       firstRoute.current = false;
       return;
     }
+    // A page that already placed focus (a deep-linked section) keeps it.
+    const active = document.activeElement;
+    if (active && active !== main.current && main.current?.contains(active))
+      return;
     const heading = main.current?.querySelector<HTMLElement>('h1');
     const target = heading ?? main.current;
     if (!target) return;

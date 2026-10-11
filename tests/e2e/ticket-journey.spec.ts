@@ -111,10 +111,11 @@ test('OAuth, pending settings, publication, restart-safe bot control, private ti
   await page.goto(`/dashboard/${guild}/support/tickets`);
   await page.getByRole('link', { name: 'Open ticket 1' }).click();
   await page.getByRole('button', { name: 'Claim ticket' }).click();
-  await expect(page.getByText('claimed', { exact: true })).toBeVisible();
+  await expect(page.getByText('You claimed this ticket.')).toBeVisible();
+  await expect(page.getByText('Claimed', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close ticket', exact: true }).click();
   await page
-    .getByLabel('Closure reason')
+    .getByLabel(/Reason for closing/)
     .fill('Resolved in the browser acceptance journey');
   await page.getByRole('button', { name: 'Close this ticket' }).focus();
   await page.keyboard.press('Enter');
@@ -127,7 +128,8 @@ test('OAuth, pending settings, publication, restart-safe bot control, private ti
     })
     .toBe('closed');
   await page.reload();
-  await expect(page.getByText('closed', { exact: true })).toBeVisible();
+  await expect(page.getByText('This ticket is closed')).toBeVisible();
+  await expect(page.getByText('Closed', { exact: true })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Download transcript' }),
   ).toBeVisible();

@@ -209,7 +209,17 @@ describe('real PostgreSQL API ticket journey', () => {
       url: '/api/v1/auth/discord/callback?code=test&state=nonce',
       headers: { cookie: 'sparko_oauth=verifier' },
     });
-    expect(replay.statusCode).toBe(400);
+    expect(replay.statusCode).toBe(302);
+    expect(replay.headers['location']).toBe('/dashboard?signin=expired');
+    const replayCookies = [replay.headers['set-cookie'] ?? []].flat();
+    expect(replayCookies.some((value) => value.startsWith('sparko='))).toBe(
+      false,
+    );
+    const cancelled = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/discord/callback?error=access_denied&state=other',
+    });
+    expect(cancelled.headers['location']).toBe('/dashboard?signin=cancelled');
     const logout = await app.inject({
       method: 'POST',
       url: '/api/v1/session/logout',

@@ -50,7 +50,7 @@ export function WelcomePage() {
       <ConfigForm
         controller={controller.shell}
         title="Welcome messages"
-        description="Sent when Discord reports a member joining. Requires the Server Members intent; joins that happen while Sparko is offline are not greeted later."
+        description="Sent once for each member who joins."
         enableLabel="Welcome new members"
       >
         <Card>
@@ -117,7 +117,7 @@ export function LeaveBoostPage() {
       <ConfigForm
         controller={controller.shell}
         title="Leave and boost messages"
-        description="Each event is announced only when Discord reports it while Sparko is connected."
+        description="Each leave or new boost is announced once."
         enableLabel="Announce leaves and boosts"
       >
         <Card>

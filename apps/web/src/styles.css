@@ -3541,3 +3541,80 @@ h2 {
     width: 100%;
   }
 }
+/* Discord preview: close to Discord's own scale, never below 11px. */
+.discord-app-badge {
+  font-size: 11px;
+}
+.discord-author small {
+  font-size: 12px;
+}
+.discord-button {
+  font-size: 13px;
+}
+.field > label {
+  font-size: 14px;
+}
+.input,
+select,
+textarea {
+  font-size: 14px;
+  min-height: 44px;
+}
+.input[aria-invalid='true'],
+select[aria-invalid='true'],
+textarea[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.search-field:focus-within {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+:root[data-theme='light'] .search-field:focus-within {
+  outline-color: #a16207;
+}
+.search-field input {
+  font-size: 14px;
+}
+.finder .search-field {
+  max-width: none;
+  min-height: 48px;
+}
+@media (max-width: 600px) {
+  /* 16px stops iOS from zooming into focused fields. */
+  .input,
+  select,
+  textarea,
+  .search-field input {
+    font-size: 16px;
+  }
+}
+.studio-status {
+  font-size: 14px;
+}
+.auth-problem {
+  width: 100%;
+  max-width: 460px;
+  text-align: left;
+}
+/* Long names, IDs and operation kinds wrap instead of widening rows. */
+.activity-row > span,
+.module-status-list > div > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.activity-row > span:not(.activity-icon) {
+  flex: 1;
+}
+.module-status-list > div {
+  flex-wrap: wrap;
+}
+.activity-row .badge {
+  flex-shrink: 0;
+}
+@media (pointer: fine) and (min-width: 801px) {
+  .sidebar-nav a {
+    min-height: 40px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
