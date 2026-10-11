@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFieldArray, useForm } from 'react-hook-form';
@@ -15,6 +15,7 @@ import {
   Field,
   Input,
   LoadingState,
+  Notice,
   PageHeading,
 } from '@sparko/ui';
 import { useFeatureConfig } from '../../features/config/useFeatureConfig';
@@ -99,9 +100,6 @@ function FormEditor({
   const [stagesText, setStagesText] = useState(
     initial.stages?.join('\n') ?? 'Review',
   );
-  useEffect(() => {
-    form.setValue('stages', lines(stagesText), { shouldDirty: true });
-  }, [stagesText, form]);
   const dirty = form.formState.isDirty;
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: ['forms', guildId] });
@@ -304,7 +302,12 @@ function FormEditor({
           <textarea
             id="form-stages"
             value={stagesText}
-            onChange={(event) => setStagesText(event.target.value)}
+            onChange={(event) => {
+              setStagesText(event.target.value);
+              form.setValue('stages', lines(event.target.value), {
+                shouldDirty: true,
+              });
+            }}
           />
         </Field>
         <Field
@@ -338,11 +341,19 @@ function FormEditor({
         </Field>
       </Card>
       {conflict ? (
-        <div className="alert alert-warning" role="alert">
-          <p>
-            Someone else changed this form. Your edits are kept; reload to see
-            their version.
-          </p>
+        <div role="alert">
+          <Notice
+            tone="warning"
+            title="Someone else changed this form while you were editing"
+            action={
+              <Button type="button" variant="secondary" onClick={refresh}>
+                Load the newer version
+              </Button>
+            }
+          >
+            Your edits are still here and nothing was overwritten. Loading the
+            newer version replaces your unsaved edits.
+          </Notice>
         </div>
       ) : (
         (save.error || publish.error) && (
@@ -368,11 +379,12 @@ function FormEditor({
           ))}
         </Card>
       )}
-      <div className="save-bar">
-        <span>
-          {dirty ? 'Unsaved changes' : record ? 'Saved' : 'Not saved yet'}
+      <div className={`save-bar${dirty ? ' dirty' : ''}`}>
+        <span className="save-state" aria-live="polite">
+          {dirty && <span className="dirty-dot" aria-hidden="true" />}
+          {dirty ? 'Unsaved changes' : record ? 'Draft saved' : 'Not saved yet'}
           {record?.state === 'draft' && !dirty
-            ? ' · publish to make this version live'
+            ? ' · publish to make it available to members'
             : ''}
         </span>
         <Button
@@ -439,7 +451,7 @@ function FormsList({ guildId }: { guildId: string }) {
                 </small>
               </span>
               <Badge tone={item.state === 'published' ? 'success' : 'neutral'}>
-                {item.state}
+                {item.state === 'published' ? 'Published' : 'Draft'}
               </Badge>
             </button>
           ))
@@ -470,6 +482,14 @@ function FormsList({ guildId }: { guildId: string }) {
   );
 }
 
+const historyLabels: Record<string, string> = {
+  submitted: 'Submitted',
+  resubmitted: 'Resubmitted with changes',
+  advance: 'Moved to the next stage',
+  accept: 'Accepted',
+  reject: 'Declined',
+  request_changes: 'Changes requested',
+};
 const stateLabels: Record<string, string> = {
   submitted: 'New',
   reviewing: 'In review',
@@ -554,7 +574,11 @@ function ApplicationReview({
           {item.data.history.map((entry) => (
             <div className="activity-row" key={entry.at}>
               <span>
-                <strong>{entry.decision ?? entry.event}</strong>
+                <strong>
+                  {historyLabels[entry.decision ?? entry.event ?? ''] ??
+                    entry.decision ??
+                    entry.event}
+                </strong>
                 {entry.reason && <small>{entry.reason}</small>}
               </span>
               <small className="muted">
@@ -569,7 +593,8 @@ function ApplicationReview({
           <Field
             label="Reason"
             htmlFor="review-reason"
-            hint="Recorded with the decision; the applicant is notified."
+            required
+            hint="At least 3 characters. Recorded with the decision; the applicant is notified."
           >
             <textarea
               id="review-reason"
@@ -731,7 +756,7 @@ export function FormsPage() {
     <>
       <PageHeading
         eyebrow="Support"
-        title="Applications, reviewed fairly."
+        title="Forms & applications"
         description="Build versioned forms, review answers stage by stage, and keep every decision on record."
       />
       <Tabs
