@@ -4,7 +4,7 @@ Paused at the user's explicit request on **2026-10-11, 07:59 UTC**. Repository: 
 
 ## Resume checkpoint
 
-**Resume from the tip of `sparko/m2-message-platform`, not the older M0 branch.** This pause checkpoint contains the M2 work in progress and this handoff. Run `git rev-parse HEAD` for the full checkpoint commit ID and `git status` before editing. The checkpoint's parent is M1 head `90dcab35bd94b49216d681d463d6dcef7d7827a5`. M2 is deliberately incomplete: its latest four worker files are unformatted and unverified. Pushing a checkpoint may start CI; it is not a completed-milestone claim.
+**Resume from the tip of `sparko/m2-message-platform`, not the older M0 branch.** This pause checkpoint contains the M2 work in progress and this handoff. Run `git rev-parse HEAD` for the full checkpoint commit ID and `git status` before editing. The implementation checkpoint is `2fc38138ffaa1d41533208a88f2bdd7a3ddaa3f2`, tree `3c8cb392129e92317af2df93c34d26a2fb21cae3`; a documentation-only commit records those IDs. Its parent is M1 head `90dcab35bd94b49216d681d463d6dcef7d7827a5`. M2 is deliberately incomplete: its latest four worker files are unformatted and unverified. Pushing a checkpoint may start CI; it is not a completed-milestone claim.
 
 The original task remains: read this file and the full 1,468-line `SPARKO_ANTIGRAVITY_FROM_SCRATCH_GPT61_ULTRA.md`, continue the ordered M0–M9 implementation, and create **and merge** a PR after each completed milestone. PR creation/merge is authorized. Production cutover is a separate operator action. Do not wait for repeated “continue” prompts after resumption.
 
