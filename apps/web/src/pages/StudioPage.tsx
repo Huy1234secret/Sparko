@@ -40,18 +40,17 @@ import {
   Badge,
   Button,
   Card,
-  EmptyState,
   ErrorState,
   Field,
   Input,
-  LoadingState,
   PageHeading,
 } from '@sparko/ui';
 import { MessagePreview, PREVIEW_CONTEXT } from '../components/MessagePreview';
-import { getChannels, getRoles } from '../services/guilds';
+import { getChannels, getRoles, getEmojis } from '../services/guilds';
 import { ControlEditor } from '../components/ControlEditor';
 import { EmbedEditor } from '../components/EmbedEditor';
 import { GalleryPicker } from '../components/GalleryPicker';
+import { TemplateLibrary } from '../components/TemplateLibrary';
 import {
   createTemplate,
   createVersion,
@@ -63,6 +62,8 @@ import {
   type Template,
   type Publication,
   updatePublication,
+  reconcilePublication,
+  type TemplateVersion,
 } from '../services/messages';
 import { ApiError, errorMessage } from '../services/http';
 import { useActionIdentity } from '../hooks/useActionIdentity';
@@ -109,8 +110,50 @@ function labelFor(block: MessageBlock) {
 function isTokenName(value: string): value is TokenName {
   return Object.hasOwn(TOKEN_REGISTRY, value);
 }
+function PublicationFeedback({ publication }: { publication: Publication }) {
+  const confirmed =
+    publication.state === 'applied' &&
+    publication.appliedRevision === publication.revision &&
+    publication.deliveryStatus === 'applied';
+  const message =
+    publication.state === 'missing'
+      ? 'The original Discord message or channel is missing. Review a replacement before posting again.'
+      : publication.state === 'conflict'
+        ? 'The Discord message differs from this saved publication. Review its current content before replacing it.'
+        : confirmed
+          ? 'Discord delivery confirmed.'
+          : ['unknown', 'uncertain'].includes(publication.deliveryStatus)
+            ? 'Discord delivery could not be confirmed. Check the original message before posting again.'
+            : ['blocked', 'failed'].includes(publication.deliveryStatus)
+              ? 'Your design is saved. Discord delivery needs attention.'
+              : `Delivery ${publication.deliveryStatus}. Your design is saved.`;
+  return (
+    <div className="stack">
+      <p role="status">{message}</p>
+      {publication.error && <p className="field-error">{publication.error}</p>}
+    </div>
+  );
+}
 
-export function StudioPage() {
+export function StudioPage({
+  section,
+}: {
+  /** Deep link to the template library or publication inventory. */
+  section?: 'templates' | 'publications' | undefined;
+} = {}) {
+  const { guildId = '' } = useParams();
+  useEffect(() => {
+    if (!section) return;
+    const target = window.document.getElementById(
+      section === 'templates' ? 'template-library' : 'publication-inventory',
+    );
+    target?.scrollIntoView?.({ block: 'start' });
+    target?.focus({ preventScroll: true });
+  }, [section, guildId]);
+  return <StudioEditor key={guildId} />;
+}
+
+function StudioEditor() {
   const { guildId = '' } = useParams();
   const queryClient = useQueryClient();
   const identity = useActionIdentity();
@@ -122,6 +165,14 @@ export function StudioPage() {
   );
   const [selected, setSelected] = useState<BlockPosition | null>({ top: 0 });
   const [template, setTemplate] = useState<Template | null>(null);
+  const [versionLabel, setVersionLabel] = useState('');
+  const [preservedDraft, setPreservedDraft] = useState<{
+    document: MessageDocument;
+    savedDocument: string;
+    template: Template | null;
+    publication: Publication | null;
+    versionLabel: string;
+  } | null>(null);
   const [channelId, setChannelId] = useState('');
   const [editingPublication, setEditingPublication] =
     useState<Publication | null>(null);
@@ -138,7 +189,12 @@ export function StudioPage() {
   const [autoSave, setAutoSave] = useState(false);
   const [undoStack, setUndoStack] = useState<MessageDocument[]>([]);
   const [redoStack, setRedoStack] = useState<MessageDocument[]>([]);
+  const [insertInside, setInsertInside] = useState(true);
   const fileInput = useRef<HTMLInputElement>(null);
+  const editorContext = useRef(0);
+  const mediaOpener = useRef<HTMLElement | null>(null);
+  const replacementOpener = useRef<HTMLElement | null>(null);
+  const conversionOpener = useRef<HTMLElement | null>(null);
   const dirty = JSON.stringify(document) !== savedDocument;
   const templates = useQuery({
     queryKey: ['templates', guildId],
@@ -152,10 +208,19 @@ export function StudioPage() {
     queryKey: ['roles', guildId],
     queryFn: ({ signal }) => getRoles(guildId, signal),
   });
+  const emojis = useQuery({
+    queryKey: ['emojis', guildId],
+    queryFn: ({ signal }) => getEmojis(guildId, signal),
+  });
   const publications = useQuery({
     queryKey: ['publications', guildId],
     queryFn: ({ signal }) => getPublications(guildId, signal),
-    refetchInterval: 15000,
+    refetchInterval: (query) =>
+      query.state.data?.some((publication) =>
+        ['pending', 'retrying'].includes(publication.deliveryStatus),
+      )
+        ? 2000
+        : 15000,
   });
   const compiled = useMemo(() => {
     try {
@@ -183,8 +248,10 @@ export function StudioPage() {
     }
   }, [document]);
   const save = useMutation({
-    mutationFn: (snapshot: MessageDocument) =>
-      template
+    mutationFn: async (snapshot: MessageDocument) => {
+      const context = editorContext.current;
+      const label = versionLabel.trim();
+      const result = await (template
         ? createVersion(
             guildId,
             template,
@@ -193,17 +260,32 @@ export function StudioPage() {
               id: template.id,
               revision: template.revision,
               document: snapshot,
+              label,
             }),
+            label || undefined,
           )
         : createTemplate(
             guildId,
             snapshot,
-            identity('template-create', snapshot),
-          ),
+            identity('template-create', {
+              document: snapshot,
+              label,
+            }),
+            label || undefined,
+          ));
+      return { ...result, context, label };
+    },
     onSuccess: (result, snapshot) => {
+      void queryClient.invalidateQueries({ queryKey: ['templates', guildId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['template-versions', guildId],
+      });
+      if (result.context !== editorContext.current) return;
       setTemplate(result.data);
       setSavedDocument(JSON.stringify(snapshot));
-      void queryClient.invalidateQueries({ queryKey: ['templates', guildId] });
+      setVersionLabel((current) =>
+        current.trim() === result.label ? '' : current,
+      );
     },
   });
   const delivery = useMutation({
@@ -223,33 +305,48 @@ export function StudioPage() {
       }),
   });
   const updateLive = useMutation({
-    mutationFn: (replace: boolean) => {
+    mutationFn: async (replace: boolean) => {
       if (!editingPublication) throw new Error('Choose a publication first.');
+      const context = editorContext.current;
       const body = {
         id: editingPublication.id,
         expectedRevision: editingPublication.revision,
         document,
         replace,
       };
-      return updatePublication(
+      const result = await updatePublication(
         guildId,
         editingPublication,
         document,
         replace,
         identity('publication-update', body),
       );
+      return { ...result, context };
     },
     onSuccess: (result) => {
-      setEditingPublication(result.data);
-      setReplacementOpen(false);
       void queryClient.invalidateQueries({
         queryKey: ['publications', guildId],
       });
+      if (result.context !== editorContext.current) return;
+      setEditingPublication(result.data);
+      setReplacementOpen(false);
     },
   });
   let replacementRequired = false;
   const publicationLosses: string[] = [];
   if (editingPublication?.document) {
+    if (
+      ['missing', 'conflict'].includes(
+        publications.data?.find(
+          (publication) => publication.id === editingPublication.id,
+        )?.state ?? editingPublication.state,
+      )
+    ) {
+      replacementRequired = true;
+      publicationLosses.push(
+        'The original message is missing or differs from the saved design. A replacement posts a new message and revokes the old controls.',
+      );
+    }
     try {
       if (editingPublication.document.mode !== document.mode) {
         replacementRequired = true;
@@ -285,6 +382,21 @@ export function StudioPage() {
           revision: publications.data?.find(
             (publication) => publication.id === id,
           )?.revision,
+        }),
+      ),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({
+        queryKey: ['publications', guildId],
+      }),
+  });
+  const reconcile = useMutation({
+    mutationFn: (publication: Publication) =>
+      reconcilePublication(
+        guildId,
+        publication,
+        identity('publication-reconcile', {
+          id: publication.id,
+          revision: publication.revision,
         }),
       ),
     onSuccess: () =>
@@ -332,9 +444,22 @@ export function StudioPage() {
   const addBlock = (block: MessageBlock) => {
     if (document.mode !== 'v2') return;
     const next = structuredClone(document);
-    next.blocks.push(block);
-    change(next);
-    setSelected({ top: next.blocks.length - 1 });
+    const parentIndex = selected?.top;
+    const parent =
+      parentIndex === undefined ? undefined : next.blocks[parentIndex];
+    if (
+      insertInside &&
+      parent?.type === 'container' &&
+      block.type !== 'container'
+    ) {
+      parent.children.push(block);
+      change(next);
+      setSelected({ top: parentIndex ?? 0, child: parent.children.length - 1 });
+    } else {
+      next.blocks.push(block);
+      change(next);
+      setSelected({ top: next.blocks.length - 1 });
+    }
   };
   const move = (direction: -1 | 1) => {
     if (!selected || document.mode !== 'v2') return;
@@ -378,25 +503,35 @@ export function StudioPage() {
   const duplicate = () => {
     if (current) {
       const copy = structuredClone(current);
-      if (copy.type === 'controls')
-        copy.controls.forEach((control) => {
-          control.key = `${control.key}-copy-${crypto.randomUUID().slice(0, 5)}`;
-        });
+      const renewKeys = (block: MessageBlock) => {
+        if (block.type === 'container') block.children.forEach(renewKeys);
+        if (block.type === 'controls')
+          block.controls.forEach((control) => {
+            control.key = `copy-${crypto.randomUUID().slice(0, 12)}`;
+          });
+        if (block.type === 'section' && block.accessory.type === 'button')
+          block.accessory.key = `copy-${crypto.randomUUID().slice(0, 12)}`;
+      };
+      renewKeys(copy);
       addBlock(copy);
     }
   };
-  const loadTemplate = (item: Template) => {
-    if (!item.document) return;
-    if (
-      dirty &&
-      !window.confirm('Discard your unsaved edits and open this template?')
-    )
-      return;
-    setDocument(item.document);
-    setSavedDocument(JSON.stringify(item.document));
+  const loadTemplate = (item: Template, version: TemplateVersion) => {
+    if (dirty)
+      setPreservedDraft({
+        document: structuredClone(document),
+        savedDocument,
+        template,
+        publication: editingPublication,
+        versionLabel,
+      });
+    editorContext.current += 1;
+    change(structuredClone(version.document));
+    setSavedDocument(JSON.stringify(item.document ?? version.document));
     setTemplate(item);
-    setUndoStack([]);
-    setRedoStack([]);
+    setEditingPublication(null);
+    setAutoSave(false);
+    setVersionLabel('');
     setSelected({ top: 0 });
   };
   const exportDocument = () => {
@@ -418,10 +553,14 @@ export function StudioPage() {
       return;
     }
     try {
+      const context = editorContext.current;
       const input: unknown = JSON.parse(await file.text());
       const parsed = MessageDocumentSchema.parse(input);
+      if (context !== editorContext.current) return;
+      editorContext.current += 1;
       change(parsed);
       setTemplate(null);
+      setEditingPublication(null);
       setImportError('');
     } catch (error) {
       setImportError(
@@ -435,7 +574,7 @@ export function StudioPage() {
   };
   return (
     <>
-      <DraftGuard dirty={dirty} />
+      <DraftGuard dirty={dirty || !!preservedDraft} />
       <PageHeading
         eyebrow="Messages & design"
         title="Make it feel like your community."
@@ -449,7 +588,13 @@ export function StudioPage() {
               <Upload size={15} />
               Import
             </Button>
-            <Button variant="secondary" onClick={() => setMediaOpen(true)}>
+            <Button
+              variant="secondary"
+              onClick={(event) => {
+                mediaOpener.current = event.currentTarget;
+                setMediaOpen(true);
+              }}
+            >
               <ImagePlus size={15} />
               Media library
             </Button>
@@ -478,7 +623,12 @@ export function StudioPage() {
               key={mode}
               className={document.mode === mode ? 'active' : ''}
               aria-pressed={document.mode === mode}
-              onClick={() => document.mode !== mode && setConversion(mode)}
+              onClick={(event) => {
+                if (document.mode !== mode) {
+                  conversionOpener.current = event.currentTarget;
+                  setConversion(mode);
+                }
+              }}
             >
               {mode === 'v2' ? 'Components V2' : 'Traditional embed'}
             </button>
@@ -550,6 +700,32 @@ export function StudioPage() {
               </div>
               <div className="block-add">
                 <p className="nav-label">ADD A BLOCK</p>
+                <Field
+                  label="Add new blocks to"
+                  htmlFor="block-insertion-target"
+                >
+                  <select
+                    id="block-insertion-target"
+                    value={
+                      insertInside &&
+                      document.blocks[selected?.top ?? -1]?.type === 'container'
+                        ? 'container'
+                        : 'message'
+                    }
+                    onChange={(event) =>
+                      setInsertInside(event.target.value === 'container')
+                    }
+                  >
+                    <option value="message">Message</option>
+                    {document.blocks[selected?.top ?? -1]?.type ===
+                      'container' && (
+                      <option value="container">Selected container</option>
+                    )}
+                  </select>
+                  <p className="field-hint">
+                    Containers always appear at message level.
+                  </p>
+                </Field>
                 <button
                   onClick={() =>
                     addBlock({ type: 'text', text: 'Your message goes here.' })
@@ -629,8 +805,8 @@ export function StudioPage() {
                       type: 'gallery',
                       items: [
                         {
-                          url: 'https://panel.coin-sprite.com/sparko.svg',
-                          alt: 'Sparko spark mascot',
+                          url: 'https://panel.coin-sprite.com/og-image.png',
+                          alt: 'Sparko community illustration',
                         },
                       ],
                     })
@@ -648,6 +824,7 @@ export function StudioPage() {
               resources={{
                 channels: channels.data ?? [],
                 roles: roles.data ?? [],
+                emojis: emojis.data ?? [],
               }}
             />
           )}
@@ -822,22 +999,139 @@ export function StudioPage() {
                 </Field>
               )}
               {current.type === 'section' && (
-                <Field label="Section text" htmlFor="section-text">
-                  <textarea
-                    id="section-text"
-                    value={current.texts.join('\n\n')}
-                    onChange={(e) =>
-                      editBlock({
-                        ...current,
-                        texts: e.target.value.split('\n\n').slice(0, 3),
-                      })
-                    }
-                  />
-                </Field>
+                <div className="stack">
+                  <Field label="Section text" htmlFor="section-text">
+                    <textarea
+                      id="section-text"
+                      value={current.texts.join('\n\n')}
+                      onChange={(e) =>
+                        editBlock({
+                          ...current,
+                          texts: e.target.value.split('\n\n').slice(0, 3),
+                        })
+                      }
+                    />
+                  </Field>
+                  <Field label="Section accessory" htmlFor="section-accessory">
+                    <select
+                      id="section-accessory"
+                      value={current.accessory.type}
+                      onChange={(event) =>
+                        editBlock({
+                          ...current,
+                          accessory:
+                            event.target.value === 'thumbnail'
+                              ? {
+                                  type: 'thumbnail',
+                                  url: 'https://panel.coin-sprite.com/og-image.png',
+                                  alt: 'Sparko community illustration',
+                                }
+                              : {
+                                  type: 'button',
+                                  key: `section-${crypto.randomUUID().slice(0, 8)}`,
+                                  label: 'Learn more',
+                                  style: 'secondary',
+                                  action: {
+                                    type: 'response.private',
+                                    text: 'Thanks for taking a look.',
+                                  },
+                                },
+                        })
+                      }
+                    >
+                      <option value="button">Button</option>
+                      <option value="thumbnail">Thumbnail image</option>
+                    </select>
+                  </Field>
+                  {current.accessory.type === 'thumbnail' ? (
+                    <>
+                      <Field
+                        label="Thumbnail image URL"
+                        htmlFor="section-thumbnail-url"
+                      >
+                        <Input
+                          id="section-thumbnail-url"
+                          value={current.accessory.url}
+                          onChange={(event) => {
+                            if (current.accessory.type === 'thumbnail')
+                              editBlock({
+                                ...current,
+                                accessory: {
+                                  ...current.accessory,
+                                  url: event.target.value,
+                                },
+                              });
+                          }}
+                        />
+                      </Field>
+                      <Field
+                        label="Thumbnail alternative text"
+                        htmlFor="section-thumbnail-alt"
+                      >
+                        <Input
+                          id="section-thumbnail-alt"
+                          maxLength={1024}
+                          value={current.accessory.alt ?? ''}
+                          onChange={(event) => {
+                            if (current.accessory.type === 'thumbnail')
+                              editBlock({
+                                ...current,
+                                accessory: {
+                                  ...current.accessory,
+                                  alt: event.target.value,
+                                },
+                              });
+                          }}
+                        />
+                      </Field>
+                      <label className="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={current.accessory.spoiler ?? false}
+                          onChange={(event) => {
+                            if (current.accessory.type === 'thumbnail')
+                              editBlock({
+                                ...current,
+                                accessory: {
+                                  ...current.accessory,
+                                  spoiler: event.target.checked,
+                                },
+                              });
+                          }}
+                        />
+                        Hide thumbnail until revealed
+                      </label>
+                      <Button
+                        variant="secondary"
+                        onClick={(event) => {
+                          mediaOpener.current = event.currentTarget;
+                          setMediaOpen(true);
+                        }}
+                      >
+                        Choose thumbnail from library
+                      </Button>
+                    </>
+                  ) : (
+                    <ControlEditor
+                      singleButton
+                      row={{ type: 'controls', controls: [current.accessory] }}
+                      resources={{
+                        channels: channels.data ?? [],
+                        roles: roles.data ?? [],
+                        emojis: emojis.data ?? [],
+                      }}
+                      onChange={(row) => {
+                        const button = row.controls[0];
+                        if (button?.type === 'button')
+                          editBlock({ ...current, accessory: button });
+                      }}
+                    />
+                  )}
+                </div>
               )}
               {current.type === 'gallery' &&
                 current.items.map((item, index) => (
-                  <div className="stack" key={index}>
+                  <div className="stack card" key={index}>
                     <Field label="Media URL" htmlFor={`media-url-${index}`}>
                       <Input
                         id={`media-url-${index}`}
@@ -863,8 +1157,66 @@ export function StudioPage() {
                         }}
                       />
                     </Field>
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={item.spoiler ?? false}
+                        onChange={(event) => {
+                          const items = [...current.items];
+                          items[index] = {
+                            ...item,
+                            spoiler: event.target.checked,
+                          };
+                          editBlock({ ...current, items });
+                        }}
+                      />
+                      Hide image until revealed
+                    </label>
+                    <Button
+                      variant="ghost"
+                      disabled={current.items.length === 1}
+                      onClick={() =>
+                        editBlock({
+                          ...current,
+                          items: current.items.filter(
+                            (_, position) => position !== index,
+                          ),
+                        })
+                      }
+                    >
+                      Remove gallery image {index + 1}
+                    </Button>
                   </div>
                 ))}
+              {current.type === 'gallery' && (
+                <div className="row wrap">
+                  <Button
+                    variant="secondary"
+                    disabled={current.items.length >= 10}
+                    onClick={() => {
+                      const item = current.items.at(-1);
+                      if (item)
+                        editBlock({
+                          ...current,
+                          items: [...current.items, { ...item }],
+                        });
+                    }}
+                  >
+                    Add gallery image
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={current.items.length >= 10}
+                    onClick={(event) => {
+                      mediaOpener.current = event.currentTarget;
+                      setMediaOpen(true);
+                    }}
+                  >
+                    Add image from library
+                  </Button>
+                  <small>{current.items.length} / 10 images</small>
+                </div>
+              )}
               {current.type === 'separator' && (
                 <label className="checkbox-row">
                   <input
@@ -897,6 +1249,7 @@ export function StudioPage() {
                   resources={{
                     channels: channels.data ?? [],
                     roles: roles.data ?? [],
+                    emojis: emojis.data ?? [],
                   }}
                   onChange={editBlock}
                 />
@@ -938,6 +1291,40 @@ export function StudioPage() {
           </Card>
           <Card>
             <h3>Save & delivery</h3>
+            {preservedDraft && (
+              <div className="stack">
+                <p className="field-hint">
+                  Your previous editor draft is kept.
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    editorContext.current += 1;
+                    change(structuredClone(preservedDraft.document));
+                    setSavedDocument(preservedDraft.savedDocument);
+                    setTemplate(preservedDraft.template);
+                    setEditingPublication(preservedDraft.publication);
+                    setVersionLabel(preservedDraft.versionLabel);
+                    setPreservedDraft(null);
+                    setSelected({ top: 0 });
+                  }}
+                >
+                  Return to previous draft
+                </Button>
+              </div>
+            )}
+            <Field
+              label="Version name (optional)"
+              htmlFor="studio-version-label"
+            >
+              <Input
+                id="studio-version-label"
+                value={versionLabel}
+                maxLength={100}
+                placeholder="For example: Spring support panel"
+                onChange={(event) => setVersionLabel(event.target.value)}
+              />
+            </Field>
             <label className="checkbox-row">
               <input
                 type="checkbox"
@@ -959,11 +1346,32 @@ export function StudioPage() {
                 message={
                   save.error instanceof ApiError &&
                   save.error.code === 'REVISION_CONFLICT'
-                    ? 'A newer version exists. Your local draft is retained; open the latest template to review it.'
+                    ? 'A newer version exists. Your local draft is retained. Review the saved history, then refresh its revision to save your draft as a new version.'
                     : errorMessage(save.error)
                 }
               />
             )}
+            {save.error instanceof ApiError &&
+              save.error.code === 'REVISION_CONFLICT' &&
+              template && (
+                <Button
+                  variant="secondary"
+                  onClick={async () => {
+                    const context = editorContext.current;
+                    const refreshed = await templates.refetch();
+                    if (context !== editorContext.current) return;
+                    const latest = refreshed.data?.find(
+                      (item) => item.id === template.id,
+                    );
+                    if (!latest) return;
+                    setTemplate(latest);
+                    setSavedDocument(JSON.stringify(latest.document));
+                    save.reset();
+                  }}
+                >
+                  Refresh saved revision, keep this draft
+                </Button>
+              )}
             {save.isSuccess && !dirty && (
               <p className="save-feedback" role="status">
                 <CheckCircle2 size={16} />
@@ -1033,11 +1441,12 @@ export function StudioPage() {
                     !!compiled.issues.length ||
                     document.visibility === 'private'
                   }
-                  onClick={() =>
-                    replacementRequired
-                      ? setReplacementOpen(true)
-                      : updateLive.mutate(false)
-                  }
+                  onClick={(event) => {
+                    if (replacementRequired) {
+                      replacementOpener.current = event.currentTarget;
+                      setReplacementOpen(true);
+                    } else updateLive.mutate(false);
+                  }}
                 >
                   {replacementRequired
                     ? 'Review replacement'
@@ -1046,6 +1455,7 @@ export function StudioPage() {
                 <Button
                   variant="ghost"
                   onClick={() => {
+                    editorContext.current += 1;
                     setEditingPublication(null);
                     updateLive.reset();
                   }}
@@ -1063,13 +1473,16 @@ export function StudioPage() {
                   />
                 )}
                 {updateLive.data && (
-                  <p role="status">
-                    Publication update saved. Delivery{' '}
-                    {publications.data?.find(
-                      (item) => item.id === updateLive.data?.data.id,
-                    )?.state ?? updateLive.data.data.state}
-                    .
-                  </p>
+                  <div>
+                    <p>Publication update saved.</p>
+                    <PublicationFeedback
+                      publication={
+                        publications.data?.find(
+                          (item) => item.id === updateLive.data?.data.id,
+                        ) ?? updateLive.data.data
+                      }
+                    />
+                  </div>
                 )}
               </div>
             )}
@@ -1086,53 +1499,54 @@ export function StudioPage() {
               <ErrorState message={errorMessage(delivery.error)} />
             )}
             {delivery.data && (
-              <p className="save-feedback" role="status">
-                {['applied', 'published'].includes(
+              <PublicationFeedback
+                publication={
                   publications.data?.find(
                     (item) => item.id === delivery.data?.data.id,
-                  )?.state ?? delivery.data.data.state,
-                )
-                  ? 'Discord delivery confirmed.'
-                  : `Delivery ${delivery.data.data.deliveryStatus}. Your design is saved.`}
-              </p>
+                  ) ?? delivery.data.data
+                }
+              />
             )}
           </Card>
         </aside>
       </div>
       {importError && <ErrorState message={importError} />}
       <div className="overview-grid studio-library">
-        <Card>
-          <h2>Your template library</h2>
-          {templates.isPending ? (
-            <LoadingState />
-          ) : templates.error ? (
-            <ErrorState
-              message={errorMessage(templates.error)}
-              retry={() => void templates.refetch()}
-            />
-          ) : templates.data?.length ? (
-            templates.data.map((item) => (
-              <button
-                className="template-row"
-                key={item.id}
-                disabled={!item.document}
-                onClick={() => loadTemplate(item)}
-              >
-                <FileText size={18} />
-                <span>
-                  {item.name}
-                  <small>Revision {item.revision}</small>
-                </span>
-              </button>
-            ))
-          ) : (
-            <EmptyState
-              title="Your first design belongs here"
-              description="Save a draft to create an immutable version in your server’s template library."
-            />
-          )}
-        </Card>
-        <Card>
+        <TemplateLibrary
+          guildId={guildId}
+          templates={templates.data ?? []}
+          pending={templates.isPending}
+          error={templates.error}
+          onRetry={() => void templates.refetch()}
+          onOpen={loadTemplate}
+          onRestored={(id, version) => {
+            const restored = (item: Template): Template => ({
+              ...item,
+              revision: version.number,
+              document: structuredClone(version.document),
+              versions: [
+                version,
+                ...item.versions.filter((saved) => saved.id !== version.id),
+              ],
+            });
+            setTemplate((current) =>
+              current?.id === id ? restored(current) : current,
+            );
+            if (template?.id === id)
+              setSavedDocument(JSON.stringify(version.document));
+            setPreservedDraft((current) =>
+              current?.template?.id === id
+                ? {
+                    ...current,
+                    template: restored(current.template),
+                    savedDocument: JSON.stringify(version.document),
+                  }
+                : current,
+            );
+          }}
+          dirty={dirty}
+        />
+        <Card id="publication-inventory" tabIndex={-1}>
           <h2>Publication inventory</h2>
           {publications.data?.length ? (
             publications.data.map((publication) => (
@@ -1149,6 +1563,9 @@ export function StudioPage() {
                   </small>
                 </span>
                 <Badge>{publication.deliveryStatus}</Badge>
+                {['missing', 'conflict'].includes(publication.state) && (
+                  <Badge>{publication.state}</Badge>
+                )}
                 <Button
                   variant="secondary"
                   disabled={
@@ -1164,6 +1581,7 @@ export function StudioPage() {
                       )
                     )
                       return;
+                    editorContext.current += 1;
                     setDocument(structuredClone(publication.document));
                     setSavedDocument(JSON.stringify(publication.document));
                     setTemplate(null);
@@ -1174,6 +1592,22 @@ export function StudioPage() {
                   }}
                 >
                   Edit publication
+                </Button>
+                <Button
+                  variant="secondary"
+                  busy={
+                    reconcile.isPending &&
+                    reconcile.variables?.id === publication.id
+                  }
+                  disabled={
+                    ['archived', 'replaced'].includes(publication.state) ||
+                    ['pending', 'running', 'retrying'].includes(
+                      publication.deliveryStatus,
+                    )
+                  }
+                  onClick={() => reconcile.mutate(publication)}
+                >
+                  Check Discord message
                 </Button>
                 <Button
                   variant="ghost"
@@ -1190,6 +1624,18 @@ export function StudioPage() {
                 >
                   Archive
                 </Button>
+                {(publication.error ||
+                  [
+                    'missing',
+                    'conflict',
+                    'blocked',
+                    'failed',
+                    'unknown',
+                    'uncertain',
+                  ].includes(publication.deliveryStatus) ||
+                  ['missing', 'conflict'].includes(publication.state)) && (
+                  <PublicationFeedback publication={publication} />
+                )}
               </div>
             ))
           ) : (
@@ -1201,12 +1647,35 @@ export function StudioPage() {
           {archive.error && (
             <ErrorState message={errorMessage(archive.error)} />
           )}
+          {reconcile.error && (
+            <ErrorState
+              message={
+                reconcile.error instanceof ApiError &&
+                reconcile.error.code === 'REVISION_CONFLICT'
+                  ? 'This publication changed. Refresh the inventory and check its current revision; your editor draft is kept.'
+                  : errorMessage(reconcile.error)
+              }
+              retry={() => void publications.refetch()}
+            />
+          )}
+          {reconcile.isSuccess && (
+            <p role="status">
+              Discord message check requested. It updates the saved status
+              without posting a replacement.
+            </p>
+          )}
         </Card>
       </div>
       <Dialog.Root open={replacementOpen} onOpenChange={setReplacementOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content className="dialog-content">
+          <Dialog.Content
+            className="dialog-content"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              replacementOpener.current?.focus();
+            }}
+          >
             <Dialog.Title>Replace this published message?</Dialog.Title>
             <Dialog.Description>
               The existing controls will stop working. Sparko will post a new
@@ -1241,7 +1710,13 @@ export function StudioPage() {
       <Dialog.Root open={mediaOpen} onOpenChange={setMediaOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content className="dialog-content">
+          <Dialog.Content
+            className="dialog-content"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              mediaOpener.current?.focus();
+            }}
+          >
             <Dialog.Title>Media library</Dialog.Title>
             <Dialog.Description>
               Add your own accessible images to this server’s saved message
@@ -1251,7 +1726,22 @@ export function StudioPage() {
               guildId={guildId}
               onSelect={(asset) => {
                 if (document.mode === 'v2') {
-                  if (current?.type === 'gallery')
+                  if (
+                    current?.type === 'section' &&
+                    current.accessory.type === 'thumbnail'
+                  )
+                    editBlock({
+                      ...current,
+                      accessory: {
+                        ...current.accessory,
+                        url: asset.url,
+                        alt: asset.alt,
+                      },
+                    });
+                  else if (
+                    current?.type === 'gallery' &&
+                    current.items.length < 10
+                  )
                     editBlock({
                       ...current,
                       items: [
@@ -1259,7 +1749,7 @@ export function StudioPage() {
                         { url: asset.url, alt: asset.alt },
                       ],
                     });
-                  else
+                  else if (current?.type !== 'gallery')
                     addBlock({
                       type: 'gallery',
                       items: [{ url: asset.url, alt: asset.alt }],
@@ -1285,7 +1775,13 @@ export function StudioPage() {
       >
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content className="dialog-content">
+          <Dialog.Content
+            className="dialog-content"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              conversionOpener.current?.focus();
+            }}
+          >
             <Dialog.Title>Change Discord output mode?</Dialog.Title>
             <Dialog.Description>
               Components V2 and traditional embeds are separate modes. Existing

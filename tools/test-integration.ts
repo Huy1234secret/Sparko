@@ -34,9 +34,19 @@ try {
 } finally {
   await redis.quit();
 }
+const focus = process.argv
+  .slice(2)
+  .filter((arg) => arg !== '--' && arg.includes('.integration'));
 const child = spawn(
   'pnpm',
-  ['exec', 'vitest', 'run', '.integration.test.ts', '--maxWorkers=2'],
+  [
+    'exec',
+    'vitest',
+    'run',
+    // Optional integration file filters narrow a focused run after the same reset.
+    ...(focus.length ? focus : ['.integration.test.ts']),
+    '--maxWorkers=2',
+  ],
   {
     stdio: 'inherit',
     env: {

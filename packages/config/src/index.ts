@@ -20,6 +20,13 @@ const Schema = z.object({
   OWNER_USER_IDS: z.string().default(''),
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
   STORAGE_PATH: z.string().default('.data/private'),
+  /** Per-client API request budget; dashboards poll delivery state, so keep headroom. */
+  API_RATE_LIMIT_PER_MINUTE: z.coerce
+    .number()
+    .int()
+    .min(10)
+    .max(100000)
+    .default(300),
 });
 export function loadConfig() {
   const result = Schema.safeParse(process.env);

@@ -1,9 +1,71 @@
-import type { MessageDocument } from '@sparko/messages';
+import { useEffect, useState } from 'react';
+import { EmbedSchema, type MessageDocument } from '@sparko/messages';
 import { Button, Field, Input } from '@sparko/ui';
-import { ControlEditor } from './ControlEditor';
+import { ControlEditor, type ControlEditorResources } from './ControlEditor';
 
 type Document = Extract<MessageDocument, { mode: 'embed' }>;
 type Embed = Document['embeds'][number];
+function TimestampEditor({
+  value,
+  onChange,
+  id,
+}: {
+  value: string | undefined;
+  onChange: (next: string | undefined) => void;
+  id: string;
+}) {
+  const [draft, setDraft] = useState(value?.replace(/Z$/, '') ?? '');
+  const [issue, setIssue] = useState<string | undefined>();
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    setDraft(value?.replace(/Z$/, '') ?? '');
+    setIssue(undefined);
+  }, [value]);
+  function apply() {
+    if (!draft) {
+      onChange(undefined);
+      setIssue(undefined);
+      setSaved(true);
+      return;
+    }
+    const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(draft)
+      ? `${draft}:00Z`
+      : `${draft}Z`;
+    const parsed = EmbedSchema.shape.timestamp.safeParse(timestamp);
+    if (!parsed.success || !parsed.data) {
+      setIssue('Enter a valid date and time in UTC.');
+      return;
+    }
+    onChange(new Date(parsed.data).toISOString());
+    setIssue(undefined);
+    setSaved(true);
+  }
+  return (
+    <div className="stack">
+      <Field
+        label="Timestamp (UTC)"
+        htmlFor={id}
+        hint="Optional. Enter the time in UTC, then apply it. Discord displays it in each member’s local timezone. Clear this field and apply to remove it."
+        error={issue}
+      >
+        <Input
+          id={id}
+          type="datetime-local"
+          step="any"
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setSaved(false);
+          }}
+        />
+      </Field>
+      {saved && <p role="status">Timestamp applied to this design.</p>}
+      <Button variant="secondary" onClick={apply}>
+        Apply timestamp
+      </Button>
+    </div>
+  );
+}
 export function EmbedEditor({
   document,
   onChange,
@@ -11,10 +73,7 @@ export function EmbedEditor({
 }: {
   document: Document;
   onChange: (next: Document) => void;
-  resources: {
-    channels: { id: string; name: string }[];
-    roles: { id: string; name: string }[];
-  };
+  resources: ControlEditorResources;
 }) {
   function update(index: number, edit: (embed: Embed) => void) {
     const next = structuredClone(document);
@@ -54,6 +113,24 @@ export function EmbedEditor({
               }
             />
           </Field>
+          <Field
+            label="Title link URL"
+            htmlFor={`embed-url-${index}`}
+            hint="Optional public HTTPS link opened when a member selects the embed title."
+          >
+            <Input
+              id={`embed-url-${index}`}
+              type="url"
+              maxLength={512}
+              value={embed.url ?? ''}
+              onChange={(e) =>
+                update(index, (current) => {
+                  if (e.target.value) current.url = e.target.value;
+                  else delete current.url;
+                })
+              }
+            />
+          </Field>
           <Field label="Description" htmlFor={`embed-description-${index}`}>
             <textarea
               id={`embed-description-${index}`}
@@ -79,6 +156,16 @@ export function EmbedEditor({
               }
             />
           </Field>
+          <TimestampEditor
+            id={`embed-timestamp-${index}`}
+            value={embed.timestamp}
+            onChange={(timestamp) =>
+              update(index, (current) => {
+                if (timestamp) current.timestamp = timestamp;
+                else delete current.timestamp;
+              })
+            }
+          />
           <div className="form-grid">
             {(['image', 'thumbnail'] as const).map((name) => (
               <Field

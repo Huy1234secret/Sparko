@@ -9,7 +9,7 @@ import {
   modeChangeLossReport,
   type MessageDocument,
 } from '@sparko/messages';
-import { type DomainContext, type DomainRoute } from './core.js';
+import { jsonObject, type DomainContext, type DomainRoute } from './core.js';
 
 const PublishSchema = z
   .object({
@@ -25,6 +25,76 @@ const UpdateSchema = z.object({
   document: MessageDocumentSchema,
   replace: z.boolean().default(false),
 });
+const VersionLabel = z.string().trim().min(1).max(100).optional();
+const VersionSchema = z.object({
+  expectedRevision: z.number().int().min(1),
+  document: MessageDocumentSchema,
+  label: VersionLabel,
+});
+
+async function template(
+  ctx: DomainContext,
+  id: string,
+  expectedRevision?: number,
+) {
+  const value = await ctx.tx.template.findFirst({
+    where: { id, guildId: ctx.guildId, archived: false },
+  });
+  if (!value) throw new DomainError('NOT_FOUND', 'Template unavailable.', 404);
+  if (expectedRevision !== undefined && value.revision !== expectedRevision)
+    throw new DomainError(
+      'REVISION_CONFLICT',
+      'Template changed. Review the latest version.',
+      409,
+      { currentRevision: value.revision },
+    );
+  return value;
+}
+
+async function publicationView(
+  ctx: DomainContext,
+  value: Awaited<ReturnType<typeof publication>>,
+) {
+  const jobs = await ctx.tx.outbox.findMany({
+    where: {
+      guildId: ctx.guildId,
+      type: {
+        in: [
+          'publication.send',
+          'publication.update',
+          'publication.archive',
+          'publication.reconcile',
+        ],
+      },
+      payload: { path: ['publicationId'], equals: value.id },
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 20,
+  });
+  const latest = jobs.find((job) => {
+    const revision = jsonObject(job.payload)['revision'];
+    return (
+      revision === value.revision ||
+      (revision === undefined &&
+        (value.revision === 1 || job.type === 'publication.archive'))
+    );
+  });
+  return {
+    ...value,
+    deliveryStatus:
+      latest?.state === 'dead'
+        ? 'failed'
+        : (latest?.state ??
+          (value.state === 'applied' ? 'applied' : 'pending')),
+    error:
+      latest?.lastError ??
+      (value.state === 'missing'
+        ? 'The Discord message is missing. Review before republishing.'
+        : value.state === 'conflict'
+          ? 'The Discord message differs from the saved design. Review before replacing it.'
+          : null),
+  };
+}
 
 /** Only action meaning and valid choice values define an issued control's identity. */
 export function publicationControlSignature(document: MessageDocument) {
@@ -107,8 +177,11 @@ export async function publishDocument(
     });
   }
   compileMessage(document, {}, controls);
-  await ctx.effect('publication.send', { publicationId: publication.id });
-  return publication;
+  await ctx.effect('publication.send', {
+    publicationId: publication.id,
+    revision: publication.revision,
+  });
+  return publicationView(ctx, publication);
 }
 
 async function publication(ctx: DomainContext, id: string) {
@@ -137,15 +210,17 @@ export const publicationRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/templates/:id/versions',
     capability: 'templates.edit',
-    handler: async (ctx, _input, p) =>
-      ctx.tx.templateVersion.findMany({
+    handler: async (ctx, _input, p) => {
+      const current = await template(ctx, p['id'] ?? '');
+      return ctx.tx.templateVersion.findMany({
         where: {
-          templateId: p['id'] ?? '',
+          templateId: current.id,
           template: { guildId: ctx.guildId },
         },
         orderBy: { number: 'desc' },
         take: 100,
-      }),
+      });
+    },
   },
   {
     method: 'POST',
@@ -154,16 +229,27 @@ export const publicationRoutes: DomainRoute[] = [
     schema: z.object({
       name: z.string().min(1).max(100),
       document: MessageDocumentSchema,
+      label: VersionLabel,
     }),
     handler: async (ctx, input) => {
       const b = z
-        .object({ name: z.string(), document: MessageDocumentSchema })
+        .object({
+          name: z.string(),
+          document: MessageDocumentSchema,
+          label: VersionLabel,
+        })
         .parse(input);
       return ctx.tx.template.create({
         data: {
           guildId: ctx.guildId,
           name: b.name,
-          versions: { create: { number: 1, document: json(b.document) } },
+          versions: {
+            create: {
+              number: 1,
+              document: json(b.document),
+              ...(b.label ? { label: b.label } : {}),
+            },
+          },
         },
         include: { versions: true },
       });
@@ -173,25 +259,10 @@ export const publicationRoutes: DomainRoute[] = [
     method: 'POST',
     path: '/guilds/:guildId/templates/:id/versions',
     capability: 'templates.edit',
-    schema: z.object({
-      expectedRevision: z.number().int().min(1),
-      document: MessageDocumentSchema,
-    }),
+    schema: VersionSchema,
     handler: async (ctx, input, p) => {
-      const b = z
-        .object({
-          expectedRevision: z.number(),
-          document: MessageDocumentSchema,
-        })
-        .parse(input);
-      const t = await ctx.tx.template.findFirst({
-        where: { id: p['id'] ?? '', guildId: ctx.guildId, archived: false },
-      });
-      if (!t) throw new DomainError('NOT_FOUND', 'Template unavailable.', 404);
-      if (t.revision !== b.expectedRevision)
-        throw new DomainError('REVISION_CONFLICT', 'Template changed.', 409, {
-          currentRevision: t.revision,
-        });
+      const b = VersionSchema.parse(input),
+        t = await template(ctx, p['id'] ?? '', b.expectedRevision);
       await ctx.tx.template.update({
         where: { id: t.id },
         data: { revision: { increment: 1 } },
@@ -201,6 +272,84 @@ export const publicationRoutes: DomainRoute[] = [
           templateId: t.id,
           number: t.revision + 1,
           document: json(b.document),
+          ...(b.label ? { label: b.label } : {}),
+        },
+      });
+    },
+  },
+  {
+    method: 'POST',
+    path: '/guilds/:guildId/templates/:id/duplicate',
+    capability: 'templates.edit',
+    schema: z.object({
+      expectedRevision: z.number().int().min(1),
+      name: z.string().trim().min(1).max(100),
+      sourceVersionId: z.string().uuid(),
+    }),
+    handler: async (ctx, input, p) => {
+      const b = z
+          .object({
+            expectedRevision: z.number().int().min(1),
+            name: z.string().trim().min(1).max(100),
+            sourceVersionId: z.string().uuid(),
+          })
+          .parse(input),
+        current = await template(ctx, p['id'] ?? '', b.expectedRevision),
+        version = await ctx.tx.templateVersion.findFirst({
+          where: { id: b.sourceVersionId, templateId: current.id },
+        });
+      if (!version)
+        throw new DomainError('NOT_FOUND', 'Version unavailable.', 404);
+      const document = MessageDocumentSchema.parse(version.document);
+      return ctx.tx.template.create({
+        data: {
+          guildId: ctx.guildId,
+          name: b.name,
+          versions: {
+            create: {
+              number: 1,
+              label: `Copied version ${version.number}`,
+              document: json({ ...document, name: b.name }),
+            },
+          },
+        },
+        include: { versions: true },
+      });
+    },
+  },
+  {
+    method: 'POST',
+    path: '/guilds/:guildId/templates/:id/restore',
+    capability: 'templates.edit',
+    schema: z.object({
+      expectedRevision: z.number().int().min(1),
+      versionId: z.string().uuid(),
+      label: VersionLabel,
+    }),
+    handler: async (ctx, input, p) => {
+      const b = z
+          .object({
+            expectedRevision: z.number().int().min(1),
+            versionId: z.string().uuid(),
+            label: VersionLabel,
+          })
+          .parse(input),
+        current = await template(ctx, p['id'] ?? '', b.expectedRevision),
+        version = await ctx.tx.templateVersion.findFirst({
+          where: { id: b.versionId, templateId: current.id },
+        });
+      if (!version)
+        throw new DomainError('NOT_FOUND', 'Version unavailable.', 404);
+      await ctx.tx.template.update({
+        where: { id: current.id },
+        data: { revision: { increment: 1 } },
+      });
+      return ctx.tx.templateVersion.create({
+        data: {
+          templateId: current.id,
+          number: current.revision + 1,
+          label: b.label ?? `Restored version ${version.number}`,
+          document: json(MessageDocumentSchema.parse(version.document)),
         },
       });
     },
@@ -270,12 +419,41 @@ export const publicationRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/publications',
     capability: 'messages.publish',
-    handler: async (ctx) =>
-      ctx.tx.publication.findMany({
+    handler: async (ctx) => {
+      const rows = await ctx.tx.publication.findMany({
         where: { guildId: ctx.guildId },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
+      });
+      return Promise.all(rows.map((row) => publicationView(ctx, row)));
+    },
+  },
+  {
+    method: 'POST',
+    path: '/guilds/:guildId/publications/:id/reconcile',
+    capability: 'messages.publish',
+    schema: z.object({ expectedRevision: z.number().int().min(1) }),
+    handler: async (ctx, input, p) => {
+      const b = z
+          .object({ expectedRevision: z.number().int().min(1) })
+          .parse(input),
+        current = await publication(ctx, p['id'] ?? '');
+      if (
+        current.revision !== b.expectedRevision ||
+        ['archived', 'replaced'].includes(current.state)
+      )
+        throw new DomainError(
+          'REVISION_CONFLICT',
+          'Publication changed. Review its current status.',
+          409,
+          { currentRevision: current.revision },
+        );
+      await ctx.effect('publication.reconcile', {
+        publicationId: current.id,
+        revision: current.revision,
+      });
+      return publicationView(ctx, current);
+    },
   },
   {
     method: 'POST',
@@ -300,8 +478,11 @@ export const publicationRoutes: DomainRoute[] = [
         where: { id: current.id },
         data: { state: 'archived', revision: { increment: 1 } },
       });
-      await ctx.effect('publication.archive', { publicationId: current.id });
-      return changed;
+      await ctx.effect('publication.archive', {
+        publicationId: current.id,
+        revision: changed.revision,
+      });
+      return publicationView(ctx, changed);
     },
   },
   {
@@ -347,7 +528,10 @@ export const publicationRoutes: DomainRoute[] = [
           where: { id: current.id },
           data: { state: 'replaced', revision: { increment: 1 } },
         });
-        await ctx.effect('publication.archive', { publicationId: current.id });
+        await ctx.effect('publication.archive', {
+          publicationId: current.id,
+          revision: current.revision + 1,
+        });
         return publishDocument(
           ctx,
           current.channelId,
@@ -378,8 +562,11 @@ export const publicationRoutes: DomainRoute[] = [
           state: 'pending',
         },
       });
-      await ctx.effect('publication.update', { publicationId: current.id });
-      return changed;
+      await ctx.effect('publication.update', {
+        publicationId: current.id,
+        revision: changed.revision,
+      });
+      return publicationView(ctx, changed);
     },
   },
 ];

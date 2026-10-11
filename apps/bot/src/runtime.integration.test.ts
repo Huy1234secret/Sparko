@@ -41,6 +41,7 @@ const config: Config = {
   OWNER_USER_IDS: '',
   TRUST_PROXY: 'false',
   STORAGE_PATH: '.data/private',
+  API_RATE_LIMIT_PER_MINUTE: 300,
 };
 beforeAll(async () => {
   await db.guild.upsert({

@@ -8,6 +8,7 @@ import {
   type DiscordFile,
 } from '../../worker/src/discord.js';
 import { ADMIN, GUILD_A, CHANNEL, STAFF } from './fixtures.js';
+import { DiscordAPIError } from 'discord.js';
 export const TEST_BOT = '823456789012345678',
   TEST_BOT_ROLE = '923456789012345678';
 /** Discord test double. It is never loaded by production entrypoints. */
@@ -24,6 +25,21 @@ export class FakeRest extends DiscordRest {
   messageStore: DiscordMessage[] = [];
   uploadedFiles: { name: string; bytes: number; contentType: string }[] = [];
   counter = 700000000000000000n;
+  failWrites = false;
+  private rejectWrite() {
+    if (this.failWrites)
+      throw new DiscordAPIError(
+        { code: 50013, message: 'Missing Permissions' },
+        50013,
+        403,
+        'POST',
+        'https://discord-boundary.test/channels/message',
+        {},
+      );
+  }
+  override async emojis() {
+    return [];
+  }
   constructor() {
     super('test-only-token', TEST_BOT);
     // Guard every raw SDK call: an unimplemented boundary must fail locally.
@@ -85,7 +101,15 @@ export class FakeRest extends DiscordRest {
   }
   override async channel(id: string): Promise<DiscordChannel> {
     const found = this.channelsStore.find((c) => c.id === id);
-    if (!found) throw new Error('Unknown test channel');
+    if (!found)
+      throw new DiscordAPIError(
+        { code: 10003, message: 'Unknown Channel' },
+        10003,
+        404,
+        'GET',
+        'https://discord-boundary.test/channels/channel',
+        {},
+      );
     return found;
   }
   override async channels(guildId: string): Promise<DiscordChannel[]> {
@@ -116,6 +140,7 @@ export class FakeRest extends DiscordRest {
     nonce: string,
     files: DiscordFile[] = [],
   ): Promise<DiscordMessage> {
+    this.rejectWrite();
     const old = this.messageStore.find((m) => m.nonce === nonce);
     if (old) return old;
     for (const file of files)
@@ -133,6 +158,7 @@ export class FakeRest extends DiscordRest {
       content: typeof data['content'] === 'string' ? data['content'] : '',
       components: Array.isArray(data['components']) ? data['components'] : [],
       embeds: Array.isArray(data['embeds']) ? data['embeds'] : [],
+      ...(typeof data['flags'] === 'number' ? { flags: data['flags'] } : {}),
       attachments: files.map((file, index) => ({
         id: String(index),
         filename: file.name,
@@ -164,7 +190,15 @@ export class FakeRest extends DiscordRest {
     const found = this.messageStore.find(
       (m) => m.id === id && m.channel_id === channelId,
     );
-    if (!found) throw new Error('Unknown test message');
+    if (!found)
+      throw new DiscordAPIError(
+        { code: 10008, message: 'Unknown Message' },
+        10008,
+        404,
+        'GET',
+        'https://discord-boundary.test/channels/message',
+        {},
+      );
     return found;
   }
   override async edit(
@@ -173,6 +207,7 @@ export class FakeRest extends DiscordRest {
     payload: unknown,
     files: DiscordFile[] = [],
   ): Promise<DiscordMessage> {
+    this.rejectWrite();
     for (const file of files)
       this.uploadedFiles.push({
         name: file.name,
@@ -183,6 +218,16 @@ export class FakeRest extends DiscordRest {
       data = payload as Record<string, unknown>;
     if (Array.isArray(data['components']))
       message.components = data['components'];
+    if (typeof data['content'] === 'string') message.content = data['content'];
+    if (Array.isArray(data['embeds'])) message.embeds = data['embeds'];
+    if (typeof data['flags'] === 'number') message.flags = data['flags'];
+    if (files.length || Array.isArray(data['attachments']))
+      message.attachments = files.map((file, index) => ({
+        id: String(index),
+        filename: file.name,
+        size: file.data.length,
+        url: `https://discord-boundary.test/${file.name}`,
+      }));
     return message;
   }
   override async deleteMessage(channelId: string, id: string) {

@@ -182,4 +182,88 @@ describe('ticket configuration and publication', () => {
       vi.mocked(saveConfig).mock.calls[1]?.[3],
     );
   });
+  it('shows server field errors beside their controls and summarises unknown paths', async () => {
+    const user = userEvent.setup();
+    vi.mocked(saveConfig).mockRejectedValue(
+      new ApiError(
+        'A selected channel or role is unavailable.',
+        'INVALID_INPUT',
+        400,
+        'request-invalid',
+        undefined,
+        {
+          fieldErrors: [
+            {
+              path: 'categoryChannelId',
+              message: 'Choose a Discord category the bot can see.',
+            },
+            { path: 'categories.0.name', message: 'Name is reserved.' },
+            { path: 'retiredSetting', message: 'No longer supported.' },
+          ],
+          retryable: false,
+        },
+      ),
+    );
+    renderConfig();
+    const input = await screen.findByLabelText('Open tickets per member');
+    await user.clear(input);
+    await user.type(input, '2');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    const category = screen.getByLabelText('Ticket category');
+    expect(
+      await screen.findByText('Choose a Discord category the bot can see.'),
+    ).toBeVisible();
+    expect(category).toHaveAttribute('aria-invalid', 'true');
+    expect(category).toHaveFocus();
+    expect(screen.getByLabelText('Topic name')).toHaveAccessibleDescription(
+      'Name is reserved.',
+    );
+    expect(
+      screen.getByText('retiredSetting: No longer supported.'),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Try again' }),
+    ).not.toBeInTheDocument();
+    expect(input).toHaveValue(2);
+  });
+  it('offers a retry for transient failures that repeats the same request key', async () => {
+    const user = userEvent.setup();
+    vi.mocked(saveConfig)
+      .mockRejectedValueOnce(
+        new ApiError(
+          'The service is unavailable. Retry with the same request key.',
+          'SERVICE_UNAVAILABLE',
+          503,
+          'request-503',
+          undefined,
+          { retryable: true },
+        ),
+      )
+      .mockResolvedValueOnce({
+        data: {
+          ...structuredClone(saved),
+          revision: 4,
+          config: {
+            ...saved.config,
+            maxOpenPerMember: 2,
+          },
+        },
+      });
+    renderConfig();
+    const input = await screen.findByLabelText('Open tickets per member');
+    await user.clear(input);
+    await user.type(input, '2');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('Reference: request-503')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(saveConfig).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(saveConfig).mock.calls[0]?.[3]).toBe(
+      vi.mocked(saveConfig).mock.calls[1]?.[3],
+    );
+    expect(
+      await screen.findByText(
+        'Settings saved. Waiting for the bot to apply them.',
+      ),
+    ).toBeVisible();
+  });
 });

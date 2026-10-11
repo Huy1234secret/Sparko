@@ -62,6 +62,7 @@ const discord: DiscordAdapter = {
   member: async () => ({ roles: [] }),
   channels: async () => [],
   roles: async () => [],
+  emojis: async () => [],
 };
 let app: Awaited<ReturnType<typeof createApp>>,
   directory: string,

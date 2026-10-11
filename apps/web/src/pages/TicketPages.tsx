@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { get, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -47,7 +47,13 @@ import {
   type Ticket,
 } from '../services/tickets';
 import { publishMessage, getPublications } from '../services/messages';
-import { ApiError, errorMessage } from '../services/http';
+import {
+  ApiError,
+  errorMessage,
+  isRetryable,
+  type ApiFieldError,
+} from '../services/http';
+import { applyServerFieldErrors } from '../services/formErrors';
 import { RuntimeState } from '../components/AppShell';
 import { MessagePreview } from '../components/MessagePreview';
 import { DraftGuard } from '../hooks/useDraftGuard';
@@ -132,6 +138,10 @@ export function TicketConfigPage() {
     resolver: zodResolver(TicketConfigFormSchema),
     defaultValues: defaults,
   });
+  const [unmatchedErrors, setUnmatchedErrors] = useState<ApiFieldError[]>([]);
+  const fieldError = (path: string) =>
+    (get(form.formState.errors, path) as { message?: string } | undefined)
+      ?.message;
   const dirty = form.formState.isDirty;
   const categories = form.watch('categories');
   const panelDraft = MessageDocumentSchema.safeParse({
@@ -195,6 +205,8 @@ export function TicketConfigPage() {
         identity('ticket-settings', body),
       );
     },
+    onMutate: () => setUnmatchedErrors([]),
+    onError: (error) => setUnmatchedErrors(applyServerFieldErrors(form, error)),
     onSuccess: (result) => {
       queryClient.setQueryData(['config', guildId, 'tickets'], result.data);
       form.reset(
@@ -282,6 +294,7 @@ export function TicketConfigPage() {
               <Field
                 label="Ticket category"
                 htmlFor="parent-channel"
+                error={fieldError('categoryChannelId')}
                 hint="New private ticket channels are placed under this Discord category."
               >
                 <select
@@ -301,6 +314,7 @@ export function TicketConfigPage() {
               <Field
                 label="Panel channel"
                 htmlFor="panel-channel"
+                error={fieldError('panelChannelId')}
                 hint="Default destination for your member-facing support panel."
               >
                 <select id="panel-channel" {...form.register('panelChannelId')}>
@@ -365,6 +379,11 @@ export function TicketConfigPage() {
                   </label>
                 ))}
             </div>
+            {fieldError('staffRoleIds') && (
+              <p className="field-error" role="alert">
+                {fieldError('staffRoleIds')}
+              </p>
+            )}
             {roles.isPending && <LoadingState label="Fetching server roles…" />}
             {roles.error && (
               <ErrorState
@@ -382,7 +401,11 @@ export function TicketConfigPage() {
             {categories.map((category, index) => (
               <fieldset className="stack" key={index}>
                 <legend>Topic {index + 1}</legend>
-                <Field label="Topic name" htmlFor={'category-name-' + index}>
+                <Field
+                  label="Topic name"
+                  htmlFor={'category-name-' + index}
+                  error={fieldError(`categories.${index}.name`)}
+                >
                   <Input
                     id={'category-name-' + index}
                     {...form.register(`categories.${index}.name`)}
@@ -391,6 +414,7 @@ export function TicketConfigPage() {
                 <Field
                   label="Topic identifier"
                   htmlFor={'category-id-' + index}
+                  error={fieldError(`categories.${index}.id`)}
                   hint="Lowercase letters, digits and hyphens. Keep an existing identifier to preserve its panel action."
                 >
                   <Input
@@ -401,6 +425,7 @@ export function TicketConfigPage() {
                 <Field
                   label="Topic description"
                   htmlFor={'category-description-' + index}
+                  error={fieldError(`categories.${index}.description`)}
                 >
                   <textarea
                     id={'category-description-' + index}
@@ -412,6 +437,9 @@ export function TicketConfigPage() {
                     <Field
                       label="Question"
                       htmlFor={`question-${index}-${fieldIndex}`}
+                      error={fieldError(
+                        `categories.${index}.fields.${fieldIndex}.label`,
+                      )}
                     >
                       <Input
                         id={`question-${index}-${fieldIndex}`}
@@ -423,6 +451,9 @@ export function TicketConfigPage() {
                     <Field
                       label="Answer identifier"
                       htmlFor={`answer-id-${index}-${fieldIndex}`}
+                      error={fieldError(
+                        `categories.${index}.fields.${fieldIndex}.id`,
+                      )}
                     >
                       <Input
                         id={`answer-id-${index}-${fieldIndex}`}
@@ -434,6 +465,9 @@ export function TicketConfigPage() {
                     <Field
                       label="Answer length limit"
                       htmlFor={`answer-limit-${index}-${fieldIndex}`}
+                      error={fieldError(
+                        `categories.${index}.fields.${fieldIndex}.maxLength`,
+                      )}
                     >
                       <Input
                         type="number"
@@ -586,7 +620,34 @@ export function TicketConfigPage() {
               </div>
             </div>
           ) : save.error ? (
-            <ErrorState message={errorMessage(save.error)} />
+            <>
+              <ErrorState
+                message={errorMessage(save.error)}
+                code={
+                  save.error instanceof ApiError
+                    ? save.error.requestId
+                    : undefined
+                }
+                retry={
+                  isRetryable(save.error)
+                    ? () =>
+                        void form.handleSubmit((values) =>
+                          save.mutate(values),
+                        )()
+                    : undefined
+                }
+              />
+              {unmatchedErrors.length > 0 && (
+                <ul className="field-error" role="alert">
+                  {unmatchedErrors.map((item) => (
+                    <li key={item.path + item.message}>
+                      {item.path ? item.path + ': ' : ''}
+                      {item.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           ) : null}
           {save.data && !dirty && (
             <p className="save-feedback" role="status">

@@ -38,7 +38,10 @@ import { createAuth, requireActiveSession } from './auth.js';
 import { registerAccountRoutes } from './account.js';
 import { registerProviderCallbacks } from './providers.js';
 import { registerGrantRoutes } from './grants.js';
-import { validatePublicationResources } from './publication-resources.js';
+import {
+  validatePublicationResources,
+  validateTemplateResources,
+} from './publication-resources.js';
 import { registerAssetRoutes } from './assets.js';
 import { discordAdapter, type DiscordAdapter } from './discord.js';
 const presets = [
@@ -96,7 +99,10 @@ export async function createApp(options: {
   });
   await app.register(cookie);
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+  await app.register(rateLimit, {
+    max: config.API_RATE_LIMIT_PER_MINUTE,
+    timeWindow: '1 minute',
+  });
   await app.register(websocket, { options: { maxPayload: 8192 } });
   await app.register(swagger, {
     openapi: { info: { title: 'Sparko API', version: '1.0.0' } },
@@ -320,6 +326,40 @@ export async function createApp(options: {
       );
     return { data: await discord.roles(guildId) };
   });
+  app.get('/api/v1/guilds/:guildId/resources/emojis', async (req) => {
+    const { guildId } = z.object({ guildId: z.string() }).parse(req.params),
+      actor = await auth.actor(req, guildId);
+    if (
+      ![
+        'config.manage',
+        'templates.edit',
+        'messages.publish',
+        'community.manage',
+        'automation.manage',
+      ].some((capability) => allowed(actor, capability))
+    )
+      throw new DomainError(
+        'FORBIDDEN',
+        'You cannot select resources in this server.',
+        403,
+      );
+    const botId = discord.botUser
+        ? (await discord.botUser()).id
+        : config.DISCORD_CLIENT_ID,
+      [emojis, bot] = await Promise.all([
+        discord.emojis(guildId),
+        discord.member(guildId, botId),
+      ]);
+    return {
+      data: emojis.map((emoji) => ({
+        ...emoji,
+        available:
+          emoji.available &&
+          (!emoji.roles.length ||
+            emoji.roles.some((id) => id === guildId || bot.roles.includes(id))),
+      })),
+    };
+  });
   app.get('/api/v1/guilds/:guildId/overview', async (req) => {
     const { guildId } = z.object({ guildId: z.string() }).parse(req.params),
       actor = await auth.actor(req, guildId),
@@ -462,14 +502,26 @@ export async function createApp(options: {
       const tc = TicketConfigSchema.parse(cfg),
         roles = await discord.roles(p.guildId),
         channels = await discord.channels(p.guildId);
+      const fieldErrors: { path: string; message: string }[] = [];
+      if (tc.staffRoleIds.some((id) => !roles.some((r) => r.id === id)))
+        fieldErrors.push({
+          path: 'staffRoleIds',
+          message: 'A selected staff role no longer exists. Reselect roles.',
+        });
       if (
-        tc.staffRoleIds.some((id) => !roles.some((r) => r.id === id)) ||
-        (tc.categoryChannelId &&
-          !channels.some((c) => c.id === tc.categoryChannelId && c.type === 4))
+        tc.categoryChannelId &&
+        !channels.some((c) => c.id === tc.categoryChannelId && c.type === 4)
       )
+        fieldErrors.push({
+          path: 'categoryChannelId',
+          message: 'Choose a Discord category the bot can see.',
+        });
+      if (fieldErrors.length)
         throw new DomainError(
           'INVALID_INPUT',
           'A selected channel or role is unavailable.',
+          400,
+          { fieldErrors },
         );
     }
     return platform.mutate(
@@ -606,6 +658,39 @@ export async function createApp(options: {
             params['guildId'] ?? '',
             route.capability,
           );
+        if (
+          route.method === 'POST' &&
+          (route.path.endsWith('/templates') ||
+            route.path.endsWith('/templates/:id/versions'))
+        )
+          await validateTemplateResources(
+            db,
+            actor,
+            jsonObject(req.body)['document'],
+          );
+        if (
+          route.method === 'POST' &&
+          (route.path.endsWith('/templates/:id/duplicate') ||
+            route.path.endsWith('/templates/:id/restore'))
+        ) {
+          const body = jsonObject(route.schema?.parse(req.body) ?? req.body),
+            version = await db.templateVersion.findFirst({
+              where: {
+                id: String(
+                  body[
+                    route.path.endsWith('/duplicate')
+                      ? 'sourceVersionId'
+                      : 'versionId'
+                  ],
+                ),
+                templateId: params['id'] ?? '',
+                template: { guildId: actor.guildId, archived: false },
+              },
+            });
+          if (!version)
+            throw new DomainError('NOT_FOUND', 'Version unavailable.', 404);
+          await validateTemplateResources(db, actor, version.document);
+        }
         if (
           route.path.endsWith('/messages/publish') ||
           route.path.endsWith('/messages/test') ||

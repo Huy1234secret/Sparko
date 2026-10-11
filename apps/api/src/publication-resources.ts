@@ -2,6 +2,7 @@ import { DomainError, TicketConfigSchema, type Actor } from '@sparko/contracts';
 import {
   MessageDocumentSchema,
   getMessageActions,
+  resolveCustomEmojis,
   type MessageDocument,
 } from '@sparko/messages';
 import { jsonObject } from '@sparko/domain';
@@ -22,6 +23,96 @@ const privilegedRolePermissions =
   536870912n |
   1099511627776n;
 
+function attachmentReferences(document: MessageDocument) {
+  const attachments = new Set<string>();
+  function visit(value: unknown): void {
+    if (typeof value === 'string' && value.startsWith('attachment://'))
+      attachments.add(value.slice('attachment://'.length));
+    else if (Array.isArray(value)) value.forEach(visit);
+    else if (value && typeof value === 'object')
+      Object.values(value).forEach(visit);
+  }
+  visit(document);
+  return attachments;
+}
+
+/** Snapshot edits never publish; private media remains restricted to its owner. */
+export async function validateTemplateResources(
+  db: PrismaClient,
+  actor: Actor,
+  input: unknown,
+) {
+  const document = MessageDocumentSchema.parse(input);
+  for (const filename of attachmentReferences(document)) {
+    const match = /^sparko-([a-f0-9-]{36})\.png$/.exec(filename);
+    if (!match)
+      throw new DomainError(
+        'INVALID_INPUT',
+        'Choose an uploaded image from this server.',
+      );
+    const asset = await db.record.findFirst({
+      where: {
+        id: match[1]!,
+        guildId: actor.guildId,
+        kind: 'asset',
+        state: 'clean',
+      },
+    });
+    if (
+      !asset ||
+      (jsonObject(asset.data)['visibility'] !== 'public' &&
+        !(
+          document.visibility === 'private' &&
+          asset.ownerId === actor.userId &&
+          jsonObject(asset.data)['visibility'] === 'private'
+        ))
+    )
+      throw new DomainError(
+        'FORBIDDEN',
+        'Choose a validated public server image or your own private image for a private design.',
+        403,
+      );
+  }
+  return document;
+}
+
+function channelPermissions(
+  roles: Awaited<ReturnType<DiscordAdapter['roles']>>,
+  guildId: string,
+  memberId: string,
+  memberRoles: string[],
+  channel: Awaited<ReturnType<DiscordAdapter['channels']>>[number],
+) {
+  let permissions = roles
+    .filter((role) => role.id === guildId || memberRoles.includes(role.id))
+    .reduce((value, role) => value | BigInt(role.permissions), 0n);
+  if (permissions & 8n) return permissions;
+  const overwrites = channel.permission_overwrites ?? [],
+    everyone = overwrites.find(
+      (overwrite) => overwrite.id === guildId && overwrite.type === 0,
+    );
+  if (everyone)
+    permissions =
+      (permissions & ~BigInt(everyone.deny)) | BigInt(everyone.allow);
+  const roleOverwrites = overwrites.filter(
+      (overwrite) => overwrite.type === 0 && memberRoles.includes(overwrite.id),
+    ),
+    deny = roleOverwrites.reduce(
+      (value, overwrite) => value | BigInt(overwrite.deny),
+      0n,
+    ),
+    allow = roleOverwrites.reduce(
+      (value, overwrite) => value | BigInt(overwrite.allow),
+      0n,
+    );
+  permissions = (permissions & ~deny) | allow;
+  const own = overwrites.find(
+    (overwrite) => overwrite.id === memberId && overwrite.type === 1,
+  );
+  if (own) permissions = (permissions & ~BigInt(own.deny)) | BigInt(own.allow);
+  return permissions;
+}
+
 export async function validatePublicationResources(
   db: PrismaClient,
   discord: DiscordAdapter,
@@ -30,6 +121,7 @@ export async function validatePublicationResources(
   input: unknown,
   publicationId?: string,
 ) {
+  requireCapability(actor, actor.guildId, 'messages.publish');
   const body = jsonObject(input);
   let rawDocument = body['document'];
   if (body['templateVersionId']) {
@@ -44,15 +136,7 @@ export async function validatePublicationResources(
     rawDocument = version.document;
   }
   const document = MessageDocumentSchema.parse(rawDocument);
-  const attachments = new Set<string>();
-  function scanMedia(value: unknown) {
-    if (typeof value === 'string' && value.startsWith('attachment://'))
-      attachments.add(value.slice('attachment://'.length));
-    else if (Array.isArray(value)) value.forEach(scanMedia);
-    else if (value && typeof value === 'object')
-      Object.values(value).forEach(scanMedia);
-  }
-  scanMedia(document);
+  const attachments = attachmentReferences(document);
   for (const filename of attachments) {
     const match = /^sparko-([a-f0-9-]{36})\.png$/.exec(filename);
     if (!match)
@@ -89,7 +173,13 @@ export async function validatePublicationResources(
       throw new DomainError('NOT_FOUND', 'Publication unavailable.', 404);
     channelId = publication.channelId;
   }
-  const channels = await discord.channels(actor.guildId);
+  const [channels, roles, botUserId] = await Promise.all([
+    discord.channels(actor.guildId),
+    discord.roles(actor.guildId),
+    discord.botUser
+      ? discord.botUser().then((user) => user.id)
+      : Promise.resolve(config.DISCORD_CLIENT_ID),
+  ]);
   function textChannel(id: unknown) {
     if (
       typeof id !== 'string' ||
@@ -101,10 +191,48 @@ export async function validatePublicationResources(
       );
   }
   textChannel(channelId);
-  let roles: Awaited<ReturnType<DiscordAdapter['roles']>> | undefined;
-  let botRoles: string[] | undefined;
+  const botRoles = (await discord.member(actor.guildId, botUserId)).roles,
+    destination = channels.find((channel) => channel.id === channelId)!,
+    permissions = channelPermissions(
+      roles,
+      actor.guildId,
+      botUserId,
+      botRoles,
+      destination,
+    ),
+    required = [
+      ['View Channel', 1024n],
+      ['Send Messages', 2048n],
+      ...(document.mode === 'embed' && document.embeds.length
+        ? [['Embed Links', 16384n]]
+        : []),
+      ...(attachments.size ? [['Attach Files', 32768n]] : []),
+    ] as [string, bigint][],
+    missingPermissions = required
+      .filter(([, bit]) => !(permissions & 8n) && (permissions & bit) !== bit)
+      .map(([name]) => name);
+  if (missingPermissions.length)
+    throw new DomainError(
+      'MISSING_PERMISSION',
+      `Give Sparko ${missingPermissions.join(', ')} in the selected channel.`,
+      403,
+      { missingPermissions },
+    );
+  const emojis = await discord.emojis(actor.guildId);
+  resolveCustomEmojis(
+    document,
+    emojis
+      .filter(
+        (emoji) =>
+          emoji.available &&
+          (!emoji.roles.length ||
+            emoji.roles.some(
+              (id) => id === actor.guildId || botRoles.includes(id),
+            )),
+      )
+      .map((emoji) => emoji.id),
+  );
   async function safeRole(roleId: string) {
-    roles ??= await discord.roles(actor.guildId);
     const role = roles.find((r) => r.id === roleId);
     if (
       !role ||
@@ -117,12 +245,8 @@ export async function validatePublicationResources(
         'Public controls can use only ordinary, unmanaged roles in this server.',
         403,
       );
-    const botUserId = discord.botUser
-      ? (await discord.botUser()).id
-      : config.DISCORD_CLIENT_ID;
-    botRoles ??= (await discord.member(actor.guildId, botUserId)).roles;
     const bot = roles.filter(
-      (r) => botRoles!.includes(r.id) || r.id === actor.guildId,
+      (r) => botRoles.includes(r.id) || r.id === actor.guildId,
     );
     const botPermissions = bot.reduce(
       (permissions, r) => permissions | BigInt(r.permissions),

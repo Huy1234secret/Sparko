@@ -158,6 +158,7 @@ model TemplateVersion {
   templateId String
   template Template @relation(fields: [templateId], references: [id], onDelete: Restrict)
   number Int
+  label String?
   document Json
   createdAt DateTime @default(now())
   @@unique([templateId, number])

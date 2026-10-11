@@ -8,7 +8,9 @@ export const TemplateVersionSchema = z.object({
   number: z.number(),
   document: MessageDocumentSchema,
   createdAt: z.string(),
+  label: z.string().nullable().optional(),
 });
+export type TemplateVersion = z.infer<typeof TemplateVersionSchema>;
 export const TemplateSchema = z
   .object({
     id: z.string(),
@@ -34,25 +36,38 @@ export const PublicationSchema = z
     appliedRevision: z.number(),
     test: z.boolean(),
     createdAt: z.string(),
+    deliveryStatus: z.string().optional(),
+    error: z.string().nullable().optional(),
   })
   .transform((publication) => ({
     ...publication,
     status: publication.state,
-    deliveryStatus: publication.state,
+    deliveryStatus: publication.deliveryStatus ?? publication.state,
   }));
 export type Publication = z.infer<typeof PublicationSchema>;
 export type Template = z.infer<typeof TemplateSchema>;
 export const getTemplates = (guild: string, signal?: AbortSignal) =>
   read(`/guilds/${guild}/templates`, z.array(TemplateSchema), signal);
+export const getTemplateVersions = (
+  guild: string,
+  id: string,
+  signal?: AbortSignal,
+) =>
+  read(
+    `/guilds/${guild}/templates/${id}/versions`,
+    z.array(TemplateVersionSchema),
+    signal,
+  );
 export const createTemplate = (
   guild: string,
   document: MessageDocument,
   key: string,
+  label?: string,
 ) =>
   mutate(
     'post',
     `/guilds/${guild}/templates`,
-    { name: document.name, document },
+    { name: document.name, document, ...(label ? { label } : {}) },
     TemplateSchema,
     key,
   );
@@ -61,11 +76,16 @@ export async function createVersion(
   template: Template,
   document: MessageDocument,
   key: string,
+  label?: string,
 ) {
   const result = await mutate(
     'post',
     `/guilds/${guild}/templates/${template.id}/versions`,
-    { expectedRevision: template.revision, document },
+    {
+      expectedRevision: template.revision,
+      document,
+      ...(label ? { label } : {}),
+    },
     TemplateVersionSchema,
     key,
   );
@@ -157,6 +177,45 @@ export const updatePublication = (
     'post',
     `/guilds/${guild}/publications/${publication.id}/update`,
     { expectedRevision: publication.revision, document, replace },
+    PublicationSchema,
+    key,
+  );
+
+export const duplicateTemplate = (
+  guild: string,
+  template: Template,
+  body: { name: string; sourceVersionId: string },
+  key: string,
+) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/templates/${template.id}/duplicate`,
+    { expectedRevision: template.revision, ...body },
+    TemplateSchema,
+    key,
+  );
+export const restoreTemplateVersion = (
+  guild: string,
+  template: Template,
+  body: { versionId: string; label?: string },
+  key: string,
+) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/templates/${template.id}/restore`,
+    { expectedRevision: template.revision, ...body },
+    TemplateVersionSchema,
+    key,
+  );
+export const reconcilePublication = (
+  guild: string,
+  publication: Publication,
+  key: string,
+) =>
+  mutate(
+    'post',
+    `/guilds/${guild}/publications/${publication.id}/reconcile`,
+    { expectedRevision: publication.revision },
     PublicationSchema,
     key,
   );

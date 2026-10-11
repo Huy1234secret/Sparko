@@ -59,6 +59,182 @@ afterAll(async () => {
 });
 
 describe('durable publication lifecycle with PostgreSQL', () => {
+  it('restores named versions immutably and preserves revision conflicts and tenant scope', async () => {
+    const original = initialMessage('embed');
+    const created = await platform.route(
+      actor,
+      route('/templates'),
+      { name: 'History', document: original, label: 'Original' },
+      {},
+      randomUUID(),
+    );
+    const saved = await db.template.findUniqueOrThrow({
+      where: { id: (created.data as { id: string }).id },
+      include: { versions: true },
+    });
+    const first = saved.versions[0]!;
+    await platform.route(
+      actor,
+      route('/templates/:id/versions'),
+      {
+        expectedRevision: 1,
+        document: { ...original, name: 'Changed' },
+        label: 'Revision two',
+      },
+      { id: saved.id },
+      randomUUID(),
+    );
+    const outcomes = await Promise.allSettled(
+      [0, 1].map(() =>
+        platform.route(
+          actor,
+          route('/templates/:id/restore'),
+          { expectedRevision: 2, versionId: first.id },
+          { id: saved.id },
+          randomUUID(),
+        ),
+      ),
+    );
+    expect(outcomes.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes.find((r) => r.status === 'rejected')).toMatchObject({
+      reason: { code: 'REVISION_CONFLICT' },
+    });
+    const versions = await db.templateVersion.findMany({
+      where: { templateId: saved.id },
+      orderBy: { number: 'desc' },
+    });
+    expect(versions.map((v) => v.number)).toEqual([3, 2, 1]);
+    expect(versions[0]).toMatchObject({
+      label: 'Restored version 1',
+      document: original,
+    });
+    expect(versions[2]).toEqual(first);
+    await expect(
+      platform.route(
+        { ...actor, guildId: otherGuildId },
+        route('/templates/:id/restore'),
+        { expectedRevision: 3, versionId: first.id },
+        { id: saved.id },
+        randomUUID(),
+      ),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+  it('duplicates the chosen immutable snapshot and rejects a version from a different template', async () => {
+    const make = async (name: string) => {
+      const result = await platform.route(
+        actor,
+        route('/templates'),
+        { name, document: initialMessage('embed') },
+        {},
+        randomUUID(),
+      );
+      return db.template.findUniqueOrThrow({
+        where: { id: (result.data as { id: string }).id },
+        include: { versions: true },
+      });
+    };
+    const original = await make('Original'),
+      unrelated = await make('Other');
+    const copy = await platform.route(
+      actor,
+      route('/templates/:id/duplicate'),
+      {
+        expectedRevision: 1,
+        name: 'My copy',
+        sourceVersionId: original.versions[0]!.id,
+      },
+      { id: original.id },
+      randomUUID(),
+    );
+    expect(copy.data).toMatchObject({
+      name: 'My copy',
+      revision: 1,
+      versions: [
+        {
+          number: 1,
+          document: { ...initialMessage('embed'), name: 'My copy' },
+        },
+      ],
+    });
+    await expect(
+      platform.route(
+        actor,
+        route('/templates/:id/duplicate'),
+        {
+          expectedRevision: 1,
+          name: 'Invalid copy',
+          sourceVersionId: unrelated.versions[0]!.id,
+        },
+        { id: original.id },
+        randomUUID(),
+      ),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+  it('reports real delivery errors separately from business state and queues one read-only reconciliation', async () => {
+    const sent = await platform.mutate(
+      actor,
+      'delivery-status-fixture',
+      randomUUID(),
+      {},
+      (ctx) => publishDocument(ctx, channel, initialMessage('embed')),
+    );
+    await db.outbox.updateMany({
+      where: { operationId: sent.operation.id },
+      data: { state: 'blocked', lastError: 'Discord denied the action.' },
+    });
+    const list = publicationRoutes.find(
+      (r) => r.method === 'GET' && r.path.endsWith('/publications'),
+    )!;
+    const rows = (await platform.route(actor, list, {}, {}, randomUUID()))
+      .data as {
+      id: string;
+      state: string;
+      deliveryStatus: string;
+      error: string | null;
+    }[];
+    expect(rows.find((r) => r.id === sent.data.id)).toMatchObject({
+      state: 'pending',
+      deliveryStatus: 'blocked',
+      error: 'Discord denied the action.',
+    });
+    const key = randomUUID(),
+      request = { expectedRevision: 1 },
+      params = { id: sent.data.id };
+    const reconciled = await platform.route(
+      actor,
+      route('/publications/:id/reconcile'),
+      request,
+      params,
+      key,
+    );
+    const replay = await platform.route(
+      actor,
+      route('/publications/:id/reconcile'),
+      request,
+      params,
+      key,
+    );
+    if (!('operation' in replay) || !('operation' in reconciled)) {
+      throw new Error('Mutation response is missing its operation');
+    }
+    expect(replay.operation.id).toBe(reconciled.operation.id);
+    expect(
+      await db.outbox.count({
+        where: {
+          operationId: reconciled.operation.id,
+          type: 'publication.reconcile',
+        },
+      }),
+    ).toBe(1);
+    expect(
+      await db.outbox.count({
+        where: {
+          operationId: reconciled.operation.id,
+          type: 'publication.send',
+        },
+      }),
+    ).toBe(0);
+  });
   it('keeps controls when ordinary content changes and rejects a concurrent stale edit', async () => {
     const original = structuredClone(defaultTicketDocument);
     const result = await platform.mutate(

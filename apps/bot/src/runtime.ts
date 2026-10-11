@@ -8,6 +8,7 @@ import {
   PermissionFlagsBits,
   TextInputBuilder,
   TextInputStyle,
+  StringSelectMenuBuilder,
   type Client,
   type Guild,
   type Interaction,
@@ -35,6 +36,9 @@ import {
   ticketRoutes,
   claimReward,
   balance,
+  prepareApplicationForm,
+  submitApplication,
+  type DomainContext,
 } from '@sparko/domain';
 import {
   ActionSchema,
@@ -49,15 +53,38 @@ import { logger } from '@sparko/observability';
 import { InteractionResponse } from './response.js';
 import { validateIssuedControl, type ControlFacts } from './controls.js';
 
-const FlowSchema = z.object({
-  categoryId: z.string(),
-  configRevision: z.number(),
+const FlowCommon = z.object({
   form: FormDocumentSchema,
+  choices: z.record(z.string(), z.array(z.string())).default({}),
   step: z.number().int().min(0),
   answers: z.record(z.string(), z.string()),
   expiresAt: z.iso.datetime(),
   controlId: z.string().nullable(),
+  controlFacts: z
+    .object({
+      guildId: z.string(),
+      channelId: z.string(),
+      messageId: z.string(),
+      actorId: z.string(),
+      values: z.array(z.string()),
+    })
+    .optional(),
 });
+const FlowSchema = z.discriminatedUnion('kind', [
+  FlowCommon.extend({
+    kind: z.literal('ticket'),
+    categoryId: z.string(),
+    configRevision: z.number(),
+  }),
+  FlowCommon.extend({
+    kind: z.literal('application'),
+    formId: z.string(),
+    version: z.number().int().min(1),
+  }),
+]);
+type FormFlow = z.infer<typeof FlowSchema>;
+const parseFlow = (data: unknown) =>
+  FlowSchema.parse({ kind: 'ticket', ...jsonObject(data) });
 
 export class BotRuntime {
   readonly platform: Platform;
@@ -138,6 +165,13 @@ export class BotRuntime {
           'Open this action in a server where Sparko is installed.',
         );
       if (
+        interaction.isButton() &&
+        interaction.customId.startsWith('spk:cancel:')
+      ) {
+        await this.cancelForm(interaction, response);
+        return;
+      }
+      if (
         interaction.isModalSubmit() &&
         interaction.customId.startsWith('spk:form:')
       ) {
@@ -180,6 +214,16 @@ export class BotRuntime {
             interaction,
             response,
             issued.action.categoryId,
+            interaction.customId,
+            facts,
+          );
+          return;
+        }
+        if (issued.action.type === 'form.open') {
+          await this.beginApplication(
+            interaction,
+            response,
+            issued.action.formVersionId,
             interaction.customId,
             facts,
           );
@@ -397,11 +441,36 @@ export class BotRuntime {
     flowId: string,
     step: number,
     answers: Record<string, string>,
+    choices: Record<string, string[]> = {},
   ): ModalBuilder {
     const modal = new ModalBuilder()
       .setTitle(form.title)
       .setCustomId(`spk:form:${flowId}`);
     for (const field of form.fields.slice(step * 5, (step + 1) * 5)) {
+      const options = choices[field.key];
+      if (options?.length) {
+        const input = new StringSelectMenuBuilder()
+          .setCustomId(`field:${field.key}`)
+          .setRequired(field.required)
+          .setMinValues(field.required ? 1 : 0)
+          .setMaxValues(1)
+          .addOptions(
+            options.map((choice, index) => ({
+              label: choice.slice(0, 100),
+              value: String(index),
+              ...(choice.length > 100
+                ? { description: choice.slice(100, 200) }
+                : {}),
+              ...(answers[field.key] === choice ? { default: true } : {}),
+            })),
+          );
+        const label = new LabelBuilder()
+          .setLabel(field.label)
+          .setStringSelectMenuComponent(input);
+        if (field.description) label.setDescription(field.description);
+        modal.addLabelComponents(label);
+        continue;
+      }
       const input = new TextInputBuilder()
         .setCustomId(`field:${field.key}`)
         .setStyle(
@@ -508,27 +577,154 @@ export class BotRuntime {
         style: field.maxLength > 150 ? 'paragraph' : 'short',
       })),
     });
-    const flowId = randomUUID();
-    await this.db.record.create({
-      data: {
-        id: flowId,
-        guildId: interaction.guild.id,
-        kind: 'ticket.form',
-        key: flowId,
-        ownerId: interaction.user.id,
-        state: 'pending',
-        data: json({
+    const actor = await this.freshActor(interaction.guild, interaction.user.id);
+    const result = await this.platform.mutate(
+      actor,
+      'discord.ticket.form.begin',
+      interaction.id,
+      { categoryId, controlId },
+      async (ctx) => {
+        const current = await ctx.tx.featureConfig.findUnique({
+          where: {
+            guildId_featureId: { guildId: actor.guildId, featureId: 'tickets' },
+          },
+        });
+        if (current?.revision !== config?.revision)
+          throw new DomainError(
+            'REVISION_CONFLICT',
+            'The ticket form changed. Open the current panel.',
+            409,
+          );
+        const flow: FormFlow = {
+          kind: 'ticket',
           categoryId,
-          configRevision: config?.revision ?? 0,
+          configRevision: current?.revision ?? 0,
           form,
+          choices: {},
           step: 0,
           answers: {},
-          expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+          expiresAt: new Date(ctx.now.getTime() + 15 * 60_000).toISOString(),
           controlId,
-        }),
+          ...(facts ? { controlFacts: facts } : {}),
+        };
+        await this.checkFlowSource(ctx, flow);
+        return this.createFlow(ctx, flow);
+      },
+    );
+    const saved = await this.flow(interaction, result.data.flowId);
+    await response.modal(
+      this.modal(saved.flow.form, saved.record.id, 0, {}, saved.flow.choices),
+    );
+  }
+
+  private async createFlow(ctx: DomainContext, flow: FormFlow) {
+    const flowId = randomUUID();
+    await ctx.tx.record.create({
+      data: {
+        id: flowId,
+        guildId: ctx.guildId,
+        kind: flow.kind === 'ticket' ? 'ticket.form' : 'application.form',
+        key: flowId,
+        ownerId: ctx.actor.userId,
+        state: 'pending',
+        data: json(flow),
       },
     });
-    await response.modal(this.modal(form, flowId, 0, {}));
+    return { flowId };
+  }
+
+  private async beginApplication(
+    interaction: RepliableInteraction,
+    response: InteractionResponse,
+    formId: string,
+    controlId: string,
+    facts: ControlFacts,
+  ) {
+    if (!interaction.guild) return;
+    const actor = await this.freshActor(interaction.guild, interaction.user.id);
+    const result = await this.platform.mutate(
+      actor,
+      'discord.application.form.begin',
+      interaction.id,
+      { formId, controlId },
+      async (ctx) => {
+        const prepared = await prepareApplicationForm(ctx, formId);
+        const form = FormDocumentSchema.parse({
+          schemaVersion: 1,
+          title: prepared.form.name.slice(0, 45),
+          fields: prepared.form.fields.map((field) => ({
+            key: field.id,
+            label: field.label.slice(0, 45),
+            ...(field.label.length > 45
+              ? { description: field.label.slice(45) }
+              : {}),
+            required: field.required,
+            maxLength: field.maxLength,
+            style: field.maxLength > 150 ? 'paragraph' : 'short',
+          })),
+        });
+        const flow: FormFlow = {
+          kind: 'application',
+          formId,
+          version: prepared.version,
+          form,
+          choices: Object.fromEntries(
+            prepared.form.fields
+              .filter((field) => field.choices.length)
+              .map((field) => [field.id, field.choices]),
+          ),
+          step: 0,
+          answers: {},
+          expiresAt: new Date(ctx.now.getTime() + 15 * 60_000).toISOString(),
+          controlId,
+          controlFacts: facts,
+        };
+        await this.checkFlowSource(ctx, flow);
+        return this.createFlow(ctx, flow);
+      },
+    );
+    const saved = await this.flow(interaction, result.data.flowId);
+    await response.modal(
+      this.modal(saved.flow.form, saved.record.id, 0, {}, saved.flow.choices),
+    );
+  }
+
+  private async checkFlowSource(ctx: DomainContext, flow: FormFlow) {
+    if (!flow.controlId) return;
+    const control = await ctx.tx.issuedControl.findUnique({
+      where: { id: flow.controlId },
+      include: { publication: true },
+    });
+    if (!control || control.publication.test)
+      throw new DomainError(
+        'FORBIDDEN',
+        'This form panel is unavailable.',
+        403,
+      );
+    const facts = flow.controlFacts ?? {
+      guildId: ctx.guildId,
+      channelId: control.publication.channelId,
+      messageId: control.publication.messageId ?? '',
+      actorId: ctx.actor.userId,
+      values: [],
+    };
+    const current = validateIssuedControl(control, {
+      ...facts,
+      actorId: ctx.actor.userId,
+      now: ctx.now,
+    });
+    if (
+      flow.kind === 'ticket'
+        ? current.action.type !== 'ticket.create' ||
+          current.action.categoryId !== flow.categoryId
+        : current.action.type !== 'form.open' ||
+          current.action.formVersionId !== flow.formId
+    )
+      throw new DomainError(
+        'FORBIDDEN',
+        'The form panel changed. Open its current form.',
+        403,
+      );
   }
 
   private async flow(interaction: RepliableInteraction, id: string) {
@@ -536,7 +732,7 @@ export class BotRuntime {
       where: {
         id,
         guildId: interaction.guildId ?? '',
-        kind: 'ticket.form',
+        kind: { in: ['ticket.form', 'application.form'] },
         ownerId: interaction.user.id,
       },
     });
@@ -546,37 +742,24 @@ export class BotRuntime {
         'This form belongs to another member, expired, or was already submitted.',
         403,
       );
-    const flow = FlowSchema.parse(record.data);
+    const flow = parseFlow(record.data);
     if (Date.parse(flow.expiresAt) <= Date.now())
       throw new DomainError(
         'INVALID_INPUT',
-        'This form expired. Open a new ticket request.',
+        'This form expired. Open a new request.',
       );
-    if (flow.controlId) {
-      const control = await this.db.issuedControl.findUnique({
-        where: { id: flow.controlId },
-        include: { publication: true },
-      });
-      const action = ActionSchema.safeParse(control?.action);
-      if (
-        !control ||
-        control.guildId !== interaction.guildId ||
-        control.publication.guildId !== interaction.guildId ||
-        control.revoked ||
-        !['applied', 'published'].includes(control.publication.state) ||
-        control.publication.test ||
-        !action.success ||
-        action.data.type !== 'ticket.create' ||
-        action.data.categoryId !== flow.categoryId ||
-        (control.actorId && control.actorId !== interaction.user.id) ||
-        (control.expiresAt && control.expiresAt <= new Date())
-      )
-        throw new DomainError(
-          'FORBIDDEN',
-          'The panel was revoked or changed. Open the current ticket panel.',
-          403,
-        );
-    }
+    await this.platform.read(
+      {
+        guildId: record.guildId,
+        userId: interaction.user.id,
+        roles: [],
+        isAdmin: false,
+        isOwner: false,
+        capabilities: [],
+        globalCapabilities: [],
+      },
+      (ctx) => this.checkFlowSource(ctx, flow),
+    );
     return { record, flow };
   }
   private async continueForm(
@@ -585,12 +768,75 @@ export class BotRuntime {
   ) {
     const id = interaction.customId.slice('spk:next:'.length);
     const { flow } = await this.flow(interaction, id);
-    await response.modal(this.modal(flow.form, id, flow.step, flow.answers));
+    if (flow.kind === 'application' && interaction.guild) {
+      const actor = await this.freshActor(
+        interaction.guild,
+        interaction.user.id,
+      );
+      await this.platform.read(actor, (ctx) =>
+        prepareApplicationForm(ctx, flow.formId, flow.version),
+      );
+    }
+    await response.modal(
+      this.modal(flow.form, id, flow.step, flow.answers, flow.choices),
+    );
+  }
+  private async cancelForm(
+    interaction: RepliableInteraction & { customId: string },
+    response: InteractionResponse,
+  ) {
+    if (!interaction.guild || !(await response.defer())) return;
+    const id = interaction.customId.slice('spk:cancel:'.length);
+    const actor = await this.freshActor(interaction.guild, interaction.user.id);
+    await this.platform.mutate(
+      actor,
+      'discord.form.cancel',
+      interaction.id,
+      { flowId: id },
+      async (ctx) => {
+        const current = await ctx.tx.record.findFirst({
+          where: {
+            id,
+            guildId: actor.guildId,
+            ownerId: actor.userId,
+            kind: { in: ['ticket.form', 'application.form'] },
+          },
+        });
+        if (!current)
+          throw new DomainError(
+            'FORBIDDEN',
+            'This form belongs to another member or expired.',
+            403,
+          );
+        if (current.state === 'submitted')
+          throw new DomainError(
+            'INVALID_INPUT',
+            'This form was already submitted.',
+          );
+        await ctx.tx.record.update({
+          where: { id },
+          data: {
+            state: 'cancelled',
+            revision: { increment: 1 },
+            data: json({ expiresAt: jsonObject(current.data)['expiresAt'] }),
+          },
+        });
+        return { cancelled: true };
+      },
+    );
+    await interaction.editReply({
+      content: 'Form cancelled. Your saved answers were removed.',
+      components: [],
+      allowedMentions: { parse: [] },
+    });
   }
   private async submitForm(
     interaction: RepliableInteraction & {
       customId: string;
-      fields: { getTextInputValue(id: string): string };
+      fields: {
+        getTextInputValue(id: string): string;
+        getStringSelectValues?(id: string): readonly string[];
+      };
     },
     response: InteractionResponse,
   ) {
@@ -602,14 +848,38 @@ export class BotRuntime {
     for (const field of flow.form.fields.slice(
       flow.step * 5,
       (flow.step + 1) * 5,
-    ))
-      submitted[field.key] = interaction.fields.getTextInputValue(
-        `field:${field.key}`,
-      );
+    )) {
+      const choices = flow.choices[field.key];
+      if (!choices?.length)
+        submitted[field.key] = interaction.fields.getTextInputValue(
+          `field:${field.key}`,
+        );
+      else {
+        const values = interaction.fields.getStringSelectValues?.(
+          `field:${field.key}`,
+        );
+        if (
+          !values ||
+          values.length > 1 ||
+          (field.required && values.length !== 1) ||
+          values.some(
+            (value) =>
+              !/^(0|[1-9]\d*)$/.test(value) || Number(value) >= choices.length,
+          )
+        )
+          throw new DomainError(
+            'INVALID_INPUT',
+            'Choose an option from the original form.',
+          );
+        submitted[field.key] = values.length ? choices[Number(values[0])]! : '';
+      }
+    }
     const validated = validateFormStepAnswers(flow.form, flow.step, submitted);
     const result = await this.platform.mutate(
       actor,
-      'discord.ticket.form',
+      flow.kind === 'ticket'
+        ? 'discord.ticket.form'
+        : 'discord.application.form',
       interaction.id,
       { flowId: id, revision: record.revision, answers: validated },
       async (ctx) => {
@@ -628,36 +898,28 @@ export class BotRuntime {
             'This form changed. Continue from the latest step.',
             409,
           );
-        if (flow.controlId) {
-          const control = await ctx.tx.issuedControl.findUnique({
-            where: { id: flow.controlId },
-            include: { publication: true },
-          });
-          if (
-            !control ||
-            control.guildId !== actor.guildId ||
-            control.revoked ||
-            control.publication.state !== 'applied' ||
-            control.publication.test ||
-            (control.expiresAt && control.expiresAt <= ctx.now)
-          )
-            throw new DomainError(
-              'FORBIDDEN',
-              'The ticket panel changed. Open its current form.',
-              403,
-            );
-        }
-        const config = await ctx.tx.featureConfig.findUnique({
-          where: {
-            guildId_featureId: { guildId: actor.guildId, featureId: 'tickets' },
-          },
-        });
-        if (config?.revision !== flow.configRevision)
+        if (Date.parse(flow.expiresAt) <= ctx.now.getTime())
           throw new DomainError(
-            'REVISION_CONFLICT',
-            'The ticket form changed. Open a new request to review it.',
-            409,
+            'INVALID_INPUT',
+            'This form expired. Open a new request.',
           );
+        await this.checkFlowSource(ctx, flow);
+        if (flow.kind === 'ticket') {
+          const config = await ctx.tx.featureConfig.findUnique({
+            where: {
+              guildId_featureId: {
+                guildId: actor.guildId,
+                featureId: 'tickets',
+              },
+            },
+          });
+          if (config?.revision !== flow.configRevision)
+            throw new DomainError(
+              'REVISION_CONFLICT',
+              'The ticket form changed. Open a new request to review it.',
+              409,
+            );
+        } else await prepareApplicationForm(ctx, flow.formId, flow.version);
         const answers = { ...flow.answers, ...validated };
         const nextStep = flow.step + 1;
         const done = nextStep * 5 >= flow.form.fields.length;
@@ -669,14 +931,24 @@ export class BotRuntime {
             revision: { increment: 1 },
           },
         });
-        if (done)
-          await openTicket(ctx, { categoryId: flow.categoryId, answers });
+        if (done) {
+          if (flow.kind === 'ticket')
+            await openTicket(ctx, { categoryId: flow.categoryId, answers });
+          else
+            await submitApplication(ctx, {
+              formId: flow.formId,
+              version: flow.version,
+              answers,
+            });
+        }
         return { done };
       },
     );
     if (result.data.done) {
       await response.send(
-        'Ticket requested. Sparko is creating your private channel and will record the result in your dashboard.',
+        flow.kind === 'ticket'
+          ? 'Ticket requested. Sparko is creating your private channel and will record the result in your dashboard.'
+          : 'Application submitted. Your answers are saved for review.',
       );
       return;
     }
@@ -688,6 +960,10 @@ export class BotRuntime {
             .setCustomId(`spk:next:${id}`)
             .setLabel('Continue form')
             .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId(`spk:cancel:${id}`)
+            .setLabel('Cancel form')
+            .setStyle(ButtonStyle.Secondary),
         ),
       ],
       allowedMentions: { parse: [] },
@@ -795,7 +1071,7 @@ export class BotRuntime {
           case 'form.open':
             throw new DomainError(
               'INVALID_INPUT',
-              `Open this application in your member portal: ${this.config.PUBLIC_APP_URL}/servers/${actor.guildId}/me`,
+              'Open this application from its current published form control.',
             );
           case 'ticket.create':
             return openTicket(ctx, {

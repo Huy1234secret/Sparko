@@ -2,10 +2,13 @@ import { createHmac } from 'node:crypto';
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { createDatabase, json } from '@sparko/db';
 import { encryptProviderSecret } from '@sparko/domain';
-import { defaultTicketDocument } from '@sparko/messages';
+import { defaultTicketDocument, MessageDocumentSchema } from '@sparko/messages';
 import { createApp } from './app.js';
 import { createAuth, digest, encrypt, decrypt } from './auth.js';
-import { validatePublicationResources } from './publication-resources.js';
+import {
+  validatePublicationResources,
+  validateTemplateResources,
+} from './publication-resources.js';
 import { testConfig } from '../test/fixtures.js';
 import type { DiscordAdapter } from './discord.js';
 import { testDatabaseUrl } from '../../../tools/test-targets.js';
@@ -54,13 +57,14 @@ const discord: DiscordAdapter = {
   ],
   member: async (_guildId, id) => ({ roles: id === BOT ? [BOT] : [] }),
   botUser: async () => ({ id: BOT }),
+  emojis: async () => [],
   channels: async () => [{ id: CHANNEL, name: 'test', type: 0 }],
   roles: async () => [
     {
       id: BOT,
       name: 'Sparko',
       position: 10,
-      permissions: '268435456',
+      permissions: String(268435456n | 1024n | 2048n | 16384n | 32768n),
       managed: true,
       color: 0,
     },
@@ -676,6 +680,337 @@ describe('API security against real PostgreSQL', () => {
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
+  it('lists fresh bot-usable guild emoji and rejects unavailable IDs before creating a publication', async () => {
+    const emojiId = '911111111111111122',
+      unavailableId = '911111111111111123',
+      lockedId = '911111111111111124',
+      emojis = vi.spyOn(discord, 'emojis').mockResolvedValue([
+        {
+          id: emojiId,
+          name: 'spark',
+          animated: true,
+          available: true,
+          roles: [],
+        },
+        {
+          id: unavailableId,
+          name: 'unavailable',
+          animated: false,
+          available: false,
+          roles: [],
+        },
+        {
+          id: lockedId,
+          name: 'restricted',
+          animated: false,
+          available: true,
+          roles: [STAFF_A],
+        },
+      ]);
+    try {
+      const listed = await app.inject({
+        method: 'GET',
+        url: `/api/v1/guilds/${GUILD}/resources/emojis`,
+        headers: headers(ADMIN),
+      });
+      expect(listed.statusCode).toBe(200);
+      expect(
+        listed
+          .json()
+          .data.map((emoji: { available: boolean }) => emoji.available),
+      ).toEqual([true, false, false]);
+      const forbidden = await app.inject({
+        method: 'GET',
+        url: `/api/v1/guilds/${GUILD}/resources/emojis`,
+        headers: headers(MEMBER),
+      });
+      expect(forbidden.statusCode).toBe(403);
+      const makeDocument = (id: string, fallback?: string) =>
+        MessageDocumentSchema.parse({
+          schemaVersion: 1,
+          mode: 'embed',
+          name: 'Current emoji',
+          content: 'Choose a resource',
+          blocks: [
+            {
+              type: 'controls',
+              controls: [
+                {
+                  type: 'button',
+                  key: 'link',
+                  label: 'Site',
+                  style: 'link',
+                  url: 'https://example.com',
+                  emoji: {
+                    id,
+                    name: 'spark',
+                    animated: true,
+                    ...(fallback ? { fallback } : {}),
+                  },
+                },
+              ],
+            },
+          ],
+        });
+      for (const id of [unavailableId, lockedId]) {
+        const response = await app.inject({
+          method: 'POST',
+          url: `/api/v1/guilds/${GUILD}/messages/publish`,
+          headers: headers(ADMIN, `emoji-rejected:${id}`),
+          payload: { channelId: CHANNEL, document: makeDocument(id) },
+        });
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error.fieldErrors[0].path).toBe(
+          'blocks.0.controls.0.emoji.id',
+        );
+        expect(
+          await db.operation.count({
+            where: { guildId: GUILD, key: `emoji-rejected:${id}` },
+          }),
+        ).toBe(0);
+      }
+      for (const [id, fallback] of [
+        [emojiId, undefined],
+        [unavailableId, '✨'],
+      ] as const) {
+        const response = await app.inject({
+          method: 'POST',
+          url: `/api/v1/guilds/${GUILD}/messages/publish`,
+          headers: headers(ADMIN, `emoji-valid:${id}`),
+          payload: { channelId: CHANNEL, document: makeDocument(id, fallback) },
+        });
+        expect(response.statusCode).toBe(200);
+        const publication = await db.publication.findUniqueOrThrow({
+          where: { id: response.json().data.id },
+        });
+        expect(publication.document).toEqual(makeDocument(id, fallback));
+      }
+    } finally {
+      emojis.mockRestore();
+    }
+  });
+  it('reports missing channel overwrite and attachment permissions without persisting an operation', async () => {
+    const channels = vi.spyOn(discord, 'channels').mockResolvedValue([
+      {
+        id: CHANNEL,
+        name: 'restricted',
+        type: 0,
+        permission_overwrites: [{ id: BOT, type: 1, allow: '0', deny: '2048' }],
+      },
+    ]);
+    try {
+      const denied = await app.inject({
+        method: 'POST',
+        url: `/api/v1/guilds/${GUILD}/messages/publish`,
+        headers: headers(ADMIN, 'missing-send'),
+        payload: { channelId: CHANNEL, document: defaultTicketDocument },
+      });
+      expect(denied.statusCode).toBe(403);
+      expect(denied.json().error).toMatchObject({
+        code: 'MISSING_PERMISSION',
+        missingPermissions: ['Send Messages'],
+        retryable: false,
+      });
+      expect(
+        await db.operation.count({
+          where: { guildId: GUILD, key: 'missing-send' },
+        }),
+      ).toBe(0);
+      const asset = await db.record.create({
+        data: {
+          guildId: GUILD,
+          kind: 'asset',
+          key: 'permission-image',
+          ownerId: ADMIN,
+          state: 'clean',
+          data: json({ visibility: 'public' }),
+        },
+      });
+      channels.mockResolvedValue([
+        {
+          id: CHANNEL,
+          name: 'restricted',
+          type: 0,
+          permission_overwrites: [
+            { id: BOT, type: 1, allow: '0', deny: '32768' },
+          ],
+        },
+      ]);
+      const document = MessageDocumentSchema.parse({
+        schemaVersion: 1,
+        mode: 'v2',
+        name: 'An attachment',
+        blocks: [
+          {
+            type: 'gallery',
+            items: [
+              {
+                url: `attachment://sparko-${asset.id}.png`,
+                alt: 'Published image',
+              },
+            ],
+          },
+        ],
+      });
+      const attachment = await app.inject({
+        method: 'POST',
+        url: `/api/v1/guilds/${GUILD}/messages/publish`,
+        headers: headers(ADMIN, 'missing-attach'),
+        payload: { channelId: CHANNEL, document },
+      });
+      expect(attachment.statusCode).toBe(403);
+      expect(attachment.json().error.missingPermissions).toEqual([
+        'Attach Files',
+      ]);
+      expect(
+        await db.operation.count({
+          where: { guildId: GUILD, key: 'missing-attach' },
+        }),
+      ).toBe(0);
+    } finally {
+      channels.mockRestore();
+    }
+  });
+  it('protects private and cross-server assets when saving message snapshots', async () => {
+    const own = await db.record.create({
+        data: {
+          guildId: GUILD,
+          kind: 'asset',
+          key: 'own-private-snapshot',
+          ownerId: ADMIN,
+          state: 'clean',
+          data: json({ visibility: 'private' }),
+        },
+      }),
+      another = await db.record.create({
+        data: {
+          guildId: GUILD,
+          kind: 'asset',
+          key: 'other-private-snapshot',
+          ownerId: MEMBER,
+          state: 'clean',
+          data: json({ visibility: 'private' }),
+        },
+      }),
+      foreign = await db.record.create({
+        data: {
+          guildId: OTHER,
+          kind: 'asset',
+          key: 'foreign-public-snapshot',
+          ownerId: ADMIN,
+          state: 'clean',
+          data: json({ visibility: 'public' }),
+        },
+      }),
+      actor = {
+        userId: ADMIN,
+        guildId: GUILD,
+        roles: [],
+        isAdmin: true,
+        isOwner: true,
+        capabilities: [],
+        globalCapabilities: [],
+      },
+      design = (id: string, visibility = 'private') =>
+        MessageDocumentSchema.parse({
+          schemaVersion: 1,
+          mode: 'v2',
+          name: 'Private design',
+          visibility,
+          blocks: [
+            {
+              type: 'gallery',
+              items: [{ url: `attachment://sparko-${id}.png` }],
+            },
+          ],
+        });
+    await expect(
+      validateTemplateResources(db, actor, design(own.id)),
+    ).resolves.toEqual(design(own.id));
+    for (const document of [
+      design(own.id, 'public'),
+      design(another.id),
+      design(foreign.id),
+    ]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/guilds/${GUILD}/templates`,
+        headers: headers(
+          ADMIN,
+          `snapshot-denied:${JSON.stringify(document)}`.slice(0, 128),
+        ),
+        payload: { name: 'Unsafe snapshot', document },
+      });
+      expect(response.statusCode).toBe(403);
+    }
+    expect(
+      await db.template.count({
+        where: { guildId: GUILD, name: 'Unsafe snapshot' },
+      }),
+    ).toBe(0);
+    const unsafeSource = await db.template.create({
+      data: {
+        guildId: GUILD,
+        name: 'Prior private source',
+        versions: { create: { number: 1, document: json(design(another.id)) } },
+      },
+      include: { versions: true },
+    });
+    for (const action of ['duplicate', 'restore'] as const) {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/guilds/${GUILD}/templates/${unsafeSource.id}/${action}`,
+        headers: headers(ADMIN, `snapshot-${action}-denied`),
+        payload: {
+          expectedRevision: 1,
+          ...(action === 'duplicate'
+            ? {
+                name: 'Copied unsafe snapshot',
+                sourceVersionId: unsafeSource.versions[0]!.id,
+              }
+            : { versionId: unsafeSource.versions[0]!.id }),
+        },
+      });
+      expect(response.statusCode).toBe(403);
+    }
+    expect(
+      (await db.template.findUniqueOrThrow({ where: { id: unsafeSource.id } }))
+        .revision,
+    ).toBe(1);
+    const before = await db.publication.count({ where: { guildId: GUILD } }),
+      created = await app.inject({
+        method: 'POST',
+        url: `/api/v1/guilds/${GUILD}/templates`,
+        headers: headers(ADMIN, 'own-private-source'),
+        payload: { name: 'Own private source', document: design(own.id) },
+      });
+    expect(created.statusCode).toBe(200);
+    const source = created.json().data as {
+      id: string;
+      revision: number;
+      versions: { id: string }[];
+    };
+    for (const action of ['duplicate', 'restore'] as const) {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/v1/guilds/${GUILD}/templates/${source.id}/${action}`,
+        headers: headers(ADMIN, `snapshot-${action}-own`),
+        payload: {
+          expectedRevision: source.revision,
+          ...(action === 'duplicate'
+            ? {
+                name: 'Copied private source',
+                sourceVersionId: source.versions[0]!.id,
+              }
+            : { versionId: source.versions[0]!.id }),
+        },
+      });
+      expect(response.statusCode).toBe(200);
+    }
+    expect(await db.publication.count({ where: { guildId: GUILD } })).toBe(
+      before,
+    );
+  });
   it('expires private exports and deletes identity/access/opt-ins while retaining guild business history', async () => {
     const expired = await db.accountRequest.create({
       data: {
@@ -797,5 +1132,63 @@ describe('API security against real PostgreSQL', () => {
         })
       ).statusCode,
     ).toBe(401);
+  });
+});
+describe('field-level validation errors', () => {
+  const ticketRevision = async () =>
+    (
+      await db.featureConfig.findUnique({
+        where: { guildId_featureId: { guildId: GUILD, featureId: 'tickets' } },
+      })
+    )?.revision ?? 0;
+  it('names each unavailable ticket channel or role without saving', async () => {
+    const before = await ticketRevision();
+    const result = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/guilds/${GUILD}/features/tickets/config`,
+      headers: headers(ADMIN, 'field-errors-resources'),
+      payload: {
+        expectedRevision: before,
+        config: {
+          enabled: true,
+          categoryChannelId: CHANNEL,
+          staffRoleIds: ['911111111111111199'],
+        },
+      },
+    });
+    expect(result.statusCode).toBe(400);
+    const body = result.json<{
+      error: {
+        code: string;
+        fieldErrors: { path: string }[];
+        retryable: boolean;
+      };
+    }>();
+    expect(body.error.code).toBe('INVALID_INPUT');
+    expect(body.error.retryable).toBe(false);
+    expect(body.error.fieldErrors.map((item) => item.path).sort()).toEqual([
+      'categoryChannelId',
+      'staffRoleIds',
+    ]);
+    expect(await ticketRevision()).toBe(before);
+  });
+  it('reports schema violations relative to the submitted settings', async () => {
+    const before = await ticketRevision();
+    const result = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/guilds/${GUILD}/features/tickets/config`,
+      headers: headers(ADMIN, 'field-errors-schema'),
+      payload: {
+        expectedRevision: before,
+        config: { enabled: true, maxOpenPerMember: 500 },
+      },
+    });
+    expect(result.statusCode).toBe(400);
+    expect(
+      result
+        .json<{ error: { fieldErrors: { path: string }[] } }>()
+        .error.fieldErrors.map((item) => item.path),
+    ).toContain('maxOpenPerMember');
+    expect(await ticketRevision()).toBe(before);
   });
 });

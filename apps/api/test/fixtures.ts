@@ -23,6 +23,7 @@ export function testConfig(database: string): Config {
     OWNER_USER_IDS: ADMIN,
     TRUST_PROXY: 'false',
     STORAGE_PATH: '.data/test',
+    API_RATE_LIMIT_PER_MINUTE: 300,
   };
 }
 export function fakeDiscord(): DiscordAdapter {
@@ -48,8 +49,20 @@ export function fakeDiscord(): DiscordAdapter {
       },
     ],
     member: async () => ({ roles: [] }),
-    channels: async () => [{ id: CHANNEL, name: 'support', type: 0 }],
+    botUser: async () => ({ id: '723456789012345678' }),
+    emojis: async () => [],
+    channels: async () => [
+      { id: CHANNEL, name: 'support', type: 0, permission_overwrites: [] },
+    ],
     roles: async () => [
+      {
+        id: GUILD_A,
+        name: 'everyone',
+        position: 0,
+        permissions: String(1024 | 2048 | 16384 | 32768),
+        managed: false,
+        color: 0,
+      },
       {
         id: STAFF,
         name: 'Support',

@@ -71,6 +71,7 @@ export const DiscordMessageSchema = z.object({
     )
     .default([]),
   embeds: z.array(z.unknown()).default([]),
+  flags: z.number().optional(),
   nonce: z.union([z.string(), z.number()]).nullable().optional(),
 });
 export type DiscordGuild = z.infer<typeof DiscordGuildSchema>;
@@ -78,6 +79,13 @@ export type DiscordRole = z.infer<typeof DiscordRoleSchema>;
 export type DiscordMember = z.infer<typeof DiscordMemberSchema>;
 export type DiscordChannel = z.infer<typeof DiscordChannelSchema>;
 export type DiscordMessage = z.infer<typeof DiscordMessageSchema>;
+export const DiscordEmojiSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  available: z.boolean().default(true),
+  animated: z.boolean().default(false),
+  roles: z.array(z.string()).default([]),
+});
 export type DiscordFile = { name: string; data: Buffer; contentType: string };
 
 export function effectivePermissions(
@@ -235,6 +243,11 @@ export class DiscordRest {
       .array(DiscordRoleSchema)
       .parse(await this.rest.get(Routes.guildRoles(id)));
   }
+  async emojis(guildId: string) {
+    return z
+      .array(DiscordEmojiSchema)
+      .parse(await this.rest.get(Routes.guildEmojis(guildId)));
+  }
   async member(guildId: string, id: string) {
     return DiscordMemberSchema.parse(
       await this.rest.get(Routes.guildMember(guildId, id)),
@@ -346,10 +359,14 @@ export class DiscordRest {
         'This channel belongs to another server.',
         403,
       );
+    const permissions = effectivePermissions(guild, roles, member, channel);
+    const missing = new PermissionsBitField(required & ~permissions)
+      .toArray()
+      .map((name) => name.replace(/([a-z])([A-Z])/g, '$1 $2'));
     assertPermissions(
-      effectivePermissions(guild, roles, member, channel),
+      permissions,
       required,
-      'Check Sparko’s permissions in this channel.',
+      `Give Sparko ${missing.join(', ')} permission in this channel.`,
     );
     return { guild, roles, member, channel };
   }
