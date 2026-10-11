@@ -166,33 +166,32 @@ export const ModerationCaseSchema = z
     confirm: z.boolean().default(false),
   })
   .superRefine((v, c) => {
+    const issue = (path: string, message: string) =>
+      c.addIssue({ code: 'custom', path: [path], message });
     if (
       ['warn', 'timeout', 'kick', 'ban', 'unban', 'note'].includes(v.action) &&
       !v.targetId
     )
-      c.addIssue({
-        code: 'custom',
-        message: 'This action needs a member target',
-      });
+      issue('targetId', 'This action needs a member target');
     if (
       ['purge', 'slowmode', 'lock', 'unlock'].includes(v.action) &&
       !v.channelId
     )
-      c.addIssue({ code: 'custom', message: 'This action needs a channel' });
+      issue('channelId', 'This action needs a channel');
     if (v.action === 'timeout' && !v.durationSeconds)
-      c.addIssue({ code: 'custom', message: 'Timeout requires a duration' });
-    if (v.action === 'purge' && (!v.count || !v.confirm))
-      c.addIssue({
-        code: 'custom',
-        message: 'Purge needs an affected count and explicit confirmation',
-      });
-    if (['kick', 'ban', 'lock'].includes(v.action) && !v.confirm)
-      c.addIssue({
-        code: 'custom',
-        message: 'Confirm this consequential action',
-      });
+      issue('durationSeconds', 'Timeout requires a duration');
+    // Bans and locks may be temporary; other actions have no duration.
+    if (
+      v.durationSeconds !== undefined &&
+      !['timeout', 'ban', 'lock'].includes(v.action)
+    )
+      issue('durationSeconds', 'Only timeouts, bans and locks can expire');
+    if (v.action === 'purge' && !v.count)
+      issue('count', 'Purge needs the number of messages to remove');
+    if (['kick', 'ban', 'lock', 'purge'].includes(v.action) && !v.confirm)
+      issue('confirm', 'Confirm this consequential action');
     if (v.action === 'slowmode' && v.slowmodeSeconds === undefined)
-      c.addIssue({ code: 'custom', message: 'Slowmode requires seconds' });
+      issue('slowmodeSeconds', 'Slowmode requires seconds');
   });
 export const ReportSchema = z.object({
   subject: z.string().min(3).max(200),

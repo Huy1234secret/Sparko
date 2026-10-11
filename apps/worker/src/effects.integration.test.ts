@@ -1509,4 +1509,168 @@ describe('PostgreSQL worker execution and recovery', () => {
       expect(discord.sends).toBe(0);
     });
   });
+  describe('timed bans and locks', () => {
+    const SEND = PermissionFlagsBits.SendMessages;
+    let puts: { route: string; body: Record<string, unknown> }[];
+    let banned: Set<string>;
+    beforeEach(() => {
+      puts = [];
+      banned = new Set();
+      discord.rest.put = (async (
+        route: string,
+        options: { body?: unknown },
+      ) => {
+        const body = (options.body ?? {}) as Record<string, unknown>;
+        puts.push({ route, body });
+        const ban = /\/bans\/(\d+)$/.exec(route)?.[1];
+        if (ban) banned.add(ban);
+        const overwrite = /\/channels\/(\d+)\/permissions\/(\d+)$/.exec(route);
+        if (overwrite)
+          discord.channelsStore = discord.channelsStore.map((channel) =>
+            channel.id === overwrite[1]
+              ? {
+                  ...channel,
+                  permission_overwrites: [
+                    {
+                      id: overwrite[2]!,
+                      type: 0,
+                      allow: String(body['allow']),
+                      deny: String(body['deny']),
+                    },
+                  ],
+                }
+              : channel,
+          );
+        return {};
+      }) as REST['put'];
+      discord.rest.get = (async (route: string) => {
+        const ban = /\/bans\/(\d+)$/.exec(route)?.[1];
+        if (ban && banned.has(ban)) return { user: { id: ban } };
+        throw new DiscordAPIError(
+          { code: 10026, message: 'Unknown Ban' },
+          10026,
+          404,
+          'GET',
+          route,
+          {},
+        );
+      }) as REST['get'];
+      discord.rest.delete = (async (route: string) => {
+        const ban = /\/bans\/(\d+)$/.exec(route)?.[1];
+        if (ban) banned.delete(ban);
+        return {};
+      }) as REST['delete'];
+    });
+    async function moderate(input: Record<string, unknown>) {
+      const record = await db.record.create({
+        data: {
+          guildId,
+          kind: 'moderation_case',
+          key: crypto.randomUUID(),
+          ownerId: (input['targetId'] as string | undefined) ?? null,
+          state: 'pending',
+          data: json({
+            ...input,
+            confirm: true,
+            reason: 'Raid cleanup',
+            actorId: ownerId,
+            // Requested in the past so a 5-second action is already due.
+            requestedAt: new Date(Date.now() - 10_000).toISOString(),
+          }),
+        },
+      });
+      const work = await effect('safety.moderate', {
+        caseId: record.id,
+        caseRevision: record.revision,
+        actorId: ownerId,
+        input: { ...input, confirm: true, reason: 'Raid cleanup' },
+        source: {},
+      });
+      await processOutbox(db, discord, work.id);
+      expect(
+        (await db.outbox.findUniqueOrThrow({ where: { id: work.id } })).state,
+      ).toBe('applied');
+      return record;
+    }
+    const due = async (type: string) => {
+      const job = await db.outbox.findFirstOrThrow({
+        where: { guildId, type, state: { in: ['pending', 'retry'] } },
+        orderBy: { createdAt: 'desc' },
+      });
+      await processOutbox(db, discord, job.id);
+      return job;
+    };
+    const everyoneDeny = () =>
+      BigInt(
+        discord.channelsStore
+          .find((channel) => channel.id === channelId)!
+          .permission_overwrites.find((overwrite) => overwrite.id === guildId)
+          ?.deny ?? '0',
+      );
+    it('lifts an expired lock only after rechecking the same instance', async () => {
+      const lock = await moderate({
+        action: 'lock',
+        channelId,
+        durationSeconds: 5,
+      });
+      expect(everyoneDeny() & SEND).toBe(SEND);
+      const punishment = await db.record.findUniqueOrThrow({
+        where: {
+          guildId_kind_key: {
+            guildId,
+            kind: 'safety.punishment',
+            key: `lock:${channelId}`,
+          },
+        },
+      });
+      expect(punishment.state).toBe('active');
+      await due('safety.punishment.expire');
+      await due('safety.punishment.clear');
+      expect(everyoneDeny() & SEND).toBe(0n);
+      expect(
+        (await db.record.findUniqueOrThrow({ where: { id: punishment.id } }))
+          .state,
+      ).toBe('expired');
+      expect(
+        (await db.record.findUniqueOrThrow({ where: { id: lock.id } })).state,
+      ).toBe('expired');
+    });
+    it('a manual unlock replaces the timed lock so its timer changes nothing', async () => {
+      await moderate({ action: 'lock', channelId, durationSeconds: 5 });
+      await moderate({ action: 'unlock', channelId });
+      await moderate({ action: 'lock', channelId });
+      const writes = puts.length;
+      await due('safety.punishment.expire');
+      expect(
+        await db.outbox.count({
+          where: { guildId, type: 'safety.punishment.clear' },
+        }),
+      ).toBe(0);
+      expect(puts).toHaveLength(writes);
+      // The later permanent lock is still in place.
+      expect(everyoneDeny() & SEND).toBe(SEND);
+    });
+    it('records a ban already lifted in Discord as superseded without a second unban', async () => {
+      const target = '933456789012345699';
+      discord.members.set(target, []);
+      await moderate({ action: 'ban', targetId: target, durationSeconds: 5 });
+      expect(banned.has(target)).toBe(true);
+      banned.delete(target); // A moderator unbanned them directly in Discord.
+      await due('safety.punishment.expire');
+      await due('safety.punishment.clear');
+      expect(
+        (
+          await db.record.findUniqueOrThrow({
+            where: {
+              guildId_kind_key: {
+                guildId,
+                kind: 'safety.punishment',
+                key: `ban:${target}`,
+              },
+            },
+          })
+        ).state,
+      ).toBe('superseded');
+    });
+  });
 });

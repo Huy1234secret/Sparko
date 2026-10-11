@@ -1354,6 +1354,59 @@ export function canExpireTimeout(
     expected === observed
   );
 }
+export const PunishmentExpirySchema = z.object({
+  kind: z.enum(['ban', 'lock']),
+  /** Banned member ID or locked channel ID. */
+  subjectId: Snowflake,
+  caseId: z.string().uuid(),
+  instanceId: z.string().uuid(),
+  expiresAt: z.iso.datetime(),
+});
+/**
+ * A timed ban or lock ends only if the same applied instance is still the
+ * active punishment for its member or channel. A later ban, lock, unban or
+ * unlock replaces the instance, so an old timer cannot undo newer staff work.
+ */
+async function processPunishmentExpiry(ctx: DomainContext, payload: unknown) {
+  const input = PunishmentExpirySchema.parse(payload),
+    punishment = await ctx.tx.record.findUnique({
+      where: {
+        guildId_kind_key: {
+          guildId: ctx.guildId,
+          kind: 'safety.punishment',
+          key: `${input.kind}:${input.subjectId}`,
+        },
+      },
+    });
+  if (!punishment)
+    return { ignored: true, reason: 'Punishment instance is unavailable' };
+  const active = jsonObject(punishment.data);
+  if (
+    punishment.state !== 'active' ||
+    active['instanceId'] !== input.instanceId ||
+    active['activeCaseId'] !== input.caseId ||
+    active['expiresAt'] !== input.expiresAt
+  )
+    return {
+      ignored: true,
+      reason: 'A newer action replaced this punishment',
+    };
+  if (Date.parse(input.expiresAt) > ctx.now.getTime())
+    return { ignored: true, reason: 'Punishment is not due' };
+  await updateRecord(
+    ctx,
+    'safety.punishment',
+    punishment.id,
+    { ...active, expiryQueuedAt: ctx.now.toISOString() },
+    punishment.revision,
+    'expiring',
+  );
+  await ctx.effect('safety.punishment.clear', {
+    ...input,
+    punishmentId: punishment.id,
+  });
+  return { expiryQueued: true, caseId: input.caseId };
+}
 const TimeoutExpirySchema = z.object({
   caseId: z.string().uuid(),
   instanceId: z.string().uuid(),
@@ -1366,6 +1419,8 @@ export async function processSafetyDue(
   type: string,
   payload: unknown,
 ) {
+  if (type === 'safety.punishment.expire')
+    return processPunishmentExpiry(ctx, payload);
   if (type !== 'safety.timeout.expire')
     throw new DomainError('INVALID_INPUT', 'Unsupported safety timer.');
   const input = TimeoutExpirySchema.parse(payload),
