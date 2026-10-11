@@ -233,11 +233,17 @@ test('Studio applies compatible edits and replaces changed control meaning delib
       const state = await (
         await request.get('http://localhost:3001/__test/state')
       ).json();
-      return state.publications.filter(
-        (item: { state: string }) => item.state === 'applied',
-      ).length;
+      return {
+        total: state.publications.length,
+        applied: state.publications.filter(
+          (item: { state: string }) => item.state === 'applied',
+        ).length,
+        replaced: state.publications.filter(
+          (item: { state: string }) => item.state === 'replaced',
+        ).length,
+      };
     })
-    .toBe(1);
+    .toEqual({ total: 2, applied: 1, replaced: 1 });
   const state = await (
     await request.get('http://localhost:3001/__test/state')
   ).json();
