@@ -125,7 +125,7 @@ export async function createModerationCase(
       { lastNumber: number },
       { key: 'cases' },
     );
-  const local = ['warn', 'note'].includes(input.action);
+  const local = input.action === 'note';
   const record = await createRecord(
     ctx,
     'moderation_case',
@@ -1267,4 +1267,86 @@ async function actionBudget(
     );
   else await createRecord(ctx, 'safety_budget', { count: 1 }, { key });
   return true;
+}
+
+export function canExpireTimeout(
+  caseId: string,
+  activeCaseId: string,
+  appliedTimeoutUntil: string,
+  observedTimeoutUntil: string | null,
+) {
+  const expected = Date.parse(appliedTimeoutUntil),
+    observed = Date.parse(observedTimeoutUntil ?? '');
+  return (
+    caseId === activeCaseId &&
+    Number.isFinite(expected) &&
+    Number.isFinite(observed) &&
+    expected === observed
+  );
+}
+const TimeoutExpirySchema = z.object({
+  caseId: z.string().uuid(),
+  instanceId: z.string().uuid(),
+  userId: Snowflake,
+  appliedTimeoutUntil: z.iso.datetime(),
+});
+/** The worker additionally compares Discord's freshly fetched timeout timestamp immediately before clearing. */
+export async function processSafetyDue(
+  ctx: DomainContext,
+  type: string,
+  payload: unknown,
+) {
+  if (type !== 'safety.timeout.expire')
+    throw new DomainError('INVALID_INPUT', 'Unsupported safety timer.');
+  const input = TimeoutExpirySchema.parse(payload),
+    punishment = await ctx.tx.record.findUnique({
+      where: {
+        guildId_kind_key: {
+          guildId: ctx.guildId,
+          kind: 'safety.punishment',
+          key: `timeout:${input.userId}`,
+        },
+      },
+    });
+  if (!punishment)
+    return { ignored: true, reason: 'Punishment instance is unavailable' };
+  const active = jsonObject(punishment.data);
+  if (
+    punishment.state !== 'active' ||
+    active['instanceId'] !== input.instanceId ||
+    !canExpireTimeout(
+      input.caseId,
+      String(active['activeCaseId']),
+      input.appliedTimeoutUntil,
+      String(active['appliedTimeoutUntil']),
+    )
+  )
+    return {
+      ignored: true,
+      reason: 'A newer punishment replaced this instance',
+    };
+  const record = await getRecord(ctx, 'moderation_case', input.caseId),
+    data = jsonObject(record.data);
+  if (
+    record.ownerId !== input.userId ||
+    data['action'] !== 'timeout' ||
+    data['instanceId'] !== input.instanceId
+  )
+    return { ignored: true, reason: 'Case no longer matches this timeout' };
+  if (Date.parse(input.appliedTimeoutUntil) > ctx.now.getTime())
+    return { ignored: true, reason: 'Timeout is not due' };
+  await updateRecord(
+    ctx,
+    'safety.punishment',
+    punishment.id,
+    { ...active, expiryQueuedAt: ctx.now.toISOString() },
+    punishment.revision,
+    'expiring',
+  );
+  await ctx.effect('safety.timeout.clear', {
+    ...input,
+    actorId: data['actorId'],
+    punishmentId: punishment.id,
+  });
+  return { expiryQueued: true, caseId: input.caseId };
 }

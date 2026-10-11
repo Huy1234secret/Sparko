@@ -1,0 +1,15 @@
+import {readFile} from 'node:fs/promises';
+import {Client} from 'pg';
+import {createDatabase} from '@sparko/db';
+import {communityRoutes,communityConfigSchemas,safetyRoutes,safetyConfigSchemas,automationRoutes,automationConfigSchemas} from '@sparko/domain';
+import {createApp} from '../src/app.js';
+import {fakeDiscord,testConfig,GUILD_A} from './fixtures.js';
+import {FakeRest} from './fake-rest.js';
+import {processOutbox} from '../../worker/src/runner.js';
+import {testDatabaseUrl} from '../../../tools/test-targets.js';
+const target=testDatabaseUrl();if(!new URL(target).pathname.endsWith('_browser_test'))throw new Error('Browser tests require a separate *_browser_test database.');
+const pg=new Client({connectionString:target});await pg.connect();await pg.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public');await pg.query(await readFile(new URL('../../../packages/db/prisma/migrations/202610110001_initial/migration.sql',import.meta.url),'utf8'));await pg.end();
+const db=createDatabase(target),rest=new FakeRest(),config=testConfig(target);await db.guild.create({data:{id:GUILD_A,name:'Test community',installed:true}});await db.heartbeat.create({data:{service:'bot',version:'test',status:'connected',details:{observationId:'test-observer',intents:['content']}}});
+const app=await createApp({db,config,discord:fakeDiscord(),routes:[...communityRoutes,...safetyRoutes,...automationRoutes],configSchemas:{...communityConfigSchemas,...safetyConfigSchemas,...automationConfigSchemas}});await app.listen({port:3001,host:'127.0.0.1'});
+let busy=false;const timer=setInterval(async()=>{if(busy)return;busy=true;try{await db.heartbeat.update({where:{service:'bot'},data:{status:'connected'}});for(const job of await db.outbox.findMany({where:{state:{in:['pending','retry']},dueAt:{lte:new Date()}},take:20}))await processOutbox(db,rest,job.id);}catch(error){app.log.error(error);}finally{busy=false;}},250);
+for(const signal of ['SIGINT','SIGTERM'] as const)process.on(signal,()=>{clearInterval(timer);void app.close().then(()=>db.$disconnect()).then(()=>process.exit(0));});

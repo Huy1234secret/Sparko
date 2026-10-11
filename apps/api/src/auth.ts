@@ -1,5 +1,5 @@
 import {randomBytes,createHash,createCipheriv,createDecipheriv,timingSafeEqual} from 'node:crypto';
-import type {FastifyInstance,FastifyRequest,FastifyReply} from 'fastify';
+import type {FastifyInstance,FastifyRequest} from 'fastify';
 import {z} from 'zod';
 import {DomainError,PreferenceSchema,type Actor} from '@sparko/contracts';
 import type {PrismaClient} from '@sparko/db';

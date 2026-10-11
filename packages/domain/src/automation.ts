@@ -20,7 +20,6 @@ import {
   ScheduleSchema,
   ReplySchema,
   StickySchema,
-  WorkflowStepSchema,
   WorkflowSchema,
   CustomCommandSchema,
   automationConfigSchemas,
@@ -1901,6 +1900,7 @@ export async function guardAutomationEffect(
     return { deliver: false, reason: 'Role assignment already expired' };
   if (
     record.kind === 'voice_room' &&
+    typeof p['channelId'] === 'string' &&
     p['channelId'] !== jsonObject(record.data)['channelId']
   )
     throw new DomainError(

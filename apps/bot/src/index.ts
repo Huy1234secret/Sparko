@@ -49,7 +49,7 @@ client.on(Events.MessageDelete, (message) => {
 
 client.on(Events.GuildMemberAdd, (member) => {
   const now = new Date().toISOString(); const event = { kind: 'memberJoin', eventId: `join:${member.id}:${member.joinedTimestamp ?? now}`, occurredAt: now, ...memberFields(member) };
-  void observed(member.guild.id, event.eventId, event, async (ctx) => { await ingestCommunityEvent(ctx, event); await ingestSafetyEvent(ctx, { type: 'join', id: event.eventId, userId: member.id, roleIds: event.roleIds, joinedAt: member.joinedAt?.toISOString() ?? now, accountCreatedAt: member.user.createdAt.toISOString() }); await ingestAutomationEvent(ctx, { type: 'join', id: event.eventId, userId: member.id, roleIds: event.roleIds, bot: member.user.bot });
+  void observed(member.guild.id, event.eventId, event, async (ctx) => { await ingestCommunityEvent(ctx, event); await ingestSafetyEvent(ctx, { type: 'join', id: event.eventId, userId: member.id, roleIds: event.roleIds, joinedAt: member.joinedAt?.toISOString() ?? now, accountCreatedAt: member.user.createdAt.toISOString() }); await ingestAutomationEvent(ctx, { type: 'join', id: event.eventId, userId: member.id, roleIds: event.roleIds, bot: member.user.bot, joinedAt: member.joinedAt?.toISOString() ?? now, accountCreatedAt: member.user.createdAt.toISOString() });
     // Without complete serialized invite snapshots, attribution stays explicitly unknown.
     await ingestAutomationEvent(ctx, { type: 'invite_join', id: event.eventId, userId: member.id, joinedAt: member.joinedAt?.toISOString() ?? now, accountCreatedAt: member.user.createdAt.toISOString(), before: [], after: [], canReadInvites: false, simultaneousJoins: 1, vanityChanged: false, snapshotComplete: false });
   });

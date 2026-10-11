@@ -21,3 +21,5 @@ export const MusicQueueSchema = z.object({ assetId: z.string().min(1).max(128), 
 export const ExternalEventSchema = z.object({ eventId: z.string().regex(/^[A-Za-z0-9:_-]{1,128}$/), eventType: z.enum(['announcement', 'release', 'deployment']), timestamp: z.iso.datetime(), title: z.string().min(1).max(200), text: z.string().max(2000), url: z.url().max(2000).optional() }).strict();
 export const WebhookCreateSchema = z.object({ name: z.string().min(1).max(80), channelId: Snowflake, allowedEvents: z.array(z.enum(['announcement', 'release', 'deployment'])).min(1).max(3) });
 export const MultiServerPlanSchema = z.object({ sourceGuildId: Snowflake, targetGuildIds: z.array(Snowflake).min(1).max(20), featureIds: z.array(z.string().regex(/^R[0-9]{2}$/)).min(1).max(70) }).refine(v => new Set(v.targetGuildIds).size === v.targetGuildIds.length, 'Target servers must be unique');
+
+export const WebhookProvisionSchema = WebhookCreateSchema.extend({ signingSecret: z.string().min(32).max(128) });

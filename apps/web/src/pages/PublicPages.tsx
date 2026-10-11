@@ -232,7 +232,9 @@ function FeatureCard({
         <Link to={`/features/${guide.slug}`}>{guide.title}</Link>
       </h3>
       <p>{guide.summary}</p>
-      {feature && <p className="field-hint">Access: {humanize(feature.availability)}</p>}
+      {feature && (
+        <p className="field-hint">Access: {humanize(feature.availability)}</p>
+      )}
       <div className="feature-card-bottom">
         <FeatureAvailability feature={feature} loading={loading} />
         <Link

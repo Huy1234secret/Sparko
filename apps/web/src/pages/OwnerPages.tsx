@@ -2,14 +2,240 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Activity, ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react';
-import { Badge, Button, Card, EmptyState, ErrorState, Input, LoadingState, PageHeading } from '@sparko/ui';
-import { getOwnerHealth, getOwnerFleet, getOwnerJobs, getOwnerSupport, retryOwnerJob } from '../services/account';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Input,
+  LoadingState,
+  PageHeading,
+} from '@sparko/ui';
+import {
+  getOwnerHealth,
+  getOwnerFleet,
+  getOwnerJobs,
+  getOwnerSupport,
+  retryOwnerJob,
+} from '../services/account';
 import { errorMessage } from '../services/http';
 import { Metric, useSession } from '../components/AppShell';
 import { useActionIdentity } from '../hooks/useActionIdentity';
 
-export function OwnerPage({ section = 'health' }: { section?: 'health' | 'fleet' | 'jobs' | 'support' }) {
-  const session = useSession(); const canRead = session.data?.capabilities.some((capability) => ['fleet.read','diagnostics.read','support.read'].includes(capability)); const [search, setSearch] = useState(''); const queryClient = useQueryClient(); const identity = useActionIdentity(); const health = useQuery({ queryKey: ['owner-health'], queryFn: ({ signal }) => getOwnerHealth(signal), enabled: !!canRead, refetchInterval: 15000 }); const records = useQuery({ queryKey: ['owner', section], queryFn: ({ signal }) => section === 'fleet' ? getOwnerFleet(signal) : section === 'jobs' ? getOwnerJobs(signal) : getOwnerSupport(signal), enabled: !!canRead && section !== 'health', retry: false }); const retry = useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => retryOwnerJob(id, reason, identity('job-retry', { id, reason })), onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['owner', 'jobs'] }) });
-  if (!canRead) return <ErrorState message="This workspace requires an explicit global operator capability." />;
-  return <><PageHeading eyebrow="Global operations" title="Keep the whole fleet in view." description="Real service observations and narrowly scoped recovery tools. Global access is separate from server administration." actions={<Button variant="secondary" onClick={() => { void health.refetch(); void records.refetch(); }}><RefreshCw size={15} />Refresh observations</Button>} /><nav className="tabs owner-tabs" aria-label="Owner sections">{(['health','fleet','jobs','support'] as const).map((item) => <Link key={item} to={`/owner/${item}`} className={item === section ? 'active' : ''}>{item[0]?.toUpperCase()}{item.slice(1)}</Link>)}</nav>{section === 'health' ? health.isPending ? <LoadingState label="Fetching operator observations…" /> : health.error ? <ErrorState message={errorMessage(health.error)} retry={() => void health.refetch()} /> : health.data && <><div className="row status-line"><Badge>Build {health.data.build}</Badge><span className="muted">Checked {new Date(health.data.checkedAt).toLocaleString()}</span></div><div className="metric-grid">{health.data.metrics.map((metric) => <Metric key={metric.label} label={metric.label} value={metric.value === null ? '—' : `${metric.value} ${metric.unit}`} detail={metric.window} />)}</div><Card><div className="section-heading"><h2>Service health</h2><Activity size={18} /></div>{health.data.services.map((service) => <div className="status-row" key={service.name}><div><strong>{service.name}</strong>{service.detail && <p>{service.detail}</p>}<small className="muted">{service.lastSeenAt ? `Last observed ${new Date(service.lastSeenAt).toLocaleString()}` : 'No heartbeat observed'}</small></div><Badge tone={service.status === 'online' || service.status === 'healthy' ? 'success' : 'warning'}>{service.status}</Badge></div>)}</Card><div className="alert"><ShieldCheck size={20} /><p>Metrics reflect observed state and collection windows. Provider connectivity and successful delivery need their own verification.</p></div></> : <><Input aria-label={`Search ${section}`} placeholder={`Search ${section}…`} value={search} onChange={(e) => setSearch(e.target.value)} />{records.isPending ? <LoadingState /> : records.error ? <ErrorState message={errorMessage(records.error)} retry={() => void records.refetch()} /> : records.data?.length ? <Card>{records.data.filter((record) => JSON.stringify(record).toLowerCase().includes(search.toLowerCase())).map((record) => <details className="diff-row" key={record.id}><summary>{typeof record['name'] === 'string' ? record['name'] : typeof record['subject'] === 'string' ? record['subject'] : typeof record['type'] === 'string' ? record['type'] : record.id}<Badge>{typeof record['state'] === 'string' ? record['state'] : record.status ?? 'Observed'}</Badge></summary><pre>{JSON.stringify(record, null, 2)}</pre>{section === 'jobs' && session.data?.capabilities.includes('maintenance.manage') && <Button variant="secondary" busy={retry.isPending} onClick={() => { const reason = window.prompt('Explain the recovery reason. This action is audited.'); if (reason?.trim()) retry.mutate({ id: record.id, reason }); }}>Request safe retry <ArrowRight size={15} /></Button>}</details>)}{retry.error && <ErrorState message={errorMessage(retry.error)} />}</Card> : <EmptyState title={`No ${section} records`} description="Only observed and persisted records are shown in the owner workspace." />}</>}</>;
+export function OwnerPage({
+  section = 'health',
+}: {
+  section?: 'health' | 'fleet' | 'jobs' | 'support';
+}) {
+  const session = useSession();
+  const canRead = session.data?.capabilities.some((capability) =>
+    ['fleet.read', 'diagnostics.read', 'support.read'].includes(capability),
+  );
+  const [search, setSearch] = useState('');
+  const queryClient = useQueryClient();
+  const identity = useActionIdentity();
+  const health = useQuery({
+    queryKey: ['owner-health'],
+    queryFn: ({ signal }) => getOwnerHealth(signal),
+    enabled: !!canRead,
+    refetchInterval: 15000,
+  });
+  const records = useQuery({
+    queryKey: ['owner', section],
+    queryFn: ({ signal }) =>
+      section === 'fleet'
+        ? getOwnerFleet(signal)
+        : section === 'jobs'
+          ? getOwnerJobs(signal)
+          : getOwnerSupport(signal),
+    enabled: !!canRead && section !== 'health',
+    retry: false,
+  });
+  const retry = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      retryOwnerJob(id, reason, identity('job-retry', { id, reason })),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['owner', 'jobs'] }),
+  });
+  if (!canRead)
+    return (
+      <ErrorState message="This workspace requires an explicit global operator capability." />
+    );
+  return (
+    <>
+      <PageHeading
+        eyebrow="Global operations"
+        title="Keep the whole fleet in view."
+        description="Real service observations and narrowly scoped recovery tools. Global access is separate from server administration."
+        actions={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void health.refetch();
+              void records.refetch();
+            }}
+          >
+            <RefreshCw size={15} />
+            Refresh observations
+          </Button>
+        }
+      />
+      <nav className="tabs owner-tabs" aria-label="Owner sections">
+        {(['health', 'fleet', 'jobs', 'support'] as const).map((item) => (
+          <Link
+            key={item}
+            to={`/owner/${item}`}
+            className={item === section ? 'active' : ''}
+          >
+            {item[0]?.toUpperCase()}
+            {item.slice(1)}
+          </Link>
+        ))}
+      </nav>
+      {section === 'health' ? (
+        health.isPending ? (
+          <LoadingState label="Fetching operator observations…" />
+        ) : health.error ? (
+          <ErrorState
+            message={errorMessage(health.error)}
+            retry={() => void health.refetch()}
+          />
+        ) : (
+          health.data && (
+            <>
+              <div className="row status-line">
+                <Badge>Build {health.data.build}</Badge>
+                <span className="muted">
+                  Checked {new Date(health.data.checkedAt).toLocaleString()}
+                </span>
+              </div>
+              <div className="metric-grid">
+                {health.data.metrics.map((metric) => (
+                  <Metric
+                    key={metric.label}
+                    label={metric.label}
+                    value={
+                      metric.value === null
+                        ? '—'
+                        : `${metric.value} ${metric.unit}`
+                    }
+                    detail={metric.window}
+                  />
+                ))}
+              </div>
+              <Card>
+                <div className="section-heading">
+                  <h2>Service health</h2>
+                  <Activity size={18} />
+                </div>
+                {health.data.services.map((service) => (
+                  <div className="status-row" key={service.name}>
+                    <div>
+                      <strong>{service.name}</strong>
+                      {service.detail && <p>{service.detail}</p>}
+                      <small className="muted">
+                        {service.lastSeenAt
+                          ? `Last observed ${new Date(service.lastSeenAt).toLocaleString()}`
+                          : 'No heartbeat observed'}
+                      </small>
+                    </div>
+                    <Badge
+                      tone={
+                        service.status === 'online' ||
+                        service.status === 'healthy'
+                          ? 'success'
+                          : 'warning'
+                      }
+                    >
+                      {service.status}
+                    </Badge>
+                  </div>
+                ))}
+              </Card>
+              <div className="alert">
+                <ShieldCheck size={20} />
+                <p>
+                  Metrics reflect observed state and collection windows.
+                  Provider connectivity and successful delivery need their own
+                  verification.
+                </p>
+              </div>
+            </>
+          )
+        )
+      ) : (
+        <>
+          <Input
+            aria-label={`Search ${section}`}
+            placeholder={`Search ${section}…`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {records.isPending ? (
+            <LoadingState />
+          ) : records.error ? (
+            <ErrorState
+              message={errorMessage(records.error)}
+              retry={() => void records.refetch()}
+            />
+          ) : records.data?.length ? (
+            <Card>
+              {records.data
+                .filter((record) =>
+                  JSON.stringify(record)
+                    .toLowerCase()
+                    .includes(search.toLowerCase()),
+                )
+                .map((record) => (
+                  <details className="diff-row" key={record.id}>
+                    <summary>
+                      {typeof record['name'] === 'string'
+                        ? record['name']
+                        : typeof record['subject'] === 'string'
+                          ? record['subject']
+                          : typeof record['type'] === 'string'
+                            ? record['type']
+                            : record.id}
+                      <Badge>
+                        {typeof record['state'] === 'string'
+                          ? record['state']
+                          : (record.status ?? 'Observed')}
+                      </Badge>
+                    </summary>
+                    <pre>{JSON.stringify(record, null, 2)}</pre>
+                    {section === 'jobs' &&
+                      session.data?.capabilities.includes(
+                        'maintenance.manage',
+                      ) && (
+                        <Button
+                          variant="secondary"
+                          busy={retry.isPending}
+                          onClick={() => {
+                            const reason = window.prompt(
+                              'Explain the recovery reason. This action is audited.',
+                            );
+                            if (reason?.trim())
+                              retry.mutate({ id: record.id, reason });
+                          }}
+                        >
+                          Request safe retry <ArrowRight size={15} />
+                        </Button>
+                      )}
+                  </details>
+                ))}
+              {retry.error && (
+                <ErrorState message={errorMessage(retry.error)} />
+              )}
+            </Card>
+          ) : (
+            <EmptyState
+              title={`No ${section} records`}
+              description="Only observed and persisted records are shown in the owner workspace."
+            />
+          )}
+        </>
+      )}
+    </>
+  );
 }

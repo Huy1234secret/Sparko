@@ -2,8 +2,10 @@ import { DiscordAPIError, HTTPError } from 'discord.js';
 import { DomainError } from '@sparko/contracts';
 
 export type FailureDecision = { state: 'blocked' | 'unknown' | 'retry' | 'dead'; retryAt?: Date; message: string };
+export class DeliveryUncertainError extends Error {}
 export function classifyDeliveryFailure(error: unknown, attempt: number, createsResource: boolean, now = new Date()): FailureDecision {
   const message = error instanceof Error ? error.message.slice(0, 500) : 'The external delivery failed.';
+  if (error instanceof DeliveryUncertainError) return { state: 'unknown', message };
   if (error instanceof DomainError) return { state: ['MISSING_PERMISSION', 'FORBIDDEN', 'INVALID_INPUT', 'FEATURE_DISABLED', 'NOT_FOUND'].includes(error.code) ? 'blocked' : 'retry', message, ...(error.code === 'SERVICE_UNAVAILABLE' ? { retryAt: new Date(now.getTime() + 30_000) } : {}) };
   if (error instanceof DiscordAPIError && [50001, 50013, 10003, 10008, 10011, 10007, 50007].includes(Number(error.code))) return { state: 'blocked', message: 'Discord denied the action or its target is unavailable. Check permissions and resources.' };
   if (error instanceof DiscordAPIError && error.status < 500 && error.status !== 429) return { state: 'blocked', message: 'Discord rejected this payload. Review the saved design or resource settings.' };

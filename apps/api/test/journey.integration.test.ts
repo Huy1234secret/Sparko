@@ -1,7 +1,7 @@
 import {beforeAll,afterAll,describe,it,expect} from 'vitest';
-import {createDatabase,json} from '@sparko/db';
+import {createDatabase} from '@sparko/db';
 import {Platform,openTicket,claimTicket} from '@sparko/domain';
-import {TicketConfigSchema,type Actor} from '@sparko/contracts';
+import {type Actor} from '@sparko/contracts';
 import {defaultTicketDocument} from '@sparko/messages';
 import {createApp} from '../src/app.js';
 import {digest,encrypt} from '../src/auth.js';
