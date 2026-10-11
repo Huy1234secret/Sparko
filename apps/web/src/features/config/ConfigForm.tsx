@@ -19,7 +19,7 @@ export function ConfigForm({
   children: ReactNode;
   enableLabel?: string;
 }) {
-  const { query, form, save, submit, conflict, unmatched, reload, dirty } =
+  const { query, save, submit, conflict, unmatched, reload, dirty } =
     controller;
   if (query.isPending) return <LoadingState label="Loading settings…" />;
   if (query.error)
@@ -32,7 +32,14 @@ export function ConfigForm({
   const data = query.data;
   const applied = data.revision === data.appliedRevision;
   return (
-    <form className="stack" onSubmit={(event) => void submit(event)} noValidate>
+    <form
+      className="stack"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+      noValidate
+    >
       <DraftGuard dirty={dirty} />
       <Card>
         <div className="section-heading">
@@ -69,7 +76,7 @@ export function ConfigForm({
             <strong>{enableLabel}</strong>
             <small>Modules stay off until you turn them on and save.</small>
           </span>
-          <input type="checkbox" role="switch" {...form.register('enabled')} />
+          <input type="checkbox" role="switch" {...controller.enabledField} />
         </label>
       </Card>
       {children}
@@ -110,7 +117,7 @@ export function ConfigForm({
           )}
         </>
       ) : null}
-      {save.isSuccess && !dirty && (
+      {save.isSuccess && save.data && !dirty && (
         <p className="save-feedback" role="status">
           <CheckCircle2 size={17} />
           {save.data.data.revision === save.data.data.appliedRevision

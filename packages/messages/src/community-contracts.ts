@@ -39,7 +39,10 @@ export const LevelConfigSchema = z
     announcementChannelId: Snowflake.optional(),
     announcement: Document,
   })
-  .refine((v) => v.maxXp >= v.minXp, 'Maximum XP must be at least minimum XP');
+  .refine((v) => v.maxXp >= v.minXp, {
+    message: 'Maximum XP must be at least minimum XP',
+    path: ['maxXp'],
+  });
 const RewardRoleSchema = z.object({
   level: z.number().int().min(1).max(1000),
   roleId: Snowflake,
@@ -69,7 +72,10 @@ export const CrateConfigSchema = z
             maxXp: XpAmount,
             document: Document,
           })
-          .refine((v) => v.maxXp >= v.minXp, 'Invalid crate XP range'),
+          .refine((v) => v.maxXp >= v.minXp, {
+            message: 'Maximum XP must be at least minimum XP',
+            path: ['maxXp'],
+          }),
       )
       .min(1)
       .max(30)

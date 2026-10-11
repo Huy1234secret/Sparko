@@ -57,8 +57,8 @@ const ModuleIndex = lazy(() =>
   })),
 );
 const Module = lazy(() =>
-  import('./pages/ModulePages').then((module) => ({
-    default: module.ModulePage,
+  import('./pages/community').then((module) => ({
+    default: module.ModuleRouter,
   })),
 );
 const Analytics = lazy(() =>

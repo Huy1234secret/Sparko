@@ -2291,13 +2291,52 @@ export const communityRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/levels',
     capability: 'community.manage',
-    handler: async (ctx) => ({
-      profiles: await ctx.tx.record.findMany({
-        where: { guildId: ctx.guildId, kind: 'level.profile' },
-        orderBy: { updatedAt: 'desc' },
-        take: 100,
-      }),
-    }),
+    handler: async (ctx) => {
+      const cfg = await config(ctx, 'R09', LevelConfigSchema),
+        rows = await ctx.tx.record.findMany({
+          where: { guildId: ctx.guildId, kind: 'level.profile' },
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
+        });
+      return {
+        profiles: rows.map((row) => {
+          const profile = ProfileSchema.parse(row.data);
+          return {
+            userId: row.ownerId ?? row.key,
+            xp: profile.xp,
+            level: levelFromXp(
+              profile.xp,
+              cfg.baseXp,
+              cfg.growthXp,
+              cfg.maxLevel,
+            ),
+            publicProfile: profile.publicProfile,
+            lastMessageAt: profile.lastMessageAt ?? null,
+            updatedAt: row.updatedAt.toISOString(),
+          };
+        }),
+      };
+    },
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/levels/members/:userId',
+    capability: 'community.manage',
+    handler: async (ctx, _input, params) => {
+      const userId = Snowflake.parse(params['userId']);
+      return {
+        profile: await getLevelProfile(ctx, userId),
+        history: await ctx.tx.record.findMany({
+          where: {
+            guildId: ctx.guildId,
+            kind: 'level.history',
+            ownerId: userId,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        }),
+      };
+    },
   },
   {
     method: 'GET',
@@ -2435,6 +2474,23 @@ export const communityRoutes: DomainRoute[] = [
   },
   {
     method: 'GET',
+    path: '/guilds/:guildId/crates/history',
+    capability: 'community.manage',
+    handler: async (ctx) => ({
+      drops: await ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'crate.drop' },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      claims: await ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'crate.claim' },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+    }),
+  },
+  {
+    method: 'GET',
     path: '/guilds/:guildId/crates/schedules',
     capability: 'community.manage',
     handler: async (ctx) =>
@@ -2558,6 +2614,28 @@ export const communityRoutes: DomainRoute[] = [
   },
   {
     method: 'GET',
+    path: '/guilds/:guildId/counting/resets',
+    capability: 'community.manage',
+    handler: async (ctx) =>
+      ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'counting.reset' },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/role-menus/manage',
+    capability: 'community.manage',
+    handler: async (ctx) =>
+      ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'role.menu' },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+  },
+  {
+    method: 'GET',
     path: '/guilds/:guildId/role-menus',
     capability: 'member',
     handler: async (ctx) =>
@@ -2645,6 +2723,30 @@ export const communityRoutes: DomainRoute[] = [
         new Date(rules.endsAt),
       );
       return row;
+    },
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/giveaways/:id',
+    capability: 'community.manage',
+    handler: async (ctx, _input, params) => {
+      const giveaway = await getRecord(ctx, 'giveaway', Id.parse(params['id']));
+      const related = (kind: string) =>
+        ctx.tx.record.findMany({
+          where: {
+            guildId: ctx.guildId,
+            kind,
+            data: { path: ['giveawayId'], equals: giveaway.id },
+          },
+          orderBy: { createdAt: 'asc' },
+          take: 1000,
+        });
+      const [entries, draws, winners] = await Promise.all([
+        related('giveaway.entry'),
+        related('giveaway.draw'),
+        related('giveaway.winner'),
+      ]);
+      return { giveaway, entries, draws, winners };
     },
   },
   {

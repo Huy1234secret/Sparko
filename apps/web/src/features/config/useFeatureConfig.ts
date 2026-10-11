@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useForm, type FieldValues } from 'react-hook-form';
+import {
+  useForm,
+  type FieldValues,
+  type Path,
+  type UseFormRegisterReturn,
+} from 'react-hook-form';
+import type { UseQueryResult } from '@tanstack/react-query';
+import type { FeatureConfig } from '../../services/guilds';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { getConfig, saveConfig } from '../../services/guilds';
@@ -38,7 +45,6 @@ export function useFeatureConfig<
   const dirty = form.formState.isDirty;
   useEffect(() => {
     if (query.data && !dirty) form.reset(defaults(query.data.config) as never);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query.data, dirty]);
   const save = useMutation({
     mutationFn: (config: Output) => {
@@ -69,6 +75,31 @@ export function useFeatureConfig<
     save.reset();
     void query.refetch();
   };
-  return { query, form, save, submit, conflict, unmatched, reload, dirty };
+  const shell: FeatureConfigController = {
+    query,
+    save,
+    submit: () => submit(),
+    conflict,
+    unmatched,
+    reload,
+    dirty,
+    enabledField: form.register('enabled' as Path<Input>),
+  };
+  return { ...shell, form, shell };
 }
-export type FeatureConfigController = ReturnType<typeof useFeatureConfig>;
+/** The schema-independent part a page shell needs. */
+export type FeatureConfigController = {
+  query: UseQueryResult<FeatureConfig>;
+  save: {
+    error: unknown;
+    isPending: boolean;
+    isSuccess: boolean;
+    data?: { data: FeatureConfig } | undefined;
+  };
+  submit: () => Promise<void>;
+  conflict: boolean;
+  unmatched: ApiFieldError[];
+  reload: () => void;
+  dirty: boolean;
+  enabledField: UseFormRegisterReturn;
+};

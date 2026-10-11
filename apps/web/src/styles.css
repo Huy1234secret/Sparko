@@ -2734,3 +2734,33 @@ td {
     max-height: 200px;
   }
 }
+.module-tabs {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.module-tabs button {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.repeat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+.curve-table td,
+.curve-table th {
+  padding: 6px 10px;
+  text-align: left;
+}
+.status-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 600px) {
+  .repeat-row {
+    grid-template-columns: 1fr;
+  }
+}
