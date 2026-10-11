@@ -78,68 +78,80 @@ export const SafetyRuleSchema = z
     (v) => v.kind !== 'keywords' || v.keywords.length > 0,
     'Keyword rules need at least one literal keyword',
   );
-export const safetyConfigSchemas: Record<string, z.ZodType> = {
-  R18: z.object({
+export const VerificationConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  roleId: Snowflake,
+  rulesVersion: z.number().int().min(1),
+  rulesText: z.string().min(1).max(4000),
+  minimumAccountAgeDays: z.number().int().min(0).max(3650).default(0),
+  minimumMemberAgeMinutes: z.number().int().min(0).max(43200).default(0),
+  challenge: z.enum(['acknowledge', 'arithmetic']).default('acknowledge'),
+});
+export const FormsConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+});
+export const ModerationConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  notificationDm: z.boolean().default(true),
+});
+export const AutomodConfigSchema = z
+  .object({
     enabled: z.boolean().default(false),
-    roleId: Snowflake,
-    rulesVersion: z.number().int().min(1),
-    rulesText: z.string().min(1).max(4000),
-    minimumAccountAgeDays: z.number().int().min(0).max(3650).default(0),
-    minimumMemberAgeMinutes: z.number().int().min(0).max(43200).default(0),
-    challenge: z.enum(['acknowledge', 'arithmetic']).default('acknowledge'),
-  }),
-  R25: z.object({ enabled: z.boolean().default(false) }),
-  R26: z.object({
-    enabled: z.boolean().default(false),
-    notificationDm: z.boolean().default(true),
-  }),
-  R27: z
-    .object({
-      enabled: z.boolean().default(false),
-      mode: z.enum(['observe', 'enforce']).default('observe'),
-      alertChannelId: Snowflake.optional(),
-      quarantineRoleId: Snowflake.optional(),
-      rules: z.array(SafetyRuleSchema).max(30).default([]),
-      maximumActionsPerMinute: z.number().int().min(1).max(30).default(5),
-    })
-    .refine(
-      (v) => new Set(v.rules.map((r) => r.id)).size === v.rules.length,
-      'Rule IDs must be unique',
-    )
-    .refine(
-      (v) =>
-        v.mode !== 'enforce' ||
-        !v.rules.some((r) => r.action === 'quarantine') ||
-        Boolean(v.quarantineRoleId),
-      'Enforced quarantine rules need a restricted role',
-    ),
-  R28: z
-    .object({
-      enabled: z.boolean().default(false),
-      mode: z.enum(['observe', 'quarantine']).default('observe'),
-      alertChannelId: Snowflake.optional(),
-      joinThreshold: z.number().int().min(2).max(100).default(10),
-      windowSeconds: z.number().int().min(5).max(300).default(30),
-      quarantineRoleId: Snowflake.optional(),
-      trustedRoleIds: ids,
-      maximumActionsPerMinute: z.number().int().min(1).max(30).default(5),
-    })
-    .refine(
-      (v) => v.mode !== 'quarantine' || Boolean(v.quarantineRoleId),
-      'Quarantine mode requires a restricted quarantine role',
-    ),
-  R29: z.object({
-    enabled: z.boolean().default(false),
-    mode: z.enum(['observe', 'alert']).default('observe'),
+    mode: z.enum(['observe', 'enforce']).default('observe'),
     alertChannelId: Snowflake.optional(),
-    threshold: z.number().int().min(1).max(50).default(3),
-    windowSeconds: z.number().int().min(5).max(300).default(30),
-    trustedMemberIds: ids,
-  }),
-  R30: z.object({
+    quarantineRoleId: Snowflake.optional(),
+    rules: z.array(SafetyRuleSchema).max(30).default([]),
+    maximumActionsPerMinute: z.number().int().min(1).max(30).default(5),
+  })
+  .refine((v) => new Set(v.rules.map((r) => r.id)).size === v.rules.length, {
+    message: 'Rule IDs must be unique',
+    path: ['rules'],
+  })
+  .refine(
+    (v) =>
+      v.mode !== 'enforce' ||
+      !v.rules.some((r) => r.action === 'quarantine') ||
+      Boolean(v.quarantineRoleId),
+    {
+      message: 'Enforced quarantine rules need a restricted role',
+      path: ['quarantineRoleId'],
+    },
+  );
+export const RaidGuardConfigSchema = z
+  .object({
     enabled: z.boolean().default(false),
-    maxOpenPerMember: z.number().int().min(1).max(10).default(3),
-  }),
+    mode: z.enum(['observe', 'quarantine']).default('observe'),
+    alertChannelId: Snowflake.optional(),
+    joinThreshold: z.number().int().min(2).max(100).default(10),
+    windowSeconds: z.number().int().min(5).max(300).default(30),
+    quarantineRoleId: Snowflake.optional(),
+    trustedRoleIds: ids,
+    maximumActionsPerMinute: z.number().int().min(1).max(30).default(5),
+  })
+  .refine((v) => v.mode !== 'quarantine' || Boolean(v.quarantineRoleId), {
+    message: 'Quarantine mode requires a restricted quarantine role',
+    path: ['quarantineRoleId'],
+  });
+export const AntiNukeConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  mode: z.enum(['observe', 'alert']).default('observe'),
+  alertChannelId: Snowflake.optional(),
+  threshold: z.number().int().min(1).max(50).default(3),
+  windowSeconds: z.number().int().min(5).max(300).default(30),
+  trustedMemberIds: ids,
+});
+export const ReportsConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  maxOpenPerMember: z.number().int().min(1).max(10).default(3),
+});
+export const safetyConfigSchemas: Record<string, z.ZodType> = {
+  R18: VerificationConfigSchema,
+  R25: FormsConfigSchema,
+  R26: ModerationConfigSchema,
+  R27: AutomodConfigSchema,
+  R28: RaidGuardConfigSchema,
+  R29: AntiNukeConfigSchema,
+  R30: ReportsConfigSchema,
 };
 export const FormCreateSchema = z.object({ form: FormSchema });
 export const FormUpdateSchema = z.object({

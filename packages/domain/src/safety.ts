@@ -477,9 +477,37 @@ export const safetyRoutes: DomainRoute[] = [
       return updated;
     },
   ),
-  formRoute('GET', '/cases', 'moderation.read', undefined, (ctx) =>
-    list(ctx, 'moderation_case', true),
-  ),
+  formRoute('GET', '/cases', 'moderation.read', undefined, async (ctx) => {
+    const cases = await list(ctx, 'moderation_case', true);
+    // Show what Discord actually did: a pending case may be blocked or failed.
+    const jobs = await ctx.tx.outbox.findMany({
+      where: {
+        guildId: ctx.guildId,
+        type: 'safety.moderate',
+        OR: cases
+          .filter((row) => row.state === 'pending')
+          .map((row) => ({ payload: { path: ['caseId'], equals: row.id } })),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    return cases.map((row) => {
+      const job =
+        row.state === 'pending'
+          ? jobs.find((item) => jsonObject(item.payload)['caseId'] === row.id)
+          : undefined;
+      return {
+        ...row,
+        deliveryStatus:
+          row.state !== 'pending'
+            ? 'applied'
+            : job?.state === 'dead'
+              ? 'failed'
+              : (job?.state ?? 'pending'),
+        deliveryError: job?.lastError ?? null,
+      };
+    });
+  }),
   formRoute(
     'POST',
     '/cases',
