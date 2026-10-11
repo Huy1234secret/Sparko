@@ -2764,3 +2764,23 @@ td {
     grid-template-columns: 1fr;
   }
 }
+.progress {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--subtle);
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  border-radius: inherit;
+}
+.rank-card {
+  margin: 0;
+}
+.rank-card img {
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}

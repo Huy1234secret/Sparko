@@ -51,32 +51,6 @@ export const getSessions = (signal?: AbortSignal) =>
   );
 export const revokeSession = (id: string, key: string) =>
   mutate('post', `/account/sessions/${id}/revoke`, {}, z.unknown(), key);
-export const MemberSchema = z.object({
-  userId: z.string(),
-  guildId: z.string(),
-  xp: z.string(),
-  level: z.number(),
-  balance: z.string().optional(),
-  rank: z.number().nullable(),
-  history: z
-    .array(
-      z.object({
-        id: z.string(),
-        amount: z.string(),
-        source: z.string(),
-        createdAt: z.string(),
-      }),
-    )
-    .default([]),
-  achievements: z
-    .array(z.object({ id: z.string(), name: z.string(), earnedAt: z.string() }))
-    .default([]),
-  inventory: z
-    .array(z.object({ id: z.string(), name: z.string(), quantity: z.number() }))
-    .default([]),
-});
-export const getMember = (guild: string, signal?: AbortSignal) =>
-  read(`/guilds/${guild}/members/me`, MemberSchema, signal);
 export const getOwnerHealth = (signal?: AbortSignal) =>
   read(
     '/owner/health',
