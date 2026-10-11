@@ -33,7 +33,12 @@ import {
   commandRegistry,
   type Actor,
 } from '@sparko/contracts';
-import { requireGlobal, guildCapabilities, allowed } from '@sparko/policy';
+import {
+  requireGlobal,
+  guildCapabilities,
+  allowed,
+  isPrivilegedRole,
+} from '@sparko/policy';
 import type { Config } from '@sparko/config';
 import { createAuth, requireActiveSession } from './auth.js';
 import { registerAccountRoutes } from './account.js';
@@ -326,7 +331,44 @@ export async function createApp(options: {
         'You cannot select resources in this server.',
         403,
       );
-    return { data: await discord.roles(guildId) };
+    const roles = await discord.roles(guildId);
+    // Hierarchy and privilege are computed here so every role picker can
+    // explain why a role cannot be granted, using the shared policy.
+    const botRoles = await (
+      discord.botUser
+        ? discord.botUser().then((user) => user.id)
+        : Promise.resolve(config.DISCORD_CLIENT_ID)
+    )
+      .then((id) => (id ? discord.member(guildId, id) : null))
+      .then((member) => member?.roles ?? null)
+      .catch(() => null);
+    const highest =
+      botRoles === null
+        ? null
+        : Math.max(
+            0,
+            ...roles
+              .filter((role) => botRoles.includes(role.id))
+              .map((role) => role.position),
+          );
+    return {
+      data: roles.map((role) => {
+        const privileged = isPrivilegedRole(role.permissions);
+        return {
+          ...role,
+          privileged,
+          ...(highest === null
+            ? {}
+            : {
+                assignable:
+                  !role.managed &&
+                  role.id !== guildId &&
+                  !privileged &&
+                  role.position < highest,
+              }),
+        };
+      }),
+    };
   });
   app.get('/api/v1/guilds/:guildId/resources/emojis', async (req) => {
     const { guildId } = z.object({ guildId: z.string() }).parse(req.params),

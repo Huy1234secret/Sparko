@@ -1277,3 +1277,25 @@ describe('member rank card', () => {
     ).toBe('card.accent');
   });
 });
+describe('role resources', () => {
+  it('explains hierarchy and privilege with the shared role policy', async () => {
+    const result = await app.inject({
+      method: 'GET',
+      url: `/api/v1/guilds/${GUILD}/resources/roles`,
+      headers: headers(ADMIN),
+    });
+    expect(result.statusCode).toBe(200);
+    const roles = result.json<{
+      data: { id: string; assignable?: boolean; privileged: boolean }[];
+    }>().data;
+    expect(roles.find((role) => role.id === STAFF_A)).toMatchObject({
+      assignable: true,
+      privileged: false,
+    });
+    expect(roles.find((role) => role.id === STAFF_B)).toMatchObject({
+      assignable: false,
+      privileged: true,
+    });
+    expect(roles.find((role) => role.id === BOT)?.assignable).toBe(false);
+  });
+});

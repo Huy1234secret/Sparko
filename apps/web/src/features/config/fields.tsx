@@ -173,9 +173,11 @@ export function RoleChecklist<T extends FieldValues>({
         .map((role) => ({
           id: role.id,
           name:
-            assigns && role.assignable === false
-              ? `${role.name} — above Sparko’s role, cannot be assigned`
-              : role.name,
+            assigns && role.privileged
+              ? `${role.name} — has moderator permissions, cannot be assigned`
+              : assigns && role.assignable === false
+                ? `${role.name} — above Sparko’s role, cannot be assigned`
+                : role.name,
         }))}
     />
   );

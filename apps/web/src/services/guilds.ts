@@ -23,7 +23,9 @@ export const RoleSchema = z.object({
   name: z.string(),
   color: z.number().optional(),
   managed: z.boolean().optional(),
+  /** Below Sparko's highest role, unmanaged and not privileged. */
   assignable: z.boolean().optional(),
+  privileged: z.boolean().optional(),
 });
 export type Channel = z.infer<typeof ChannelSchema>;
 export const OverviewSchema = z.object({
