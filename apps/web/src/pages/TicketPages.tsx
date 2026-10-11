@@ -60,6 +60,7 @@ import {
 import { applyServerFieldErrors } from '../services/formErrors';
 import { RuntimeState } from '../components/AppShell';
 import { TicketStatusBadge } from '../components/TicketStatus';
+import { TranscriptViewer } from '../components/TranscriptViewer';
 import {
   PriorityBadge,
   TeamPanel,
@@ -1202,6 +1203,7 @@ export function TicketDetailPage() {
   const queryClient = useQueryClient();
   const identity = useActionIdentity();
   const [closeOpen, setCloseOpen] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const query = useQuery({
     queryKey: ['ticket', guildId, ticketId],
@@ -1387,35 +1389,54 @@ export function TicketDetailPage() {
           <LoadingState label="Checking retained captures…" />
         ) : transcripts.data?.length ? (
           transcripts.data.map((transcript) => (
-            <div className="activity-row" key={transcript.id}>
-              <span>
-                <strong>
-                  {transcript.status === 'complete'
-                    ? 'Complete capture'
-                    : transcript.status === 'partial'
-                      ? 'Partial capture'
-                      : transcript.status.replaceAll('_', ' ')}
-                </strong>
-                <small>
-                  Captured {new Date(transcript.createdAt).toLocaleString()} ·
-                  Expires {new Date(transcript.expiresAt).toLocaleDateString()}
-                </small>
-                {transcript.status === 'partial' && (
-                  <p>
-                    Some history or content was unavailable. Unobserved
-                    deletions cannot be reconstructed.
-                  </p>
-                )}
-              </span>
-              <Button
-                variant="secondary"
-                busy={
-                  download.isPending && download.variables === transcript.id
-                }
-                onClick={() => download.mutate(transcript.id)}
-              >
-                Download transcript
-              </Button>
+            <div key={transcript.id}>
+              <div className="activity-row">
+                <span>
+                  <strong>
+                    {transcript.status === 'complete'
+                      ? 'Complete capture'
+                      : transcript.status === 'partial'
+                        ? 'Partial capture'
+                        : transcript.status.replaceAll('_', ' ')}
+                  </strong>
+                  <small>
+                    Captured {new Date(transcript.createdAt).toLocaleString()} ·
+                    Expires{' '}
+                    {new Date(transcript.expiresAt).toLocaleDateString()}
+                  </small>
+                  {transcript.status === 'partial' && (
+                    <p>
+                      Some history or content was unavailable. Unobserved
+                      deletions cannot be reconstructed.
+                    </p>
+                  )}
+                </span>
+                <Button
+                  variant="secondary"
+                  busy={
+                    download.isPending && download.variables === transcript.id
+                  }
+                  onClick={() => download.mutate(transcript.id)}
+                >
+                  Download transcript
+                </Button>
+                <Button
+                  variant="ghost"
+                  aria-expanded={viewing === transcript.id}
+                  onClick={() =>
+                    setViewing(viewing === transcript.id ? null : transcript.id)
+                  }
+                >
+                  {viewing === transcript.id ? 'Hide' : 'Read and search'}
+                </Button>
+              </div>
+              {viewing === transcript.id && (
+                <TranscriptViewer
+                  guildId={guildId}
+                  ticketId={ticketId}
+                  transcriptId={transcript.id}
+                />
+              )}
             </div>
           ))
         ) : (

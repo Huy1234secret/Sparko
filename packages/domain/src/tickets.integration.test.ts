@@ -262,6 +262,36 @@ describe('ticket staff workflow', () => {
       }),
     ]);
   });
+  it('marks a claimed ticket as waiting for the member and back', async () => {
+    const current = await db.ticket.findUniqueOrThrow({
+      where: { id: ticketId },
+    });
+    const waiting = await platform.route(
+      staff(staffB),
+      route('/guilds/:guildId/tickets/:id/waiting', 'POST'),
+      { expectedRevision: current.revision, state: 'awaiting_member' },
+      { id: ticketId },
+      'ask-member',
+    );
+    expect(waiting.data).toMatchObject({ state: 'awaiting_member' });
+    await expect(
+      platform.route(
+        staff(staffB),
+        route('/guilds/:guildId/tickets/:id/waiting', 'POST'),
+        { expectedRevision: current.revision + 1, state: 'awaiting_member' },
+        { id: ticketId },
+        'ask-member-again',
+      ),
+    ).rejects.toMatchObject({ code: 'REVISION_CONFLICT' });
+    const resumed = await platform.route(
+      staff(staffB),
+      route('/guilds/:guildId/tickets/:id/waiting', 'POST'),
+      { expectedRevision: current.revision + 1, state: 'claimed' },
+      { id: ticketId },
+      'member-replied',
+    );
+    expect(resumed.data).toMatchObject({ state: 'claimed' });
+  });
   it('reports staff metrics with stated definitions and hides them from members', async () => {
     const metrics = await platform.route(
       staff(staffA),

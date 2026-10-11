@@ -205,12 +205,13 @@ export function TicketStaffControls({
   const queryClient = useQueryClient();
   const staff = useTicketStaff(guildId);
   const [assignee, setAssignee] = useState('');
+  const [participant, setParticipant] = useState('');
   const change = useMutation({
     mutationFn: ({
       action,
       input,
     }: {
-      action: 'priority' | 'assign';
+      action: 'priority' | 'assign' | 'waiting' | 'participants';
       input: Record<string, unknown>;
     }) =>
       updateTicket(
@@ -226,6 +227,7 @@ export function TicketStaffControls({
       }),
     onSuccess: (result) => {
       setAssignee('');
+      setParticipant('');
       queryClient.setQueryData(['ticket', guildId, ticket.id], result.data);
       void queryClient.invalidateQueries({ queryKey: ['tickets', guildId] });
       void queryClient.invalidateQueries({
@@ -240,7 +242,7 @@ export function TicketStaffControls({
   );
   return (
     <Card>
-      <h2>Priority and assignment</h2>
+      <h2>Staff actions</h2>
       <div className="form-grid">
         <Field label="Priority" htmlFor="ticket-priority">
           <select
@@ -294,6 +296,96 @@ export function TicketStaffControls({
           {ticket.claimantId ? 'Transfer ticket' : 'Assign ticket'}
         </Button>
       </div>
+      {ticket.claimantId && (
+        <div className="row wrap">
+          {ticket.status === 'claimed' ? (
+            <Button
+              variant="secondary"
+              busy={change.isPending && change.variables?.action === 'waiting'}
+              onClick={() =>
+                change.mutate({
+                  action: 'waiting',
+                  input: { state: 'awaiting_member' },
+                })
+              }
+            >
+              Mark as waiting for the member
+            </Button>
+          ) : ticket.status === 'awaiting_member' ? (
+            <Button
+              variant="secondary"
+              busy={change.isPending && change.variables?.action === 'waiting'}
+              onClick={() =>
+                change.mutate({
+                  action: 'waiting',
+                  input: { state: 'claimed' },
+                })
+              }
+            >
+              The member replied
+            </Button>
+          ) : null}
+        </div>
+      )}
+      <h3>People in this ticket</h3>
+      <p className="field-hint">
+        Participants can read and write in the ticket channel. Sparko updates
+        the channel permissions after you add or remove someone.
+      </p>
+      <ul className="plain-list">
+        {ticket.participants.map((id) => (
+          <li key={id} className="row space-between">
+            <span className="mono">
+              {id}
+              {id === ticket.ownerId && ' (opened the ticket)'}
+            </span>
+            {id !== ticket.ownerId && (
+              <Button
+                variant="ghost"
+                aria-label={`Remove participant ${id}`}
+                disabled={change.isPending}
+                onClick={() =>
+                  change.mutate({
+                    action: 'participants',
+                    input: { userId: id, action: 'remove' },
+                  })
+                }
+              >
+                Remove
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <Field
+        label="Add a participant (Discord user ID)"
+        htmlFor="ticket-participant"
+        hint="17 to 20 digits."
+      >
+        <div className="row">
+          <Input
+            id="ticket-participant"
+            inputMode="numeric"
+            value={participant}
+            onChange={(event) => setParticipant(event.target.value.trim())}
+          />
+          <Button
+            variant="secondary"
+            disabled={!/^\d{17,20}$/.test(participant)}
+            busy={
+              change.isPending && change.variables?.action === 'participants'
+            }
+            onClick={() =>
+              change.mutate({
+                action: 'participants',
+                input: { userId: participant, action: 'add' },
+              })
+            }
+          >
+            Add
+          </Button>
+        </div>
+      </Field>
       {(ticket.remindedAt || ticket.escalatedAt) && (
         <ul className="plain-list sla-list">
           {ticket.remindedAt && (

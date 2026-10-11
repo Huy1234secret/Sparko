@@ -593,3 +593,31 @@ ticketRoutes.push(
     },
   },
 );
+const waitingSchema = revisionOnly.extend({
+  state: z.enum(['awaiting_member', 'claimed']),
+});
+ticketRoutes.push({
+  method: 'POST',
+  path: '/guilds/:guildId/tickets/:id/waiting',
+  capability: 'member',
+  schema: waitingSchema,
+  // Staff mark that they asked the member for information, then resume.
+  handler: async (ctx, input, p) => {
+    const body = waitingSchema.parse(input),
+      t = await ticket(ctx, p['id'] ?? '', true);
+    assertRevision(
+      t,
+      body.expectedRevision,
+      body.state === 'awaiting_member' ? ['claimed'] : ['awaiting_member'],
+    );
+    if (!t.claimantId)
+      throw new DomainError(
+        'INVALID_INPUT',
+        'Claim the ticket before asking the member for information.',
+      );
+    return ctx.tx.ticket.update({
+      where: { id: t.id },
+      data: { state: body.state, revision: { increment: 1 } },
+    });
+  },
+});

@@ -6,6 +6,8 @@ const statuses: Record<
 > = {
   open: { label: 'Waiting for staff', tone: 'warning' },
   claimed: { label: 'Claimed', tone: 'info' },
+  awaiting_member: { label: 'Waiting for the member', tone: 'neutral' },
+  awaiting_staff: { label: 'Waiting for staff', tone: 'warning' },
   closing: { label: 'Closing', tone: 'neutral' },
   closed: { label: 'Closed', tone: 'neutral' },
   creating: { label: 'Creating in Discord', tone: 'warning' },

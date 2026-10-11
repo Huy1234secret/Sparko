@@ -3653,3 +3653,36 @@ textarea[aria-invalid='true'] {
   gap: 6px;
   align-items: center;
 }
+.transcript-viewer {
+  border-top: 1px solid var(--line);
+  padding: 14px 0 6px;
+}
+.transcript-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 480px;
+  overflow-y: auto;
+}
+.transcript-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.transcript-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+.transcript-meta strong {
+  color: var(--text);
+}
+.transcript-content {
+  white-space: pre-wrap;
+  margin-top: 4px;
+}
+.transcript-file {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+}
