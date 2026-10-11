@@ -22,11 +22,7 @@ import {
 import { useFeatureConfig } from '../../features/config/useFeatureConfig';
 import { ConfigForm } from '../../features/config/ConfigForm';
 import { Tabs } from '../../features/config/Tabs';
-import {
-  SwitchField,
-  fieldError,
-  useChannels,
-} from '../../features/config/fields';
+import { SwitchField, useChannels } from '../../features/config/fields';
 import {
   addCaseNote,
   createCase,
