@@ -37,7 +37,7 @@ export const LevelProfileSchema = z.object({
   progress: z.number(),
   publicProfile: z.boolean(),
   card: RankCardPreferencesSchema,
-  rank: z.number().optional(),
+  rank: z.number().nullable().optional(),
   revision: z.number(),
   textSummary: z.string(),
 });

@@ -9,6 +9,16 @@ import { AnalyticsPage } from './AnalyticsPage';
 import { getAnalytics } from '../../services/modules';
 
 vi.mock('../../services/modules', () => ({ getAnalytics: vi.fn() }));
+vi.mock('../../services/guilds', () => ({
+  getConfig: vi.fn(async () => ({
+    featureId: 'R48',
+    revision: 1,
+    appliedRevision: 1,
+    config: { enabled: true, retentionDays: 30 },
+    missingPrerequisites: [],
+  })),
+  saveConfig: vi.fn(),
+}));
 vi.mock('recharts', async () => {
   const actual = await vi.importActual<typeof import('recharts')>('recharts');
   return {
@@ -28,7 +38,7 @@ describe('analytics', () => {
     vi.mocked(getAnalytics).mockResolvedValue({
       range: {
         from: '2026-10-10T00:00:00.000Z',
-        to: '2026-10-11T23:00:00.000Z',
+        to: '2026-10-12T00:00:00.000Z',
         timezone: 'UTC',
         precision: 'hour',
       },

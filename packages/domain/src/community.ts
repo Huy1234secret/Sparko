@@ -251,7 +251,10 @@ export async function rankCardInput(
       ? 1
       : Math.min(span, Math.max(0, profile.xp - profile.previousLevelXp)),
     xpForNextLevel: Math.max(1, span),
-    rank: card.showRank ? await levelRank(ctx, profile.xp) : null,
+    rank:
+      card.showRank && profile.revision
+        ? await levelRank(ctx, profile.xp)
+        : null,
     theme: card.theme,
     layout: card.layout,
     avatarShape: card.avatarShape,
@@ -2273,7 +2276,8 @@ export const communityRoutes: DomainRoute[] = [
         profile: {
           ...profile,
           card: RankCardPreferencesSchema.parse(profile.card),
-          rank: await levelRank(ctx, profile.xp),
+          // No recorded XP means no position yet, not first place.
+          rank: profile.revision ? await levelRank(ctx, profile.xp) : null,
         },
         history: await ctx.tx.record.findMany({
           where: {

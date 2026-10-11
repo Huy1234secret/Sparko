@@ -58,22 +58,27 @@ export function hourlySeries(
   const relevant = gaps
     .filter((gap) => gap.metric === coverageGroup[metric])
     .map((gap) => [Date.parse(gap.from), Date.parse(gap.to)] as const);
+  const rangeStart = Date.parse(from);
+  const rangeEnd = Date.parse(to);
   const points: Point[] = [];
-  for (let hour = start; hour <= end; hour += HOUR) {
-    const hourEnd = hour + HOUR;
+  for (let hour = start; hour <= end && hour < Date.parse(to); hour += HOUR) {
+    // Only the part of the hour inside the requested range can be observed.
+    const windowStart = Math.max(hour, rangeStart);
+    const windowEnd = Math.min(hour + HOUR, rangeEnd);
     let uncovered = 0;
     for (const [gapFrom, gapTo] of relevant)
       uncovered += Math.max(
         0,
-        Math.min(hourEnd, gapTo) - Math.max(hour, gapFrom),
+        Math.min(windowEnd, gapTo) - Math.max(windowStart, gapFrom),
       );
+    const covered = Math.max(0, windowEnd - windowStart - uncovered);
     const count = counts.get(hour);
     const value =
       metric === 'voiceSeconds' && count !== undefined ? count / 60 : count;
     points.push({
       hour: new Date(hour).toISOString(),
-      value: uncovered >= HOUR && count === undefined ? null : (value ?? 0),
-      partial: uncovered > 0 && uncovered < HOUR,
+      value: covered <= 0 && count === undefined ? null : (value ?? 0),
+      partial: covered > 0 && covered < HOUR,
     });
   }
   return points;

@@ -32,19 +32,20 @@ describe('hourly analytics series', () => {
       2,
       0,
     ]);
+    // 00 and 05 are only partly inside the requested range; 03 is half offline.
     expect(points.map((point) => point.partial)).toEqual([
-      false,
+      true,
       false,
       false,
       true,
       false,
-      false,
+      true,
     ]);
     expect(summarize(points)).toEqual({
       total: 6,
       coveredHours: 4,
       hours: 6,
-      partialHours: 1,
+      partialHours: 3,
     });
   });
   it('keeps an observed count even inside a reported gap and converts voice to minutes', () => {
@@ -66,15 +67,24 @@ describe('hourly analytics series', () => {
       value: 10,
       partial: false,
     });
-    // 01, 03 and 04 are entirely uncovered; the boundary hours are partial.
+    // Every hour is uncovered except the one with an actual observation.
     expect(points.map((point) => point.value)).toEqual([
-      0,
+      null,
       null,
       10,
       null,
       null,
-      0,
+      null,
     ]);
-    expect(points[0]?.partial).toBe(true);
+  });
+  it('never counts boundary hours as observed when nothing was collected', () => {
+    const points = hourlySeries(
+      [],
+      [{ metric: 'messages', from, to }],
+      'messages',
+      from,
+      to,
+    );
+    expect(summarize(points).coveredHours).toBe(0);
   });
 });

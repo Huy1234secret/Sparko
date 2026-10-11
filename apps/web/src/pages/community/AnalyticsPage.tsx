@@ -20,7 +20,11 @@ import {
   LoadingState,
   PageHeading,
 } from '@sparko/ui';
+import { AnalyticsConfigSchema } from '@sparko/messages/community-contracts';
 import { Metric } from '../../components/AppShell';
+import { useFeatureConfig } from '../../features/config/useFeatureConfig';
+import { ConfigForm } from '../../features/config/ConfigForm';
+import { NumberField } from '../../features/config/fields';
 import { getAnalytics } from '../../services/modules';
 import { errorMessage } from '../../services/http';
 import {
@@ -65,6 +69,30 @@ function daily(points: Point[]) {
     days.set(day, entry);
   }
   return [...days.entries()];
+}
+
+function CollectionSettings({ guildId }: { guildId: string }) {
+  const controller = useFeatureConfig(guildId, 'R48', AnalyticsConfigSchema);
+  return (
+    <ConfigForm
+      controller={controller.shell}
+      title="Collection"
+      description="Sparko counts messages, joins, leaves and voice time per hour. It never stores message text for analytics."
+      enableLabel="Collect server analytics"
+    >
+      <Card>
+        <NumberField
+          form={controller.form}
+          name="retentionDays"
+          label="Keep hourly data for"
+          unit="days"
+          min={1}
+          max={365}
+          hint="Older hours are deleted daily; coverage history needed to explain gaps is kept."
+        />
+      </Card>
+    </ConfigForm>
+  );
 }
 
 export function AnalyticsPage() {
@@ -195,7 +223,7 @@ export function AnalyticsPage() {
           <div className="metric-grid">
             <Metric
               label={`${label.label} in range`}
-              value={format(summary.total, metric)}
+              value={summary.coveredHours ? format(summary.total, metric) : '—'}
               detail={`${label.unit}, observed hours only`}
             />
             <Metric
@@ -353,6 +381,7 @@ export function AnalyticsPage() {
           </div>
         </>
       )}
+      <CollectionSettings guildId={guildId} />
     </>
   );
 }

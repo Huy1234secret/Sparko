@@ -2797,3 +2797,21 @@ td {
   background: var(--brand-soft);
   border-radius: 10px;
 }
+.card h2 > svg,
+.card h3 > svg {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-right: 6px;
+}
+.card h3 {
+  margin-top: 18px;
+}
+.card > .button + h3,
+.card > button + h3 {
+  margin-top: 22px;
+}
+fieldset > legend {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
