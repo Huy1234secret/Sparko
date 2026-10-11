@@ -61,7 +61,7 @@ const Module = lazy(() =>
   })),
 );
 const Analytics = lazy(() =>
-  import('./pages/ModulePages').then((module) => ({
+  import('./pages/community/AnalyticsPage').then((module) => ({
     default: module.AnalyticsPage,
   })),
 );

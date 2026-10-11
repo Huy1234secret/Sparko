@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -19,22 +19,12 @@ import {
 import {
   ArrowRight,
   CheckCircle2,
-  Download,
   Plus,
   Search,
   Shield,
   Sparkles,
   Zap,
 } from 'lucide-react';
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import {
   Badge,
   Button,
@@ -58,7 +48,6 @@ import {
   getRecords,
   createRecord,
   recordAction,
-  getAnalytics,
   type RecordSchema,
 } from '../services/modules';
 import { ApiError, errorMessage } from '../services/http';
@@ -1318,176 +1307,5 @@ function RecordWorkspace({
         )}
       </Card>
     </div>
-  );
-}
-export function AnalyticsPage() {
-  const { guildId = '' } = useParams();
-  const [range, setRange] = useState('7');
-  const query = useQuery({
-    queryKey: ['analytics', guildId, range],
-    queryFn: ({ signal }) => getAnalytics(guildId, range, signal),
-  });
-  const chart = useMemo(
-    () =>
-      query.data?.rows
-        .filter((row) => row.metric === 'messages')
-        .map((row) => ({ hour: row.hour, count: row.count })) ?? [],
-    [query.data],
-  );
-  const download = () => {
-    if (!query.data) return;
-    const rows = query.data.rows;
-    const blob = new Blob(
-      [
-        'hour,metric,count,observedAt\n' +
-          rows
-            .map((row) =>
-              [row.hour, row.metric, row.count, row.observedAt].join(','),
-            )
-            .join('\n'),
-      ],
-      { type: 'text/csv' },
-    );
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'sparko-observed-analytics.csv';
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-  return (
-    <>
-      <PageHeading
-        eyebrow="Insights"
-        title="See the story behind the activity."
-        description="Observed trends, explicit collection gaps, and the same underlying data in your export."
-        actions={
-          <div className="row">
-            <select
-              aria-label="Analytics date range"
-              value={range}
-              onChange={(e) => setRange(e.target.value)}
-            >
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
-            </select>
-            <Button
-              variant="secondary"
-              disabled={!query.data}
-              onClick={download}
-            >
-              <Download size={15} />
-              Export
-            </Button>
-          </div>
-        }
-      />
-      {query.isPending ? (
-        <LoadingState />
-      ) : query.error ? (
-        <ErrorState
-          message={errorMessage(query.error)}
-          retry={() => void query.refetch()}
-        />
-      ) : (
-        query.data && (
-          <>
-            <div className="row status-line">
-              <Badge>{humanize(query.data.status)}</Badge>
-              <span className="muted">
-                {query.data.observedAt
-                  ? `Last observed ${new Date(query.data.observedAt).toLocaleString()}`
-                  : 'No collection observed'}{' '}
-                · UTC · {query.data.range.precision}
-              </span>
-            </div>
-            {query.data.gaps.map((gap, index) => (
-              <div className="alert alert-warning" key={index}>
-                <p>
-                  {humanize(gap.metric)}: {gap.reason} (
-                  {new Date(gap.from).toLocaleString()} –{' '}
-                  {new Date(gap.to).toLocaleString()})
-                </p>
-              </div>
-            ))}
-            <Card>
-              <h2>Message events</h2>
-              {chart.length ? (
-                <div
-                  className="analytics-chart"
-                  role="img"
-                  aria-label="Observed message events by hour; tabular equivalent follows"
-                >
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={chart}>
-                      <CartesianGrid stroke="var(--line)" vertical={false} />
-                      <XAxis
-                        dataKey="hour"
-                        tickFormatter={(value: string) =>
-                          new Date(value).toLocaleDateString()
-                        }
-                        stroke="var(--muted)"
-                        fontSize={10}
-                      />
-                      <YAxis stroke="var(--muted)" fontSize={10} />
-                      <Tooltip
-                        contentStyle={{
-                          background: 'var(--surface)',
-                          borderColor: 'var(--line)',
-                          color: 'var(--text)',
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="count"
-                        stroke="#FACC15"
-                        fill="#FACC15"
-                        fillOpacity={0.12}
-                        connectNulls={false}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <EmptyState
-                  title={
-                    query.data.status === 'no-activity'
-                      ? 'No observed activity'
-                      : 'Message analytics are not being collected'
-                  }
-                  description="A missing observation is not shown as zero. Enable collection and check Discord prerequisites."
-                />
-              )}
-            </Card>
-            <Card className="table-wrap">
-              <table>
-                <caption className="sr-only">
-                  Observed analytics records in UTC
-                </caption>
-                <thead>
-                  <tr>
-                    <th>Hour (UTC)</th>
-                    <th>Metric</th>
-                    <th>Count</th>
-                    <th>Observed at</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {query.data.rows.map((row, index) => (
-                    <tr key={index}>
-                      <td>{row.hour}</td>
-                      <td>{humanize(row.metric)}</td>
-                      <td>{row.count}</td>
-                      <td>{new Date(row.observedAt).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card>
-          </>
-        )
-      )}
-    </>
   );
 }
