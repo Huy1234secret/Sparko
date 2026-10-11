@@ -54,6 +54,24 @@ import {
   publicationMatches,
 } from './reconciliation.js';
 
+/**
+ * Use a configured design and append the module's required action row. An
+ * invalid or over-limit combination falls back to the default design.
+ */
+function withActionRow(
+  configured: unknown,
+  row: Record<string, unknown>,
+): MessageDocument | null {
+  const parsed = MessageDocumentSchema.safeParse(configured);
+  if (!parsed.success) return null;
+  const combined = MessageDocumentSchema.safeParse({
+    ...parsed.data,
+    visibility: 'public',
+    blocks: [...parsed.data.blocks, row],
+  });
+  return combined.success ? combined.data : null;
+}
+
 export type OutboxWork = {
   id: string;
   guildId: string;
@@ -1554,7 +1572,7 @@ export class EffectExecutor {
     channelId: string,
     document: MessageDocument,
     data: Record<string, unknown>,
-    state: string,
+    desiredState: string,
   ) {
     const result = await this.transaction(work, async (ctx) => {
       const published = await publishDocument(
@@ -1568,33 +1586,126 @@ export class EffectExecutor {
         data: {
           data: json({
             ...data,
+            channelId,
             publicationId: published.id,
             publicationState: 'pending',
           }),
-          state,
+          state: 'publishing',
         },
       });
       await ctx.effect('community.publication.applied', {
         recordId,
         publicationId: published.id,
-        desiredState: state === 'publishing' ? 'open' : state,
+        desiredState,
       });
       return { publicationId: published.id };
     });
     return result;
+  }
+  /**
+   * The configured drop channel, else the first fallback the bot can post in.
+   * With no usable channel the `skip` policy records a failed drop and the
+   * `retry` policy retries the delivery later.
+   */
+  private async crateChannel(
+    work: OutboxWork,
+    dropId: string,
+    data: Record<string, unknown>,
+  ): Promise<string | null> {
+    const configuration = await this.db.featureConfig.findUnique({
+      where: { guildId_featureId: { guildId: work.guildId, featureId: 'R10' } },
+    });
+    const fallbacks = z
+      .array(Snowflake)
+      .catch([])
+      .parse(jsonObject(configuration?.config)['fallbackChannelIds']);
+    const candidates = [
+      ...new Set([Snowflake.parse(data['channelId']), ...fallbacks]),
+    ];
+    const problems: string[] = [];
+    for (const candidate of candidates)
+      try {
+        await this.discord.channelPermissions(
+          work.guildId,
+          candidate,
+          sendPermissions,
+        );
+        return candidate;
+      } catch (error) {
+        if (
+          !(
+            error instanceof DomainError &&
+            ['FORBIDDEN', 'MISSING_PERMISSION'].includes(error.code)
+          ) &&
+          !(
+            error instanceof DiscordAPIError &&
+            [10003, 50001, 50013].includes(Number(error.code))
+          )
+        )
+          throw error;
+        problems.push(
+          `${candidate}: ${error instanceof Error ? error.message : 'unavailable'}`,
+        );
+      }
+    const reason = `No crate channel is usable. ${problems.join(' ')}`.slice(
+      0,
+      1000,
+    );
+    if (data['failurePolicy'] !== 'skip')
+      throw new DomainError('SERVICE_UNAVAILABLE', reason, 503);
+    await this.db.record.update({
+      where: { id: dropId },
+      data: {
+        state: 'failed',
+        data: json({
+          ...data,
+          publicationState: 'failed',
+          deliveryError: reason,
+        }),
+      },
+    });
+    return null;
   }
   private async community(work: OutboxWork, p: Record<string, unknown>) {
     if (work.type === 'community.publication.applied') {
       const publication = await this.db.publication.findFirst({
         where: { id: ID.parse(p['publicationId']), guildId: work.guildId },
       });
-      if (publication?.state !== 'applied')
+      const record = await this.record(work.guildId, p['recordId']);
+      if (publication?.state !== 'applied') {
+        const send = await this.db.outbox.findFirst({
+          where: {
+            guildId: work.guildId,
+            type: 'publication.send',
+            payload: {
+              path: ['publicationId'],
+              equals: ID.parse(p['publicationId']),
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        // A delivery that can no longer succeed is reported, not retried forever.
+        if (publication && send && ['blocked', 'dead'].includes(send.state)) {
+          await this.db.record.update({
+            where: { id: record.id },
+            data: {
+              state: 'failed',
+              data: json({
+                ...jsonObject(record.data),
+                publicationState: 'failed',
+                deliveryError:
+                  send.lastError ?? 'Discord delivery did not complete.',
+              }),
+            },
+          });
+          return;
+        }
         throw new DomainError(
           'SERVICE_UNAVAILABLE',
           'The Discord publication is still pending.',
           503,
         );
-      const record = await this.record(work.guildId, p['recordId']);
+      }
       await this.db.record.update({
         where: { id: record.id },
         data: {
@@ -1626,6 +1737,12 @@ export class EffectExecutor {
       const record = await this.record(work.guildId, id, kind);
       const data = jsonObject(record.data);
       if (data['publicationId']) return;
+      let channelId = Snowflake.parse(data['channelId']);
+      if (kind === 'crate.drop') {
+        const chosen = await this.crateChannel(work, record.id, data);
+        if (!chosen) return;
+        channelId = chosen;
+      }
       let document: MessageDocument;
       if (kind === 'role.menu') {
         const options = z
@@ -1639,30 +1756,30 @@ export class EffectExecutor {
         options.forEach((option) =>
           assertRoleAssignable(guild, roles, bot, option.roleId),
         );
-        document = MessageDocumentSchema.parse({
-          schemaVersion: 1,
-          mode: 'v2',
-          name: 'Role menu',
-          blocks: [
-            { type: 'text', text: String(data['name']) },
+        const row = {
+          type: 'controls',
+          controls: [
             {
-              type: 'controls',
-              controls: [
-                {
-                  type: 'select',
-                  key: 'role-menu',
-                  minValues: data['minSelections'],
-                  maxValues: data['maxSelections'],
-                  options: options.map((option) => ({
-                    label: option.label,
-                    value: option.roleId,
-                  })),
-                  action: { type: 'role.menu', menuId: record.id },
-                },
-              ],
+              type: 'select',
+              key: 'role-menu',
+              minValues: data['minSelections'],
+              maxValues: data['maxSelections'],
+              options: options.map((option) => ({
+                label: option.label,
+                value: option.roleId,
+              })),
+              action: { type: 'role.menu', menuId: record.id },
             },
           ],
-        });
+        };
+        document =
+          withActionRow(data['document'], row) ??
+          MessageDocumentSchema.parse({
+            schemaVersion: 1,
+            mode: 'v2',
+            name: 'Role menu',
+            blocks: [{ type: 'text', text: String(data['name']) }, row],
+          });
       } else {
         const preview = data['preview'] === true;
         const title =
@@ -1673,50 +1790,68 @@ export class EffectExecutor {
           kind === 'crate.drop'
             ? { type: 'crate.claim', crateId: record.id }
             : { type: 'giveaway.enter', giveawayId: record.id };
-        document = MessageDocumentSchema.parse({
-          schemaVersion: 1,
-          mode: 'v2',
-          name: kind,
-          blocks: [
+        const configured =
+          kind === 'crate.drop'
+            ? jsonObject(data['type'])['document']
+            : data['document'];
+        const row = {
+          type: 'controls',
+          controls: [
             {
-              type: 'container',
-              accentColor: BRAND_YELLOW,
-              children: [
-                { type: 'text', text: `## ${title}` },
-                {
-                  type: 'text',
-                  text:
-                    kind === 'crate.drop'
-                      ? `Expires ${String(data['expiresAt'])}. ${preview ? 'This preview grants no XP.' : 'Claims and rewards are recorded atomically.'}`
-                      : `Ends ${String(data['endsAt'])}. Winner count: ${String(data['winnerCount'])}. Eligibility is checked when entering and drawing.`,
-                },
-                {
-                  type: 'controls',
-                  controls: [
-                    {
-                      type: 'button',
-                      key: 'entry',
-                      label:
-                        kind === 'crate.drop'
-                          ? 'Claim crate'
-                          : 'Enter giveaway',
-                      style: 'primary',
-                      action,
-                    },
-                  ],
-                },
-              ],
+              type: 'button',
+              key: 'entry',
+              label: kind === 'crate.drop' ? 'Claim crate' : 'Enter giveaway',
+              style: 'primary',
+              action,
             },
           ],
-        });
+        };
+        document =
+          withActionRow(configured, row) ??
+          MessageDocumentSchema.parse({
+            schemaVersion: 1,
+            mode: 'v2',
+            name: kind,
+            blocks: [
+              {
+                type: 'container',
+                accentColor: BRAND_YELLOW,
+                children: [
+                  { type: 'text', text: `## ${title}` },
+                  {
+                    type: 'text',
+                    text:
+                      kind === 'crate.drop'
+                        ? `Expires ${String(data['expiresAt'])}. ${preview ? 'This preview grants no XP.' : 'Claims and rewards are recorded atomically.'}`
+                        : `Ends ${String(data['endsAt'])}. Winner count: ${String(data['winnerCount'])}. Eligibility is checked when entering and drawing.`,
+                  },
+                  {
+                    type: 'controls',
+                    controls: [
+                      {
+                        type: 'button',
+                        key: 'entry',
+                        label:
+                          kind === 'crate.drop'
+                            ? 'Claim crate'
+                            : 'Enter giveaway',
+                        style: 'primary',
+                        action,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          });
       }
       await this.publishRecord(
         work,
         record.id,
-        Snowflake.parse(data['channelId']),
+        channelId,
         document,
         data,
-        kind === 'role.menu' ? 'published' : 'publishing',
+        kind === 'role.menu' ? 'published' : 'open',
       );
       return;
     }
