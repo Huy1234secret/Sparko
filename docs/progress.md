@@ -41,9 +41,26 @@ Resolved: typed community services/pages; `/levels/me` member portal; single ran
 
 Still open (tracked for later milestones): rank cards do not render avatars/backgrounds; community message XP, counting and starboard depend on live Gateway observation; leaderboards show user IDs (no stored display names).
 
-## Next concrete action
+## Paused checkpoint (M4 in progress)
 
-Merge the UI pass, merge `main` into the M4 work, then M4 — add FormsPage tests and complete staff/ticket/forms/reports/moderation interfaces, scheduled lock/ban expiry, anti-nuke variants/restoration, verification and hierarchy diagnostics. Start by listing safety routes in `packages/domain/src/safety.ts`, compare with the generic module pages, and build typed workspaces using `apps/web/src/features/config` like M3.
+The user paused work on 2026-10-11. Branch `claude/amazing-maxwell-yonuhl` has been pushed. It is based on main `8108330`, and the M4 commits on top have not been delivered in a PR yet.
+
+Done locally for M4, each with focused tests:
+
+- Timed bans and locks (`safety.punishment.expire` / `.clear`), with superseding and Discord rechecks. Worker PostgreSQL tests pass: 31 in the effects suite.
+- The moderation workspace (`apps/web/src/pages/safety/ModerationPage.tsx`, 3 tests). Cases now show the real delivery outcome.
+- Safety config schemas are exported with their real types, and refinements name their fields.
+- The forms workspace (`FormsPage.tsx`, builder and staged review). It typechecks, but **has no test yet**.
+
+Next steps, in order:
+
+1. Add `FormsPage.test.tsx`.
+2. Build typed pages for reports/appeals (R30), verification (R18), automod with `/safety/test` simulation (R27), raid guard (R28), and anti-nuke incidents with manual recovery (R29).
+3. Build the R23 staff workflows. There is no backend yet: ticket priority, assignment, staff availability, reminders and escalation timers.
+4. Run the full gates, add an M4 browser journey, and update the docs, the M4 report and traceability.
+5. Open the M4 PR, wait for CI, and merge.
+
+The full gates have not been rerun since the M3 merge. Run typecheck, lint, format, unit, build, integration and e2e before the PR. Local services: the PostgreSQL 16 cluster in `/tmp/pgtest` on port 55432, Redis on port 56379, and Node 24 at `/opt/node24/bin` (see Environment notes). A new container needs these recreated.
 
 ## Later exact gaps / external prerequisites
 
