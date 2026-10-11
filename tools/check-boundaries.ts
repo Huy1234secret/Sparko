@@ -1,0 +1,6 @@
+import {readdir,readFile} from 'node:fs/promises';
+import {join} from 'node:path';
+async function scan(path:string):Promise<string[]>{const out:string[]=[];for(const entry of await readdir(path,{withFileTypes:true})){const target=join(path,entry.name);if(entry.isDirectory()){if(!['node_modules','dist','generated'].includes(entry.name))out.push(...await scan(target));}else if(/\.(tsx?|js|mjs)$/.test(entry.name))out.push(target);}return out;}
+for(const file of await scan('apps/web/src')){const source=await readFile(file,'utf8');if(/(?:from\s*|import\s*\()['"](?:@sparko\/(?:db|domain|config|observability)|node:|@prisma|discord\.js|bullmq|ioredis|fs|pg)(?:\/|['"])/.test(source))throw new Error('Browser boundary violated in '+file);if(/process\.env|DISCORD_BOT_TOKEN|DISCORD_CLIENT_SECRET|TOKEN_ENCRYPTION_KEY/.test(source))throw new Error('Secret/runtime boundary violated in '+file);}
+for(const file of await scan('apps/web/dist')){const source=await readFile(file,'utf8');if(/DISCORD_BOT_TOKEN|DISCORD_CLIENT_SECRET|TOKEN_ENCRYPTION_KEY|PrismaClient|pg_advisory_xact_lock/.test(source))throw new Error('Server-only material found in '+file);}
+console.log('Browser source and built assets passed server/secret boundary checks.');

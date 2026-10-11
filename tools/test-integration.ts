@@ -1,0 +1,11 @@
+import 'dotenv/config';
+import {spawn} from 'node:child_process';
+import {readFile} from 'node:fs/promises';
+import {Client} from 'pg';
+import {Redis} from 'ioredis';
+import {testDatabaseUrl,testRedisUrl} from './test-targets.js';
+const database=testDatabaseUrl(),redisUrl=testRedisUrl();
+const pg=new Client({connectionString:database});await pg.connect();await pg.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public');await pg.query(await readFile(new URL('../packages/db/prisma/migrations/202610110001_initial/migration.sql',import.meta.url),'utf8'));await pg.end();
+const redis=new Redis(redisUrl);await redis.flushdb();await redis.quit();
+const child=spawn('pnpm',['exec','vitest','run','.integration.test.ts'],{stdio:'inherit',env:{...process.env,NODE_ENV:'test',TEST_DATABASE_URL:database,TEST_REDIS_URL:redisUrl}});
+child.on('exit',code=>process.exit(code??1));

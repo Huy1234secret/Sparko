@@ -1,0 +1,29 @@
+{
+  "name": "@sparko/assets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./registry": "./src/registry.ts",
+    "./animated-icon": "./src/AnimatedIcon.tsx"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src/registry.test.ts",
+    "dev:gallery": "vite ./preview --host 0.0.0.0 --port 5188"
+  },
+  "dependencies": {
+    "lottie-react": "3.1.2"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "vite": "8.3.4"
+  }
+}

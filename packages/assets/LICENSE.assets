@@ -1,0 +1,13 @@
+Sparko owned asset collection
+
+All artwork in media/ and the authored geometry in tools/generate.py was created
+from scratch for Sparko by Sparko contributors. It contains no artwork copied
+from CoinSprite, a stock library, or another product.
+
+The artwork is dedicated to the public domain under Creative Commons CC0 1.0
+Universal (CC0-1.0). You may copy, modify, distribute and use this artwork,
+including commercially, without asking permission.
+
+Full legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+The CC0 dedication applies to this artwork, not the lottie-react player or other
+application dependencies, whose licenses remain their own.
