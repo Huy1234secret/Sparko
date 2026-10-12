@@ -195,6 +195,8 @@ const timer = setInterval(async () => {
       where: {
         state: { in: ['pending', 'retry'] },
         dueAt: { lte: new Date() },
+        // Provider polls would reach real third-party hosts; browser tests stay offline.
+        type: { notIn: ['provider.social.schedule', 'provider.social.poll'] },
       },
       take: 20,
     }))

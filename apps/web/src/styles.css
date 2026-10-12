@@ -4031,5 +4031,9 @@ td[aria-current='true'] {
   justify-content: flex-end;
 }
 .economy-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   margin-top: 24px;
 }

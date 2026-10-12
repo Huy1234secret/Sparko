@@ -101,3 +101,33 @@ test('staff stock the shop and a member earns, buys and plays trivia across a re
   await page.goto(`/dashboard/${guild}/engagement/economy`);
   await expect(page.getByText(/accounts match the ledger/)).toBeVisible();
 });
+
+test('staff add a GitHub release source with honest provider status, then turn it off', async ({
+  page,
+}) => {
+  await login(page);
+  await turnOn(page, 'automations/social', /Turn on social alerts/);
+  await page.goto(`/dashboard/${guild}/automations/social`);
+  await expect(page.getByText('No alert sources yet')).toBeVisible();
+  const status = page.getByRole('listitem').filter({ hasText: 'YouTube' });
+  await expect(status.getByText('Needs operator setup')).toBeVisible();
+  await expect(
+    page
+      .getByRole('listitem')
+      .filter({ hasText: 'GitHub releases' })
+      .getByText('Ready'),
+  ).toBeVisible();
+
+  await page.getByRole('tab', { name: 'New source' }).click();
+  await page.getByLabel('Owner').fill('sparko');
+  await page.getByLabel('Repository').fill('community');
+  await page.getByLabel('Post alerts in').selectOption({ label: '# support' });
+  await page.getByRole('button', { name: 'Add source' }).click();
+  await expect(page.getByText('sparko/community releases')).toBeVisible();
+  await expect(page.getByText(/not checked yet/)).toBeVisible();
+  await page.getByRole('button', { name: 'Check now' }).click();
+  await expect(page.getByText(/check requested/)).toBeVisible();
+  await page.getByRole('button', { name: 'Turn off' }).click();
+  await expect(page.getByText('Turned off')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Check now' })).toHaveCount(0);
+});

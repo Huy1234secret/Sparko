@@ -1819,17 +1819,46 @@ export const providerRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/social/sources',
     capability: 'community.manage',
-    handler: async (ctx) => ({
-      sources: await ctx.tx.record.findMany({
-        where: { guildId: ctx.guildId, kind: 'social.source' },
-        take: 100,
-      }),
-      events: await ctx.tx.record.findMany({
-        where: { guildId: ctx.guildId, kind: 'provider.event' },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }),
-    }),
+    handler: async (ctx) => {
+      const [sources, events, cursors, rules, polls, announced] =
+        await Promise.all([
+          ctx.tx.record.findMany({
+            where: { guildId: ctx.guildId, kind: 'social.source' },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+          }),
+          ctx.tx.record.findMany({
+            where: { guildId: ctx.guildId, kind: 'provider.event' },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+          }),
+          ctx.tx.record.findMany({
+            where: { guildId: ctx.guildId, kind: 'social.cursor' },
+            take: 100,
+          }),
+          config(ctx, 'R47', SocialConfigSchema),
+          keyed(ctx, 'social.poll-budget', day(ctx)),
+          keyed(ctx, 'social.event-budget', day(ctx)),
+        ]);
+      const polled = new Map(cursors.map((c) => [c.key, jsonObject(c.data)]));
+      return {
+        // Each source with when it was last checked; never the provider secrets.
+        sources: sources.map((row) => ({
+          ...row,
+          lastPolledAt:
+            (polled.get(row.id)?.['polledAt'] as string | undefined) ?? null,
+          lastReceived:
+            (polled.get(row.id)?.['received'] as number | undefined) ?? null,
+        })),
+        events,
+        usage: {
+          pollsToday: Number(jsonObject(polls?.data)['count'] ?? 0),
+          pollsPerDay: rules.pollsPerDay,
+          announcedToday: Number(jsonObject(announced?.data)['count'] ?? 0),
+          eventsPerDay: rules.eventsPerDay,
+        },
+      };
+    },
   },
   {
     method: 'POST',

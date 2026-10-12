@@ -42,6 +42,12 @@ import {
   TradesPage,
 } from '../economy/StaffEconomy';
 import {
+  AiPage,
+  MusicPage,
+  SocialPage,
+  WebhooksPage,
+} from '../providers/ProviderPages';
+import {
   AchievementsPage,
   CollectionsPage,
   GamesPage,
@@ -94,6 +100,10 @@ const typedPages: Record<string, ComponentType> = {
   'engagement/reputation': ReputationPage,
   'engagement/seasons': SeasonsPage,
   'engagement/achievements': AchievementsPage,
+  'automations/social': SocialPage,
+  'automations/webhooks': WebhooksPage,
+  'settings/music': MusicPage,
+  'settings/ai': AiPage,
 };
 export function ModuleRouter() {
   const { group = '', module = '' } = useParams();
