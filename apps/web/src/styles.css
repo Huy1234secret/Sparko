@@ -3903,7 +3903,7 @@ td[aria-current='true'] {
 .economy-page .activity-row {
   flex-wrap: wrap;
 }
-.row-list .activity-row > span {
+.row-list .activity-row > span:first-child {
   min-width: min(100%, 220px);
 }
 .row-list .activity-row > .alert,
@@ -4022,4 +4022,14 @@ td[aria-current='true'] {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.activity-row > span.badge,
+.activity-row > span.row {
+  flex: 0 1 auto;
+}
+.activity-row > span.row {
+  justify-content: flex-end;
+}
+.economy-footnote {
+  margin-top: 24px;
 }

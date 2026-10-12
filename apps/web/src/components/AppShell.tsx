@@ -39,6 +39,7 @@ import {
   LayoutGrid,
   LifeBuoy,
   UserRound,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -501,6 +502,12 @@ function ToolFinder({ guildId }: { guildId: string }) {
       group: 'Member',
       to: `/servers/${guildId}/me`,
     },
+    {
+      name: 'Your economy',
+      group: 'Member',
+      description: 'Wallet, shop, trades and games',
+      to: `/servers/${guildId}/economy`,
+    },
     ...modules.map((module) => ({
       name: module.name,
       group: groupNames[module.group] ?? module.group,
@@ -707,6 +714,10 @@ export function DashboardShell() {
             <NavLink to={`/servers/${guildId}/me`} onClick={closeMenu}>
               <UserRound size={18} aria-hidden="true" />
               Your member profile
+            </NavLink>
+            <NavLink to={`/servers/${guildId}/economy`} onClick={closeMenu}>
+              <Wallet size={18} aria-hidden="true" />
+              Your economy
             </NavLink>
           </div>
         )}

@@ -554,7 +554,7 @@ export function MemberEconomyPage() {
           description="Server staff can turn on rewards, the shop, trading and games from the dashboard."
         />
       )}
-      <p className="field-hint">
+      <p className="field-hint economy-footnote">
         <Badge tone="neutral">Virtual only</Badge> Nothing here can be exchanged
         for real money.
       </p>
