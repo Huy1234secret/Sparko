@@ -1,4 +1,9 @@
 name: sparko
+# Bounded, rotating container logs (about 50 MB per service), matching the
+# privacy policy's promise that request logs are overwritten automatically.
+x-logging: &default-logging
+  driver: json-file
+  options: { max-size: 10m, max-file: '5' }
 x-runtime-environment: &runtime-environment
   NODE_ENV: production
   APP_VERSION: ${APP_VERSION:-0.1.0}
@@ -17,6 +22,7 @@ x-runtime-environment: &runtime-environment
   LOG_LEVEL: ${LOG_LEVEL:-info}
   STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
   STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:-}
   AI_API_KEY: ${AI_API_KEY:-}
   AI_MODEL: ${AI_MODEL:-}
   AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
@@ -25,6 +31,7 @@ services:
   postgres:
     image: postgres:17.6-bookworm
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: sparko
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Required}
@@ -39,6 +46,7 @@ services:
   redis:
     image: redis:7.4.6-bookworm
     restart: unless-stopped
+    logging: *default-logging
     command:
       [
         'redis-server',
@@ -57,6 +65,7 @@ services:
       retries: 10
     mem_limit: 384m
   migrate:
+    image: sparko-migrate:${APP_VERSION:-local}
     build: { context: .., dockerfile: infra/Dockerfile, target: runtime }
     environment: *runtime-environment
     command:
@@ -70,8 +79,10 @@ services:
       ]
     depends_on: { postgres: { condition: service_healthy } }
     restart: 'no'
+    logging: *default-logging
     mem_limit: 512m
   api:
+    image: sparko-api:${APP_VERSION:-local}
     build:
       {
         context: ..,
@@ -80,6 +91,7 @@ services:
         args: { SERVICE: api },
       }
     restart: unless-stopped
+    logging: *default-logging
     environment: { <<: *runtime-environment, PORT: 3001 }
     depends_on:
       {
@@ -107,6 +119,7 @@ services:
     mem_limit: 512m
     stop_grace_period: 30s
   bot:
+    image: sparko-bot:${APP_VERSION:-local}
     profiles: ['discord']
     build:
       {
@@ -116,6 +129,7 @@ services:
         args: { SERVICE: bot },
       }
     restart: unless-stopped
+    logging: *default-logging
     environment:
       {
         <<: *runtime-environment,
@@ -140,6 +154,7 @@ services:
     mem_limit: 512m
     stop_grace_period: 30s
   worker:
+    image: sparko-worker:${APP_VERSION:-local}
     profiles: ['discord']
     build:
       {
@@ -149,6 +164,7 @@ services:
         args: { SERVICE: worker },
       }
     restart: unless-stopped
+    logging: *default-logging
     environment: *runtime-environment
     depends_on:
       {
@@ -170,8 +186,10 @@ services:
     mem_limit: 768m
     stop_grace_period: 30s
   web:
+    image: sparko-web:${APP_VERSION:-local}
     build: { context: .., dockerfile: infra/Dockerfile, target: web }
     restart: unless-stopped
+    logging: *default-logging
     ports: ['127.0.0.1:8080:8080']
     depends_on: { api: { condition: service_healthy } }
     healthcheck:

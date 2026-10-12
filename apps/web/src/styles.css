@@ -1122,6 +1122,7 @@ summary {
   font-size: 15px;
 }
 .legal-content ul {
+  list-style: disc;
   font-size: 14px;
   color: var(--muted);
   margin: 0 0 17px;
