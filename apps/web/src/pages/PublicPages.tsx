@@ -47,6 +47,7 @@ import {
 } from '../services/public';
 import { loginUrl } from '../services/session';
 import { useUi } from '../state/ui';
+import { legal } from '../content/legal';
 
 const canonicalOrigin = 'https://panel.coin-sprite.com';
 
@@ -1457,6 +1458,17 @@ export function ChangelogPage() {
   );
 }
 
+const mail = `mailto:${legal.email}`;
+function Contact() {
+  return (
+    <>
+      email <a href={mail}>{legal.email}</a> or ask in our{' '}
+      <a href={legal.discordInvite} rel="noopener noreferrer" target="_blank">
+        Discord support server
+      </a>
+    </>
+  );
+}
 function LegalPage({
   title,
   description,
@@ -1470,29 +1482,19 @@ function LegalPage({
   return (
     <div className="public-page legal-page">
       <PageIntro
-        eyebrow="Clear boundaries"
+        eyebrow={`Effective ${legal.effectiveDate}`}
         title={title}
         description={description}
       />
       <article className="container legal-content">
-        <div className="alert">
-          <ShieldCheck size={19} />
-          <p>
-            Deployment policy draft · Operator review required. The service
-            operator must confirm its identity, contact route, retention
-            settings, and applicable legal details before a public production
-            release.
-          </p>
-        </div>
         {children}
         <section>
-          <h2>Questions or requests</h2>
+          <h2>Contact</h2>
           <p>
-            Use <Link to="/account/support">private account support</Link> for
-            service questions and{' '}
-            <Link to="/account/privacy">account privacy</Link> for export or
-            deletion workflows. Server administrators can review their
-            configured modules and retention in the server workspace.
+            Sparko is run by {legal.operator}, an individual based in{' '}
+            {legal.country}. For questions about these documents or your data,{' '}
+            <Contact />. Signed-in users can also use{' '}
+            <Link to="/account/support">private account support</Link>.
           </p>
         </section>
       </article>
@@ -1503,90 +1505,222 @@ function LegalPage({
 export function PrivacyPage() {
   return (
     <LegalPage
-      title="Privacy, with the details in view."
-      description="How Sparko’s account, server, support, and provider boundaries are designed to work."
+      title="Privacy Policy"
+      description="What Sparko collects, why, who it is shared with, how long it is kept and how to control it."
     >
       <section>
-        <h2>Account information and sessions</h2>
+        <h2>Who we are</h2>
         <p>
-          Discord sign-in requests the profile and server-list scopes needed to
-          identify you and determine eligible servers. OAuth credentials remain
-          on the server; they are not exposed in the browser. Account
-          preferences include theme, locale, timezone, motion, and notification
-          choices.
-        </p>
-        <p>
-          Sessions use an opaque cookie and server-side expiry and revocation.
-          Logging out revokes the current session. The connected-session
-          interface is the place to review or revoke available sessions.
+          Sparko is a Discord bot and the website at {legal.site}. It is run by{' '}
+          {legal.operator}, an individual in {legal.country} (“we”, “us”), who
+          decides how the personal data described here is used. This policy
+          covers people who sign in to the website and members of Discord
+          servers that use Sparko, even if they never visit the website.
         </p>
       </section>
       <section>
-        <h2>Server features and observed activity</h2>
+        <h2>What we collect</h2>
+        <h3>When you sign in with Discord</h3>
+        <ul>
+          <li>
+            Your Discord user ID, username and avatar, and the list of servers
+            you are in with your permissions there, so we can show the servers
+            you may manage.
+          </li>
+          <li>
+            Discord sign-in tokens, stored encrypted on our server and never
+            sent to your browser.
+          </li>
+          <li>
+            Your preferences (theme, language, timezone, motion, notifications
+            and whether your profile is public).
+          </li>
+          <li>
+            Messages and screenshots you send to product support, and export or
+            deletion requests you make.
+          </li>
+        </ul>
+        <h3>In servers that use Sparko</h3>
         <p>
-          Enabled modules may observe Discord member, message, reaction,
-          interaction, voice, or moderation events when permissions and intents
-          allow them. They retain the records necessary for configured behavior,
-          such as progression, claims, tickets, moderation cases, and aggregate
-          analytics.
+          A server’s staff choose which modules to turn on. Depending on those
+          choices, Sparko processes:
         </p>
+        <ul>
+          <li>
+            Member IDs, roles, join dates and account age, for welcome messages,
+            verification, auto roles and safety features.
+          </li>
+          <li>
+            Message activity and content, for levels, counting, auto moderation,
+            auto replies, starboard and ticket transcripts.
+          </li>
+          <li>
+            Voice activity, reactions and invites, for voice rooms, reaction
+            roles, invite tracking and analytics.
+          </li>
+          <li>
+            Things you create or do: tickets and form answers, reports and
+            appeals, suggestions, polls, events, reminders, birthdays, economy
+            balances and items, and moderation cases.
+          </li>
+          <li>An audit log of staff actions in the dashboard.</li>
+        </ul>
+        <h3>Technical data</h3>
         <p>
-          Message content can be retained for enabled transcripts or other
-          disclosed features. Sparko does not describe this architecture as
-          zero-content storage. Missing event access is displayed as a
-          collection limitation rather than fabricated history.
-        </p>
-      </section>
-      <section>
-        <h2>Private support and transcripts</h2>
-        <p>
-          Product-support conversations belong to the account and authorized
-          product-support staff. Guild administrator access does not
-          automatically grant access to product support. Server tickets and
-          their transcripts have separate participant and staff authorization.
-        </p>
-        <p>
-          Private files are delivered through authorized routes, separate from
-          public assets. Download access is rechecked. Transcript capture
-          reports available history and gaps.
-        </p>
-      </section>
-      <section>
-        <h2>Optional external providers</h2>
-        <p>
-          Billing, social, AI, and music features require configured adapters.
-          An unavailable provider is shown as unavailable. When optional AI or
-          another provider receives content, the enabled workflow must disclose
-          the provider and the information sent.
-        </p>
-        <p>
-          Verified provider events control paid entitlements. Browser redirects
-          do not establish payment. Virtual-economy balances are separate from
-          billing.
-        </p>
-      </section>
-      <section>
-        <h2>Retention, exports, and deletion</h2>
-        <p>
-          Retention depends on the deployed policy and enabled module. The
-          operator must publish exact retention periods before production
-          release. Permission-filtered account and server exports include only
-          records the requester may access.
-        </p>
-        <p>
-          Deletion requests follow the service’s operational policy and preserve
-          required consistency for pending operations, references, and retained
-          audit records. The interface should show the actual request state
-          rather than imply that all data was instantly removed.
+          Our servers keep short rolling logs of requests, which can include
+          your IP address as passed on by Cloudflare. They are used only for
+          security and fixing faults, never contain your sign-in tokens or
+          message content, and are overwritten automatically.
         </p>
       </section>
       <section>
-        <h2>Public information</h2>
+        <h2>Why we use it</h2>
+        <ul>
+          <li>
+            To provide the features you or your server’s staff turned on. This
+            is necessary to run the service you asked for.
+          </li>
+          <li>
+            To keep Sparko secure: sign-in sessions, permission checks, abuse
+            prevention and audit records.
+          </li>
+          <li>
+            To take payments for Premium and keep the records the law requires.
+          </li>
+          <li>To answer support requests.</li>
+        </ul>
         <p>
-          Public status exposes safe service observations. Public widgets and
-          leaderboards require configured privacy controls and opt-in where
-          applicable. Private server names, support records, credentials, and
-          transcript content do not belong in public aggregate endpoints.
+          We do not sell personal data, show advertising or use your data to
+          train AI models.
+        </p>
+      </section>
+      <section>
+        <h2>Who we share it with</h2>
+        <p>
+          Only with the services needed to run Sparko, each under its own
+          privacy terms:
+        </p>
+        <ul>
+          <li>
+            <strong>Discord</strong>, where the bot runs and through which you
+            sign in.
+          </li>
+          <li>
+            <strong>Vultr</strong>, which hosts our servers and database.
+          </li>
+          <li>
+            <strong>Cloudflare</strong>, which provides DNS, HTTPS and
+            protection from attacks for the website.
+          </li>
+          <li>
+            <strong>PayPal</strong>, which handles Premium payments. We never
+            see your card or bank details.
+          </li>
+          <li>
+            <strong>Google (Gmail)</strong>, if you email us.
+          </li>
+          <li>
+            <strong>OpenAI</strong>, only if a server turns on AI assistance,
+            and only the text a staff member submits for it.
+          </li>
+        </ul>
+        <p>
+          Social alerts read public feeds from YouTube, Twitch, GitHub or RSS
+          sites; no personal data is sent to them. We may disclose data when the
+          law requires it. Staff of a server can see the records of that server
+          their role allows.
+        </p>
+        <p>
+          These services may store data outside {legal.country}, including in
+          the United States. We only use providers that protect personal data to
+          a standard required by applicable law.
+        </p>
+      </section>
+      <section>
+        <h2>How long we keep it</h2>
+        <ul>
+          <li>
+            <strong>Server data</strong> is kept while Sparko is in the server.
+            When the bot is removed, the server’s data is deleted{' '}
+            {legal.removalGraceDays} days later. The delay lets a server that
+            removed Sparko by mistake add it back without losing its setup.
+          </li>
+          <li>
+            <strong>Ticket transcripts</strong> are deleted automatically after{' '}
+            {legal.transcriptDays} days at most ({legal.freeTranscriptDays} days
+            on the Free plan).
+          </li>
+          <li>
+            <strong>Your account</strong> is kept until you delete it. Sign-in
+            sessions end after {legal.sessionDays} days, and data exports can be
+            downloaded for {legal.exportDays} days.
+          </li>
+          <li>
+            <strong>Payment records</strong> are kept for as long as tax and
+            accounting law requires, even after a server or account is deleted.
+          </li>
+        </ul>
+      </section>
+      <section>
+        <h2>Your rights and choices</h2>
+        <p>
+          Depending on where you live, including under {legal.country}’s
+          personal data protection law and the EU GDPR, you can ask to see,
+          copy, correct or delete your data, withdraw consent, or object to or
+          restrict how it is used.
+        </p>
+        <ul>
+          <li>
+            <Link to="/account/privacy">Account privacy</Link> lets you download
+            your data or delete your account yourself. Deleting your account
+            ends your sessions, removes your sign-in tokens, support
+            conversations, reminders, birthdays and uploads, and replaces your
+            name with “Deleted user”.
+          </li>
+          <li>
+            Records a server keeps about its members (such as tickets,
+            moderation cases, levels and economy history) stay with that server
+            until it removes Sparko. To have them removed sooner, ask that
+            server’s staff, or contact us.
+          </li>
+          <li>
+            For anything else, <Contact />. We answer within the time limits the
+            law sets. You may also complain to your data protection authority.
+          </li>
+        </ul>
+      </section>
+      <section>
+        <h2>Cookies and storage</h2>
+        <p>
+          We use only cookies needed to keep you signed in and to protect forms
+          from cross-site attacks, plus your theme choice stored in your
+          browser. Cloudflare may set its own security cookies. There are no
+          advertising or analytics trackers.
+        </p>
+      </section>
+      <section>
+        <h2>Children</h2>
+        <p>
+          You must be at least {legal.minimumAge}, and old enough to use Discord
+          where you live. If you are under 16, use Sparko only with permission
+          from a parent or guardian. If we learn that we hold data about a child
+          who is too young, we will delete it.
+        </p>
+      </section>
+      <section>
+        <h2>Security</h2>
+        <p>
+          Connections use HTTPS, sign-in tokens and integration secrets are
+          encrypted, and every action is checked against your current Discord
+          permissions. No system is perfectly secure; if a breach affects your
+          data, we will tell you and the authorities as the law requires.
+        </p>
+      </section>
+      <section>
+        <h2>Changes</h2>
+        <p>
+          We will update this page and its effective date when this policy
+          changes, and announce important changes in our Discord support server.
         </p>
       </section>
     </LegalPage>
@@ -1596,89 +1730,156 @@ export function PrivacyPage() {
 export function TermsPage() {
   return (
     <LegalPage
-      title="Terms, plainly stated."
-      description="The service’s intended use, authorization rules, provider limits, and operational responsibilities."
+      title="Terms of Service"
+      description="The agreement between you and Sparko’s operator for using the bot and website."
     >
       <section>
-        <h2>Using the service</h2>
+        <h2>The agreement</h2>
         <p>
-          Sparko provides configurable Discord community tools and their related
-          website. Use the service only for servers and records you are
-          authorized to manage or access. Your Discord account remains subject
-          to Discord’s own terms and rules.
-        </p>
-        <p>
-          Visible controls do not grant permission. Actions require current
-          actor authority, the correct tenant, module access, and necessary
-          Discord permissions. Staff capabilities are scoped, and a server owner
-          is not automatically a global product operator.
+          These terms are an agreement between you and {legal.operator}, the
+          individual in {legal.country} who runs Sparko. By adding Sparko to a
+          server, signing in to {legal.site} or using the bot, you accept them
+          and our <Link to="/privacy">Privacy Policy</Link>. If you do not
+          agree, do not use Sparko.
         </p>
       </section>
       <section>
-        <h2>Configuration and consequential actions</h2>
+        <h2>Who can use Sparko</h2>
         <p>
-          Review destinations, roles, eligibility, message mentions, schedules,
-          and affected scope before enabling or publishing a workflow. Saving a
-          draft, applying a setting, and delivering a Discord message are
-          distinct outcomes.
-        </p>
-        <p>
-          Keep access deliberate and use the displayed confirmation for
-          destructive or bulk actions. Do not upload unsafe files, attempt to
-          bypass authorization, forge events, or use integrations to execute
-          unreviewed code.
+          You must be at least {legal.minimumAge}, old enough to use Discord
+          where you live, and follow Discord’s Terms of Service and Community
+          Guidelines. If you are under 18, you need a parent or guardian’s
+          permission to buy Premium.
         </p>
       </section>
       <section>
-        <h2>Availability and provider limits</h2>
+        <h2>Server staff</h2>
+        <p>If you add Sparko to a server or manage it there, you agree to:</p>
+        <ul>
+          <li>Only manage servers you are authorized to manage.</li>
+          <li>
+            Tell your members which features you turn on, especially ones that
+            record messages, such as transcripts and moderation.
+          </li>
+          <li>
+            Check channels, roles and audiences before publishing messages or
+            running automations.
+          </li>
+          <li>
+            Use Sparko in line with Discord’s rules and the law, and handle
+            member requests about the server’s records.
+          </li>
+        </ul>
+      </section>
+      <section>
+        <h2>Acceptable use</h2>
+        <p>You must not use Sparko to:</p>
+        <ul>
+          <li>
+            Harass, spam or harm people, or share illegal content or content you
+            have no right to share.
+          </li>
+          <li>
+            Get around permissions, access other servers’ data, or attack,
+            overload or reverse-engineer the service.
+          </li>
+          <li>
+            Run gambling for real money or real-world prizes, or sell virtual
+            currency or items.
+          </li>
+          <li>Pretend to be Sparko staff or another person.</li>
+        </ul>
         <p>
-          Discord and optional providers impose permissions, rate limits,
-          connectivity requirements, and product restrictions. Some events or
-          historical data may be unavailable. The service records uncertainty
-          and recovery states where it cannot establish an external outcome.
-        </p>
-        <p>
-          Service observations are current evidence, not an uptime guarantee. A
-          local preview or test suite does not establish live provider delivery.
-          Optional integrations remain gated until configured and verified for
-          the intended use.
+          We may remove content, limit features, or stop providing Sparko to a
+          user or server that breaks these terms.
         </p>
       </section>
       <section>
-        <h2>Plans and virtual items</h2>
+        <h2>Your content</h2>
         <p>
-          Plans and capability limits come from the deployed service
-          configuration. Checkout requires a configured provider, and verified
-          provider events determine entitlement state. The operator must publish
-          applicable prices, cancellation, refund, and account policies before
-          accepting production payments.
-        </p>
-        <p>
-          Virtual economy currency and items are scoped game records, separate
-          from payments. Virtual lottery, when available and explicitly enabled,
-          uses virtual-only entries without cash redemption.
+          You keep ownership of what you create and upload. You give us
+          permission to store, display and send it only as needed to run the
+          features you use. You are responsible for having the rights to content
+          you publish through Sparko.
         </p>
       </section>
       <section>
-        <h2>Content, privacy, and support</h2>
+        <h2>Virtual currency and items</h2>
         <p>
-          Use content and media you have permission to publish. The service may
-          reject unsafe or unsupported files. Server administrators should
-          explain their enabled collection and moderation policies to members.
-        </p>
-        <p>
-          Read the <Link to="/privacy">privacy policy</Link> for account,
-          server, support, and provider boundaries. Use the authorized export,
-          deletion, session, and support workflows for requests.
+          Economy balances, items, lottery tickets and rewards are game records
+          with no real-world value. They cannot be exchanged for money, sold, or
+          transferred outside Sparko, and they may be reset or removed. The
+          virtual lottery uses virtual currency only.
         </p>
       </section>
       <section>
-        <h2>Release policy</h2>
+        <h2>Premium</h2>
+        <ul>
+          <li>
+            Premium (the Plus plan) is paid through PayPal. The price and
+            billing period are shown before you pay, and PayPal’s terms also
+            apply to the payment.
+          </li>
+          <li>
+            Subscriptions renew automatically until cancelled. You can cancel
+            any time in PayPal; Premium then stays active until the end of the
+            period already paid for.
+          </li>
+          <li>
+            If you were charged by mistake, or Premium does not work and we
+            cannot fix it, contact us within {legal.refundWindowDays} days of
+            the payment for a refund. Otherwise payments are not refundable,
+            except where the law gives you a right to a refund.
+          </li>
+          <li>
+            If a payment is reversed or charged back, Premium may be removed.
+            When Premium ends, your server keeps its data and returns to Free
+            limits.
+          </li>
+          <li>
+            We may change prices or Premium features; a price change applies
+            from your next billing period after we announce it.
+          </li>
+        </ul>
+      </section>
+      <section>
+        <h2>Availability</h2>
         <p>
-          The deployed operator must complete this policy with its identity,
-          contact information, applicable legal terms, and production release
-          details. This draft does not invent a legal entity, jurisdiction,
-          certification, or production availability promise.
+          Sparko depends on Discord and other services and may change, be
+          interrupted, or stop. We provide it “as is” and do not promise that it
+          will always be available or free of errors.
+        </p>
+      </section>
+      <section>
+        <h2>Liability</h2>
+        <p>
+          To the extent the law allows, we are not liable for indirect or
+          consequential losses, or for loss of data, revenue or community
+          members, arising from use of Sparko. Our total liability to you is
+          limited to the amount you paid us in the 12 months before the claim.
+          Nothing in these terms removes rights you have under consumer
+          protection law.
+        </p>
+      </section>
+      <section>
+        <h2>Ending use</h2>
+        <p>
+          You can stop at any time by removing Sparko from your server or
+          deleting your account. A removed server’s data is deleted{' '}
+          {legal.removalGraceDays} days after the bot leaves, as described in
+          the <Link to="/privacy">Privacy Policy</Link>.
+        </p>
+      </section>
+      <section>
+        <h2>Changes and law</h2>
+        <p>
+          We will post changes to these terms on this page with a new effective
+          date and announce important changes in our Discord support server.
+          Using Sparko after a change means you accept it. These terms are
+          governed by the laws of {legal.country}. Please contact us first so we
+          can try to resolve any dispute informally; otherwise disputes go to
+          the competent courts of {legal.country}, without affecting any right
+          you have to bring a claim where you live.
         </p>
       </section>
     </LegalPage>

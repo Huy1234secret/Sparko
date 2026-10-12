@@ -10,7 +10,9 @@ import {
   DocsPage,
   FeaturesPage,
   HomePage,
+  PrivacyPage,
   StatusPage,
+  TermsPage,
 } from './PublicPages';
 import {
   getPublicCommands,
@@ -181,5 +183,34 @@ describe('public product behavior', () => {
     ).toBeVisible();
     expect(screen.getAllByText('Availability not loaded')).toHaveLength(10);
     expect(screen.queryByText('Available')).not.toBeInTheDocument();
+  });
+});
+
+describe('legal pages', () => {
+  it('names the operator, contacts, processors and real retention periods', () => {
+    renderPage(<PrivacyPage />, '/privacy');
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Privacy Policy' }),
+    ).toBeVisible();
+    expect(screen.getAllByText(/VietHuy/).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole('link', { name: 'Sparko.support@gmail.com' })[0],
+    ).toHaveAttribute('href', 'mailto:Sparko.support@gmail.com');
+    expect(
+      screen.getAllByRole('link', { name: 'Discord support server' })[0],
+    ).toHaveAttribute('href', 'https://discord.gg/HwvYrwupZm');
+    for (const processor of ['Discord', 'Vultr', 'Cloudflare', 'PayPal'])
+      expect(screen.getByText(processor, { selector: 'strong' })).toBeVisible();
+    expect(screen.getByText(/deleted\s+7 days later/)).toBeVisible();
+    expect(screen.getByText(/after\s+30 days at most/)).toBeVisible();
+    expect(screen.queryByText(/draft/i)).toBeNull();
+  });
+
+  it('sets the age, payment, refund and governing-law terms', () => {
+    renderPage(<TermsPage />, '/terms');
+    expect(screen.getByText(/You must be at least 13/)).toBeVisible();
+    expect(screen.getByText(/paid through PayPal/)).toBeVisible();
+    expect(screen.getByText(/within 14 days of/)).toBeVisible();
+    expect(screen.getByText(/governed by the laws of Vietnam/)).toBeVisible();
   });
 });
