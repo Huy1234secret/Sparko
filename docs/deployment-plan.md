@@ -1,6 +1,6 @@
 # Deployment plan
 
-This is the plan for the first production release of Sparko at `https://panel.coin-sprite.com`. **It has not been executed.** Production deployment and the domain cutover each need explicit authorization from the owner. Nobody runs a step below until that authorization is recorded in the release record. [Deployment](deployment.md) and [operations](operations.md) hold the commands; this page fixes the order, the evidence and the go/no-go decisions.
+This is the plan for the first production release of Sparko at `https://panel.coin-sprite.com`. **It has not been executed.** Production deployment and the domain cutover each need explicit authorization from the owner. Nobody runs a step below until that authorization is recorded in the release record. The concrete steps for the Vultr server and Cloudflare are in [deploy-vultr](deploy-vultr.md). [Deployment](deployment.md) and [operations](operations.md) hold the general commands; this page fixes the order, the evidence and the go/no-go decisions.
 
 ## Authorizations and inputs
 

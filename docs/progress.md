@@ -9,7 +9,8 @@ Active continuation (Claude, 2026-10-12). Repository: private `Huy1234secret/Spa
 - M5 merged ([PR #8](https://github.com/Huy1234secret/Sparko/pull/8), `e9d58a1`). See `docs/milestones/m5.md`.
 - M6 merged ([PR #9](https://github.com/Huy1234secret/Sparko/pull/9), `f7ee647`). See `docs/milestones/m6.md`.
 - M7/M8 merged ([PR #10](https://github.com/Huy1234secret/Sparko/pull/10), `114b548`). See `docs/milestones/m7.md`.
-- M9 is delivered from `claude/clever-lovelace-b5a124`, restarted from `114b548`. See `docs/milestones/m9.md`, `docs/quality.md` and `docs/deployment-plan.md`.
+- M9 merged ([PR #11](https://github.com/Huy1234secret/Sparko/pull/11), `ab9d8e2`). See `docs/milestones/m9.md`, `docs/quality.md` and `docs/deployment-plan.md`.
+- Release preparation (legal pages, removal purge, Vultr deploy workflow) is delivered from `claude/clever-lovelace-b5a124`, restarted from `ab9d8e2`. See `docs/deploy-vultr.md`.
 - Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head; the next milestone restarts the working branch from the merged `main`.
 
 ## Milestone / PR state
@@ -25,7 +26,8 @@ Active continuation (Claude, 2026-10-12). Repository: private `Huy1234secret/Spa
 | M5 Time and automation      | **Merged** | [PR #8](https://github.com/Huy1234secret/Sparko/pull/8) (`e9d58a1`). See `docs/milestones/m5.md`.                                                                         |
 | M6 Gates, plans and support | **Merged** | [PR #9](https://github.com/Huy1234secret/Sparko/pull/9) (`f7ee647`). See `docs/milestones/m6.md`.                                                                         |
 | M7/M8 Economy and social    | **Merged** | [PR #10](https://github.com/Huy1234secret/Sparko/pull/10) (`114b548`). See `docs/milestones/m7.md`.                                                                       |
-| M9 Config tools and quality | **PR**     | All local gates pass. See `docs/milestones/m9.md`; PR and CI recorded on merge. Production deployment awaits separate authorization.                                      |
+| M9 Config tools and quality | **Merged** | [PR #11](https://github.com/Huy1234secret/Sparko/pull/11) (`ab9d8e2`). See `docs/milestones/m9.md`.                                                                       |
+| Release preparation         | **PR**     | Legal pages, removal purge, deploy workflow. See `docs/deploy-vultr.md`; PR and CI recorded on merge.                                                                     |
 
 ## Verification record (M9 source)
 
@@ -75,9 +77,13 @@ Resolved: configuration backups (snapshot, import, download, remapped restore un
 
 Still open: live acceptance (see `docs/quality.md`); rollout between two real guilds; screen-reader passes and a reviewed Vietnamese interface; production deployment and cutover after authorization.
 
+## Release decisions (owner, 2026-10-12)
+
+Host: Vultr `64.177.44.183` behind Cloudflare (proxied) at `https://panel.coin-sprite.com`, replacing the old CoinSprite site. Deployment is authorized. The production bot is "Sparko" (Sparko-Test is for testing). Operator VietHuy (individual, Vietnam); minimum age 13; contact Sparko.support@gmail.com and https://discord.gg/HwvYrwupZm; Premium is sold through PayPal (manual staff Plus grants until a PayPal integration exists); server data is kept until the bot is removed and deleted 7 days later; transcripts are kept at most 30 days. Deploys run from GitHub Actions › Deploy with an SSH key the owner stores as repository secrets; this cloud session cannot reach the server.
+
 ## Next concrete action
 
-Merge M9 after CI passes on its exact head, then restart the working branch from `main`. The code milestones are then complete. What remains needs the owner: the authorizations and inputs in `docs/deployment-plan.md` (hosting, DNS, Discord application, secrets, approved providers) for staging, then live acceptance, then production and cutover, each separately authorized.
+Merge the release-preparation PR after CI passes on its exact head. The owner then follows `docs/deploy-vultr.md`: Discord portal settings, deploy key, `server-setup.sh` on the server, GitHub secrets, first Deploy run, then the Cloudflare DNS switch and live checks.
 
 ## Later exact gaps / external prerequisites
 

@@ -1,0 +1,88 @@
+name: Deploy
+# Manual production release. Each run is a deliberate decision: it only
+# deploys a commit on main whose Checks passed, uploads that exact source to
+# the server and runs infra/deploy-release.sh there. Add required reviewers
+# to the "production" environment in GitHub settings for a second approval.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit or branch to deploy (must be on main and have passed Checks)
+        required: true
+        default: main
+      check_public_site:
+        description: Check https://panel.coin-sprite.com afterwards (turn off until DNS points at the server)
+        type: boolean
+        default: true
+permissions:
+  contents: read
+  checks: read
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: https://panel.coin-sprite.com
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Require a commit on main that passed Checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::$sha is not on main. Merge it through a pull request first."
+            exit 1
+          fi
+          conclusion=$(gh api "repos/$REPO/commits/$sha/check-runs?check_name=verify" \
+            --jq '[.check_runs[].conclusion] | first // "missing"')
+          if [ "$conclusion" != success ]; then
+            echo "::error::Checks have not passed for $sha (verify: $conclusion)."
+            exit 1
+          fi
+          echo "SHA=$sha" >>"$GITHUB_ENV"
+          echo "Deploying $sha"
+      - name: Prepare the SSH connection
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository secret $name is not set. See docs/deploy-vultr.md."
+              exit 1
+            fi
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" >~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # Pinned host key: the connection fails rather than trusting a new server.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >~/.ssh/known_hosts
+      - name: Upload and release
+        run: |
+          git archive --format=tar.gz -o release.tar.gz "$SHA"
+          scp -i ~/.ssh/deploy -o StrictHostKeyChecking=yes release.tar.gz \
+            "$DEPLOY_USER@$DEPLOY_HOST:/opt/sparko/incoming/$SHA.tar.gz"
+          ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            "tar -xzOf /opt/sparko/incoming/$SHA.tar.gz infra/deploy-release.sh | bash -s $SHA"
+      - name: Check the public site
+        if: ${{ inputs.check_public_site }}
+        run: |
+          for path in /health/live /health/ready /api/v1/public/status /privacy; do
+            curl -fsS --retry 6 --retry-delay 10 --retry-all-errors -o /dev/null \
+              -w "$path %{http_code}\n" "https://panel.coin-sprite.com$path"
+          done
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/deploy

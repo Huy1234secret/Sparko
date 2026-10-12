@@ -20,6 +20,8 @@ import {
   ingestSafetyEvent,
   ingestAutomationEvent,
   type DomainContext,
+  guildReinstalled,
+  guildRemoved,
 } from '@sparko/domain';
 import type { Actor } from '@sparko/contracts';
 import { logger } from '@sparko/observability';
@@ -523,7 +525,40 @@ async function primeInvites() {
   for (const guild of client.guilds.cache.values())
     await invites.prime(guild.id);
 }
+client.on(Events.GuildCreate, (guild) => {
+  void db.guild
+    .upsert({
+      where: { id: guild.id },
+      create: { id: guild.id, name: guild.name, installed: true },
+      update: { name: guild.name, installed: true },
+    })
+    .then(() =>
+      observed(guild.id, `guild_join:${guild.id}:${Date.now()}`, {}, (ctx) =>
+        guildReinstalled(ctx),
+      ),
+    );
+});
+client.on(Events.GuildDelete, (guild) => {
+  // An outage makes a guild unavailable; only a real removal schedules deletion.
+  if (!guild.available) return;
+  void observed(guild.id, `guild_remove:${guild.id}:${Date.now()}`, {}, (ctx) =>
+    guildRemoved(ctx),
+  );
+});
+/** Servers that removed Sparko while it was offline. */
+async function reconcileRemovals() {
+  const known = await db.guild.findMany({
+    where: { installed: true },
+    select: { id: true },
+  });
+  for (const { id } of known)
+    if (!client.guilds.cache.has(id))
+      await observed(id, `guild_remove:${id}:${Date.now()}`, {}, (ctx) =>
+        guildRemoved(ctx),
+      );
+}
 client.once(Events.ClientReady, () => {
+  void reconcileRemovals();
   void coverage(
     'collecting',
     'Gateway connected; collection starts at this observation.',

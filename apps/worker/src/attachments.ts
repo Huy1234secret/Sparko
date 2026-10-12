@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, unlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { DomainError } from '@sparko/contracts';
 import type { PrismaClient } from '@sparko/db';
@@ -108,4 +108,30 @@ export async function publicationFiles(
     });
   }
   return files;
+}
+
+/**
+ * Deletes stored library files that no remaining server references. Files
+ * are content-addressed and may be shared, so each hash is checked first.
+ */
+export async function removeOrphanAssets(
+  db: PrismaClient,
+  hashes: string[],
+  storagePath = process.env['STORAGE_PATH'] ?? '.data/private',
+): Promise<number> {
+  let removed = 0;
+  for (const hash of new Set(hashes)) {
+    if (!/^[a-f0-9]{64}$/.test(hash)) continue;
+    const used = await db.record.count({
+      where: { kind: 'asset', data: { path: ['hash'], equals: hash } },
+    });
+    if (used) continue;
+    await unlink(resolve(storagePath, 'assets', `${hash}.png`)).then(
+      () => removed++,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      },
+    );
+  }
+  return removed;
 }

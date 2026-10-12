@@ -1117,6 +1117,24 @@ summary {
   color: var(--muted);
   margin-bottom: 17px;
 }
+.legal-content h3 {
+  margin: 20px 0 10px;
+  font-size: 15px;
+}
+.legal-content ul {
+  list-style: disc;
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0 0 17px;
+  padding-left: 20px;
+}
+.legal-content li {
+  margin-bottom: 8px;
+}
+.legal-content a {
+  color: var(--text);
+  text-decoration: underline;
+}
 .dashboard-shell {
   display: flex;
   min-height: 100vh;
