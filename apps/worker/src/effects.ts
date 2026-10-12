@@ -32,6 +32,7 @@ import {
   createStripeCheckout,
   completeCheckout,
   runProviderJob,
+  purgeGuild,
 } from '@sparko/domain';
 import {
   BRAND_YELLOW,
@@ -50,7 +51,7 @@ import {
   type DiscordFile,
   type DiscordMessage,
 } from './discord.js';
-import { publicationFiles } from './attachments.js';
+import { publicationFiles, removeOrphanAssets } from './attachments.js';
 import { DeliveryUncertainError } from './failure.js';
 import {
   archivedMessageComponents,
@@ -153,6 +154,17 @@ export class EffectExecutor {
   }
   async execute(work: OutboxWork): Promise<void> {
     const p = jsonObject(work.payload);
+    if (work.type === 'guild.purge') {
+      const result = await this.transaction(work, (ctx) =>
+        purgeGuild(ctx, p, work.id),
+      );
+      // Files go only after the records that named them are gone.
+      await removeOrphanAssets(
+        this.db,
+        (result.data as Awaited<ReturnType<typeof purgeGuild>>).assetHashes,
+      );
+      return;
+    }
     if (work.type === 'config.apply') {
       const heartbeat = await this.db.heartbeat.findUnique({
         where: { service: 'bot' },
