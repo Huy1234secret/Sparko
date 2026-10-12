@@ -1,6 +1,6 @@
 # Deployment and release
 
-The intended origin is `https://panel.coin-sprite.com`. This configuration prepares a new independent deployment. It does not change the existing live website, reuse its database, or establish DNS/hosting credentials.
+The intended origin is `https://panel.coin-sprite.com`. This configuration prepares a new independent deployment. It does not change the existing live website, reuse its database, or establish DNS/hosting credentials. The order of stages, the authorizations each needs and the go/no-go criteria are in the [deployment plan](deployment-plan.md).
 
 ## Build and stage
 

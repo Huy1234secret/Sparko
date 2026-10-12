@@ -630,6 +630,8 @@ function StudioEditor() {
       <input
         type="file"
         className="sr-only"
+        aria-label="Message file to import"
+        tabIndex={-1}
         ref={fileInput}
         accept="application/json,.json"
         onChange={(event) => void importDocument(event.target.files?.[0])}

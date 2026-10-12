@@ -27,13 +27,15 @@
     "discord:register": "tsx apps/bot/src/register.ts",
     "backup": "tsx tools/backup.ts",
     "restore:verify": "tsx tools/restore.ts",
-    "smoke": "tsx tools/smoke.ts"
+    "smoke": "tsx tools/smoke.ts",
+    "load": "tsx tools/load.ts"
   },
   "devDependencies": {
     "typescript": "5.9.3",
     "tsx": "4.21.0",
     "vitest": "5.0.3",
     "@playwright/test": "1.64.0",
+    "@axe-core/playwright": "4.13.0",
     "eslint": "10.12.0",
     "typescript-eslint": "8.71.1",
     "eslint-plugin-react-hooks": "7.1.1",

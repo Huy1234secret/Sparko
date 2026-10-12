@@ -54,10 +54,11 @@ The production build includes real public React prerendering, canonical metadata
 | `RESTORE_FILE=/absolute/path/backup.dump TEST_DATABASE_URL=... pnpm restore:verify` | Restore only into a disposable local test target and verify core relations/ledger.                          |
 | `pnpm smoke`                                                                        | Check health, truthful public status, API routing, and the web app at `SMOKE_ORIGIN` or `PUBLIC_APP_URL`.   |
 | `SMOKE_CHECK_PROXY=true pnpm smoke`                                                 | Also check production private-route headers and asset 404 behavior.                                         |
+| `pnpm load`                                                                         | Measure local API latency through real sign-in; loopback only. See [quality](docs/quality.md).              |
 
 Database archive commands require PostgreSQL client tools matching the server major version. Database archives exclude private media; [operations](docs/operations.md) describes the combined backup and recovery procedure.
 
-See [deployment](docs/deployment.md) for non-root production containers, migration ordering, same-origin proxy/TLS, staging, and rollback. Building or merging source does not change the existing live website. Live hosting, domain cutover, Discord/provider verification, and operator legal text remain separate release gates.
+The staged release order, required authorizations and go/no-go criteria are in the [deployment plan](docs/deployment-plan.md). See [deployment](docs/deployment.md) for non-root production containers, migration ordering, same-origin proxy/TLS, staging, and rollback. Building or merging source does not change the existing live website. Live hosting, domain cutover, Discord/provider verification, and operator legal text remain separate release gates.
 
 ## Layout
 
