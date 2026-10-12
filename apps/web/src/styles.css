@@ -3919,6 +3919,11 @@ td[aria-current='true'] {
   white-space: nowrap;
 }
 .reward-grid,
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  column-gap: 16px;
+}
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
@@ -4029,6 +4034,7 @@ td[aria-current='true'] {
 }
 .activity-row > span.row {
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 .economy-footnote {
   display: flex;

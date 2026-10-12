@@ -48,6 +48,11 @@ import {
   WebhooksPage,
 } from '../providers/ProviderPages';
 import {
+  BackupsPage,
+  MultiServerPage,
+  WidgetsPage,
+} from '../settings/ConfigToolsPages';
+import {
   AchievementsPage,
   CollectionsPage,
   GamesPage,
@@ -104,6 +109,9 @@ const typedPages: Record<string, ComponentType> = {
   'automations/webhooks': WebhooksPage,
   'settings/music': MusicPage,
   'settings/ai': AiPage,
+  'settings/backups': BackupsPage,
+  'settings/multi-server': MultiServerPage,
+  'settings/widgets': WidgetsPage,
 };
 export function ModuleRouter() {
   const { group = '', module = '' } = useParams();
