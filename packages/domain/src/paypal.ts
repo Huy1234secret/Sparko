@@ -4,9 +4,11 @@ import { hash, type DomainContext } from './core.js';
 import {
   callJson,
   configured,
+  paypalPlanSettings,
   paypalSettings,
   providerHttp,
   recordEntitlement,
+  type BillingPeriod,
   type EntitlementObservation,
   type HttpRequest,
   type ProviderTransport,
@@ -87,12 +89,19 @@ async function api(
 
 /** Starts a subscription for a checkout intent; the member approves it on PayPal. */
 export async function createPaypalSubscription(
-  intent: { id: string; guildId: string; userId: string },
+  intent: {
+    id: string;
+    guildId: string;
+    userId: string;
+    period?: BillingPeriod;
+  },
   origin: string,
   env: Environment = process.env,
   transport: ProviderTransport = providerHttp,
 ) {
   configured(env, paypalSettings);
+  const planSetting = paypalPlanSettings[intent.period ?? 'monthly'];
+  configured(env, [planSetting]);
   const publicOrigin = new URL(origin);
   if (
     publicOrigin.protocol !== 'https:' ||
@@ -116,7 +125,7 @@ export async function createPaypalSubscription(
         // The same intent always maps to the same PayPal request.
         requestId: `sparko-checkout-${intent.id}`,
         body: JSON.stringify({
-          plan_id: env['PAYPAL_PLAN_ID'],
+          plan_id: env[planSetting],
           custom_id: intent.id,
           application_context: {
             brand_name: 'Sparko',
@@ -345,7 +354,11 @@ export async function applyPaypalObservation(
 ) {
   configured(env, ['PAYPAL_PLAN_ID']);
   const { event, subscription, observedAt, revocation } = observation;
-  if (subscription.plan_id !== env['PAYPAL_PLAN_ID'])
+  // Every configured period is the same Plus plan; anything else is foreign.
+  const plusPlans = Object.values(paypalPlanSettings)
+    .map((name) => env[name])
+    .filter(Boolean);
+  if (!plusPlans.includes(subscription.plan_id))
     throw new DomainError(
       'INVALID_INPUT',
       'The subscription uses an unrecognized PayPal plan.',

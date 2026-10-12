@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CreditCard, ExternalLink } from 'lucide-react';
@@ -22,6 +23,7 @@ import {
 import { getGuilds } from '../services/guilds';
 import { ApiError, errorMessage } from '../services/http';
 import { useActionIdentity } from '../hooks/useActionIdentity';
+import { periodOptions, type BillingPeriod } from '../content/pricing';
 
 const planName = (id: string) => (id === 'plus' ? 'Plus' : 'Free');
 const limitRows: {
@@ -100,11 +102,19 @@ export function ServerBilling({ guildId }: { guildId: string }) {
         ? 3000
         : false,
   });
+  const [period, setPeriod] = useState<BillingPeriod | null>(null);
+  const [changing, setChanging] = useState(false);
   const checkout = useMutation({
-    mutationFn: () =>
-      startCheckout(guildId, identity('checkout', billing.dataUpdatedAt)),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ['billing', guildId] }),
+    mutationFn: (chosen: BillingPeriod) =>
+      startCheckout(
+        guildId,
+        identity('checkout', [chosen, billing.dataUpdatedAt]),
+        chosen,
+      ),
+    onSuccess: () => {
+      setChanging(false);
+      void queryClient.invalidateQueries({ queryKey: ['billing', guildId] });
+    },
   });
   if (billing.isPending) return <LoadingState label="Loading plan…" />;
   if (billing.error)
@@ -123,6 +133,11 @@ export function ServerBilling({ guildId }: { guildId: string }) {
         Date.parse(intent.data.expiresAt) > Date.now()),
   );
   const preparing = data.intents.some((i) => i.state === 'checkout-pending');
+  const offered = data.availability.periods;
+  const chosen = period && offered.includes(period) ? period : offered[0];
+  const readyPeriod = periodOptions[ready?.data.period as BillingPeriod]
+    ? (ready?.data.period as BillingPeriod)
+    : 'monthly';
   return (
     <div className="stack">
       <Card>
@@ -153,18 +168,29 @@ export function ServerBilling({ guildId }: { guildId: string }) {
               The operator hasn’t finished setting up the billing provider, so
               nothing can be bought here.
             </Notice>
-          ) : ready ? (
-            <div className="row">
-              <a
-                className="button button-primary"
-                href={ready.data.checkoutUrl}
-              >
-                {data.availability.provider === 'paypal'
-                  ? 'Continue to PayPal'
-                  : 'Continue to secure checkout'}{' '}
-                <ExternalLink size={15} />
-              </a>
-            </div>
+          ) : ready && !changing ? (
+            <>
+              <p className="muted">
+                {periodOptions[readyPeriod].label}:{' '}
+                {periodOptions[readyPeriod].price}.
+              </p>
+              <div className="row">
+                <a
+                  className="button button-primary"
+                  href={ready.data.checkoutUrl}
+                >
+                  {data.availability.provider === 'paypal'
+                    ? 'Continue to PayPal'
+                    : 'Continue to secure checkout'}{' '}
+                  <ExternalLink size={15} />
+                </a>
+                {offered.length > 1 && (
+                  <Button variant="ghost" onClick={() => setChanging(true)}>
+                    Choose another billing period
+                  </Button>
+                )}
+              </div>
+            </>
           ) : (
             <>
               <p className="muted">
@@ -172,10 +198,31 @@ export function ServerBilling({ guildId }: { guildId: string }) {
                 once the provider confirms payment to Sparko; returning to this
                 page does not by itself turn it on.
               </p>
+              {offered.length > 0 && (
+                <fieldset className="stack period-options">
+                  <legend>Billing period</legend>
+                  {offered.map((id) => (
+                    <label className="checkbox-row" key={id}>
+                      <input
+                        type="radio"
+                        name="billing-period"
+                        checked={chosen === id}
+                        onChange={() => setPeriod(id)}
+                      />
+                      <span>
+                        <strong>{periodOptions[id].label}</strong> ·{' '}
+                        {periodOptions[id].price}{' '}
+                        <Badge tone="info">{periodOptions[id].note}</Badge>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
               <div className="row">
                 <Button
                   busy={checkout.isPending || preparing}
-                  onClick={() => checkout.mutate()}
+                  disabled={!chosen}
+                  onClick={() => chosen && checkout.mutate(chosen)}
                 >
                   <CreditCard size={16} /> Prepare checkout
                 </Button>

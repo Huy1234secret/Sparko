@@ -15,6 +15,7 @@ const providerEnv = {
   PAYPAL_CLIENT_ID: 'client',
   PAYPAL_CLIENT_SECRET: 'secret',
   PAYPAL_PLAN_ID: 'P-PLUS',
+  PAYPAL_PLAN_ID_ANNUAL: 'P-YEAR',
   PAYPAL_WEBHOOK_ID: 'WEBHOOK',
 };
 /** A stand-in for PayPal: it verifies what we tell it to and reports the current subscription. */
@@ -207,6 +208,17 @@ describe('PayPal Premium', () => {
     expect((await deliver('CHECKOUT.ORDER.APPROVED', { id: 'X' })).status).toBe(
       200,
     );
+  });
+
+  it('accepts the yearly plan as Plus', async () => {
+    paypal.subscription = {
+      ...subscription('ACTIVE', inDays(365)),
+      plan_id: 'P-YEAR',
+    };
+    expect(
+      (await deliver('BILLING.SUBSCRIPTION.ACTIVATED', { id: SUB })).status,
+    ).toBe(200);
+    expect((await plan()).id).toBe('plus');
   });
 
   it('suspends Premium when PayPal suspends the subscription', async () => {

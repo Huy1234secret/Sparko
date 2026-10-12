@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { mutate, read } from './http';
+import type { BillingPeriod } from '../content/pricing';
 
 const PlanSchema = z.object({
   id: z.enum(['free', 'plus']),
@@ -39,6 +40,9 @@ export const BillingSchema = z.object({
     .object({
       available: z.boolean(),
       provider: z.enum(['paypal', 'stripe']).nullable().optional(),
+      periods: z
+        .array(z.enum(['monthly', 'semiannual', 'annual']))
+        .default(['monthly']),
     })
     .loose(),
   entitlements: z.array(EntitlementSchema),
@@ -57,6 +61,7 @@ export const BillingSchema = z.object({
       z
         .object({
           plan: z.string().optional(),
+          period: z.string().optional(),
           checkoutUrl: z.string().optional(),
           expiresAt: z.string().optional(),
         })
@@ -67,11 +72,15 @@ export const BillingSchema = z.object({
 export type Billing = z.infer<typeof BillingSchema>;
 export const getBilling = (guild: string, signal?: AbortSignal) =>
   read(`/guilds/${guild}/billing`, BillingSchema, signal);
-export const startCheckout = (guild: string, key: string) =>
+export const startCheckout = (
+  guild: string,
+  key: string,
+  period: BillingPeriod = 'monthly',
+) =>
   mutate(
     'post',
     `/guilds/${guild}/billing/checkout`,
-    { plan: 'plus', confirmed: true },
+    { plan: 'plus', confirmed: true, period },
     z.unknown(),
     key,
   );

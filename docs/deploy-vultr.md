@@ -93,7 +93,7 @@ Premium uses PayPal once it is configured; see the next section.
 Sparko sells Plus as a PayPal subscription. Premium turns on only when PayPal itself confirms the subscription to Sparko's webhook, never because someone returned from the PayPal page. Test in the sandbox first, then repeat with live details.
 
 1. **App credentials.** Sign in to developer.paypal.com with your PayPal Business account. Go to Apps & Credentials, choose Sandbox (later Live), create an app, and note its Client ID and Secret.
-2. **Plan.** In PayPal, create a product and a monthly subscription plan at your price (Pay & Get Paid › Subscriptions, or the sandbox equivalent). Note the Plan ID; it starts with `P-`.
+2. **Plans.** In PayPal, create a product and a monthly subscription plan at your price (Pay & Get Paid › Subscriptions, or the sandbox equivalent). You can also add 6-month and yearly plans for the same product. Note each Plan ID; they start with `P-`. Members choose among the periods you configure. If you change a price in PayPal, also update the labels in `apps/web/src/content/pricing.ts`.
 3. **Webhook.** In the same app, add the webhook `https://panel.coin-sprite.com/api/v1/webhooks/paypal` and subscribe it to these events, then note the Webhook ID:
    - `BILLING.SUBSCRIPTION.ACTIVATED`, `.UPDATED`, `.RE-ACTIVATED`, `.CANCELLED`, `.SUSPENDED`, `.EXPIRED` and `.PAYMENT.FAILED`
    - `PAYMENT.SALE.COMPLETED`, `PAYMENT.SALE.REFUNDED` and `PAYMENT.SALE.REVERSED`
@@ -104,12 +104,14 @@ Sparko sells Plus as a PayPal subscription. Premium turns on only when PayPal it
    PAYPAL_ENV=sandbox
    PAYPAL_CLIENT_ID=...
    PAYPAL_CLIENT_SECRET=...
-   PAYPAL_PLAN_ID=P-...
+   PAYPAL_PLAN_ID=P-...              # monthly (required)
+   PAYPAL_PLAN_ID_SEMIANNUAL=P-...   # every 6 months (optional)
+   PAYPAL_PLAN_ID_ANNUAL=P-...       # yearly (optional)
    PAYPAL_WEBHOOK_ID=...
    ```
 
 5. **Apply.** Run Deploy again. Then, in a server's Plan & billing page, choose Prepare checkout, pay with a sandbox buyer account, and confirm the server shows Plus.
-6. **Go live.** Replace all five values with the Live ones (`PAYPAL_ENV=live`), and Deploy again.
+6. **Go live.** Replace all the values with the Live ones (`PAYPAL_ENV=live`), and Deploy again.
 
 Refunds and chargebacks in PayPal remove Premium automatically. Cancelling in PayPal keeps it until the paid period ends.
 
