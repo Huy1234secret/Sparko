@@ -56,6 +56,16 @@ if ! command -v docker >/dev/null; then
 fi
 systemctl enable --now docker
 
+# Building the images needs about 2.5 GB; small servers get it from swap.
+if [[ ! -e /swapfile ]] && (($(awk '/MemTotal|SwapTotal/ {s += $2} END {print s}' /proc/meminfo) < 3500000)); then
+  say 'Adding a 3 GB swap file'
+  fallocate -l 3G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >>/etc/fstab
+fi
+
 say "Creating the ${DEPLOY_USER} user"
 id "$DEPLOY_USER" >/dev/null 2>&1 || useradd --create-home --shell /bin/bash "$DEPLOY_USER"
 # Docker access is root-equivalent; this key should only ever live in GitHub secrets.

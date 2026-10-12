@@ -115,6 +115,16 @@ Sparko sells Plus as a PayPal subscription. Premium turns on only when PayPal it
 
 Refunds and chargebacks in PayPal remove Premium automatically. Cancelling in PayPal keeps it until the paid period ends.
 
+## Server memory
+
+Building the images needs about 2.5 GB of memory plus swap. The setup script adds a 3 GB swap file on smaller servers. On a server set up before that, add it once as root:
+
+```sh
+fallocate -l 3G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+free -h   # the Swap line should show 3.0Gi
+```
+
 ## Rollback and recovery
 
 - **Undo a release:** run Deploy with the previous good commit as `ref`. The database is never rolled back. Migrations only move forward, and a backup is taken before every release (`/opt/sparko/backups/predeploy-*.dump`).
