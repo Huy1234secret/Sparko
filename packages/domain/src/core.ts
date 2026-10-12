@@ -221,14 +221,13 @@ export function isTransactionConflict(error: unknown): boolean {
   const value = error as Record<string, unknown>;
   if (['P2034', '40001', '40P01'].includes(String(value['code']))) return true;
   if (['40001', '40P01'].includes(String(value['originalCode']))) return true;
-  // Prisma's PostgreSQL adapter can surface commit conflicts as DriverAdapterError.
-  const cause = value['cause'];
-  return (
-    !!cause &&
-    typeof cause === 'object' &&
-    ['40001', '40P01'].includes(
-      String((cause as Record<string, unknown>)['originalCode']),
-    )
+  // Prisma's PostgreSQL adapter can surface commit conflicts as DriverAdapterError,
+  // and a failed raw query as P2010 with that adapter error in its metadata.
+  const adapterError = jsonObject(
+    jsonObject(value['meta'])['driverAdapterError'],
+  );
+  return [jsonObject(value['cause']), jsonObject(adapterError['cause'])].some(
+    (cause) => ['40001', '40P01'].includes(String(cause['originalCode'])),
   );
 }
 /**
