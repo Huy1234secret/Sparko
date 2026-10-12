@@ -10,6 +10,10 @@ import {
   verifyStripeCallback,
   resolveStripeEvent,
   applyBillingObservation,
+  verifyPaypalWebhook,
+  resolvePaypalEvent,
+  applyPaypalObservation,
+  paypalIntentGuild,
   type ProviderTransport,
 } from '@sparko/domain';
 import type { PrismaClient } from '@sparko/db';
@@ -140,6 +144,46 @@ export async function registerProviderCallbacks(
           event,
           async (ctx) => {
             await applyBillingObservation(ctx, observation, env);
+            return { received: true, eventId: event.id };
+          },
+        );
+        return { data: { ...result.data, operationId: result.operation.id } };
+      },
+    );
+    callback.post(
+      '/api/v1/webhooks/paypal',
+      { bodyLimit: 65536 },
+      async (req) => {
+        if (!env['PAYPAL_WEBHOOK_ID'])
+          throw new DomainError(
+            'SERVICE_UNAVAILABLE',
+            'Configure the PayPal webhook ID.',
+            503,
+            { missingConfiguration: ['PAYPAL_WEBHOOK_ID'] },
+          );
+        if (!Buffer.isBuffer(req.body))
+          throw new DomainError(
+            'INVALID_INPUT',
+            'The event must use application/json.',
+          );
+        // PayPal verifies the exact bytes before anything is read or written.
+        const event = await verifyPaypalWebhook(
+          req.body,
+          req.headers,
+          env,
+          transport,
+        );
+        const observation = await resolvePaypalEvent(event, env, transport);
+        if (!observation) return { data: { received: true, ignored: true } };
+        const guildId = await paypalIntentGuild(db, observation.subscription);
+        if (!guildId) return { data: { received: true, ignored: true } };
+        const result = await platform.mutate(
+          providerActor(guildId, 'paypal'),
+          'paypal.callback',
+          event.id,
+          event,
+          async (ctx) => {
+            await applyPaypalObservation(ctx, observation, env);
             return { received: true, eventId: event.id };
           },
         );

@@ -159,7 +159,10 @@ export function ServerBilling({ guildId }: { guildId: string }) {
                 className="button button-primary"
                 href={ready.data.checkoutUrl}
               >
-                Continue to secure checkout <ExternalLink size={15} />
+                {data.availability.provider === 'paypal'
+                  ? 'Continue to PayPal'
+                  : 'Continue to secure checkout'}{' '}
+                <ExternalLink size={15} />
               </a>
             </div>
           ) : (

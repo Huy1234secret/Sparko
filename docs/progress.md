@@ -10,7 +10,8 @@ Active continuation (Claude, 2026-10-12). Repository: private `Huy1234secret/Spa
 - M6 merged ([PR #9](https://github.com/Huy1234secret/Sparko/pull/9), `f7ee647`). See `docs/milestones/m6.md`.
 - M7/M8 merged ([PR #10](https://github.com/Huy1234secret/Sparko/pull/10), `114b548`). See `docs/milestones/m7.md`.
 - M9 merged ([PR #11](https://github.com/Huy1234secret/Sparko/pull/11), `ab9d8e2`). See `docs/milestones/m9.md`, `docs/quality.md` and `docs/deployment-plan.md`.
-- Release preparation (legal pages, removal purge, Vultr deploy workflow) is delivered from `claude/clever-lovelace-b5a124`, restarted from `ab9d8e2`. See `docs/deploy-vultr.md`.
+- Release preparation merged ([PR #12](https://github.com/Huy1234secret/Sparko/pull/12), `4ea2fed`). See `docs/deploy-vultr.md`.
+- PayPal Premium is delivered from `claude/clever-lovelace-b5a124`, restarted from `4ea2fed`.
 - Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head; the next milestone restarts the working branch from the merged `main`.
 
 ## Milestone / PR state
@@ -27,7 +28,8 @@ Active continuation (Claude, 2026-10-12). Repository: private `Huy1234secret/Spa
 | M6 Gates, plans and support | **Merged** | [PR #9](https://github.com/Huy1234secret/Sparko/pull/9) (`f7ee647`). See `docs/milestones/m6.md`.                                                                         |
 | M7/M8 Economy and social    | **Merged** | [PR #10](https://github.com/Huy1234secret/Sparko/pull/10) (`114b548`). See `docs/milestones/m7.md`.                                                                       |
 | M9 Config tools and quality | **Merged** | [PR #11](https://github.com/Huy1234secret/Sparko/pull/11) (`ab9d8e2`). See `docs/milestones/m9.md`.                                                                       |
-| Release preparation         | **PR**     | Legal pages, removal purge, deploy workflow. See `docs/deploy-vultr.md`; PR and CI recorded on merge.                                                                     |
+| Release preparation         | **Merged** | [PR #12](https://github.com/Huy1234secret/Sparko/pull/12) (`4ea2fed`). See `docs/deploy-vultr.md`.                                                                        |
+| PayPal Premium              | **PR**     | PayPal subscriptions with verified webhooks. See `docs/providers.md`; PR and CI recorded on merge.                                                                        |
 
 ## Verification record (M9 source)
 
@@ -79,7 +81,7 @@ Still open: live acceptance (see `docs/quality.md`); rollout between two real gu
 
 ## Release decisions (owner, 2026-10-12)
 
-Host: Vultr `64.177.44.183` behind Cloudflare (proxied) at `https://panel.coin-sprite.com`, replacing the old CoinSprite site. Deployment is authorized. The production bot is "Sparko" (Sparko-Test is for testing). Operator VietHuy (individual, Vietnam); minimum age 13; contact Sparko.support@gmail.com and https://discord.gg/HwvYrwupZm; Premium is sold through PayPal (manual staff Plus grants until a PayPal integration exists); server data is kept until the bot is removed and deleted 7 days later; transcripts are kept at most 30 days. Deploys run from GitHub Actions › Deploy with an SSH key the owner stores as repository secrets; this cloud session cannot reach the server.
+Host: Vultr `64.177.44.183` behind Cloudflare (proxied) at `https://panel.coin-sprite.com`, replacing the old CoinSprite site. Deployment is authorized. The production bot is "Sparko" (Sparko-Test is for testing). Operator VietHuy (individual, Vietnam); minimum age 13; contact Sparko.support@gmail.com and https://discord.gg/HwvYrwupZm; Premium is sold through PayPal subscriptions (configure per `docs/deploy-vultr.md`; staff Plus grants remain for manual cases); server data is kept until the bot is removed and deleted 7 days later; transcripts are kept at most 30 days. Deploys run from GitHub Actions › Deploy with an SSH key the owner stores as repository secrets; this cloud session cannot reach the server.
 
 ## Next concrete action
 
