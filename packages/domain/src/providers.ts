@@ -110,12 +110,36 @@ export const paypalSettings = [
   'PAYPAL_PLAN_ID',
   'PAYPAL_WEBHOOK_ID',
 ];
+/** How often Plus is billed. Stripe offers monthly only. */
+export const billingPeriods = ['monthly', 'semiannual', 'annual'] as const;
+export type BillingPeriod = (typeof billingPeriods)[number];
+/** The PayPal plan for each period; only PAYPAL_PLAN_ID (monthly) is required. */
+export const paypalPlanSettings: Record<BillingPeriod, string> = {
+  monthly: 'PAYPAL_PLAN_ID',
+  semiannual: 'PAYPAL_PLAN_ID_SEMIANNUAL',
+  annual: 'PAYPAL_PLAN_ID_ANNUAL',
+};
+/** The billing periods a checkout can offer right now. */
+export function offeredPeriods(
+  env: Environment = process.env,
+): BillingPeriod[] {
+  const provider = billingProvider(env);
+  if (provider === 'stripe') return ['monthly'];
+  if (provider === 'paypal')
+    return billingPeriods.filter((p) => Boolean(env[paypalPlanSettings[p]]));
+  return [];
+}
 /** PayPal when it is fully configured, otherwise Stripe, otherwise none. */
 export function billingProvider(env: Environment = process.env) {
   if (paypalSettings.every((n) => env[n])) return 'paypal' as const;
   if (stripeSettings.every((n) => env[n])) return 'stripe' as const;
   return null;
 }
+const CheckoutSchema = z.object({
+  plan: z.literal('plus'),
+  confirmed: z.literal(true),
+  period: z.enum(billingPeriods).default('monthly'),
+});
 export function providerAvailability(env: Environment = process.env) {
   const describe = (names: string[]) => ({
     available: names.every((n) => Boolean(env[n])),
@@ -128,6 +152,7 @@ export function providerAvailability(env: Environment = process.env) {
         billingProvider(env) === 'stripe' ? stripeSettings : paypalSettings,
       ),
       provider: billingProvider(env),
+      periods: offeredPeriods(env),
     },
     youtube: describe(['YOUTUBE_API_KEY']),
     twitch: describe(['TWITCH_CLIENT_ID', 'TWITCH_ACCESS_TOKEN']),
@@ -2118,23 +2143,27 @@ export const providerRoutes: DomainRoute[] = [
     method: 'POST',
     path: '/guilds/:guildId/billing/checkout',
     capability: 'config.manage',
-    schema: z.object({ plan: z.literal('plus'), confirmed: z.literal(true) }),
+    schema: CheckoutSchema,
     handler: async (ctx, input) => {
       if (!billingProvider()) configured(process.env, paypalSettings);
-      const data = z
-          .object({ plan: z.literal('plus'), confirmed: z.literal(true) })
-          .parse(input),
-        row = await createRecord(
-          ctx,
-          'billing.intent',
-          {
-            plan: data.plan,
-            userId: ctx.actor.userId,
-            guildId: ctx.guildId,
-            authorizedAt: ctx.now.toISOString(),
-          },
-          { state: 'checkout-pending' },
+      const data = CheckoutSchema.parse(input);
+      if (!offeredPeriods().includes(data.period))
+        throw new DomainError(
+          'INVALID_INPUT',
+          'This billing period is not offered.',
         );
+      const row = await createRecord(
+        ctx,
+        'billing.intent',
+        {
+          plan: data.plan,
+          period: data.period,
+          userId: ctx.actor.userId,
+          guildId: ctx.guildId,
+          authorizedAt: ctx.now.toISOString(),
+        },
+        { state: 'checkout-pending' },
+      );
       await ctx.effect('provider.billing.checkout', { intentId: row.id });
       return row;
     },

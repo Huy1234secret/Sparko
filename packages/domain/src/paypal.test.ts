@@ -87,6 +87,35 @@ describe('PayPal subscriptions', () => {
     ).rejects.toThrow('approval link');
   });
 
+  it('subscribes to the plan for the chosen period and refuses one that is not set up', async () => {
+    const transport = fake(() => ({
+      id: 'I-ABCDEF123456',
+      links: [
+        {
+          rel: 'approve',
+          href: 'https://www.paypal.com/webapps/billing/subscriptions?ba_token=BA-1',
+        },
+      ],
+    }));
+    await createPaypalSubscription(
+      { id: 'intent-y', guildId: '1', userId: '1', period: 'annual' },
+      'https://panel.coin-sprite.com',
+      { ...env, PAYPAL_PLAN_ID_ANNUAL: 'P-YEAR' },
+      transport,
+    );
+    expect(JSON.parse(transport.calls[1]!.body!)).toMatchObject({
+      plan_id: 'P-YEAR',
+    });
+    await expect(
+      createPaypalSubscription(
+        { id: 'intent-s', guildId: '1', userId: '1', period: 'semiannual' },
+        'https://panel.coin-sprite.com',
+        env,
+        transport,
+      ),
+    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+  });
+
   it('uses the sandbox hosts only when asked to', async () => {
     const transport = fake(() => ({
       id: 'I-ABCDEF123456',

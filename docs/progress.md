@@ -11,7 +11,7 @@ Active continuation (Claude, 2026-10-12). Repository: private `Huy1234secret/Spa
 - M7/M8 merged ([PR #10](https://github.com/Huy1234secret/Sparko/pull/10), `114b548`). See `docs/milestones/m7.md`.
 - M9 merged ([PR #11](https://github.com/Huy1234secret/Sparko/pull/11), `ab9d8e2`). See `docs/milestones/m9.md`, `docs/quality.md` and `docs/deployment-plan.md`.
 - Release preparation merged ([PR #12](https://github.com/Huy1234secret/Sparko/pull/12), `4ea2fed`). See `docs/deploy-vultr.md`.
-- PayPal Premium is delivered from `claude/clever-lovelace-b5a124`, restarted from `4ea2fed`.
+- PayPal Premium merged ([PR #13](https://github.com/Huy1234secret/Sparko/pull/13), `3d868e3`). Billing periods are delivered from `claude/clever-lovelace-b5a124`, restarted from `3d868e3`. Prices: monthly US$3.99 (first month US$1.49), 6 months US$21.55, yearly US$35.91 (`apps/web/src/content/pricing.ts`).
 - Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head; the next milestone restarts the working branch from the merged `main`.
 
 ## Milestone / PR state
@@ -29,7 +29,8 @@ Active continuation (Claude, 2026-10-12). Repository: private `Huy1234secret/Spa
 | M7/M8 Economy and social    | **Merged** | [PR #10](https://github.com/Huy1234secret/Sparko/pull/10) (`114b548`). See `docs/milestones/m7.md`.                                                                       |
 | M9 Config tools and quality | **Merged** | [PR #11](https://github.com/Huy1234secret/Sparko/pull/11) (`ab9d8e2`). See `docs/milestones/m9.md`.                                                                       |
 | Release preparation         | **Merged** | [PR #12](https://github.com/Huy1234secret/Sparko/pull/12) (`4ea2fed`). See `docs/deploy-vultr.md`.                                                                        |
-| PayPal Premium              | **PR**     | PayPal subscriptions with verified webhooks. See `docs/providers.md`; PR and CI recorded on merge.                                                                        |
+| PayPal Premium              | **Merged** | [PR #13](https://github.com/Huy1234secret/Sparko/pull/13) (`3d868e3`). See `docs/providers.md`.                                                                           |
+| PayPal billing periods      | **PR**     | Monthly, 6-month and yearly plans. PR and CI recorded on merge.                                                                                                           |
 
 ## Verification record (M9 source)
 

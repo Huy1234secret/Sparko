@@ -34,6 +34,7 @@ import {
   runProviderJob,
   purgeGuild,
   billingProvider,
+  billingPeriods,
   createPaypalSubscription,
 } from '@sparko/domain';
 import {
@@ -78,6 +79,7 @@ function withActionRow(
   return combined.success ? combined.data : null;
 }
 
+const BillingPeriodSchema = z.enum(billingPeriods);
 export type OutboxWork = {
   id: string;
   guildId: string;
@@ -1638,7 +1640,12 @@ export class EffectExecutor {
           ? createPaypalSubscription
           : createStripeCheckout;
       const result = await checkout(
-        { id: intent.id, guildId: work.guildId, userId },
+        {
+          id: intent.id,
+          guildId: work.guildId,
+          userId,
+          period: BillingPeriodSchema.parse(data['period'] ?? 'monthly'),
+        },
         process.env['PUBLIC_APP_URL'] ?? '',
       );
       await this.assertCurrent();

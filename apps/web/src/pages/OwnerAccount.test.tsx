@@ -19,7 +19,7 @@ import { getSession } from '../services/session';
 import { getOwnerHealth } from '../services/account';
 import { getConfig } from '../services/guilds';
 import { getFleet, getOwnerGuild, setFeaturePolicy } from '../services/owner';
-import { getBilling, type Billing } from '../services/billing';
+import { getBilling, startCheckout, type Billing } from '../services/billing';
 import {
   getSupportTickets,
   replySupport,
@@ -235,7 +235,7 @@ describe('plans and billing', () => {
     const billing: Billing = {
       plan: plan('free'),
       plans: { free: plan('free'), plus: plan('plus') },
-      availability: { available: false },
+      availability: { available: false, periods: [] },
       entitlements: [
         {
           id: 'e1',
@@ -269,6 +269,39 @@ describe('plans and billing', () => {
     expect(screen.getByText('Granted by Sparko staff')).toBeVisible();
     expect(screen.getByText('Revoked')).toBeVisible();
     expect(screen.queryByRole('button', { name: /checkout/i })).toBeNull();
+  });
+});
+
+describe('choosing a billing period', () => {
+  it('offers the configured periods with prices and checks out the chosen one', async () => {
+    vi.mocked(getBilling).mockResolvedValue({
+      plan: plan('free'),
+      plans: { free: plan('free'), plus: plan('plus') },
+      availability: {
+        available: true,
+        provider: 'paypal',
+        periods: ['monthly', 'semiannual', 'annual'],
+      },
+      entitlements: [],
+      events: [],
+      intents: [],
+    });
+    vi.mocked(startCheckout).mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    renderAt(`/dashboard/${guildId}/settings/billing`, [
+      {
+        path: '/dashboard/:guildId/settings/billing',
+        element: <BillingPage />,
+      },
+    ]);
+    expect(
+      await screen.findByRole('radio', { name: /Monthly · US\$3\.99 a month/ }),
+    ).toBeChecked();
+    expect(screen.getByText('First month US$1.49')).toBeVisible();
+    await user.click(screen.getByRole('radio', { name: /Yearly/ }));
+    await user.click(screen.getByRole('button', { name: 'Prepare checkout' }));
+    await waitFor(() => expect(startCheckout).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(startCheckout).mock.calls[0]![2]).toBe('annual');
   });
 });
 

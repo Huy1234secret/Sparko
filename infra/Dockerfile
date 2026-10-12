@@ -29,9 +29,11 @@ RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     pnpm install --frozen-lockfile
 COPY . .
+# Node sizes its heap from physical memory, which on a small server is below
+# the ~800 MB the website's type check needs; this lets it use swap instead.
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    pnpm build
+    NODE_OPTIONS=--max-old-space-size=2048 pnpm build
 FROM base AS runtime
 ENV NODE_ENV=production
 WORKDIR /app

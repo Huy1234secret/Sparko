@@ -29,6 +29,13 @@ healthy() {
   return 1
 }
 
+memory_kb=$(awk '/MemTotal|SwapTotal/ {s += $2} END {print s}' /proc/meminfo)
+if ((memory_kb < 2500000)); then
+  echo "Memory plus swap is $((memory_kb / 1024)) MB; building needs about 2.5 GB." >&2
+  echo 'Add swap as root (see "Server memory" in docs/deploy-vultr.md), then deploy again.' >&2
+  exit 1
+fi
+
 echo "==> Unpacking $SHA"
 rm -rf "$RELEASE"
 mkdir -p "$RELEASE"

@@ -27,11 +27,8 @@ jobs:
     environment:
       name: production
       url: https://panel.coin-sprite.com
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
@@ -55,26 +52,59 @@ jobs:
           echo "Deploying $sha"
       - name: Prepare the SSH connection
         env:
+          RAW_HOST: ${{ secrets.DEPLOY_HOST }}
+          RAW_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Repository secret $name is not set. See docs/deploy-vultr.md."
+          # Pasted secrets often carry spaces or a trailing line break.
+          host=$(printf '%s' "$RAW_HOST" | tr -d '[:space:]')
+          user=$(printf '%s' "$RAW_USER" | tr -d '[:space:]')
+          for pair in "DEPLOY_HOST=$host" "DEPLOY_USER=$user" \
+            "DEPLOY_SSH_KEY=${DEPLOY_SSH_KEY:+set}" "DEPLOY_KNOWN_HOSTS=${DEPLOY_KNOWN_HOSTS:+set}"; do
+            if [ -z "${pair#*=}" ]; then
+              echo "::error::Repository secret ${pair%%=*} is not set. See docs/deploy-vultr.md."
               exit 1
             fi
           done
+          if ! [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            echo "::error::DEPLOY_USER must be just the user name, deploy."
+            exit 1
+          fi
+          echo "DEPLOY_HOST=$host" >>"$GITHUB_ENV"
+          echo "DEPLOY_USER=$user" >>"$GITHUB_ENV"
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" >~/.ssh/deploy
+          # Keys pasted from Windows can carry CR line endings; OpenSSH rejects them.
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' >~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
           # Pinned host key: the connection fails rather than trusting a new server.
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" | tr -d '\r' >~/.ssh/known_hosts
+          if ! ssh-keygen -y -f ~/.ssh/deploy >/dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY is not a valid private key. Paste the whole sparko-deploy file (not the .pub), from BEGIN to END."
+            exit 1
+          fi
+      - name: Check the SSH connection
+        run: |
+          if ! out=$(ssh -i ~/.ssh/deploy -o BatchMode=yes -o ConnectTimeout=20 \
+            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" true 2>&1); then
+            echo "$out"
+            case "$out" in
+              *"Host key verification failed"*|*"No ED25519 host key"*|*"REMOTE HOST IDENTIFICATION"*)
+                echo "::error::DEPLOY_KNOWN_HOSTS does not match the server. Use the line server-setup.sh printed: 64.177.44.183 ssh-ed25519 AAAA..." ;;
+              *"Permission denied"*)
+                echo "::error::The server refused the key. Check DEPLOY_USER is deploy and that sparko-deploy.pub is in /home/deploy/.ssh/authorized_keys." ;;
+              *"timed out"*|*"Connection refused"*|*"No route"*)
+                echo "::error::Cannot reach $DEPLOY_HOST on port 22. Check DEPLOY_HOST and any Vultr firewall group." ;;
+              *) echo "::error::SSH failed; see the output above." ;;
+            esac
+            exit 1
+          fi
       - name: Upload and release
         run: |
           git archive --format=tar.gz -o release.tar.gz "$SHA"
-          scp -i ~/.ssh/deploy -o StrictHostKeyChecking=yes release.tar.gz \
+          scp -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes release.tar.gz \
             "$DEPLOY_USER@$DEPLOY_HOST:/opt/sparko/incoming/$SHA.tar.gz"
-          ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" \
             "tar -xzOf /opt/sparko/incoming/$SHA.tar.gz infra/deploy-release.sh | bash -s $SHA"
       - name: Check the public site
         if: ${{ inputs.check_public_site }}

@@ -29,6 +29,18 @@ describe('transaction retry classification', () => {
       }),
     ).toBe(true);
     expect(isTransactionConflict({ originalCode: '40P01' })).toBe(true);
+    // A raw query (such as the session check) failing on a serialization conflict.
+    expect(
+      isTransactionConflict({
+        code: 'P2010',
+        meta: {
+          driverAdapterError: {
+            name: 'DriverAdapterError',
+            cause: { originalCode: '40001', kind: 'TransactionWriteConflict' },
+          },
+        },
+      }),
+    ).toBe(true);
   });
   it('does not retry constraints, connection uncertainty or application errors', () => {
     expect(isTransactionConflict({ code: 'P2002' })).toBe(false);
