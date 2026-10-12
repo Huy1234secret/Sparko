@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Gift, Package, Ticket, Trophy } from 'lucide-react';
+import { Gift, Package, Ticket, Trophy, Wallet } from 'lucide-react';
 import {
   LevelPreferencesSchema,
   type RankCardPreferences,
@@ -584,13 +584,22 @@ export function MemberPage() {
         title="Your member profile"
         description="Your own progression, rewards and conversations in this server."
         actions={
-          <Link
-            className="button button-secondary"
-            to={`/servers/${guildId}/tickets`}
-          >
-            <Ticket size={16} />
-            Your tickets
-          </Link>
+          <>
+            <Link
+              className="button button-secondary"
+              to={`/servers/${guildId}/economy`}
+            >
+              <Wallet size={16} />
+              Your economy
+            </Link>
+            <Link
+              className="button button-secondary"
+              to={`/servers/${guildId}/tickets`}
+            >
+              <Ticket size={16} />
+              Your tickets
+            </Link>
+          </>
         }
       />
       <div className="metric-grid">

@@ -55,7 +55,14 @@ export function routeTrail(pathname: string, guildName?: string): Crumb[] {
     return [
       servers,
       server,
-      { label: rest[0] === 'tickets' ? 'Your tickets' : 'Your member profile' },
+      {
+        label:
+          rest[0] === 'tickets'
+            ? 'Your tickets'
+            : rest[0] === 'economy'
+              ? 'Your economy'
+              : 'Your member profile',
+      },
     ];
   }
   if (root !== 'dashboard') return [];

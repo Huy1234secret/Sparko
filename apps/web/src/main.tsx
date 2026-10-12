@@ -70,6 +70,11 @@ const MemberPortal = lazy(() =>
     default: module.MemberPage,
   })),
 );
+const MemberEconomy = lazy(() =>
+  import('./pages/economy/MemberEconomy').then((module) => ({
+    default: module.MemberEconomyPage,
+  })),
+);
 const AccountBilling = lazy(() =>
   import('./pages/BillingPages').then((module) => ({
     default: module.AccountBillingPage,
@@ -160,6 +165,10 @@ export const router = createBrowserRouter([
               { path: 'account/support', element: <ProductSupportPage /> },
               { path: 'account/billing', element: <AccountBilling /> },
               { path: 'servers/:guildId/me', element: <MemberPortal /> },
+              {
+                path: 'servers/:guildId/economy',
+                element: <MemberEconomy />,
+              },
               {
                 path: 'servers/:guildId/tickets',
                 element: <TicketInboxPage member />,
