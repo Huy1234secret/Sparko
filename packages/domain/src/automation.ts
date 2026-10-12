@@ -3,6 +3,8 @@ import { Snowflake, Timezone, Revision, DomainError } from '@sparko/contracts';
 import { allowed } from '@sparko/policy';
 import { MessageDocumentSchema, type MessageDocument } from '@sparko/messages';
 import {
+  planFor,
+  requirePlanRoom,
   featureActive,
   createRecord,
   getRecord,
@@ -902,6 +904,12 @@ export const automationRoutes: DomainRoute[] = [
               'A sticky message already owns this channel.',
             );
         }
+        if (def.kind === 'workflow')
+          requirePlanRoom(
+            await planFor(ctx.tx, ctx.guildId, ctx.now),
+            'automationSteps',
+            WorkflowSchema.parse(v).steps.length,
+          );
         if (def.kind === 'custom_command') {
           const count = await ctx.tx.record.count({
             where: {
@@ -961,6 +969,12 @@ export const automationRoutes: DomainRoute[] = [
           throw new DomainError(
             'INVALID_INPUT',
             'Only active configurations can be edited.',
+          );
+        if (def.kind === 'workflow')
+          requirePlanRoom(
+            await planFor(ctx.tx, ctx.guildId, ctx.now),
+            'automationSteps',
+            WorkflowSchema.parse(v.config).steps.length,
           );
         if (def.kind === 'sticky') {
           if (data['channelId'] !== previous['channelId'])

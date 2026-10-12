@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Config } from '@sparko/config';
 import { json, type PrismaClient } from '@sparko/db';
 import { DomainError } from '@sparko/contracts';
-import { hash, jsonObject, Platform } from '@sparko/domain';
+import { hash, jsonObject, planFor, Platform } from '@sparko/domain';
 import { normalizeUploadedImage } from '@sparko/rendering';
 import type { createAuth } from './auth.js';
 import { requireActiveSession } from './auth.js';
@@ -178,15 +178,16 @@ export function registerAssetRoutes(
             take: 101,
             select: { data: true },
           });
+          const plan = await planFor(tx, guildId);
           if (
             used.length >= 100 ||
             used.reduce((n, r) => n + Metadata.parse(r.data).bytes, 0) +
               image.bytes >
-              50 * 1024 * 1024
+              plan.storageBytes
           )
             throw new DomainError(
-              'RATE_LIMITED',
-              'This server’s 100-image or 50 MiB library budget is full.',
+              'PLAN_LIMIT',
+              `This server’s image library is full: up to 100 images and ${plan.storageBytes / 1_000_000} MB on the ${plan.id === 'plus' ? 'Plus' : 'Free'} plan.`,
               429,
             );
         }

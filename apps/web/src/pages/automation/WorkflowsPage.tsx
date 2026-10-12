@@ -46,6 +46,7 @@ import {
   AutomationSettings,
   OffNotice,
   StateBadge,
+  useFeature,
 } from '../../features/automation/shared';
 import {
   RecordList,
@@ -400,6 +401,9 @@ function WorkflowEditor({
     | WorkflowStep[]
     | undefined;
   const trigger = useWatch({ control: form.control, name: 'trigger' });
+  // The plan's step limit; the server enforces it on save as well.
+  const maxSteps =
+    useFeature(guildId, 'R45').data?.gate?.limits?.automationSteps ?? 25;
   const current = () => form.getValues('steps') as WorkflowStep[];
   const save = useMutation({
     mutationFn: (config: z.output<typeof WorkflowSchema>) =>
@@ -563,7 +567,12 @@ function WorkflowEditor({
             );
           })}
         </ol>
-        {steps.fields.length < 25 && (
+        {steps.fields.length >= maxSteps && (
+          <p className="field-hint">
+            This plan allows up to {maxSteps} steps in one workflow.
+          </p>
+        )}
+        {steps.fields.length < maxSteps && (
           <div className="row">
             <Button
               type="button"

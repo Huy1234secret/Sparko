@@ -370,4 +370,50 @@ describe('durable publication lifecycle with PostgreSQL', () => {
       ),
     ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
   });
+  it('keeps saved designs within the plan and never deletes existing ones on downgrade', async () => {
+    const limited = '715678901234567899';
+    await db.guild.upsert({
+      where: { id: limited },
+      create: { id: limited, name: 'Plan limit test' },
+      update: {},
+    });
+    await db.template.deleteMany({ where: { guildId: limited } });
+    await db.record.deleteMany({ where: { guildId: limited } });
+    const who = { ...actor, guildId: limited };
+    const create = (n: number) =>
+      platform.route(
+        who,
+        route('/templates'),
+        { name: `Design ${n}`, document: initialMessage('embed') },
+        {},
+        randomUUID(),
+      );
+    for (let n = 1; n <= 10; n++) await create(n);
+    await expect(create(11)).rejects.toMatchObject({
+      code: 'PLAN_LIMIT',
+      message: expect.stringContaining('up to 10 saved designs'),
+    });
+    const plus = await db.record.create({
+      data: {
+        guildId: limited,
+        kind: 'billing.entitlement',
+        key: 'plan-limit-plus',
+        state: 'active',
+        data: {
+          provider: 'staff',
+          active: true,
+          revoked: false,
+          expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        },
+      },
+    });
+    await create(11);
+    await db.record.update({
+      where: { id: plus.id },
+      data: { state: 'revoked' },
+    });
+    // Downgrade: all eleven remain; only new ones are refused.
+    expect(await db.template.count({ where: { guildId: limited } })).toBe(11);
+    await expect(create(12)).rejects.toMatchObject({ code: 'PLAN_LIMIT' });
+  });
 });

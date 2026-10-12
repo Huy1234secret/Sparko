@@ -1490,4 +1490,28 @@ describe('shared feature gate across direct paths', () => {
     });
     expect(await gate()).toMatchObject({ planEntitled: false, plan: 'free' });
   });
+  it('limits workflow length by plan when saving', async () => {
+    const steps = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        type: 'send',
+        channelId,
+        text: `Step ${i + 1}`,
+      }));
+    await expect(
+      call(
+        admin(),
+        'POST',
+        '/workflows',
+        { name: 'Long', trigger: 'manual', steps: steps(11) },
+        'long-free',
+      ),
+    ).rejects.toMatchObject({ code: 'PLAN_LIMIT' });
+    await call(
+      admin(),
+      'POST',
+      '/workflows',
+      { name: 'Fits', trigger: 'manual', steps: steps(10) },
+      'fits-free',
+    );
+  });
 });

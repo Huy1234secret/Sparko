@@ -183,6 +183,25 @@ export function gateError(gate: FeatureGate): DomainError | null {
     );
   return null;
 }
+/**
+ * Refuses new work beyond the plan's limit. Existing work over the limit (for
+ * example after a downgrade) is kept and still usable.
+ */
+export function requirePlanRoom(
+  plan: Plan,
+  limit: 'templates' | 'automationSteps',
+  wanted: number,
+) {
+  if (wanted <= plan[limit]) return;
+  const what =
+    limit === 'templates' ? 'saved designs' : 'steps in one workflow';
+  throw new DomainError(
+    'PLAN_LIMIT',
+    `The ${plan.id === 'plus' ? 'Plus' : 'Free'} plan allows up to ${plan[limit]} ${what}.${plan.id === 'free' ? ' Plus raises this limit.' : ''}`,
+    403,
+    { limit, allowed: plan[limit], plan: plan.id },
+  );
+}
 /** True when new work for the feature may start (all gates pass). */
 export async function featureActive(
   tx: Transaction,

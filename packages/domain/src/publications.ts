@@ -9,7 +9,13 @@ import {
   modeChangeLossReport,
   type MessageDocument,
 } from '@sparko/messages';
-import { jsonObject, type DomainContext, type DomainRoute } from './core.js';
+import {
+  planFor,
+  requirePlanRoom,
+  jsonObject,
+  type DomainContext,
+  type DomainRoute,
+} from './core.js';
 
 const PublishSchema = z
   .object({
@@ -239,6 +245,13 @@ export const publicationRoutes: DomainRoute[] = [
           label: VersionLabel,
         })
         .parse(input);
+      requirePlanRoom(
+        await planFor(ctx.tx, ctx.guildId, ctx.now),
+        'templates',
+        (await ctx.tx.template.count({
+          where: { guildId: ctx.guildId, archived: false },
+        })) + 1,
+      );
       return ctx.tx.template.create({
         data: {
           guildId: ctx.guildId,
@@ -301,6 +314,13 @@ export const publicationRoutes: DomainRoute[] = [
       if (!version)
         throw new DomainError('NOT_FOUND', 'Version unavailable.', 404);
       const document = MessageDocumentSchema.parse(version.document);
+      requirePlanRoom(
+        await planFor(ctx.tx, ctx.guildId, ctx.now),
+        'templates',
+        (await ctx.tx.template.count({
+          where: { guildId: ctx.guildId, archived: false },
+        })) + 1,
+      );
       return ctx.tx.template.create({
         data: {
           guildId: ctx.guildId,

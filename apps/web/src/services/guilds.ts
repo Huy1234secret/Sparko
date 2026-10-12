@@ -84,6 +84,24 @@ export const ConfigSchema = z.object({
   appliedRevision: z.number(),
   config: z.record(z.string(), z.unknown()),
   setupState: z.enum(['configured', 'unconfigured']).optional(),
+  /** Staff policy and plan, separate from the server's own switch. */
+  gate: z
+    .object({
+      ownerAllowed: z.boolean(),
+      ownerReason: z.string().nullable(),
+      planEntitled: z.boolean(),
+      requiredPlan: z.string().nullable(),
+      plan: z.string(),
+      limits: z
+        .object({
+          templates: z.number(),
+          storageBytes: z.number(),
+          automationSteps: z.number(),
+          transcriptRetentionDays: z.number(),
+        })
+        .optional(),
+    })
+    .optional(),
   // The API reports each unmet requirement with the setting it belongs to.
   missingPrerequisites: z
     .array(

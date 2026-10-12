@@ -541,7 +541,34 @@ describe('API security against real PostgreSQL', () => {
       revoked: true,
     });
     await db.featurePolicy.deleteMany({ where: { guildId: GUILD } });
-    await db.globalGrant.deleteMany({ where: { userId: STAFF_A } });
+    await db.globalGrant.update({
+      where: { userId: STAFF_A },
+      data: {
+        capabilities: ['support.reply'],
+        expiresAt: new Date(Date.now() + 86400000),
+      },
+    });
+  });
+  it('lets delegated staff list resource names that plain members cannot', async () => {
+    const list = () =>
+      app.inject({
+        url: `/api/v1/guilds/${GUILD}/resources/channels`,
+        headers: headers(MEMBER),
+      });
+    expect((await list()).statusCode).toBe(403);
+    const grant = await db.accessGrant.create({
+      data: {
+        guildId: GUILD,
+        subjectType: 'user',
+        subjectId: MEMBER,
+        capabilities: ['tickets.manage'],
+      },
+    });
+    const delegated = await list();
+    expect(delegated.statusCode).toBe(200);
+    expect(delegated.json().data[0]).toMatchObject({ id: CHANNEL });
+    await db.accessGrant.delete({ where: { id: grant.id } });
+    expect((await list()).statusCode).toBe(403);
   });
   it('verifies callback exact raw bytes before writes and rejects replay content changes/revocation', async () => {
     await db.featureConfig.create({

@@ -7,6 +7,7 @@ import {
   Platform,
   completeAutomationEffect,
   featureActive,
+  planFor,
   guardAutomationEffect,
   jsonObject,
   openTicket,
@@ -1146,7 +1147,12 @@ export class EffectExecutor {
           checksum: createHash('sha256')
             .update(JSON.stringify(captured))
             .digest('hex'),
-          expiresAt: new Date(Date.now() + 30 * 86_400_000),
+          // Retention follows the plan at capture; a later downgrade keeps it.
+          expiresAt: new Date(
+            Date.now() +
+              (await planFor(ctx.tx, work.guildId)).transcriptRetentionDays *
+                86_400_000,
+          ),
         },
       });
       if (!complete && settings.requireTranscriptBeforeCleanup) {
