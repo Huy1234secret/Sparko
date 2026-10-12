@@ -10,6 +10,8 @@ const ErrorSchema = z.object({
       .array(z.object({ path: z.string(), message: z.string() }))
       .optional(),
     retryable: z.boolean().optional(),
+    /** The server an error is about, when a request spans several. */
+    guildId: z.string().optional(),
   }),
   requestId: z.string().optional(),
 });
@@ -26,6 +28,7 @@ export class ApiError extends Error {
   readonly fieldErrors: readonly ApiFieldError[];
   /** True when repeating the same request (with the same idempotency key) may succeed. */
   readonly retryable: boolean;
+  readonly guildId: string | undefined;
   constructor(
     message: string,
     code: string,
@@ -35,6 +38,7 @@ export class ApiError extends Error {
     options: {
       fieldErrors?: readonly ApiFieldError[] | undefined;
       retryable?: boolean | undefined;
+      guildId?: string | undefined;
     } = {},
   ) {
     super(message);
@@ -45,6 +49,7 @@ export class ApiError extends Error {
     this.currentRevision = currentRevision;
     this.fieldErrors = options.fieldErrors ?? [];
     this.retryable = options.retryable ?? false;
+    this.guildId = options.guildId;
   }
 }
 export function isRetryable(error: unknown) {
@@ -85,6 +90,7 @@ http.interceptors.response.use(
             {
               fieldErrors: parsed.data.error.fieldErrors,
               retryable: parsed.data.error.retryable,
+              guildId: parsed.data.error.guildId,
             },
           ),
         );

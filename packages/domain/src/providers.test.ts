@@ -527,6 +527,10 @@ describe('provider authentication and bounded adapters', () => {
           reads++;
           return [];
         },
+        async () => {
+          reads++;
+          return { channels: new Set(), roles: new Set() };
+        },
       ),
     ).rejects.toThrow('Denied target');
     expect(reads).toBe(0);

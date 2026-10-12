@@ -37,6 +37,11 @@ import {
   type DomainContext,
   type DomainRoute,
 } from './core.js';
+import {
+  compareConfigs,
+  isProtectedFeature,
+  type ConfigRow,
+} from './config-tools.js';
 export { providerConfigSchemas } from '@sparko/contracts/providers';
 
 type Environment = Record<string, string | undefined>;
@@ -1557,13 +1562,19 @@ export async function completeCheckout(
   );
 }
 
-/** Root passes an API-backed fresh authority callback for ALL targets before any reads. */
+/**
+ * The caller passes a fresh authority callback; every server is authorized
+ * before any configuration is read. Each server must opt in, and the preview
+ * never writes. Rollout recomputes this plan and writes only to targets that
+ * also allow rollout.
+ */
 export async function multiServerPlan(
   input: unknown,
   authorize: (guildId: string) => Promise<Actor>,
-  readConfigs: (
-    actor: Actor,
-  ) => Promise<{ featureId: string; revision: number; config: unknown }[]>,
+  readConfigs: (actor: Actor) => Promise<ConfigRow[]>,
+  readResources: (
+    guildId: string,
+  ) => Promise<{ channels: Set<string>; roles: Set<string> }>,
 ) {
   const data = MultiServerPlanSchema.parse(input),
     ids = [...new Set([data.sourceGuildId, ...data.targetGuildIds])];
@@ -1582,63 +1593,56 @@ export async function multiServerPlan(
       rows: await readConfigs(actor),
     })),
   );
-  const source = collections.find((c) => c.guildId === data.sourceGuildId)!,
-    sourceOptIn = jsonObject(
-      source.rows.find((r) => r.featureId === 'R61')?.config,
-    );
-  if (!sourceOptIn['enabled'] || !sourceOptIn['allowComparison'])
+  const optedIn = (guildId: string) => {
+    const rows = collections.find((c) => c.guildId === guildId)!.rows,
+      optIn = jsonObject(rows.find((r) => r.featureId === 'R61')?.config);
+    return {
+      rows,
+      comparison:
+        optIn['enabled'] === true && optIn['allowComparison'] === true,
+      rollout: optIn['enabled'] === true && optIn['allowRollout'] === true,
+    };
+  };
+  const source = optedIn(data.sourceGuildId);
+  if (!source.comparison)
     throw new DomainError(
       'FORBIDDEN',
       'The source server must opt into comparison.',
       403,
     );
-  const targets = data.targetGuildIds.map((guildId) => {
-    const target = collections.find((c) => c.guildId === guildId)!,
-      optIn = jsonObject(
-        target.rows.find((r) => r.featureId === 'R61')?.config,
-      );
-    if (!optIn['enabled'] || !optIn['allowComparison'])
-      throw new DomainError(
-        'FORBIDDEN',
-        'Every target must opt into comparison.',
-        403,
-      );
-    const changes = data.featureIds
-      .filter(
-        (id) =>
-          !['R04', 'R60', 'R61', 'R62', 'R64', 'R65', 'R69', 'R70'].includes(
-            id,
-          ),
-      )
-      .map((featureId) => {
-        const before = target.rows.find((r) => r.featureId === featureId),
-          desired = source.rows.find((r) => r.featureId === featureId);
-        return {
-          featureId,
-          expectedRevision: before?.revision ?? 0,
-          before: before?.config ?? null,
-          proposed: desired?.config ?? null,
-          changed:
-            hash(before?.config ?? null) !== hash(desired?.config ?? null),
-          prerequisites: [
-            'Remap Discord channels and roles per target; validate resource permissions before apply.',
-          ],
-        };
-      });
-    return {
-      guildId,
-      actorId: byGuild.get(guildId)!.userId,
-      rolloutAllowed: optIn['allowRollout'] === true,
-      changes,
-    };
-  });
+  const requested = data.featureIds.filter((id) => !isProtectedFeature(id)),
+    featureIds = requested.filter((id) =>
+      source.rows.some((r) => r.featureId === id),
+    );
+  const targets = await Promise.all(
+    data.targetGuildIds.map(async (guildId) => {
+      const target = optedIn(guildId);
+      if (!target.comparison)
+        throw new DomainError(
+          'FORBIDDEN',
+          'Every target must opt into comparison.',
+          403,
+        );
+      return {
+        guildId,
+        actorId: byGuild.get(guildId)!.userId,
+        rolloutAllowed: target.rollout,
+        changes: compareConfigs(
+          target.rows,
+          source.rows,
+          featureIds,
+          data.remaps[guildId] ?? { channels: {}, roles: {} },
+          await readResources(guildId),
+        ),
+      };
+    }),
+  );
   return {
     sourceGuildId: data.sourceGuildId,
     generatedAt: new Date().toISOString(),
     targets,
-    excludedFeatures: data.featureIds.filter((id) =>
-      ['R04', 'R60', 'R61', 'R62', 'R64', 'R65', 'R69', 'R70'].includes(id),
-    ),
+    excludedFeatures: data.featureIds.filter(isProtectedFeature),
+    notConfiguredInSource: requested.filter((id) => !featureIds.includes(id)),
     applied: false,
   };
 }

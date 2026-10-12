@@ -393,7 +393,6 @@ export const modules: ModuleDefinition[] = [
     description:
       'Export protected configuration and preview resource remapping before restore.',
     group: 'settings',
-    resource: 'backups',
   },
   {
     id: 'R61',
@@ -409,7 +408,6 @@ export const modules: ModuleDefinition[] = [
     description:
       'Publish only opted-in safe aggregates and permitted profile fields.',
     group: 'settings',
-    resource: 'widgets',
   },
   {
     id: 'R60',

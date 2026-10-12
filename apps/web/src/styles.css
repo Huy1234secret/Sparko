@@ -163,6 +163,8 @@ strong {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Reflow at 320px and 400% zoom instead of scrolling sideways. */
+  flex-wrap: wrap;
 }
 .space-between {
   justify-content: space-between;
@@ -592,7 +594,6 @@ input[type='checkbox'] {
 }
 .footer-note span {
   color: var(--muted);
-  opacity: 0.7;
 }
 .public-page {
   overflow: hidden;
@@ -2066,7 +2067,7 @@ td {
 }
 .block-item > small {
   font-size: 12px;
-  opacity: 0.7;
+  color: var(--muted);
   max-width: 70px;
   overflow: hidden;
   white-space: nowrap;
@@ -3919,6 +3920,11 @@ td[aria-current='true'] {
   white-space: nowrap;
 }
 .reward-grid,
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  column-gap: 16px;
+}
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
@@ -4029,6 +4035,7 @@ td[aria-current='true'] {
 }
 .activity-row > span.row {
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 .economy-footnote {
   display: flex;
