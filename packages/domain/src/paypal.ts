@@ -264,11 +264,39 @@ const subscriptionEvents = new Set([
   'BILLING.SUBSCRIPTION.EXPIRED',
   'BILLING.SUBSCRIPTION.PAYMENT.FAILED',
 ]);
-const saleEvents = new Set([
-  'PAYMENT.SALE.COMPLETED',
-  'PAYMENT.SALE.REFUNDED',
-  'PAYMENT.SALE.REVERSED',
+/**
+ * Refunds and reversals reach a PayPal account under different names
+ * depending on its integration; each maps to the same revocation.
+ */
+const revokingEvents = new Map<string, 'refund' | 'chargeback'>([
+  ['PAYMENT.SALE.REFUNDED', 'refund'],
+  ['PAYMENT.REFUND.COMPLETED', 'refund'],
+  ['PAYMENT.CAPTURE.REFUNDED', 'refund'],
+  ['PAYMENT.SALE.REVERSED', 'chargeback'],
+  ['PAYMENT.CAPTURE.REVERSED', 'chargeback'],
 ]);
+/** Transaction IDs a refund or capture event points at, most direct first. */
+function transactionIds(event: PaypalEvent) {
+  const r = event.resource;
+  const links = Array.isArray(r['links'])
+    ? (r['links'] as Record<string, unknown>[]).map((l) => text(l['href']))
+    : [];
+  const fromLinks = links.flatMap((href) => {
+    const match = /\/v[12]\/payments\/(?:sale|captures)\/([A-Z0-9]+)/.exec(
+      href,
+    );
+    return match ? [match[1]!] : [];
+  });
+  return [
+    ...new Set(
+      [
+        text(r['sale_id']),
+        ...fromLinks,
+        event.event_type.startsWith('PAYMENT.CAPTURE.') ? text(r['id']) : '',
+      ].filter((id) => SaleId.safeParse(id).success),
+    ),
+  ];
+}
 const disputeEvents = new Set([
   'CUSTOMER.DISPUTE.CREATED',
   'CUSTOMER.DISPUTE.RESOLVED',
@@ -297,11 +325,16 @@ export async function resolvePaypalEvent(
     );
   let subscriptionId = '';
   if (subscriptionEvents.has(event.event_type)) subscriptionId = text(r['id']);
-  else if (saleEvents.has(event.event_type))
-    subscriptionId =
-      text(r['billing_agreement_id']) ||
-      (text(r['sale_id']) ? await saleAgreement(text(r['sale_id'])) : '');
-  else if (disputeEvents.has(event.event_type)) {
+  else if (event.event_type === 'PAYMENT.SALE.COMPLETED')
+    subscriptionId = text(r['billing_agreement_id']);
+  else if (revokingEvents.has(event.event_type)) {
+    subscriptionId = text(r['billing_agreement_id']);
+    // A subscription payment's sale and capture share one transaction ID.
+    for (const id of transactionIds(event)) {
+      if (subscriptionId) break;
+      subscriptionId = await saleAgreement(id).catch(() => '');
+    }
+  } else if (disputeEvents.has(event.event_type)) {
     const disputed = Array.isArray(r['disputed_transactions'])
       ? (r['disputed_transactions'] as Record<string, unknown>[])
       : [];
@@ -318,15 +351,13 @@ export async function resolvePaypalEvent(
     ],
   );
   const revocation: EntitlementObservation['revocation'] =
-    event.event_type === 'PAYMENT.SALE.REFUNDED'
-      ? 'refund'
-      : event.event_type === 'PAYMENT.SALE.REVERSED' ||
-          event.event_type === 'CUSTOMER.DISPUTE.CREATED'
-        ? 'chargeback'
-        : event.event_type === 'CUSTOMER.DISPUTE.RESOLVED' &&
-            outcome === 'RESOLVED_SELLER_FAVOUR'
-          ? 'dispute-won'
-          : null;
+    revokingEvents.get(event.event_type) ??
+    (event.event_type === 'CUSTOMER.DISPUTE.CREATED'
+      ? 'chargeback'
+      : event.event_type === 'CUSTOMER.DISPUTE.RESOLVED' &&
+          outcome === 'RESOLVED_SELLER_FAVOUR'
+        ? 'dispute-won'
+        : null);
   return {
     event,
     subscription,

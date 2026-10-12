@@ -96,7 +96,7 @@ Sparko sells Plus as a PayPal subscription. Premium turns on only when PayPal it
 2. **Plans.** In PayPal, create a product and a monthly subscription plan at your price (Pay & Get Paid › Subscriptions, or the sandbox equivalent). You can also add 6-month and yearly plans for the same product. Note each Plan ID; they start with `P-`. Members choose among the periods you configure. If you change a price in PayPal, also update the labels in `apps/web/src/content/pricing.ts`.
 3. **Webhook.** In the same app, add the webhook `https://panel.coin-sprite.com/api/v1/webhooks/paypal` and subscribe it to these events, then note the Webhook ID:
    - `BILLING.SUBSCRIPTION.ACTIVATED`, `.UPDATED`, `.RE-ACTIVATED`, `.CANCELLED`, `.SUSPENDED`, `.EXPIRED` and `.PAYMENT.FAILED`
-   - `PAYMENT.SALE.COMPLETED`, `PAYMENT.SALE.REFUNDED` and `PAYMENT.SALE.REVERSED`
+   - Payment sale completed, and whichever refund and reversal events your account lists: Payment refund completed, Payment capture refunded, Payment capture reversed, or the older Payment sale refunded and Payment sale reversed. Ticking **All Events** also works; Sparko ignores the rest.
    - `CUSTOMER.DISPUTE.CREATED` and `CUSTOMER.DISPUTE.RESOLVED`
 4. **Server settings.** On the server, run `nano /opt/sparko/shared/.env.production` and add these lines (`sandbox` for testing, `live` for real payments):
 

@@ -210,6 +210,34 @@ describe('PayPal Premium', () => {
     );
   });
 
+  it('ends Premium on a refund reported as a completed refund linked to its capture', async () => {
+    paypal.subscription = subscription('ACTIVE');
+    await deliver('BILLING.SUBSCRIPTION.ACTIVATED', { id: SUB });
+    expect((await plan()).id).toBe('plus');
+    expect(
+      (
+        await deliver('PAYMENT.REFUND.COMPLETED', {
+          id: 'REFUND2',
+          links: [
+            {
+              rel: 'up',
+              href: 'https://api.paypal.com/v2/payments/captures/SALE00000001',
+            },
+          ],
+        })
+      ).status,
+    ).toBe(200);
+    expect((await plan()).id).toBe('free');
+    expect((await entitlement()).data).toMatchObject({ revoked: true });
+  });
+
+  it('ends Premium on a reversed capture', async () => {
+    paypal.subscription = subscription('ACTIVE');
+    await deliver('BILLING.SUBSCRIPTION.ACTIVATED', { id: SUB });
+    await deliver('PAYMENT.CAPTURE.REVERSED', { id: 'SALE00000001' });
+    expect((await plan()).id).toBe('free');
+  });
+
   it('accepts the yearly plan as Plus', async () => {
     paypal.subscription = {
       ...subscription('ACTIVE', inDays(365)),
