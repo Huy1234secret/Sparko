@@ -942,3 +942,247 @@ describe('PostgreSQL virtual economy settlement and concurrency', () => {
     await assertBalanced();
   });
 });
+
+describe('member and staff read models', () => {
+  const get = (who: Actor, path: string, input: unknown = {}) =>
+    call(who, 'GET', path, input, 'read').then((r) => r.data as never);
+
+  it('recovers an open trivia question after a reload without revealing the answer', async () => {
+    await call(
+      manager(),
+      'POST',
+      '/games/questions',
+      {
+        questionId: 'colour',
+        question: 'Sparko brand colour?',
+        choices: ['Yellow', 'Blue', 'Green'],
+        correctIndex: 0,
+      },
+      'question',
+    );
+    const started = (await call(actor(), 'POST', '/games/trivia', {}, 'play'))
+      .data as { id: string };
+    const reloaded: {
+      current: Record<string, unknown> | null;
+      playsLeft: number;
+      nextPlayAt: string | null;
+    } = await get(actor(), '/games/me');
+    expect(reloaded.current).toMatchObject({
+      id: started.id,
+      question: 'Sparko brand colour?',
+      choices: ['Yellow', 'Blue', 'Green'],
+    });
+    expect(reloaded.current).not.toHaveProperty('correctIndex');
+    expect(JSON.stringify(reloaded)).not.toContain('questionSnapshot');
+    expect(reloaded.nextPlayAt).not.toBeNull();
+    // Another member never sees this session.
+    expect(await get(actor(secondId), '/games/me')).toMatchObject({
+      current: null,
+      recent: [],
+    });
+    await call(
+      actor(),
+      'POST',
+      '/games/:id/answer',
+      { choice: 1 },
+      'answer-after-reload',
+      { id: started.id },
+    );
+    const after: {
+      current: unknown;
+      recent: { state: string; correctIndex: number; selectedIndex: number }[];
+    } = await get(actor(), '/games/me');
+    expect(after.current).toBeNull();
+    expect(after.recent[0]).toMatchObject({
+      state: 'lost',
+      selectedIndex: 1,
+      correctIndex: 0,
+    });
+  });
+
+  it('joins item definitions into inventory, collections and trades', async () => {
+    await shop('gem', { name: 'Blue gem', rarity: 'rare' });
+    await shop('ore', { name: 'Iron ore' });
+    await call(
+      manager(),
+      'POST',
+      '/collections/recipes',
+      {
+        recipeId: 'ring',
+        name: 'Ring',
+        ingredients: [{ itemId: 'ore', quantity: 2 }],
+        resultItemId: 'gem',
+        resultQuantity: 1,
+        cost: '0',
+      },
+      'recipe',
+    );
+    await grant();
+    await purchase(memberId, 'ore');
+    const inventory: {
+      items: { itemId: string; quantity: number; item: { name: string } }[];
+      orders: { name: string; state: string; price: string }[];
+    } = await get(actor(), '/inventory/me');
+    expect(inventory.items).toEqual([
+      expect.objectContaining({
+        itemId: 'ore',
+        quantity: 1,
+        item: expect.objectContaining({ name: 'Iron ore' }),
+      }),
+    ]);
+    expect(inventory.orders[0]).toMatchObject({
+      name: 'Iron ore',
+      state: 'delivered',
+      price: '10',
+    });
+    const collections: {
+      catalog: { item: { itemId: string }; quantity: number }[];
+      recipes: { ingredients: { name: string; have: number }[] }[];
+    } = await get(actor(), '/collections');
+    expect(collections.catalog.map((c) => [c.item.itemId, c.quantity])).toEqual(
+      [
+        ['gem', 0],
+        ['ore', 1],
+      ],
+    );
+    expect(collections.recipes[0]!.ingredients[0]).toMatchObject({
+      name: 'Iron ore',
+      have: 1,
+    });
+    await call(
+      actor(),
+      'POST',
+      '/trades',
+      {
+        recipientId: secondId,
+        offered: { amount: '1', items: [{ itemId: 'ore', quantity: 1 }] },
+        requested: { amount: '5', items: [] },
+        expiresAt: future(),
+      },
+      'named-trade',
+    );
+    const [sent]: { direction: string; offered: unknown }[] = await get(
+      actor(),
+      '/trades/me',
+    );
+    expect(sent).toMatchObject({
+      direction: 'sent',
+      offered: { items: [{ itemId: 'ore', name: 'Iron ore', quantity: 1 }] },
+    });
+    const [received]: { direction: string }[] = await get(
+      actor(secondId),
+      '/trades/me',
+    );
+    expect(received?.direction).toBe('received');
+    expect(await get(actor(thirdId), '/trades/me')).toEqual([]);
+  });
+
+  it('shows each member only their own lottery tickets and the shared pot', async () => {
+    await grant();
+    const lottery = await call(
+      manager(),
+      'POST',
+      '/lotteries',
+      {
+        name: 'Weekly draw',
+        ticketPrice: '10',
+        endsAt: future(),
+        maxTicketsPerMember: 3,
+        maxTotalTickets: 10,
+      },
+      'lottery-view',
+    );
+    await call(
+      actor(),
+      'POST',
+      '/lotteries/:id/enter',
+      { tickets: 2, optIn: true },
+      'two',
+      { id: (lottery.data as { id: string }).id },
+    );
+    const [mine]: Record<string, unknown>[] = await get(actor(), '/lotteries');
+    expect(mine).toMatchObject({
+      name: 'Weekly draw',
+      myTickets: 2,
+      totalTickets: 2,
+      pot: '20',
+    });
+    const [theirs]: Record<string, unknown>[] = await get(
+      actor(secondId),
+      '/lotteries',
+    );
+    expect(theirs).toMatchObject({ myTickets: 0, totalTickets: 2 });
+  });
+
+  it('lists undelivered role orders for staff only, then refunded ones on request', async () => {
+    await shop('vip', {
+      name: 'VIP role',
+      type: 'role',
+      roleId,
+      unique: true,
+      tradeable: false,
+    });
+    await grant();
+    const order = (
+      (await purchase(memberId, 'vip')).data as { order: { id: string } }
+    ).order;
+    await mutate(manager(), 'vip-fail', (ctx) =>
+      completeRoleOrder(ctx, order.id, 'failed', 'Role is above the bot'),
+    );
+    const queue: Record<string, unknown>[] = await get(
+      manager(),
+      '/shop/orders',
+    );
+    expect(queue).toEqual([
+      expect.objectContaining({
+        id: order.id,
+        state: 'delivery-failed',
+        name: 'VIP role',
+        userId: memberId,
+        roleId,
+        deliveryError: 'Role is above the bot',
+      }),
+    ]);
+    await expect(get(actor(), '/shop/orders')).rejects.toThrow();
+    await call(
+      manager(),
+      'POST',
+      '/shop/orders/:id/refund',
+      { reason: 'Role misconfigured' },
+      'vip-refund',
+      { id: order.id },
+    );
+    expect(await get(manager(), '/shop/orders')).toEqual([]);
+    expect(await get(manager(), '/shop/orders', { state: 'refunded' })).toEqual(
+      [
+        expect.objectContaining({
+          state: 'refunded',
+          refundReason: 'Role misconfigured',
+        }),
+      ],
+    );
+  });
+
+  it('reports reward timing and which modules a member can use', async () => {
+    await db.featureConfig.update({
+      where: { guildId_featureId: { guildId, featureId: 'R56' } },
+      data: { config: json({ enabled: false }) },
+    });
+    await call(actor(), 'POST', '/economy/daily', {}, 'daily-view');
+    const overview: {
+      balance: { balance: string };
+      modules: Record<string, boolean>;
+      rewards: { nextDailyAt: string | null; nextWorkAt: string | null };
+      recent: { amount: string }[];
+    } = await get(actor(), '/economy/me');
+    expect(overview.modules).toMatchObject({
+      R51: true,
+      R53: true,
+      R56: false,
+    });
+    expect(overview.rewards.nextDailyAt).not.toBeNull();
+    expect(overview.rewards.nextWorkAt).toBeNull();
+    expect(overview.recent).toHaveLength(1);
+    expect(overview.balance.balance).toBe(overview.recent[0]!.amount);
+  });
+});
