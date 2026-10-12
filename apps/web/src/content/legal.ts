@@ -19,4 +19,6 @@ export const legal = {
   sessionDays: 7,
   exportDays: 30,
   refundWindowDays: 14,
+  /** Encrypted backups are deleted after this many days. */
+  backupDays: 30,
 } as const;

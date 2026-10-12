@@ -163,21 +163,9 @@ else
   say "Keeping existing $ENV_FILE"
 fi
 
-say 'Daily database and file backups (kept 14 days)'
-cat >/etc/cron.daily/sparko-backup <<'BACKUP'
-#!/usr/bin/env bash
-set -euo pipefail
-dir=/opt/sparko/backups
-stamp=$(date -u +%Y%m%dT%H%M%SZ)
-cd /opt/sparko/current 2>/dev/null || exit 0
-compose() { docker compose --env-file /opt/sparko/shared/.env.production -f infra/compose.prod.yaml "$@"; }
-compose exec -T postgres pg_dump -U sparko -Fc sparko >"$dir/sparko-$stamp.dump"
-docker run --rm -v sparko_private:/data:ro -v "$dir":/backup busybox tar czf "/backup/private-$stamp.tgz" -C /data .
-(cd "$dir" && sha256sum "sparko-$stamp.dump" "private-$stamp.tgz" >"sparko-$stamp.sha256")
-chown deploy:deploy "$dir"/*-"$stamp".*
-find "$dir" -type f -mtime +14 -delete
-BACKUP
-chmod 755 /etc/cron.daily/sparko-backup
+# Daily backups are infra/backup.sh, scheduled by each deploy in the deploy
+# user's crontab; this removes the copy older versions of this script added.
+rm -f /etc/cron.daily/sparko-backup
 
 say 'Done'
 echo 'Add these GitHub repository secrets (Settings > Secrets and variables > Actions):'
