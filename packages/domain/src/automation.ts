@@ -3,6 +3,7 @@ import { Snowflake, Timezone, Revision, DomainError } from '@sparko/contracts';
 import { allowed } from '@sparko/policy';
 import { MessageDocumentSchema, type MessageDocument } from '@sparko/messages';
 import {
+  featureActive,
   createRecord,
   getRecord,
   jsonObject,
@@ -1774,10 +1775,7 @@ async function advanceWorkflow(ctx: DomainContext, id: string) {
       record.revision,
       'failed',
     );
-  const feature = await ctx.tx.featureConfig.findUnique({
-    where: { guildId_featureId: { guildId: ctx.guildId, featureId: 'R45' } },
-  });
-  if (!jsonObject(feature?.config)['enabled'])
+  if (!(await featureActive(ctx.tx, ctx.guildId, 'R45', ctx.now)))
     return updateRecord(
       ctx,
       'workflow_run',
@@ -2251,10 +2249,7 @@ export async function ingestAutomationEvent(
     if (e.bot || e.webhook || e.generatedBySparko) return { ignored: true };
     if (Math.abs(Date.parse(e.at) - ctx.now.getTime()) > 300000)
       return { ignored: true, reason: 'stale event' };
-    const replyCfg = await ctx.tx.featureConfig.findUnique({
-      where: { guildId_featureId: { guildId: ctx.guildId, featureId: 'R43' } },
-    });
-    if (jsonObject(replyCfg?.config)['enabled']) {
+    if (await featureActive(ctx.tx, ctx.guildId, 'R43', ctx.now)) {
       const replies = await ctx.tx.record.findMany({
         where: { guildId: ctx.guildId, kind: 'reply', state: 'active' },
         take: 100,
@@ -2310,10 +2305,7 @@ export async function ingestAutomationEvent(
         delivered++;
       }
     }
-    const stickyCfg = await ctx.tx.featureConfig.findUnique({
-      where: { guildId_featureId: { guildId: ctx.guildId, featureId: 'R44' } },
-    });
-    if (jsonObject(stickyCfg?.config)['enabled']) {
+    if (await featureActive(ctx.tx, ctx.guildId, 'R44', ctx.now)) {
       const sticky = await ctx.tx.record.findUnique({
         where: {
           guildId_kind_key: {
@@ -2370,7 +2362,8 @@ export async function ingestAutomationEvent(
         },
       }),
       raw = jsonObject(config?.config);
-    if (!raw['enabled']) return { ignored: true };
+    if (!(await featureActive(ctx.tx, ctx.guildId, 'R39', ctx.now)))
+      return { ignored: true };
     const configuration = automationConfigSchemas['R39']!.parse(raw) as {
       lobbyChannelId: string;
       categoryId?: string;
@@ -2450,10 +2443,8 @@ export async function ingestAutomationEvent(
     return { observed: true };
   }
   if (e.type === 'invite_join') {
-    const config = await ctx.tx.featureConfig.findUnique({
-      where: { guildId_featureId: { guildId: ctx.guildId, featureId: 'R40' } },
-    });
-    if (!jsonObject(config?.config)['enabled']) return { ignored: true };
+    if (!(await featureActive(ctx.tx, ctx.guildId, 'R40', ctx.now)))
+      return { ignored: true };
     const attribution = attributeInvite(e),
       record = await createRecord(
         ctx,
@@ -2482,7 +2473,7 @@ export async function ingestAutomationEvent(
     });
     if (
       attribution.status === 'confirmed' &&
-      jsonObject(reward?.config)['enabled']
+      (await featureActive(ctx.tx, ctx.guildId, 'R41', ctx.now))
     )
       await due(
         ctx,
@@ -2551,10 +2542,7 @@ async function eventWorkflows(
   source: WorkflowSource,
   channelId?: string,
 ) {
-  const feature = await ctx.tx.featureConfig.findUnique({
-    where: { guildId_featureId: { guildId: ctx.guildId, featureId: 'R45' } },
-  });
-  if (!jsonObject(feature?.config)['enabled']) return;
+  if (!(await featureActive(ctx.tx, ctx.guildId, 'R45', ctx.now))) return;
   const workflows = await ctx.tx.record.findMany({
     where: { guildId: ctx.guildId, kind: 'workflow', state: 'active' },
     take: 20,

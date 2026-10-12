@@ -456,6 +456,93 @@ describe('API security against real PostgreSQL', () => {
     });
     expect(health.statusCode).toBe(200);
   });
+  it('separates fleet reads from audited feature policy and staff plan grants', async () => {
+    await db.globalGrant.upsert({
+      where: { userId: STAFF_A },
+      create: { userId: STAFF_A, capabilities: ['fleet.read'] },
+      update: { capabilities: ['fleet.read'], expiresAt: null },
+    });
+    const summary = await app.inject({
+      url: `/api/v1/owner/guilds/${GUILD}`,
+      headers: headers(STAFF_A),
+    });
+    expect(summary.statusCode).toBe(200);
+    expect(summary.json().data.plan.id).toBe('free');
+    const policy = {
+      allowed: false,
+      reason: 'Abuse review',
+      expectedRevision: 0,
+    };
+    const denied = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/owner/guilds/${GUILD}/features/R43/policy`,
+      headers: headers(STAFF_A, 'policy-denied'),
+      payload: policy,
+    });
+    expect(denied.statusCode).toBe(403);
+    const blocked = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/owner/guilds/${GUILD}/features/R43/policy`,
+      headers: headers(ADMIN, 'policy-block'),
+      payload: policy,
+    });
+    expect(blocked.statusCode).toBe(200);
+    const stale = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/owner/guilds/${GUILD}/features/R43/policy`,
+      headers: headers(ADMIN, 'policy-stale'),
+      payload: { ...policy, allowed: true },
+    });
+    expect(stale.statusCode).toBe(409);
+    // The server's own settings page explains the pause; its config is untouched.
+    const config = await app.inject({
+      url: `/api/v1/guilds/${GUILD}/features/R43/config`,
+      headers: headers(ADMIN),
+    });
+    expect(config.json().data.gate).toMatchObject({
+      ownerAllowed: false,
+      ownerReason: 'Abuse review',
+    });
+    expect(
+      await db.auditLog.count({
+        where: { guildId: GUILD, action: 'owner.feature.policy' },
+      }),
+    ).toBe(1);
+    const grant = await app.inject({
+      method: 'POST',
+      url: `/api/v1/owner/guilds/${GUILD}/entitlements`,
+      headers: headers(ADMIN, 'grant-plus'),
+      payload: {
+        plan: 'plus',
+        expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+        reason: 'Community partner',
+      },
+    });
+    expect(grant.statusCode).toBe(200);
+    const granted = await app.inject({
+      url: `/api/v1/owner/guilds/${GUILD}`,
+      headers: headers(STAFF_A),
+    });
+    expect(granted.json().data.plan.id).toBe('plus');
+    const revoke = await app.inject({
+      method: 'POST',
+      url: `/api/v1/owner/guilds/${GUILD}/entitlements/${grant.json().data.id}/revoke`,
+      headers: headers(ADMIN, 'revoke-plus'),
+      payload: { reason: 'Partnership ended', expectedRevision: 1 },
+    });
+    expect(revoke.statusCode).toBe(200);
+    const after = await app.inject({
+      url: `/api/v1/owner/guilds/${GUILD}`,
+      headers: headers(STAFF_A),
+    });
+    expect(after.json().data.plan.id).toBe('free');
+    expect(after.json().data.entitlements[0]).toMatchObject({
+      source: 'staff',
+      revoked: true,
+    });
+    await db.featurePolicy.deleteMany({ where: { guildId: GUILD } });
+    await db.globalGrant.deleteMany({ where: { userId: STAFF_A } });
+  });
   it('verifies callback exact raw bytes before writes and rejects replay content changes/revocation', async () => {
     await db.featureConfig.create({
       data: {

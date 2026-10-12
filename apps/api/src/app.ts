@@ -7,6 +7,7 @@ import swagger from '@fastify/swagger';
 import { z } from 'zod';
 import {
   Platform,
+  featureGate,
   ticketRoutes,
   publicationRoutes,
   jsonObject,
@@ -44,6 +45,7 @@ import { createAuth, requireActiveSession } from './auth.js';
 import { registerAccountRoutes } from './account.js';
 import { registerProviderCallbacks } from './providers.js';
 import { registerGrantRoutes } from './grants.js';
+import { registerOwnerRoutes } from './owner.js';
 import {
   validatePublicationResources,
   validateTemplateResources,
@@ -496,10 +498,15 @@ export async function createApp(options: {
     });
     const defaults = schema.safeParse({ enabled: false });
     const savedValidation = saved ? schema.safeParse(saved.config) : null;
+    // Staff policy and plan are separate from the server's own on/off switch.
+    const gate = await db.$transaction((tx) =>
+      featureGate(tx, p.guildId, p.featureId),
+    );
     return {
       data: saved
         ? {
             ...saved,
+            gate,
             setupState: savedValidation?.success
               ? 'configured'
               : 'unconfigured',
@@ -513,6 +520,7 @@ export async function createApp(options: {
           }
         : {
             featureId: p.featureId,
+            gate,
             revision: 0,
             appliedRevision: 0,
             config: defaults.success ? defaults.data : { enabled: false },
@@ -863,6 +871,7 @@ export async function createApp(options: {
   });
   registerAccountRoutes(app, db, auth, globalActor);
   registerGrantRoutes(app, db, platform, auth, config, discord);
+  registerOwnerRoutes(app, db, platform, globalActor, Object.keys(schemas));
   registerAssetRoutes(app, db, config, auth);
   await registerProviderCallbacks(
     app,

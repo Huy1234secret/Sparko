@@ -46,6 +46,7 @@ model Guild {
   memberCount Int?
   createdAt DateTime @default(now())
   configs FeatureConfig[]
+  policies FeaturePolicy[]
   records Record[]
   grants AccessGrant[]
   operations Operation[]
@@ -81,6 +82,19 @@ model FeatureConfig {
   revision Int @default(0)
   appliedRevision Int @default(0)
   config Json
+  updatedAt DateTime @updatedAt
+  @@unique([guildId, featureId])
+}
+/// Owner (Sparko staff) policy per server feature, separate from server configuration.
+model FeaturePolicy {
+  id String @id @default(uuid())
+  guildId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  featureId String
+  allowed Boolean @default(true)
+  reason String
+  actorId String
+  revision Int @default(1)
   updatedAt DateTime @updatedAt
   @@unique([guildId, featureId])
 }

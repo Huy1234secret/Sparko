@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { DomainError, Snowflake, Revision } from '@sparko/contracts';
 import { allowed } from '@sparko/policy';
 import {
+  featureActive,
   createRecord,
   getRecord,
   jsonObject,
@@ -1121,7 +1122,10 @@ export async function ingestSafetyEvent(ctx: DomainContext, input: unknown) {
     })
   )?.config;
   const parsed = safetyConfigSchemas[feature]!.safeParse(raw);
-  if (!parsed.success || !jsonObject(parsed.data)['enabled'])
+  if (
+    !parsed.success ||
+    !(await featureActive(ctx.tx, ctx.guildId, feature, ctx.now))
+  )
     return { observed: true, enabled: false };
   const cfg = jsonObject(parsed.data);
   if (event.type === 'message') {

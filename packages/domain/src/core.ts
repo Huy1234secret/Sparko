@@ -61,18 +61,136 @@ export function context(
       return e.id;
     },
     requireFeature: async (featureId) => {
-      const config = await tx.featureConfig.findUnique({
-        where: { guildId_featureId: { guildId: actor.guildId, featureId } },
-      });
-      if (!config || !jsonObject(config.config)['enabled'])
-        throw new DomainError(
-          'FEATURE_DISABLED',
-          'Enable this module before using it.',
-          409,
-        );
+      const error = gateError(
+        await featureGate(tx, actor.guildId, featureId, ctx.now),
+      );
+      if (error) throw error;
     },
   };
   return ctx;
+}
+/** Real capability limits per plan; paid tiers never bypass privacy or permission checks. */
+export const plans = {
+  free: {
+    id: 'free',
+    templates: 10,
+    storageBytes: 10000000,
+    automationSteps: 10,
+    transcriptRetentionDays: 7,
+    multiServer: false,
+  },
+  plus: {
+    id: 'plus',
+    templates: 100,
+    storageBytes: 100000000,
+    automationSteps: 25,
+    transcriptRetentionDays: 30,
+    multiServer: true,
+  },
+} as const;
+export type Plan = (typeof plans)[keyof typeof plans];
+/** Features that need a paid plan; every other feature is available on Free. */
+export const planFeatures: Record<string, keyof typeof plans> = {
+  R61: 'plus',
+};
+/**
+ * The server's plan: Plus while any provider-verified or staff-granted
+ * entitlement is active, unrevoked and unexpired. Records are never deleted on
+ * downgrade; limits apply to new work only.
+ */
+export async function planFor(
+  tx: Transaction,
+  guildId: string,
+  now = new Date(),
+): Promise<Plan> {
+  const rows = await tx.record.findMany({
+    where: { guildId, kind: 'billing.entitlement', state: 'active' },
+    take: 100,
+  });
+  return rows.some((row) => {
+    const data = jsonObject(row.data);
+    return (
+      data['active'] === true &&
+      data['revoked'] !== true &&
+      typeof data['expiresAt'] === 'string' &&
+      Date.parse(data['expiresAt']) > now.getTime()
+    );
+  })
+    ? plans.plus
+    : plans.free;
+}
+export interface FeatureGate {
+  featureId: string;
+  /** The server's own configuration turns the module on. */
+  enabled: boolean;
+  /** Sparko staff have not paused the module for this server. */
+  ownerAllowed: boolean;
+  ownerReason: string | null;
+  /** The server's plan includes the module. */
+  planEntitled: boolean;
+  requiredPlan: keyof typeof plans | null;
+  plan: keyof typeof plans;
+}
+/**
+ * The shared gate for every path that starts new feature work: HTTP routes,
+ * Gateway ingestion, workflows, timers and worker effects. Cleanup, refunds,
+ * expiry and privacy maintenance deliberately do not call it.
+ */
+export async function featureGate(
+  tx: Transaction,
+  guildId: string,
+  featureId: string,
+  now = new Date(),
+): Promise<FeatureGate> {
+  const [config, policy, plan] = await Promise.all([
+    tx.featureConfig.findUnique({
+      where: { guildId_featureId: { guildId, featureId } },
+    }),
+    tx.featurePolicy.findUnique({
+      where: { guildId_featureId: { guildId, featureId } },
+    }),
+    planFor(tx, guildId, now),
+  ]);
+  const requiredPlan = planFeatures[featureId] ?? null;
+  return {
+    featureId,
+    enabled: jsonObject(config?.config)['enabled'] === true,
+    ownerAllowed: policy?.allowed !== false,
+    ownerReason: policy && !policy.allowed ? policy.reason : null,
+    planEntitled: !requiredPlan || plan.id === requiredPlan,
+    requiredPlan,
+    plan: plan.id,
+  };
+}
+export function gateError(gate: FeatureGate): DomainError | null {
+  if (!gate.ownerAllowed)
+    return new DomainError(
+      'FEATURE_BLOCKED',
+      `Sparko staff paused this module for this server: ${gate.ownerReason}`,
+      403,
+    );
+  if (!gate.planEntitled)
+    return new DomainError(
+      'PLAN_REQUIRED',
+      `This module needs the ${gate.requiredPlan === 'plus' ? 'Plus' : String(gate.requiredPlan)} plan.`,
+      403,
+    );
+  if (!gate.enabled)
+    return new DomainError(
+      'FEATURE_DISABLED',
+      'Enable this module before using it.',
+      409,
+    );
+  return null;
+}
+/** True when new work for the feature may start (all gates pass). */
+export async function featureActive(
+  tx: Transaction,
+  guildId: string,
+  featureId: string,
+  now = new Date(),
+) {
+  return !gateError(await featureGate(tx, guildId, featureId, now));
 }
 export function jsonObject(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value))
