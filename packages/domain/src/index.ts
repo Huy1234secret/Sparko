@@ -6,3 +6,4 @@ export * from './safety.js';
 export * from './automation.js';
 export * from './economy.js';
 export * from './providers.js';
+export * from './config-tools.js';

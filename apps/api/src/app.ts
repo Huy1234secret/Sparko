@@ -22,7 +22,7 @@ import {
   economyConfigSchemas,
   providerRoutes,
   providerConfigSchemas,
-  multiServerPlan,
+  configReferences,
   publicWidget,
   rankCardInput,
   type ProviderTransport,
@@ -52,6 +52,7 @@ import {
   validateTemplateResources,
 } from './publication-resources.js';
 import { registerAssetRoutes } from './assets.js';
+import { registerConfigToolRoutes } from './config-tools.js';
 import { discordAdapter, type DiscordAdapter } from './discord.js';
 import { renderRankCard } from '@sparko/rendering';
 const presets = [
@@ -530,35 +531,7 @@ export async function createApp(options: {
    * modules are covered without per-feature code.
    */
   async function assertConfigReferences(guildId: string, config: unknown) {
-    const channels: { path: string; id: string }[] = [],
-      roles: { path: string; id: string }[] = [];
-    function visit(value: unknown, path: string[]): void {
-      if (Array.isArray(value))
-        return value.forEach((item, index) =>
-          visit(item, [...path, String(index)]),
-        );
-      if (!value || typeof value !== 'object') return;
-      for (const [key, item] of Object.entries(value)) {
-        const target = /channelIds?$/i.test(key)
-          ? channels
-          : /roleIds?$/i.test(key)
-            ? roles
-            : null;
-        if (target && typeof item === 'string')
-          target.push({ path: [...path, key].join('.'), id: item });
-        else if (target && Array.isArray(item))
-          item.forEach((id, index) => {
-            if (typeof id === 'string')
-              target.push({
-                path: [...path, key, String(index)].join('.'),
-                id,
-              });
-          });
-        else if (key !== 'document' && !key.endsWith('Document'))
-          visit(item, [...path, key]);
-      }
-    }
-    visit(config, []);
+    const { channels, roles } = configReferences(config);
     if (!channels.length && !roles.length) return;
     const [known, knownRoles] = await Promise.all([
       channels.length ? discord.channels(guildId) : Promise.resolve([]),
@@ -870,17 +843,7 @@ export async function createApp(options: {
     options.providerEnv,
     options.providerTransport,
   );
-  app.post('/api/v1/multi-server/preview', async (req) => {
-    await auth.csrf(req);
-    return {
-      data: await multiServerPlan(
-        req.body,
-        (guildId) => auth.actor(req, guildId, 'config.manage'),
-        (actor) =>
-          db.featureConfig.findMany({ where: { guildId: actor.guildId } }),
-      ),
-    };
-  });
+  registerConfigToolRoutes(app, db, platform, auth, discord, schemas);
   // The member's own card, built from server state exactly like Discord `/level`.
   app.get('/api/v1/guilds/:guildId/levels/me/card.png', async (req, reply) => {
     const { guildId } = z.object({ guildId: z.string() }).parse(req.params);
