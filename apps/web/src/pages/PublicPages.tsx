@@ -1610,7 +1610,8 @@ export function PrivacyPage() {
           </li>
           <li>
             <strong>Cloudflare</strong>, which provides DNS, HTTPS and
-            protection from attacks for the website.
+            protection from attacks for the website, and stores our encrypted
+            backups.
           </li>
           <li>
             <strong>PayPal</strong>, which handles Premium payments. We never
@@ -1658,6 +1659,11 @@ export function PrivacyPage() {
           <li>
             <strong>Payment records</strong> are kept for as long as tax and
             accounting law requires, even after a server or account is deleted.
+          </li>
+          <li>
+            <strong>Backups</strong> of the database and uploaded files are
+            encrypted and kept for {legal.backupDays} days, so data deleted from
+            Sparko also leaves the backups within that time.
           </li>
         </ul>
       </section>

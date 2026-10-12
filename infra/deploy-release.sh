@@ -71,6 +71,10 @@ else
   exit 1
 fi
 
+echo '==> Scheduling the daily backup'
+backup_job="17 3 * * * bash $ROOT/current/infra/backup.sh >>$ROOT/backups/backup.log 2>&1"
+{ crontab -l 2>/dev/null | grep -vF 'infra/backup.sh' || true; echo "$backup_job"; } | crontab -
+
 echo '==> Removing old releases (keeping 5)'
 for old in $(ls -1dt "$ROOT"/releases/*/ | tail -n +6); do
   tag=$(basename "$old" | cut -c1-12)

@@ -40,7 +40,6 @@ The script:
 - **Settings:** writes `/opt/sparko/shared/.env.production`, readable only by `deploy`.
   - Generates fresh database, session and encryption keys.
   - Asks for the production bot's details and your Discord user ID (for the owner console).
-- **Backups:** schedules daily database and file backups in `/opt/sparko/backups`, kept 14 days.
 - **Prints** the four values for step 4.
 
 It does not change SSH settings. When you are ready, consider disabling root password login (`PasswordAuthentication no` in `/etc/ssh/sshd_config`), but only after confirming you can still sign in with a key.
@@ -114,6 +113,53 @@ Sparko sells Plus as a PayPal subscription. Premium turns on only when PayPal it
 6. **Go live.** Replace all the values with the Live ones (`PAYPAL_ENV=live`), and Deploy again.
 
 Refunds and chargebacks in PayPal remove Premium automatically. Cancelling in PayPal keeps it until the paid period ends.
+
+## Off-site backups in Cloudflare R2
+
+Every deploy schedules `infra/backup.sh` to run daily at 03:17 UTC. The script works in this order:
+
+1. **Saves locally.** It writes the database and the uploaded files to `/opt/sparko/backups`, kept 7 days.
+2. **Encrypts.** When R2 is set up, it encrypts those files on the server with your backup passphrase.
+3. **Uploads.** It copies them to R2, kept 30 days.
+
+The privacy policy states the 30 days. Cloudflare cannot read the copies, and nor can anyone else without the passphrase.
+
+1. **Bucket.** In Cloudflare › R2, create a bucket named `sparko-backups`. Keep it private, and add no public access or custom domain.
+2. **Token.** In R2 › Manage API tokens › Create API token:
+   - Permission: **Object Read & Write**.
+   - Scope: only the `sparko-backups` bucket.
+   - Note the **Access Key ID**, the **Secret Access Key**, and your **Account ID** (shown on the R2 overview page).
+3. **Passphrase.** On the server, run `openssl rand -base64 32`. Save the output in your password manager. Without it, the backups cannot be restored, and it is lost if the server is.
+4. **Settings.** Run `nano /opt/sparko/shared/.env.production` and add:
+
+   ```
+   R2_ACCOUNT_ID=...
+   R2_ACCESS_KEY_ID=...
+   R2_SECRET_ACCESS_KEY=...
+   R2_BUCKET=sparko-backups
+   BACKUP_PASSPHRASE=...
+   ```
+
+5. **Test.** As the deploy user (`su - deploy`), run `bash /opt/sparko/current/infra/backup.sh`. It should end with `Uploaded 3 files to R2.` In the bucket, the files have scrambled names, which is expected. Each night's result is logged in `/opt/sparko/backups/backup.log`.
+
+To restore, download and decrypt into a new folder. Then follow [operations](operations.md) to restore into a separate database first:
+
+```sh
+mkdir -p /opt/sparko/restore && cd /opt/sparko/restore
+read -rp 'Account ID: ' R2_ACCOUNT_ID; read -rp 'Access Key ID: ' R2_ACCESS_KEY_ID
+read -rsp 'Secret Access Key: ' R2_SECRET_ACCESS_KEY; echo; read -rsp 'Passphrase: ' BACKUP_PASSPHRASE; echo
+read -rp 'Backup stamp (blank to list them): ' STAMP
+export R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY BACKUP_PASSPHRASE STAMP
+docker run --rm -v "$PWD":/out -e R2_ACCOUNT_ID -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY \
+  -e BACKUP_PASSPHRASE -e STAMP --entrypoint sh rclone/rclone:1.68.2 -euc '
+  export RCLONE_CONFIG_R2_TYPE=s3 RCLONE_CONFIG_R2_PROVIDER=Cloudflare RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
+  export RCLONE_CONFIG_R2_ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+  export RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+  export RCLONE_CONFIG_VAULT_TYPE=crypt RCLONE_CONFIG_VAULT_REMOTE=r2:sparko-backups/sparko
+  export RCLONE_CONFIG_VAULT_PASSWORD="$(printf %s "$BACKUP_PASSPHRASE" | rclone obscure -)"
+  if [ -z "$STAMP" ]; then rclone lsf vault:; else rclone copy vault: /out --include "*-$STAMP.*"; fi'
+sha256sum -c sparko-*.sha256
+```
 
 ## Server memory
 
