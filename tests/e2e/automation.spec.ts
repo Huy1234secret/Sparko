@@ -84,7 +84,9 @@ test('a workflow is built from typed steps, runs once and posts through the work
   await expect(page.getByText('1 of 5 actions used.')).toBeVisible();
   await page.getByRole('button', { name: 'Create workflow' }).click();
   await expect(page.getByText('Greeter', { exact: true })).toBeVisible();
-  await expect(page.getByText(/Only when staff run it · 2 steps/)).toBeVisible();
+  await expect(
+    page.getByText(/Only when staff run it · 2 steps/),
+  ).toBeVisible();
 
   await page.getByRole('button', { name: 'Run for me' }).click();
   await expect(page.getByRole('tab', { name: 'Runs' })).toHaveAttribute(

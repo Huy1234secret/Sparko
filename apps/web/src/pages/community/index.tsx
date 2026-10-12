@@ -35,6 +35,26 @@ import { StickyPage } from '../automation/StickyPage';
 import { WorkflowsPage } from '../automation/WorkflowsPage';
 import { CommandsPage } from '../automation/CommandsPage';
 import { BillingPage } from '../BillingPages';
+import {
+  EconomyPage,
+  RewardsPage,
+  ShopPage,
+  TradesPage,
+} from '../economy/StaffEconomy';
+import {
+  AiPage,
+  MusicPage,
+  SocialPage,
+  WebhooksPage,
+} from '../providers/ProviderPages';
+import {
+  AchievementsPage,
+  CollectionsPage,
+  GamesPage,
+  LotteryPage,
+  ReputationPage,
+  SeasonsPage,
+} from '../economy/StaffPlay';
 
 /** Typed module pages; modules not listed here still use the generic page. */
 const typedPages: Record<string, ComponentType> = {
@@ -70,6 +90,20 @@ const typedPages: Record<string, ComponentType> = {
   'automations/commands': CommandsPage,
   'settings/billing': BillingPage,
   'engagement/reward-roles': () => <LevelsPage defaultTab="rewards" />,
+  'engagement/economy': EconomyPage,
+  'engagement/rewards': RewardsPage,
+  'engagement/shop': ShopPage,
+  'engagement/trades': TradesPage,
+  'engagement/collections': CollectionsPage,
+  'engagement/games': GamesPage,
+  'engagement/lottery': LotteryPage,
+  'engagement/reputation': ReputationPage,
+  'engagement/seasons': SeasonsPage,
+  'engagement/achievements': AchievementsPage,
+  'automations/social': SocialPage,
+  'automations/webhooks': WebhooksPage,
+  'settings/music': MusicPage,
+  'settings/ai': AiPage,
 };
 export function ModuleRouter() {
   const { group = '', module = '' } = useParams();

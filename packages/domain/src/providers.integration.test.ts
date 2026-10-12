@@ -265,6 +265,17 @@ describe('PostgreSQL verified provider events and quota state', () => {
       },
     });
     expect(skipped.data).toMatchObject({ delivery: 'budget-skipped' });
+    const view = (await call(manager(), 'GET', '/social/sources', {}, 'view'))
+      .data as {
+      sources: { id: string; lastPolledAt: string | null }[];
+      usage: { announcedToday: number; eventsPerDay: number };
+    };
+    expect(view.sources[0]).toMatchObject({ id: source.id });
+    expect(view.sources[0]!.lastPolledAt).not.toBeNull();
+    expect(view.usage).toMatchObject({ announcedToday: 1, eventsPerDay: 1 });
+    await expect(
+      call(actor(), 'GET', '/social/sources', {}, 'member-view'),
+    ).rejects.toThrow();
     await db.record.update({
       where: { id: source.id },
       data: { revision: { increment: 1 }, state: 'disabled' },

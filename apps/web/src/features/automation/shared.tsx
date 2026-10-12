@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import type { z } from 'zod';
 import type { UseFormReturn, FieldValues } from 'react-hook-form';
 import { automationConfigSchemas } from '@sparko/contracts';
+import { economyConfigSchemas } from '@sparko/contracts/economy';
+import { providerConfigSchemas } from '@sparko/contracts/providers';
 import { Badge, Notice } from '@sparko/ui';
 import { getConfig } from '../../services/guilds';
 import { useFeatureConfig } from '../config/useFeatureConfig';
@@ -11,9 +13,14 @@ import { useChannels } from '../config/fields';
 import { ConfigForm } from '../config/ConfigForm';
 
 type Loose = Record<string, unknown>;
-/** Automation settings schemas are keyed by feature; fields are addressed by name. */
+const configSchemas: Record<string, z.ZodType> = {
+  ...automationConfigSchemas,
+  ...economyConfigSchemas,
+  ...providerConfigSchemas,
+};
+/** Module settings schemas are keyed by feature; fields are addressed by name. */
 export const settingsSchema = (featureId: string) =>
-  automationConfigSchemas[featureId] as z.ZodType<Loose, Loose>;
+  configSchemas[featureId] as z.ZodType<Loose, Loose>;
 
 export function useFeature(guildId: string, featureId: string) {
   return useQuery({

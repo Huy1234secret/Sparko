@@ -4,6 +4,7 @@ import { DomainError, Snowflake } from '@sparko/contracts';
 import { json } from '@sparko/db';
 import {
   createRecord,
+  featureActive,
   getRecord,
   jsonObject,
   updateRecord,
@@ -1686,30 +1687,547 @@ export async function runEconomyJob(
   throw new DomainError('INVALID_INPUT', 'Unknown economy job.');
 }
 
+/**
+ * Read models for the member and staff pages. Each joins the item
+ * definitions a row refers to, so pages never show bare item IDs or need a
+ * second round trip, and none of them exposes another member's records.
+ */
+type ItemView = {
+  itemId: string;
+  name: string;
+  description: string;
+  type: string;
+  rarity: string;
+  unique: boolean;
+  tradeable: boolean;
+  consumeReward: string;
+  price: string;
+  available: boolean;
+};
+async function itemViews(ctx: DomainContext, ids: Iterable<string>) {
+  const keys = [...new Set(ids)];
+  const rows = keys.length
+    ? await ctx.tx.record.findMany({
+        where: { guildId: ctx.guildId, kind: 'shop.item', key: { in: keys } },
+      })
+    : [];
+  const views = new Map<string, ItemView>();
+  for (const row of rows) {
+    const parsed = ShopItemSchema.safeParse(row.data);
+    if (!parsed.success) continue;
+    const d = parsed.data;
+    views.set(row.key, {
+      itemId: d.itemId,
+      name: d.name,
+      description: d.description,
+      type: d.type,
+      rarity: d.rarity,
+      unique: d.unique,
+      tradeable: d.tradeable,
+      consumeReward: d.consumeReward,
+      price: d.price,
+      available: row.state === 'active',
+    });
+  }
+  return views;
+}
+const at = (value: unknown, seconds: number) =>
+  typeof value === 'string'
+    ? new Date(Date.parse(value) + seconds * 1000).toISOString()
+    : null;
+const later = (ctx: DomainContext, instant: string | null) =>
+  instant && Date.parse(instant) > ctx.now.getTime() ? instant : null;
+function orderView(
+  row: {
+    id: string;
+    state: string;
+    revision: number;
+    createdAt: Date;
+    updatedAt: Date;
+    data: unknown;
+  },
+  items: Map<string, ItemView>,
+) {
+  const data = jsonObject(row.data),
+    snapshot = jsonObject(data['itemSnapshot']),
+    itemId = String(data['itemId'] ?? '');
+  return {
+    id: row.id,
+    state: row.state,
+    revision: row.revision,
+    userId: String(data['userId'] ?? ''),
+    itemId,
+    name: items.get(itemId)?.name ?? String(snapshot['name'] ?? itemId),
+    type: String(snapshot['type'] ?? ''),
+    roleId: typeof snapshot['roleId'] === 'string' ? snapshot['roleId'] : null,
+    quantity: Number(data['quantity'] ?? 0),
+    price: String(data['price'] ?? '0'),
+    deliveryError:
+      typeof data['deliveryError'] === 'string' ? data['deliveryError'] : null,
+    refundReason:
+      typeof data['refundReason'] === 'string' ? data['refundReason'] : null,
+    refundedAt:
+      typeof data['refundedAt'] === 'string' ? data['refundedAt'] : null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+/** Modules a member page can act on, under the same gate as the routes. */
+const memberModules = [
+  'R13',
+  'R14',
+  'R51',
+  'R52',
+  'R53',
+  'R54',
+  'R55',
+  'R56',
+  'R67',
+  'R68',
+];
+async function economyOverview(ctx: DomainContext) {
+  const modules: Record<string, boolean> = {};
+  for (const id of memberModules)
+    modules[id] = await featureActive(ctx.tx, ctx.guildId, id, ctx.now);
+  const [wallet, rules, rewardRules] = await Promise.all([
+    balance(ctx, ctx.actor.userId),
+    cfg(ctx, 'R51', EconomyConfigSchema),
+    cfg(ctx, 'R52', EconomyRewardConfigSchema),
+  ]);
+  const cooldown = async (kind: 'daily' | 'work', seconds: number) =>
+      later(
+        ctx,
+        at(
+          jsonObject(
+            (
+              await keyed(
+                ctx,
+                'economy.cooldown',
+                `${ctx.actor.userId}:${kind}`,
+              )
+            )?.data,
+          )['lastAt'],
+          seconds,
+        ),
+      ),
+    budget = await keyed(
+      ctx,
+      'economy.reward-budget',
+      `${ctx.actor.userId}:${day(ctx)}`,
+    ),
+    recent = await ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'economy.reward',
+        ownerId: ctx.actor.userId,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+  return {
+    balance: wallet,
+    currencyName: rules.name,
+    modules,
+    limits: {
+      maxBalance: rules.maxBalance,
+      maxTransfer: rules.maxTransfer,
+      transferDailyCap: rules.transferDailyCap,
+      transferFeeBps: rules.transferFeeBps,
+    },
+    rewards: {
+      dailyAmount: rewardRules.dailyAmount,
+      workMin: rewardRules.workMin,
+      workMax: rewardRules.workMax,
+      dailyCap: rewardRules.dailyCap,
+      earnedToday: String(jsonObject(budget?.data)['amount'] ?? '0'),
+      excluded: rewardRules.excludedRoleIds.some((r) =>
+        ctx.actor.roles.includes(r),
+      ),
+      nextDailyAt: await cooldown('daily', rewardRules.dailyCooldownSeconds),
+      nextWorkAt: await cooldown('work', rewardRules.workCooldownSeconds),
+    },
+    recent: recent.map((row) => {
+      const data = jsonObject(row.data);
+      return {
+        id: row.id,
+        amount: String(data['amount'] ?? '0'),
+        reason: String(data['reason'] ?? ''),
+        createdAt: row.createdAt.toISOString(),
+      };
+    }),
+  };
+}
+async function inventoryView(ctx: DomainContext) {
+  const [rows, orders] = await Promise.all([
+    ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'inventory',
+        ownerId: ctx.actor.userId,
+      },
+      take: 1000,
+    }),
+    ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'shop.order',
+        ownerId: ctx.actor.userId,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    }),
+  ]);
+  const held = rows
+      .map((row) => {
+        const data = jsonObject(row.data);
+        return {
+          itemId: String(data['itemId'] ?? ''),
+          quantity: Number(data['quantity'] ?? 0),
+        };
+      })
+      .filter((row) => row.quantity > 0),
+    items = await itemViews(ctx, [
+      ...held.map((row) => row.itemId),
+      ...orders.map((o) => String(jsonObject(o.data)['itemId'] ?? '')),
+    ]);
+  return {
+    items: held
+      .map((row) => ({ ...row, item: items.get(row.itemId) ?? null }))
+      .sort((a, b) =>
+        (a.item?.name ?? a.itemId).localeCompare(b.item?.name ?? b.itemId),
+      ),
+    orders: orders.map((row) => orderView(row, items)),
+  };
+}
+async function collectionView(ctx: DomainContext) {
+  const [recipes, owned, collectibles, rules, state] = await Promise.all([
+    ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'collection.recipe',
+        state: 'active',
+      },
+      take: 1000,
+    }),
+    ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'inventory',
+        ownerId: ctx.actor.userId,
+      },
+      take: 1000,
+    }),
+    ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'shop.item',
+        state: 'active',
+        data: { path: ['type'], equals: 'collectible' },
+      },
+      take: 1000,
+    }),
+    cfg(ctx, 'R55', CollectionConfigSchema),
+    keyed(ctx, 'collection.hunt-state', ctx.actor.userId),
+  ]);
+  const quantities = new Map(
+      owned.map((row) => {
+        const data = jsonObject(row.data);
+        return [String(data['itemId']), Number(data['quantity'] ?? 0)];
+      }),
+    ),
+    parsed = recipes.flatMap((row) => {
+      const recipe = RecipeSchema.safeParse(row.data);
+      return recipe.success ? [{ id: row.id, ...recipe.data }] : [];
+    }),
+    items = await itemViews(ctx, [
+      ...collectibles.map((row) => row.key),
+      ...rules.drops.map((drop) => drop.itemId),
+      ...parsed.flatMap((r) => [
+        r.resultItemId,
+        ...r.ingredients.map((i) => i.itemId),
+      ]),
+      ...quantities.keys(),
+    ]),
+    name = (id: string) => items.get(id)?.name ?? id,
+    hunt = jsonObject(state?.data),
+    huntsToday = hunt['day'] === day(ctx) ? Number(hunt['count'] ?? 0) : 0,
+    totalWeight = rules.drops.reduce((n, d) => n + d.weight, 0);
+  return {
+    catalog: [...items.values()]
+      .filter((item) => item.type === 'collectible' && item.available)
+      .map((item) => ({ item, quantity: quantities.get(item.itemId) ?? 0 }))
+      .sort((a, b) => a.item.name.localeCompare(b.item.name)),
+    recipes: parsed.map((recipe) => ({
+      id: recipe.id,
+      recipeId: recipe.recipeId,
+      name: recipe.name,
+      cost: recipe.cost,
+      result: {
+        itemId: recipe.resultItemId,
+        name: name(recipe.resultItemId),
+        quantity: recipe.resultQuantity,
+      },
+      ingredients: recipe.ingredients.map((i) => ({
+        itemId: i.itemId,
+        name: name(i.itemId),
+        quantity: i.quantity,
+        have: quantities.get(i.itemId) ?? 0,
+      })),
+    })),
+    hunt: {
+      configured: rules.drops.length > 0,
+      huntsPerDay: rules.huntsPerDay,
+      huntsToday,
+      nextHuntAt: later(ctx, at(hunt['lastAt'], rules.huntCooldownSeconds)),
+      drops: rules.drops.map((drop) => ({
+        itemId: drop.itemId,
+        name: name(drop.itemId),
+        rarity: items.get(drop.itemId)?.rarity ?? 'common',
+        quantity: drop.quantity,
+        chance: totalWeight ? drop.weight / totalWeight : 0,
+      })),
+    },
+  };
+}
+const publicQuestion = (data: Record<string, unknown>) => {
+  const question = jsonObject(data['questionSnapshot']);
+  return {
+    question: String(question['question'] ?? ''),
+    choices: z.array(z.string()).catch([]).parse(question['choices']),
+  };
+};
+/**
+ * The member's games: the open question (so a reload can finish it), recent
+ * results, and when the next play is allowed. The answer is revealed only
+ * once a session is final.
+ */
+async function gamesView(ctx: DomainContext) {
+  const [rules, state, sessions] = await Promise.all([
+    cfg(ctx, 'R56', GameConfigSchema),
+    keyed(ctx, 'game.cooldown', ctx.actor.userId),
+    ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'game.session',
+        ownerId: ctx.actor.userId,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    }),
+  ]);
+  const cooldown = jsonObject(state?.data),
+    played = cooldown['day'] === day(ctx) ? Number(cooldown['count'] ?? 0) : 0,
+    open = (row: (typeof sessions)[number]) =>
+      row.state === 'awaiting-answer' &&
+      Date.parse(String(jsonObject(row.data)['expiresAt'])) > ctx.now.getTime(),
+    current = sessions.find(open);
+  return {
+    current: current
+      ? {
+          id: current.id,
+          ...publicQuestion(jsonObject(current.data)),
+          expiresAt: String(jsonObject(current.data)['expiresAt']),
+          reward: String(jsonObject(current.data)['reward'] ?? '0'),
+        }
+      : null,
+    recent: sessions
+      .filter((row) => !open(row))
+      .map((row) => {
+        const data = jsonObject(row.data),
+          snapshot = jsonObject(data['questionSnapshot']);
+        return {
+          id: row.id,
+          state: row.state === 'awaiting-answer' ? 'expired' : row.state,
+          ...publicQuestion(data),
+          selectedIndex:
+            typeof data['selectedIndex'] === 'number'
+              ? data['selectedIndex']
+              : null,
+          correctIndex: Number(snapshot['correctIndex'] ?? 0),
+          reward: row.state === 'won' ? String(data['reward'] ?? '0') : '0',
+          createdAt: row.createdAt.toISOString(),
+        };
+      }),
+    playsPerDay: rules.playsPerDay,
+    playsLeft: Math.max(0, rules.playsPerDay - played),
+    nextPlayAt: later(ctx, at(cooldown['lastAt'], rules.cooldownSeconds)),
+    answerSeconds: rules.answerSeconds,
+    reward: rules.reward,
+  };
+}
+async function lotteryView(ctx: DomainContext) {
+  const [rows, mine] = await Promise.all([
+    ctx.tx.record.findMany({
+      where: { guildId: ctx.guildId, kind: 'lottery' },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    }),
+    ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'lottery.entry',
+        ownerId: ctx.actor.userId,
+      },
+      take: 1000,
+    }),
+  ]);
+  const tickets = new Map(
+    mine.map((row) => {
+      const data = jsonObject(row.data);
+      return [String(data['lotteryId']), Number(data['tickets'] ?? 0)];
+    }),
+  );
+  return rows.map((row) => {
+    const data = jsonObject(row.data),
+      total = Number(data['totalTickets'] ?? 0),
+      price = String(data['ticketPrice'] ?? '0');
+    return {
+      id: row.id,
+      state: row.state,
+      name: String(data['name'] ?? ''),
+      ticketPrice: price,
+      endsAt: String(data['endsAt'] ?? ''),
+      maxTicketsPerMember: Number(data['maxTicketsPerMember'] ?? 0),
+      maxTotalTickets: Number(data['maxTotalTickets'] ?? 0),
+      totalTickets: total,
+      pot: (BigInt(price) * BigInt(total)).toString(),
+      myTickets: tickets.get(row.id) ?? 0,
+      winnerId: typeof data['winnerId'] === 'string' ? data['winnerId'] : null,
+      createdAt: row.createdAt.toISOString(),
+    };
+  });
+}
+type AssetsView = {
+  amount: string;
+  items: { itemId: string; name: string; quantity: number }[];
+};
+const assetsView = (value: unknown, items: Map<string, ItemView>) => {
+  const assets = Assets.catch({ amount: '0', items: [] }).parse(value);
+  return {
+    amount: assets.amount,
+    items: assets.items.map((i) => ({
+      ...i,
+      name: items.get(i.itemId)?.name ?? i.itemId,
+    })),
+  } satisfies AssetsView;
+};
+async function tradesView(ctx: DomainContext) {
+  const rows = await ctx.tx.record.findMany({
+    where: {
+      guildId: ctx.guildId,
+      kind: 'trade',
+      OR: [
+        { ownerId: ctx.actor.userId },
+        { data: { path: ['recipientId'], equals: ctx.actor.userId } },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
+  const ids = rows.flatMap((row) => {
+      const data = jsonObject(row.data);
+      return [data['offered'], data['requested']].flatMap((a) =>
+        Assets.catch({ amount: '0', items: [] })
+          .parse(a)
+          .items.map((i) => i.itemId),
+      );
+    }),
+    items = await itemViews(ctx, ids);
+  return rows.map((row) => {
+    const data = jsonObject(row.data);
+    return {
+      id: row.id,
+      state: row.state,
+      direction:
+        data['senderId'] === ctx.actor.userId
+          ? ('sent' as const)
+          : ('received' as const),
+      senderId: String(data['senderId'] ?? ''),
+      recipientId: String(data['recipientId'] ?? ''),
+      offered: assetsView(data['offered'], items),
+      requested: assetsView(data['requested'], items),
+      expiresAt: String(data['expiresAt'] ?? ''),
+      createdAt: row.createdAt.toISOString(),
+    };
+  });
+}
+async function auctionsView(ctx: DomainContext) {
+  const rows = await ctx.tx.record.findMany({
+      where: { guildId: ctx.guildId, kind: 'auction' },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    }),
+    items = await itemViews(
+      ctx,
+      rows.map((row) => String(jsonObject(row.data)['itemId'] ?? '')),
+    );
+  return rows.map((row) => {
+    const data = jsonObject(row.data),
+      itemId = String(data['itemId'] ?? '');
+    return {
+      id: row.id,
+      state: row.state,
+      itemId,
+      name: items.get(itemId)?.name ?? itemId,
+      rarity: items.get(itemId)?.rarity ?? 'common',
+      quantity: Number(data['quantity'] ?? 1),
+      minimumBid: String(data['minimumBid'] ?? '0'),
+      minimumIncrement: String(data['minimumIncrement'] ?? '1'),
+      bid: String(data['bid'] ?? '0'),
+      endsAt: String(data['endsAt'] ?? ''),
+      sellerId: String(data['sellerId'] ?? ''),
+      mine: data['sellerId'] === ctx.actor.userId,
+      leading: data['bidderId'] === ctx.actor.userId,
+      hasBids: typeof data['bidderId'] === 'string',
+    };
+  });
+}
+const orderAttention = [
+  'pending-delivery',
+  'delivery-in-progress',
+  'delivery-failed',
+];
+/** Staff order queue: undelivered role orders first, newest first. */
+async function ordersView(ctx: DomainContext, input: unknown) {
+  const { state } = z
+    .object({
+      state: z
+        .enum([
+          'attention',
+          'all',
+          'pending-delivery',
+          'delivery-in-progress',
+          'delivery-failed',
+          'delivered',
+          'refunded',
+        ])
+        .default('attention'),
+    })
+    .parse(jsonObject(input));
+  const rows = await ctx.tx.record.findMany({
+      where: {
+        guildId: ctx.guildId,
+        kind: 'shop.order',
+        ...(state === 'all'
+          ? {}
+          : { state: state === 'attention' ? { in: orderAttention } : state }),
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    }),
+    items = await itemViews(
+      ctx,
+      rows.map((row) => String(jsonObject(row.data)['itemId'] ?? '')),
+    );
+  return rows.map((row) => orderView(row, items));
+}
+
 export const economyRoutes: DomainRoute[] = [
   {
     method: 'GET',
     path: '/guilds/:guildId/economy/me',
     capability: 'member',
-    handler: async (ctx) => ({
-      balance: await balance(ctx, ctx.actor.userId),
-      cooldowns: await ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'economy.cooldown',
-          ownerId: ctx.actor.userId,
-        },
-      }),
-      rewards: await ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'economy.reward',
-          ownerId: ctx.actor.userId,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-      }),
-    }),
+    handler: economyOverview,
   },
   {
     method: 'GET',
@@ -1842,25 +2360,7 @@ export const economyRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/inventory/me',
     capability: 'member',
-    handler: async (ctx) => ({
-      items: await ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'inventory',
-          ownerId: ctx.actor.userId,
-        },
-        take: 1000,
-      }),
-      orders: await ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'shop.order',
-          ownerId: ctx.actor.userId,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }),
-    }),
+    handler: inventoryView,
   },
   {
     method: 'POST',
@@ -1868,6 +2368,12 @@ export const economyRoutes: DomainRoute[] = [
     capability: 'member',
     schema: z.object({ itemId: Slug, quantity: Quantity }),
     handler: consume,
+  },
+  {
+    method: 'GET',
+    path: '/guilds/:guildId/shop/orders',
+    capability: 'economy.manage',
+    handler: ordersView,
   },
   {
     method: 'POST',
@@ -1885,19 +2391,7 @@ export const economyRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/trades/me',
     capability: 'member',
-    handler: async (ctx) =>
-      ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'trade',
-          OR: [
-            { ownerId: ctx.actor.userId },
-            { data: { path: ['recipientId'], equals: ctx.actor.userId } },
-          ],
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }),
+    handler: tradesView,
   },
   {
     method: 'POST',
@@ -1922,12 +2416,7 @@ export const economyRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/auctions',
     capability: 'member',
-    handler: async (ctx) =>
-      ctx.tx.record.findMany({
-        where: { guildId: ctx.guildId, kind: 'auction' },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }),
+    handler: auctionsView,
   },
   {
     method: 'POST',
@@ -1959,25 +2448,7 @@ export const economyRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/collections',
     capability: 'member',
-    handler: async (ctx) => ({
-      recipes: await ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'collection.recipe',
-          state: 'active',
-        },
-        take: 1000,
-      }),
-      collected: await ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'inventory',
-          ownerId: ctx.actor.userId,
-        },
-        take: 1000,
-      }),
-      huntState: await keyed(ctx, 'collection.hunt-state', ctx.actor.userId),
-    }),
+    handler: collectionView,
   },
   {
     method: 'POST',
@@ -2031,6 +2502,12 @@ export const economyRoutes: DomainRoute[] = [
       }),
   },
   {
+    method: 'GET',
+    path: '/guilds/:guildId/games/me',
+    capability: 'member',
+    handler: gamesView,
+  },
+  {
     method: 'POST',
     path: '/guilds/:guildId/games/trivia',
     capability: 'member',
@@ -2052,21 +2529,7 @@ export const economyRoutes: DomainRoute[] = [
     method: 'GET',
     path: '/guilds/:guildId/lotteries',
     capability: 'member',
-    handler: async (ctx) => ({
-      lotteries: await ctx.tx.record.findMany({
-        where: { guildId: ctx.guildId, kind: 'lottery' },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }),
-      myEntries: await ctx.tx.record.findMany({
-        where: {
-          guildId: ctx.guildId,
-          kind: 'lottery.entry',
-          ownerId: ctx.actor.userId,
-        },
-        take: 100,
-      }),
-    }),
+    handler: lotteryView,
   },
   {
     method: 'POST',

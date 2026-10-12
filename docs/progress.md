@@ -7,26 +7,28 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 - `main` contains M1–M3 ([PR #2](https://github.com/Huy1234secret/Sparko/pull/2), [PR #3](https://github.com/Huy1234secret/Sparko/pull/3), [PR #4](https://github.com/Huy1234secret/Sparko/pull/4)), the vendored project skills ([PR #5](https://github.com/Huy1234secret/Sparko/pull/5)) and the UI/UX pass ([PR #6](https://github.com/Huy1234secret/Sparko/pull/6), `3303fbe`).
 - M4 merged ([PR #7](https://github.com/Huy1234secret/Sparko/pull/7), `396bfdd`). It merged the paused M4 branch `claude/amazing-maxwell-yonuhl` (`cafe717`, kept intact on the remote) onto the UI pass. See `docs/milestones/m4.md`.
 - M5 merged ([PR #8](https://github.com/Huy1234secret/Sparko/pull/8), `e9d58a1`). See `docs/milestones/m5.md`.
-- M6 is delivered from `claude/clever-lovelace-b5a124`, restarted from `e9d58a1`. See `docs/milestones/m6.md`.
+- M6 merged ([PR #9](https://github.com/Huy1234secret/Sparko/pull/9), `f7ee647`). See `docs/milestones/m6.md`.
+- M7/M8 is delivered from `claude/clever-lovelace-b5a124`, restarted from `f7ee647`. See `docs/milestones/m7.md`.
 - Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head; the next milestone restarts the working branch from the merged `main`.
 
 ## Milestone / PR state
 
-| Milestone                   | State           | Evidence / next gate                                                                                                                                                      |
-| --------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0 Foundation               | **Merged**      | [PR #1](https://github.com/Huy1234secret/Sparko/pull/1); main CI passed.                                                                                                  |
-| M1 Identity / first tickets | **Merged**      | [PR #2](https://github.com/Huy1234secret/Sparko/pull/2) at `ad6e1f1`; [main CI run 38131958193](https://github.com/Huy1234secret/Sparko/actions/runs/38131958193) passed. |
-| M2 Message platform         | **Merged**      | [PR #3](https://github.com/Huy1234secret/Sparko/pull/3) (`338bd6a`). See `docs/milestones/m2.md`.                                                                         |
-| M3 Community                | **Merged**      | [PR #4](https://github.com/Huy1234secret/Sparko/pull/4) (`8108330`). See `docs/milestones/m3.md`.                                                                         |
-| UI/UX pass over M1–M3       | **Merged**      | [PR #6](https://github.com/Huy1234secret/Sparko/pull/6) (`3303fbe`). See `docs/milestones/ui-pass.md`.                                                                    |
-| M4 Safety/support expansion | **Merged**      | [PR #7](https://github.com/Huy1234secret/Sparko/pull/7) (`396bfdd`). See `docs/milestones/m4.md`.                                                                         |
-| M5 Time and automation      | **Merged**      | [PR #8](https://github.com/Huy1234secret/Sparko/pull/8) (`e9d58a1`). See `docs/milestones/m5.md`.                                                                         |
-| M6 Gates, plans and support | **PR**          | All local gates pass. See `docs/milestones/m6.md`; PR and CI recorded on merge.                                                                                           |
-| M7–M9                       | Partial backend | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
+| Milestone                   | State      | Evidence / next gate                                                                                                                                                      |
+| --------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0 Foundation               | **Merged** | [PR #1](https://github.com/Huy1234secret/Sparko/pull/1); main CI passed.                                                                                                  |
+| M1 Identity / first tickets | **Merged** | [PR #2](https://github.com/Huy1234secret/Sparko/pull/2) at `ad6e1f1`; [main CI run 38131958193](https://github.com/Huy1234secret/Sparko/actions/runs/38131958193) passed. |
+| M2 Message platform         | **Merged** | [PR #3](https://github.com/Huy1234secret/Sparko/pull/3) (`338bd6a`). See `docs/milestones/m2.md`.                                                                         |
+| M3 Community                | **Merged** | [PR #4](https://github.com/Huy1234secret/Sparko/pull/4) (`8108330`). See `docs/milestones/m3.md`.                                                                         |
+| UI/UX pass over M1–M3       | **Merged** | [PR #6](https://github.com/Huy1234secret/Sparko/pull/6) (`3303fbe`). See `docs/milestones/ui-pass.md`.                                                                    |
+| M4 Safety/support expansion | **Merged** | [PR #7](https://github.com/Huy1234secret/Sparko/pull/7) (`396bfdd`). See `docs/milestones/m4.md`.                                                                         |
+| M5 Time and automation      | **Merged** | [PR #8](https://github.com/Huy1234secret/Sparko/pull/8) (`e9d58a1`). See `docs/milestones/m5.md`.                                                                         |
+| M6 Gates, plans and support | **Merged** | [PR #9](https://github.com/Huy1234secret/Sparko/pull/9) (`f7ee647`). See `docs/milestones/m6.md`.                                                                         |
+| M7/M8 Economy and social    | **PR**     | All local gates pass. See `docs/milestones/m7.md`; PR and CI recorded on merge.                                                                                           |
+| M9                          | Pending    | Acceptance, load, accessibility, localization and authorized deployment.                                                                                                  |
 
-## Verification record (M6 source)
+## Verification record (M7/M8 source)
 
-Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 257 unit, 162 PostgreSQL integration and 21 browser tests pass.
+Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 266 unit, 167 PostgreSQL integration and 23 browser tests pass. One full integration run hit a pre-existing intermittent failure in `assets.integration.test.ts` (conflicting upload replay); the file and the full suite pass on rerun.
 
 All browser/integration tests use a controlled external Discord boundary. They do not prove live Discord acceptance.
 
@@ -60,9 +62,15 @@ Resolved: one shared feature gate (server switch, stored owner policy, plan) use
 
 Still open: real Stripe sandbox checkout/callbacks/refunds/disputes; moving a subscription between servers; reply notifications for support; scoped diagnostic exports; usage/quota dashboards.
 
+## M7/M8 outcome and remaining economy/social limits
+
+Resolved: composite member read models (`/economy/me`, `/inventory/me`, `/collections`, `/trades/me`, `/auctions`, `/lotteries`); trivia reload recovery (`GET /games/me`); staff order queue (`GET /shop/orders`) with reasoned refunds; member economy portal; typed staff pages for every economy module including R52 navigation; social alerts sources/items/budgets; external-event integrations with one-time secrets; honest provider status for social, music and AI.
+
+Still open: live role delivery; live provider polling/AI/voice runtime; member/staff AI request UI; opt-in multi-server rollout and backups; display names instead of user IDs.
+
 ## Next concrete action
 
-Merge M6, restart the working branch from `main`, then M7/M8: typed member and staff workflows for the economy and social modules (see the M7/M8 line below, `docs/economy.md` and `docs/providers.md`).
+Merge M7/M8, restart the working branch from `main`, then M9: acceptance, load, accessibility and localization matrix, the remaining R50/R61 rollout and backup workflows, and an authorized deployment plan (deployment itself needs separate authorization).
 
 ## Later exact gaps / external prerequisites
 
@@ -70,7 +78,7 @@ M4–M5 (delivered; residual): full anti-nuke response/restoration (by design un
 
 M6 (delivered; residual): provider sandbox commercial evidence, subscription moves, support reply notifications, scoped diagnostic exports and usage dashboards.
 
-M7/M8: typed member/staff workflows; correct endpoints `/economy/me`, `/trades/me`, `/reputation/me` and `/social/sources`; composite inventory/collection/lottery DTOs; R52 navigation; staff refund/order queue; trivia reload recovery; actual opt-in multi-server rollout; provider panels and real voice runtime. See `docs/economy.md` and `docs/providers.md`.
+M7/M8 (delivered; residual): actual opt-in multi-server rollout (R61), configuration backups (R50), AI request UI, real voice runtime and live provider/role-delivery evidence. See `docs/milestones/m7.md`, `docs/economy.md` and `docs/providers.md`.
 
 M9: complete acceptance/load/accessibility/localization and authorized deployment. Pending asset reservations intentionally retain quota until retried; abandoned-file reclamation needs safe reconciliation, not blind expiry.
 

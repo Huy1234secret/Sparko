@@ -107,7 +107,9 @@ test('a member sends a screenshot to support, staff reply, and the member closes
   await page.getByRole('button', { name: 'Send reply' }).click();
   await expect(page.getByText('Thanks, we found the cause.')).toBeVisible();
   await page.getByRole('button', { name: /Waiting on member/ }).click();
-  await expect(page.getByRole('button', { name: /Ticket panel error/ })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Ticket panel error/ }),
+  ).toBeVisible();
 
   await page.goto('/account/support');
   await page.getByRole('button', { name: /Ticket panel error/ }).click();

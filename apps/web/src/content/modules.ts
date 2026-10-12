@@ -83,7 +83,14 @@ export const modules: ModuleDefinition[] = [
     description:
       'Manage a server-scoped balanced ledger, rewards, and audited transfers.',
     group: 'engagement',
-    resource: 'economy',
+  },
+  {
+    id: 'R52',
+    slug: 'rewards',
+    name: 'Daily & work rewards',
+    description:
+      'Pay bounded daily and work rewards with cooldowns, caps and role multipliers.',
+    group: 'engagement',
   },
   {
     id: 'R53',
@@ -100,7 +107,7 @@ export const modules: ModuleDefinition[] = [
     name: 'Trades & auctions',
     description: 'Escrow assets and settle authorized offers once.',
     group: 'engagement',
-    resource: 'trades',
+    resource: 'auctions',
   },
   {
     id: 'R55',
@@ -117,7 +124,7 @@ export const modules: ModuleDefinition[] = [
     description:
       'Run bounded quizzes and community games with configured rewards.',
     group: 'engagement',
-    resource: 'games',
+    resource: 'games/questions',
   },
   {
     id: 'R67',
@@ -134,7 +141,6 @@ export const modules: ModuleDefinition[] = [
     description:
       'Recognize members with scoped commendations and anti-farming limits.',
     group: 'engagement',
-    resource: 'reputation',
   },
   {
     id: 'R19',
@@ -361,7 +367,6 @@ export const modules: ModuleDefinition[] = [
     description:
       'Connect supported sources with dedupe and provider rate budgets.',
     group: 'automations',
-    resource: 'integrations',
   },
   {
     id: 'R69',
