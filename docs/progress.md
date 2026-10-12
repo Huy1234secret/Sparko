@@ -29,7 +29,7 @@ Active continuation (Claude, 2026-10-12). Repository: private `Huy1234secret/Spa
 
 ## Verification record (M9 source)
 
-Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 274 unit, 173 PostgreSQL integration and 29 browser tests pass, including the axe accessibility matrix (0 violations on 23 pages in both themes). Local load baseline in `docs/quality.md`.
+Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 274 unit, 174 PostgreSQL integration and 29 browser tests pass, including the axe accessibility matrix (0 violations on 23 pages in both themes). Local load baseline in `docs/quality.md`.
 
 All browser/integration tests use a controlled external Discord boundary. They do not prove live Discord acceptance.
 

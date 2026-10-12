@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { z } from 'zod';
 import { createDatabase, json } from '@sparko/db';
+import { TicketConfigSchema } from '@sparko/contracts';
 import {
   communityConfigSchemas,
   economyConfigSchemas,
@@ -96,7 +98,8 @@ const levels = (channelId: string, roleId: string, multiplier = 2) => ({
   excludedRoleIds: [roleId],
   channelMultipliers: [{ channelId, multiplier }],
 });
-const schemas = {
+const schemas: Record<string, z.ZodType> = {
+  tickets: TicketConfigSchema,
   ...communityConfigSchemas,
   ...economyConfigSchemas,
   ...providerConfigSchemas,
@@ -319,6 +322,28 @@ describe('configuration backups', () => {
         })
       ).config,
     ).toMatchObject(levels(TARGET_CHANNEL, TARGET_ROLE));
+  });
+
+  it('restores ticket settings only into a real category, like the editor', async () => {
+    await setConfig(SOURCE, 'tickets', {
+      enabled: true,
+      categoryChannelId: SOURCE_CHANNEL,
+    });
+    const backup = data<{ id: string }>(
+      await call('POST', `/guilds/${SOURCE}/backups`, { label: 'Tickets' }),
+    );
+    const refused = await call(
+      'POST',
+      `/guilds/${SOURCE}/backups/${backup.id}/restore`,
+      {
+        featureIds: ['tickets'],
+        expectedRevisions: { tickets: await revisionOf(SOURCE, 'tickets') },
+      },
+    );
+    expect(refused.status).toBe(400);
+    expect(errorOf(refused).fieldErrors?.map((e) => e.path)).toEqual([
+      'tickets.categoryChannelId',
+    ]);
   });
 
   it('keeps a bounded number of backups and deletes on request', async () => {

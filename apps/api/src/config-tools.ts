@@ -59,6 +59,9 @@ export function registerConfigToolRoutes(
     ]);
     return {
       channels: new Set(channels.map((c) => c.id)),
+      categories: new Set(
+        channels.filter((c) => c.type === 4).map((c) => c.id),
+      ),
       roles: new Set(roles.map((r) => r.id)),
     };
   };
@@ -130,6 +133,18 @@ export function registerConfigToolRoutes(
           roles: refs.roles.filter((r) => !known.roles.has(r.id)),
         }),
       );
+      // The same rule as the ticket settings editor: the parent must be a category.
+      const category = jsonObject(parsed)['categoryChannelId'];
+      if (
+        featureId === 'tickets' &&
+        typeof category === 'string' &&
+        known.channels.has(category) &&
+        !known.categories.has(category)
+      )
+        errors.push({
+          path: 'tickets.categoryChannelId',
+          message: 'Choose a Discord category the bot can see.',
+        });
       const expectedRevision = expectedRevisions[featureId];
       if (expectedRevision === undefined)
         errors.push({
