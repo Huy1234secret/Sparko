@@ -30,9 +30,15 @@ if ss -ltnpH '( sport = :80 or sport = :443 )' | grep -v '"nginx"' | grep -q .; 
   die 'another program already serves ports 80/443 (perhaps the old site). Stop it first, then re-run.'
 fi
 
-if [[ -d /etc/nginx ]] && grep -rlq --exclude=sparko.conf "$DOMAIN" /etc/nginx; then
-  grep -rl --exclude=sparko.conf "$DOMAIN" /etc/nginx
-  die "an existing nginx site already serves ${DOMAIN} (perhaps the old site). Remove it first, then re-run."
+# Only enabled sites count; a disabled config left in sites-available is fine.
+enabled_sites=()
+for dir in /etc/nginx/sites-enabled /etc/nginx/conf.d; do
+  [[ -d $dir ]] && enabled_sites+=("$dir")
+done
+if ((${#enabled_sites[@]})) &&
+  grep -RlIq --exclude=sparko.conf "$DOMAIN" "${enabled_sites[@]}"; then
+  grep -RlI --exclude=sparko.conf "$DOMAIN" "${enabled_sites[@]}"
+  die "an enabled nginx site already serves ${DOMAIN} (perhaps the old site). Disable it first, then re-run."
 fi
 
 say 'Installing Docker, nginx, firewall and updates'
