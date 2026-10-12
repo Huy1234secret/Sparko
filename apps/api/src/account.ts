@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { normalizeUploadedImage } from '@sparko/rendering';
 import { z } from 'zod';
 import { DomainError, PreferenceSchema, type Actor } from '@sparko/contracts';
 import { hash, jsonObject } from '@sparko/domain';
@@ -9,9 +10,67 @@ import { requireActiveSession, type Auth } from './auth.js';
 export const ACCOUNT_EXPORT_RETENTION_DAYS = 30;
 const cutoff = () =>
   new Date(Date.now() - ACCOUNT_EXPORT_RETENTION_DAYS * 86400000);
+const SupportAttachmentInput = z.object({
+  name: z.string().trim().min(1).max(100),
+  base64: z
+    .string()
+    .min(16)
+    .max(5_592_408)
+    .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+});
 const supportMessage = z.object({
   message: z.string().trim().min(1).max(4000),
+  attachments: z.array(SupportAttachmentInput).max(3).default([]),
 });
+export const SUPPORT_ATTACHMENTS_PER_REQUEST = 10;
+const supportBodyLimit = 3 * 5_600_000 + 64 * 1024;
+type PreparedImage = Awaited<ReturnType<typeof normalizeUploadedImage>> & {
+  name: string;
+};
+/** Screenshots only, re-encoded as metadata-free PNG before anything is stored. */
+async function prepareImages(
+  list: z.infer<typeof SupportAttachmentInput>[],
+): Promise<PreparedImage[]> {
+  const prepared: PreparedImage[] = [];
+  for (const item of list) {
+    const bytes = Buffer.from(item.base64, 'base64');
+    if (bytes.toString('base64') !== item.base64)
+      throw new DomainError('INVALID_INPUT', 'Attach a valid image.');
+    try {
+      prepared.push({
+        ...(await normalizeUploadedImage(bytes)),
+        name: item.name,
+      });
+    } catch (error) {
+      throw new DomainError(
+        'INVALID_INPUT',
+        error instanceof Error ? error.message : 'This image is unsupported.',
+      );
+    }
+  }
+  return prepared;
+}
+/** The operation receipt hashes image content, never stores it. */
+function receiptInput(
+  body: z.infer<typeof supportMessage>,
+  images: PreparedImage[],
+) {
+  return {
+    ...body,
+    attachments: images.map((image) => ({
+      name: image.name,
+      hash: image.hash,
+    })),
+  };
+}
+const supportStates = [
+  'open',
+  'waiting_on_user',
+  'resolved',
+  'closed',
+] as const;
+export const exportKinds = ['full', 'support', 'servers'] as const;
+export type ExportKind = (typeof exportKinds)[number];
 
 function requestKey(req: FastifyRequest) {
   const key = req.headers['idempotency-key'];
@@ -75,49 +134,80 @@ export async function accountMutation<T>(
   );
 }
 
-export async function accountExport(tx: Transaction, userId: string) {
+/**
+ * A personal data export. `support` covers product support conversations
+ * (attachment details, not image bytes); `servers` covers tickets and personal
+ * records kept by the servers you use; `full` covers both.
+ */
+export async function accountExport(
+  tx: Transaction,
+  userId: string,
+  kind: ExportKind = 'full',
+) {
   const user = await tx.user.findUniqueOrThrow({
     where: { id: userId },
     select: { id: true, username: true, preferences: true },
   });
+  const withSupport = kind !== 'servers',
+    withServers = kind !== 'support';
   const [support, tickets, records] = await Promise.all([
-    tx.supportTicket.findMany({
-      where: { ownerId: userId },
-      take: 1000,
-      orderBy: { id: 'asc' },
-    }),
-    tx.ticket.findMany({
-      where: { ownerId: userId },
-      select: {
-        id: true,
-        guildId: true,
-        state: true,
-        answers: true,
-        createdAt: true,
-      },
-      take: 1000,
-      orderBy: { id: 'asc' },
-    }),
-    tx.record.findMany({
-      where: {
-        ownerId: userId,
-        kind: {
-          in: [
-            'level.profile',
-            'level.history',
-            'crate.claim',
-            'inventory',
-            'achievement.award',
-            'birthday',
-            'reminder',
-            'form.submission',
-            'ai.request',
-          ],
-        },
-      },
-      take: 5000,
-      orderBy: { id: 'asc' },
-    }),
+    !withSupport
+      ? []
+      : tx.supportTicket.findMany({
+          where: { ownerId: userId },
+          include: {
+            attachments: {
+              select: {
+                id: true,
+                messageId: true,
+                name: true,
+                bytes: true,
+                width: true,
+                height: true,
+                sha256: true,
+                createdAt: true,
+              },
+            },
+          },
+          take: 1000,
+          orderBy: { id: 'asc' },
+        }),
+    !withServers
+      ? []
+      : tx.ticket.findMany({
+          where: { ownerId: userId },
+          select: {
+            id: true,
+            guildId: true,
+            state: true,
+            answers: true,
+            createdAt: true,
+          },
+          take: 1000,
+          orderBy: { id: 'asc' },
+        }),
+    !withServers
+      ? []
+      : tx.record.findMany({
+          where: {
+            ownerId: userId,
+            kind: {
+              in: [
+                'level.profile',
+                'level.history',
+                'crate.claim',
+                'inventory',
+                'achievement.award',
+                'birthday',
+                'reminder',
+                'form.submission',
+                'ai.request',
+              ],
+            },
+          },
+          take: 5000,
+          orderBy: { id: 'asc' },
+        }),
   ]);
   // Explicitly exclude provider credentials, billing details and raw AI input.
   const safeRecords = records.map((row) => {
@@ -126,6 +216,7 @@ export async function accountExport(tx: Transaction, userId: string) {
     return { ...row, data };
   });
   return {
+    kind,
     user,
     support,
     tickets,
@@ -140,6 +231,7 @@ async function appendSupport(
   ticketId: string,
   authorId: string,
   message: string,
+  images: PreparedImage[],
   ownerId?: string,
 ) {
   await tx.$queryRaw`SELECT "id" FROM "SupportTicket" WHERE "id" = ${ticketId} FOR UPDATE`;
@@ -148,22 +240,71 @@ async function appendSupport(
   });
   if (!ticket)
     throw new DomainError('NOT_FOUND', 'Support request unavailable.', 404);
-  if (ticket.state !== 'open')
-    throw new DomainError('INVALID_INPUT', 'This support request is closed.');
+  if (ticket.state === 'closed')
+    throw new DomainError(
+      'INVALID_INPUT',
+      'This support request is closed. Reopen it to add a message.',
+    );
+  const id = randomUUID();
+  const attachments = await storeAttachments(
+    tx,
+    ticket.id,
+    id,
+    authorId,
+    images,
+  );
   return tx.supportTicket.update({
     where: { id: ticket.id },
     data: {
+      // A member's reply puts it back with support; a staff reply waits on them.
+      state: ownerId ? 'open' : 'waiting_on_user',
       messages: json([
         ...(Array.isArray(ticket.messages) ? ticket.messages : []),
         {
-          id: randomUUID(),
+          id,
           authorId,
           content: message,
           createdAt: new Date().toISOString(),
+          ...(ownerId ? {} : { staff: true }),
+          attachments,
         },
       ]),
     },
   });
+}
+async function storeAttachments(
+  tx: Transaction,
+  ticketId: string,
+  messageId: string,
+  uploaderId: string,
+  images: PreparedImage[],
+) {
+  if (!images.length) return [];
+  const existing = await tx.supportAttachment.count({ where: { ticketId } });
+  if (existing + images.length > SUPPORT_ATTACHMENTS_PER_REQUEST)
+    throw new DomainError(
+      'INVALID_INPUT',
+      `A support request can hold up to ${SUPPORT_ATTACHMENTS_PER_REQUEST} images.`,
+    );
+  const saved = [];
+  for (const image of images) {
+    const row = await tx.supportAttachment.create({
+      data: {
+        ticketId,
+        messageId,
+        uploaderId,
+        name: image.name,
+        bytes: image.bytes,
+        width: image.width,
+        height: image.height,
+        sha256: image.hash,
+        data: image.buffer,
+      },
+      select: { id: true, name: true, bytes: true, width: true, height: true },
+    });
+    saved.push(row);
+  }
+  return saved;
 }
 
 export async function deleteAccount(tx: Transaction, userId: string) {
@@ -263,82 +404,222 @@ export function registerAccountRoutes(
   app.get('/api/v1/account/support', async (req) => ({
     data: await db.supportTicket.findMany({
       where: { ownerId: (await auth.session(req)).userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
       take: 100,
     }),
   }));
-  app.post('/api/v1/account/support', async (req) => {
+  app.post(
+    '/api/v1/account/support',
+    { bodyLimit: supportBodyLimit },
+    async (req) => {
+      const s = await auth.csrf(req),
+        body = supportMessage
+          .extend({
+            subject: z.string().trim().min(1).max(200),
+            category: z
+              .enum(['account', 'billing', 'bug', 'other'])
+              .default('other'),
+          })
+          .parse(req.body),
+        images = await prepareImages(body.attachments);
+      return accountMutation(
+        db,
+        s.userId,
+        'support.create',
+        requestKey(req),
+        receiptInput(body, images),
+        async (tx) => {
+          const messageId = randomUUID();
+          const created = await tx.supportTicket.create({
+            data: {
+              ownerId: s.userId,
+              subject: body.subject,
+              category: body.category,
+              messages: json([]),
+            },
+          });
+          const attachments = await storeAttachments(
+            tx,
+            created.id,
+            messageId,
+            s.userId,
+            images,
+          );
+          return tx.supportTicket.update({
+            where: { id: created.id },
+            data: {
+              messages: json([
+                {
+                  id: messageId,
+                  authorId: s.userId,
+                  content: body.message,
+                  createdAt: new Date().toISOString(),
+                  attachments,
+                },
+              ]),
+            },
+          });
+        },
+        s.id,
+      );
+    },
+  );
+  app.post(
+    '/api/v1/account/support/:id/reply',
+    { bodyLimit: supportBodyLimit },
+    async (req) => {
+      const s = await auth.csrf(req),
+        { id } = z.object({ id: z.string() }).parse(req.params),
+        body = supportMessage.parse(req.body),
+        images = await prepareImages(body.attachments);
+      return accountMutation(
+        db,
+        s.userId,
+        `support.reply:${id}`,
+        requestKey(req),
+        receiptInput(body, images),
+        (tx) => appendSupport(tx, id, s.userId, body.message, images, s.userId),
+        s.id,
+      );
+    },
+  );
+  app.post(
+    '/api/v1/owner/support/:id/reply',
+    { bodyLimit: supportBodyLimit },
+    async (req) => {
+      const s = await auth.csrf(req);
+      const a = await globalActor(req, 'support.reply'),
+        { id } = z.object({ id: z.string() }).parse(req.params),
+        body = supportMessage.parse(req.body),
+        images = await prepareImages(body.attachments);
+      // Store only a message identity in the operator receipt, never a second copy
+      // of the private conversation that could survive the account's deletion.
+      return accountMutation(
+        db,
+        a.userId,
+        `support.reply:${id}`,
+        requestKey(req),
+        receiptInput(body, images),
+        async (tx) => {
+          const row = await appendSupport(
+            tx,
+            id,
+            a.userId,
+            body.message,
+            images,
+          );
+          const messages = z
+            .array(z.object({ id: z.string() }).passthrough())
+            .parse(row.messages);
+          return {
+            id: row.id,
+            messageId: messages.at(-1)!.id,
+            state: row.state,
+          };
+        },
+        s.id,
+      );
+    },
+  );
+  /** Members close or reopen their own request; staff set any support state. */
+  async function setSupportState(
+    tx: Transaction,
+    id: string,
+    state: (typeof supportStates)[number],
+    ownerId?: string,
+  ) {
+    await tx.$queryRaw`SELECT "id" FROM "SupportTicket" WHERE "id" = ${id} FOR UPDATE`;
+    const ticket = await tx.supportTicket.findFirst({
+      where: { id, ...(ownerId ? { ownerId } : {}) },
+    });
+    if (!ticket)
+      throw new DomainError('NOT_FOUND', 'Support request unavailable.', 404);
+    const row = await tx.supportTicket.update({
+      where: { id },
+      data: { state },
+    });
+    return { id: row.id, state: row.state };
+  }
+  app.post('/api/v1/account/support/:id/status', async (req) => {
     const s = await auth.csrf(req),
-      body = supportMessage
-        .extend({
-          subject: z.string().trim().min(1).max(200),
-          category: z
-            .enum(['account', 'billing', 'bug', 'other'])
-            .default('other'),
-        })
+      { id } = z.object({ id: z.string() }).parse(req.params),
+      body = z
+        .object({ state: z.enum(['open', 'closed']) })
+        .strict()
         .parse(req.body);
     return accountMutation(
       db,
       s.userId,
-      'support.create',
+      `support.status:${id}`,
       requestKey(req),
       body,
-      (tx) =>
-        tx.supportTicket.create({
-          data: {
-            ownerId: s.userId,
-            subject: body.subject,
-            category: body.category,
-            messages: json([
-              {
-                id: randomUUID(),
-                authorId: s.userId,
-                content: body.message,
-                createdAt: new Date().toISOString(),
-              },
-            ]),
-          },
-        }),
+      (tx) => setSupportState(tx, id, body.state, s.userId),
       s.id,
     );
   });
-  app.post('/api/v1/account/support/:id/reply', async (req) => {
+  app.post('/api/v1/owner/support/:id/status', async (req) => {
     const s = await auth.csrf(req),
+      a = await globalActor(req, 'support.reply'),
       { id } = z.object({ id: z.string() }).parse(req.params),
-      body = supportMessage.parse(req.body);
-    return accountMutation(
-      db,
-      s.userId,
-      `support.reply:${id}`,
-      requestKey(req),
-      body,
-      (tx) => appendSupport(tx, id, s.userId, body.message, s.userId),
-      s.id,
-    );
-  });
-  app.post('/api/v1/owner/support/:id/reply', async (req) => {
-    const s = await auth.csrf(req);
-    const a = await globalActor(req, 'support.reply'),
-      { id } = z.object({ id: z.string() }).parse(req.params),
-      body = supportMessage.parse(req.body);
-    // Store only a message identity in the operator receipt, never a second copy
-    // of the private conversation that could survive the account's deletion.
+      body = z
+        .object({ state: z.enum(supportStates) })
+        .strict()
+        .parse(req.body);
     return accountMutation(
       db,
       a.userId,
-      `support.reply:${id}`,
+      `support.status:${id}`,
       requestKey(req),
       body,
-      async (tx) => {
-        const row = await appendSupport(tx, id, a.userId, body.message);
-        const messages = z
-          .array(z.object({ id: z.string() }).passthrough())
-          .parse(row.messages);
-        return { id: row.id, messageId: messages.at(-1)!.id, state: row.state };
-      },
+      (tx) => setSupportState(tx, id, body.state),
       s.id,
     );
   });
+  /** Private image download for the requester or support readers only. */
+  async function sendAttachment(
+    reply: FastifyReply,
+    ticketId: string,
+    attachmentId: string,
+    ownerId?: string,
+  ) {
+    const row = await db.supportAttachment.findFirst({
+      where: {
+        id: attachmentId,
+        ticketId,
+        ...(ownerId ? { ticket: { ownerId } } : {}),
+      },
+    });
+    if (!row)
+      throw new DomainError('NOT_FOUND', 'Attachment unavailable.', 404);
+    return reply
+      .header('content-type', 'image/png')
+      .header('x-content-type-options', 'nosniff')
+      .header(
+        'content-disposition',
+        `attachment; filename="support-${row.id}.png"`,
+      )
+      .send(Buffer.from(row.data));
+  }
+  app.get(
+    '/api/v1/account/support/:id/attachments/:attachmentId',
+    async (req, reply) => {
+      const s = await auth.session(req),
+        p = z
+          .object({ id: z.string(), attachmentId: z.string() })
+          .parse(req.params);
+      return sendAttachment(reply, p.id, p.attachmentId, s.userId);
+    },
+  );
+  app.get(
+    '/api/v1/owner/support/:id/attachments/:attachmentId',
+    async (req, reply) => {
+      await globalActor(req, 'support.read');
+      const p = z
+        .object({ id: z.string(), attachmentId: z.string() })
+        .parse(req.params);
+      return sendAttachment(reply, p.id, p.attachmentId);
+    },
+  );
   app.get('/api/v1/account/sessions', async (req) => {
     const current = await auth.session(req);
     return {
@@ -386,6 +667,7 @@ export function registerAccountRoutes(
           .filter((r) => r.kind === 'export')
           .map((r) => ({
             id: r.id,
+            kind: jsonObject(r.data)['kind'] ?? 'full',
             status: r.createdAt <= cutoff() ? 'expired' : r.state,
             createdAt: r.createdAt,
             ...(r.state === 'ready' && r.createdAt > cutoff()
@@ -398,29 +680,41 @@ export function registerAccountRoutes(
       },
     };
   });
+  const ExportRequest = z
+    .object({ kind: z.enum(exportKinds).default('full') })
+    .strict();
   app.get('/api/v1/account/privacy/export', async (req) => {
-    const s = await auth.session(req);
-    return { data: await db.$transaction((tx) => accountExport(tx, s.userId)) };
+    const s = await auth.session(req),
+      { kind } = ExportRequest.parse(req.query ?? {});
+    return {
+      data: await db.$transaction((tx) => accountExport(tx, s.userId, kind)),
+    };
   });
   app.post('/api/v1/account/privacy/export', async (req) => {
-    const s = await auth.csrf(req);
+    const s = await auth.csrf(req),
+      body = ExportRequest.parse(req.body ?? {});
     // The receipt stores the export ID, not its private contents.
     return accountMutation(
       db,
       s.userId,
       'privacy.export',
       requestKey(req),
-      {},
+      body,
       async (tx) => {
         const row = await tx.accountRequest.create({
           data: {
             userId: s.userId,
             kind: 'export',
             state: 'ready',
-            data: json(await accountExport(tx, s.userId)),
+            data: json(await accountExport(tx, s.userId, body.kind)),
           },
         });
-        return { id: row.id, state: row.state, createdAt: row.createdAt };
+        return {
+          id: row.id,
+          kind: body.kind,
+          state: row.state,
+          createdAt: row.createdAt,
+        };
       },
       s.id,
     );

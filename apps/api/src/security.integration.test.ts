@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { createDatabase, json } from '@sparko/db';
 import { encryptProviderSecret } from '@sparko/domain';
@@ -417,6 +418,150 @@ describe('API security against real PostgreSQL', () => {
       headers: headers(STAFF_A),
     });
     expect(privateRead.statusCode).toBe(403);
+  });
+  it('keeps support screenshots private, tracks status and exports by kind', async () => {
+    const png = (
+      await readFile(
+        new URL(
+          '../../../packages/assets/media/discord/ticket.png',
+          import.meta.url,
+        ),
+      )
+    ).toString('base64');
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/account/support',
+      headers: headers(MEMBER, 'support-shot'),
+      payload: {
+        subject: 'Broken panel',
+        category: 'bug',
+        message: 'See the screenshot.',
+        attachments: [{ name: 'panel.png', base64: png }],
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    const ticket = created.json().data;
+    const attachment = ticket.messages[0].attachments[0];
+    expect(attachment).toMatchObject({ name: 'panel.png' });
+    // The receipt keeps a content hash, never the image.
+    const receipt = await db.accountRequest.findFirstOrThrow({
+      where: {
+        userId: MEMBER,
+        kind: 'operation:support.create',
+        data: { path: ['key'], equals: 'support-shot' },
+      },
+    });
+    expect(JSON.stringify(receipt.data)).not.toContain(png.slice(0, 64));
+    const own = await app.inject({
+      url: `/api/v1/account/support/${ticket.id}/attachments/${attachment.id}`,
+      headers: headers(MEMBER),
+    });
+    expect(own.statusCode).toBe(200);
+    expect(own.headers['content-type']).toBe('image/png');
+    expect(own.headers['content-disposition']).toContain('attachment');
+    const stranger = await app.inject({
+      url: `/api/v1/account/support/${ticket.id}/attachments/${attachment.id}`,
+      headers: headers(STAFF_A),
+    });
+    expect(stranger.statusCode).toBe(404);
+    const replyOnly = await app.inject({
+      url: `/api/v1/owner/support/${ticket.id}/attachments/${attachment.id}`,
+      headers: headers(STAFF_A),
+    });
+    expect(replyOnly.statusCode).toBe(403);
+    const reader = await app.inject({
+      url: `/api/v1/owner/support/${ticket.id}/attachments/${attachment.id}`,
+      headers: headers(ADMIN),
+    });
+    expect(reader.statusCode).toBe(200);
+    const unsafe = await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/reply`,
+      headers: headers(MEMBER, 'support-svg'),
+      payload: {
+        message: 'An SVG',
+        attachments: [
+          {
+            name: 'x.svg',
+            base64: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg"/>',
+            ).toString('base64'),
+          },
+        ],
+      },
+    });
+    expect(unsafe.statusCode).toBe(400);
+
+    // Staff reply waits on the member; the member's reply returns it to staff.
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/owner/support/${ticket.id}/reply`,
+      headers: headers(STAFF_A, 'support-staff-1'),
+      payload: { message: 'Which server?' },
+    });
+    const state = async () =>
+      (await db.supportTicket.findUniqueOrThrow({ where: { id: ticket.id } }))
+        .state;
+    expect(await state()).toBe('waiting_on_user');
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/reply`,
+      headers: headers(MEMBER, 'support-member-1'),
+      payload: { message: 'The test one.' },
+    });
+    expect(await state()).toBe('open');
+    const resolved = await app.inject({
+      method: 'POST',
+      url: `/api/v1/owner/support/${ticket.id}/status`,
+      headers: headers(STAFF_A, 'support-resolve'),
+      payload: { state: 'resolved' },
+    });
+    expect(resolved.statusCode).toBe(200);
+    const memberResolve = await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/status`,
+      headers: headers(MEMBER, 'support-member-resolve'),
+      payload: { state: 'resolved' },
+    });
+    expect(memberResolve.statusCode).toBe(400);
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/status`,
+      headers: headers(MEMBER, 'support-close'),
+      payload: { state: 'closed' },
+    });
+    const closedReply = await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/reply`,
+      headers: headers(MEMBER, 'support-after-close'),
+      payload: { message: 'One more thing' },
+    });
+    expect(closedReply.statusCode).toBe(400);
+
+    const supportOnly = await app.inject({
+      method: 'POST',
+      url: '/api/v1/account/privacy/export',
+      headers: headers(MEMBER, 'export-support'),
+      payload: { kind: 'support' },
+    });
+    expect(supportOnly.json().data.kind).toBe('support');
+    const download = await app.inject({
+      url: `/api/v1/account/privacy/exports/${supportOnly.json().data.id}`,
+      headers: headers(MEMBER),
+    });
+    const data = download.json().data;
+    expect(data.kind).toBe('support');
+    expect(data.tickets).toEqual([]);
+    const exported = data.support.find(
+      (row: { id: string }) => row.id === ticket.id,
+    );
+    expect(exported.attachments[0]).toMatchObject({ name: 'panel.png' });
+    expect(exported.attachments[0]).not.toHaveProperty('data');
+    const listed = await app.inject({
+      url: '/api/v1/account/privacy',
+      headers: headers(MEMBER),
+    });
+    expect(listed.json().data.exports[0].kind).toBe('support');
   });
   it('restricts global grant delegation to configured owners and known capabilities', async () => {
     const payload = {

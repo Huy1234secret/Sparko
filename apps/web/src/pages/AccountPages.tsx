@@ -31,14 +31,23 @@ import {
   getPrivacy,
   requestExport,
   requestDeletion,
-  getSupport,
-  createSupport,
+  type ExportKind,
   getSessions,
   revokeSession,
 } from '../services/account';
 import { errorMessage, isRetryable } from '../services/http';
 import { applyServerFieldErrors } from '../services/formErrors';
 import { useSession } from '../components/AppShell';
+import {
+  ScreenshotPicker,
+  SupportStateBadge,
+  SupportThread,
+} from '../components/SupportThread';
+import {
+  createSupportTicket,
+  getSupportTickets,
+  toAttachment,
+} from '../services/support';
 import { useUi } from '../state/ui';
 import { useActionIdentity } from '../hooks/useActionIdentity';
 import { DraftGuard } from '../hooks/useDraftGuard';
@@ -235,6 +244,11 @@ export function PreferencesPage() {
     </>
   );
 }
+const exportKindLabels: Record<string, string> = {
+  full: 'Everything about you',
+  support: 'Product support conversations',
+  servers: 'Tickets and records kept by your servers',
+};
 export function PrivacyAccountPage() {
   const identity = useActionIdentity();
   const queryClient = useQueryClient();
@@ -250,8 +264,13 @@ export function PrivacyAccountPage() {
   });
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: ['privacy'] });
+  const [exportKind, setExportKind] = useState<ExportKind>('full');
   const exportRequest = useMutation({
-    mutationFn: () => requestExport(identity('export', {})),
+    mutationFn: () =>
+      requestExport(
+        exportKind,
+        identity('export', { exportKind, at: privacy.dataUpdatedAt }),
+      ),
     onSuccess: refresh,
   });
   const deletion = useMutation({
@@ -282,15 +301,30 @@ export function PrivacyAccountPage() {
           </span>
           <h2 style={{ marginTop: 20 }}>Export your account data</h2>
           <p className="muted">
-            Exports include records you’re authorized to access. Another
-            member’s private conversations are excluded.
+            Exports include only your own records. Other members’ private
+            conversations, billing details and AI prompts are never included.
           </p>
-          <Button
-            busy={exportRequest.isPending}
-            onClick={() => exportRequest.mutate()}
-          >
-            Request an export
-          </Button>
+          <Field label="What to include" htmlFor="export-kind">
+            <select
+              id="export-kind"
+              value={exportKind}
+              onChange={(e) => setExportKind(e.target.value as ExportKind)}
+            >
+              {Object.entries(exportKindLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="row">
+            <Button
+              busy={exportRequest.isPending}
+              onClick={() => exportRequest.mutate()}
+            >
+              Request an export
+            </Button>
+          </div>
           {exportRequest.error && (
             <ErrorState message={errorMessage(exportRequest.error)} />
           )}
@@ -337,7 +371,8 @@ export function PrivacyAccountPage() {
           privacy.data.exports.map((item) => (
             <div className="activity-row" key={item.id}>
               <span>
-                <strong>{new Date(item.createdAt).toLocaleString()}</strong>
+                <strong>{exportKindLabels[item.kind] ?? 'Export'}</strong>
+                <small>{new Date(item.createdAt).toLocaleString()}</small>
               </span>
               <Badge>{item.status}</Badge>
               {item.downloadUrl && (
@@ -442,72 +477,107 @@ export function ProductSupportPage() {
   const identity = useActionIdentity();
   const queryClient = useQueryClient();
   const [subject, setSubject] = useState('');
+  const [category, setCategory] = useState('other');
   const [body, setBody] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: ['account-support'],
-    queryFn: ({ signal }) => getSupport(signal),
+    queryKey: ['support', 'account'],
+    queryFn: ({ signal }) => getSupportTickets('account', signal),
   });
   const create = useMutation({
-    mutationFn: () =>
-      createSupport(
-        subject,
-        body,
-        identity('product-support', { subject, body }),
-      ),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const attachments = await Promise.all(files.map(toAttachment));
+      const input = {
+        subject: subject.trim(),
+        category,
+        message: body.trim(),
+        attachments,
+      };
+      return createSupportTicket(
+        input,
+        identity('product-support', {
+          ...input,
+          attachments: files.map((file) => `${file.name}:${file.size}`),
+        }),
+      );
+    },
+    onSuccess: (result) => {
       setSubject('');
       setBody('');
-      void queryClient.invalidateQueries({ queryKey: ['account-support'] });
+      setFiles([]);
+      setSelected(result.data.id);
+      void queryClient.invalidateQueries({ queryKey: ['support', 'account'] });
     },
   });
+  const current = query.data?.find((item) => item.id === selected);
   return (
     <>
       <PageHeading
         eyebrow="Your account"
         title="Product support"
-        description="Product support is private to you and authorized global support staff. It is separate from your server’s tickets."
+        description="Product support is private to you and authorized Sparko support staff. It is separate from your server’s tickets."
       />
       <div className="editor-layout">
         <Card>
           <h2>Start a conversation</h2>
           <form
+            className="stack"
             onSubmit={(e) => {
               e.preventDefault();
               create.mutate();
             }}
           >
-            <Field label="Subject" htmlFor="support-subject">
+            <Field label="Subject" htmlFor="support-subject" required>
               <Input
                 id="support-subject"
-                required
                 minLength={3}
                 maxLength={150}
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
               />
             </Field>
+            <Field label="Topic" htmlFor="support-category">
+              <select
+                id="support-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="account">Account and sign-in</option>
+                <option value="billing">Plans and billing</option>
+                <option value="bug">Something is broken</option>
+                <option value="other">Something else</option>
+              </select>
+            </Field>
             <Field
               label="What can we help with?"
               htmlFor="support-body"
-              hint="Share relevant steps and safe diagnostics. Keep passwords, tokens, and private credentials out of support messages."
+              required
+              hint="Share the steps and what you expected. Keep passwords, tokens and private credentials out of support messages."
             >
               <textarea
                 id="support-body"
-                required
                 minLength={5}
                 maxLength={4000}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
               />
             </Field>
-            <Button
-              type="submit"
-              busy={create.isPending}
-              disabled={subject.trim().length < 3 || body.trim().length < 5}
-            >
-              <Plus size={16} />
-              Create support request
-            </Button>
+            <ScreenshotPicker
+              id="support-files"
+              files={files}
+              onChange={setFiles}
+            />
+            <div className="row">
+              <Button
+                type="submit"
+                busy={create.isPending}
+                disabled={subject.trim().length < 3 || body.trim().length < 5}
+              >
+                <Plus size={16} />
+                Send to support
+              </Button>
+            </div>
             {create.error && (
               <ErrorState message={errorMessage(create.error)} />
             )}
@@ -522,30 +592,40 @@ export function ProductSupportPage() {
               message={errorMessage(query.error)}
               retry={() => void query.refetch()}
             />
-          ) : query.data?.length ? (
+          ) : query.data.length ? (
             query.data.map((item) => (
-              <details className="diff-row" key={item.id}>
-                <summary>
-                  {typeof item['subject'] === 'string'
-                    ? item['subject']
-                    : 'Support request'}{' '}
-                  <Badge>
-                    {typeof item['state'] === 'string'
-                      ? item['state']
-                      : 'Status unavailable'}
-                  </Badge>
-                </summary>
-                <pre>{JSON.stringify(item['messages'], null, 2)}</pre>
-              </details>
+              <button
+                type="button"
+                key={item.id}
+                className="activity-row button-reset"
+                aria-pressed={selected === item.id}
+                onClick={() => setSelected(item.id)}
+              >
+                <span>
+                  <strong className="wrap-anywhere">{item.subject}</strong>
+                  <small>
+                    Updated {new Date(item.updatedAt).toLocaleString()} ·{' '}
+                    {item.messages.length} message
+                    {item.messages.length === 1 ? '' : 's'}
+                  </small>
+                </span>
+                <SupportStateBadge scope="account" state={item.state} />
+              </button>
             ))
           ) : (
             <EmptyState
+              compact
               title="No support requests yet"
               description="Your private conversations with Sparko support will appear here."
             />
           )}
         </Card>
       </div>
+      {current && (
+        <Card>
+          <SupportThread scope="account" ticket={current} />
+        </Card>
+      )}
     </>
   );
 }

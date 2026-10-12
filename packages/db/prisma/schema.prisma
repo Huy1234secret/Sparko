@@ -247,9 +247,25 @@ model SupportTicket {
   category String
   state String @default("open")
   messages Json
+  attachments SupportAttachment[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([ownerId, createdAt, id])
+}
+model SupportAttachment {
+  id String @id @default(uuid())
+  ticketId String
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  messageId String
+  uploaderId String
+  name String
+  bytes Int
+  width Int
+  height Int
+  sha256 String
+  data Bytes
+  createdAt DateTime @default(now())
+  @@index([ticketId])
 }
 model Heartbeat {
   service String @id
