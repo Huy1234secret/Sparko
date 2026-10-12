@@ -409,9 +409,8 @@ export const modules: ModuleDefinition[] = [
   {
     id: 'R60',
     slug: 'billing',
-    name: 'Premium & billing',
-    description:
-      'Review verified entitlements and actual provider availability.',
+    name: 'Plan & billing',
+    description: 'See the plan, its real limits and the subscription history.',
     group: 'settings',
     resource: 'billing',
   },

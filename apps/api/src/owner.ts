@@ -64,6 +64,7 @@ export function registerOwnerRoutes(
             return {
               id: entry.id,
               state: entry.state,
+              revision: entry.revision,
               source: data['provider'] === 'staff' ? 'staff' : 'provider',
               status: data['status'] ?? null,
               expiresAt: data['expiresAt'] ?? null,

@@ -51,6 +51,7 @@ import {
 import { getSession, loginUrl, logout } from '../services/session';
 import { getGuilds, type Guild } from '../services/guilds';
 import { groupNames, modules } from '../content/modules';
+import { ownerSections } from '../services/owner';
 import { routeTitle, routeTrail } from './routeMeta';
 import { errorMessage } from '../services/http';
 import { useUi } from '../state/ui';
@@ -709,8 +710,8 @@ export function DashboardShell() {
             </NavLink>
           </div>
         )}
-        {session.data?.capabilities.some(
-          (c) => c.startsWith('fleet.') || c.startsWith('diagnostics.'),
+        {session.data?.capabilities.some((c) =>
+          Object.values(ownerSections).includes(c as never),
         ) && (
           <div className="nav-section nav-section-owner">
             <p className="nav-label">Sparko operators</p>

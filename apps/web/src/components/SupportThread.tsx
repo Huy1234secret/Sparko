@@ -45,6 +45,12 @@ export function SupportStateBadge({
   return <Badge tone={tone}>{label}</Badge>;
 }
 
+export const categoryLabels: Record<string, string> = {
+  account: 'Account and sign-in',
+  billing: 'Plans and billing',
+  bug: 'Something is broken',
+  other: 'Something else',
+};
 /** Up to three screenshots; PNG, JPEG or WebP, re-encoded by the server. */
 export function ScreenshotPicker({
   files,
@@ -171,7 +177,7 @@ export function SupportThread({
         <div>
           <h2 className="wrap-anywhere">{ticket.subject}</h2>
           <p className="muted">
-            {ticket.category} · opened{' '}
+            {categoryLabels[ticket.category] ?? ticket.category} · opened{' '}
             {new Date(ticket.createdAt).toLocaleString()}
           </p>
         </div>

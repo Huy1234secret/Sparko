@@ -1728,6 +1728,18 @@ summary {
   padding: 4px;
   gap: 3px;
 }
+.tabs a {
+  border-radius: 6px;
+  padding: 8px 13px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+.tabs a.active {
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: 0 1px 2px #0001;
+}
 .tabs button {
   background: transparent;
   border: 0;
@@ -3844,4 +3856,39 @@ textarea[aria-invalid='true'] {
   border-radius: 999px;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+/* M6 owner console */
+.policy-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.policy-row + .policy-row {
+  border-top: 1px solid var(--line);
+}
+.policy-form {
+  padding: 4px 0 14px;
+}
+.job-row + .job-row {
+  border-top: 1px solid var(--line);
+}
+.owner-footnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+td[aria-current='true'] {
+  font-weight: 600;
+  color: var(--text);
+  background: var(--brand-soft);
+}
+
+.owner-tabs {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.section-gap {
+  margin-top: 20px;
 }

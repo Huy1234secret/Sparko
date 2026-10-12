@@ -7,6 +7,7 @@ import { z } from 'zod';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   ArrowRight,
+  CreditCard,
   Download,
   ExternalLink,
   Globe,
@@ -81,6 +82,12 @@ export function AccountPage() {
             detail: 'A private conversation with Sparko support.',
             path: 'support',
             icon: Ticket,
+          },
+          {
+            title: 'Plans & billing',
+            detail: 'The plan of each server you manage.',
+            path: 'billing',
+            icon: CreditCard,
           },
         ].map(({ title, detail, path, icon: Icon }) => (
           <Card key={path}>
@@ -609,7 +616,9 @@ export function ProductSupportPage() {
                     {item.messages.length === 1 ? '' : 's'}
                   </small>
                 </span>
-                <SupportStateBadge scope="account" state={item.state} />
+                <span>
+                  <SupportStateBadge scope="account" state={item.state} />
+                </span>
               </button>
             ))
           ) : (
@@ -622,7 +631,7 @@ export function ProductSupportPage() {
         </Card>
       </div>
       {current && (
-        <Card>
+        <Card className="section-gap">
           <SupportThread scope="account" ticket={current} />
         </Card>
       )}

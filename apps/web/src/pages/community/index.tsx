@@ -34,6 +34,7 @@ import { RepliesPage } from '../automation/RepliesPage';
 import { StickyPage } from '../automation/StickyPage';
 import { WorkflowsPage } from '../automation/WorkflowsPage';
 import { CommandsPage } from '../automation/CommandsPage';
+import { BillingPage } from '../BillingPages';
 
 /** Typed module pages; modules not listed here still use the generic page. */
 const typedPages: Record<string, ComponentType> = {
@@ -67,6 +68,7 @@ const typedPages: Record<string, ComponentType> = {
   'automations/sticky': StickyPage,
   'automations/workflows': WorkflowsPage,
   'automations/commands': CommandsPage,
+  'settings/billing': BillingPage,
   'engagement/reward-roles': () => <LevelsPage defaultTab="rewards" />,
 };
 export function ModuleRouter() {
