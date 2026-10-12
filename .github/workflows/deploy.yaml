@@ -27,9 +27,6 @@ jobs:
     environment:
       name: production
       url: https://panel.coin-sprite.com
-    env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -55,15 +52,27 @@ jobs:
           echo "Deploying $sha"
       - name: Prepare the SSH connection
         env:
+          RAW_HOST: ${{ secrets.DEPLOY_HOST }}
+          RAW_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Repository secret $name is not set. See docs/deploy-vultr.md."
+          # Pasted secrets often carry spaces or a trailing line break.
+          host=$(printf '%s' "$RAW_HOST" | tr -d '[:space:]')
+          user=$(printf '%s' "$RAW_USER" | tr -d '[:space:]')
+          for pair in "DEPLOY_HOST=$host" "DEPLOY_USER=$user" \
+            "DEPLOY_SSH_KEY=${DEPLOY_SSH_KEY:+set}" "DEPLOY_KNOWN_HOSTS=${DEPLOY_KNOWN_HOSTS:+set}"; do
+            if [ -z "${pair#*=}" ]; then
+              echo "::error::Repository secret ${pair%%=*} is not set. See docs/deploy-vultr.md."
               exit 1
             fi
           done
+          if ! [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            echo "::error::DEPLOY_USER must be just the user name, deploy."
+            exit 1
+          fi
+          echo "DEPLOY_HOST=$host" >>"$GITHUB_ENV"
+          echo "DEPLOY_USER=$user" >>"$GITHUB_ENV"
           install -m 700 -d ~/.ssh
           # Keys pasted from Windows can carry CR line endings; OpenSSH rejects them.
           printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' >~/.ssh/deploy
