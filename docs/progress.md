@@ -6,7 +6,8 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 
 - `main` contains M1–M3 ([PR #2](https://github.com/Huy1234secret/Sparko/pull/2), [PR #3](https://github.com/Huy1234secret/Sparko/pull/3), [PR #4](https://github.com/Huy1234secret/Sparko/pull/4)), the vendored project skills ([PR #5](https://github.com/Huy1234secret/Sparko/pull/5)) and the UI/UX pass ([PR #6](https://github.com/Huy1234secret/Sparko/pull/6), `3303fbe`).
 - M4 merged ([PR #7](https://github.com/Huy1234secret/Sparko/pull/7), `396bfdd`). It merged the paused M4 branch `claude/amazing-maxwell-yonuhl` (`cafe717`, kept intact on the remote) onto the UI pass. See `docs/milestones/m4.md`.
-- M5 is delivered from `claude/clever-lovelace-b5a124`, restarted from `396bfdd`. See `docs/milestones/m5.md`.
+- M5 merged ([PR #8](https://github.com/Huy1234secret/Sparko/pull/8), `e9d58a1`). See `docs/milestones/m5.md`.
+- M6 is in progress on `claude/clever-lovelace-b5a124`, restarted from `e9d58a1`.
 - Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head; the next milestone restarts the working branch from the merged `main`.
 
 ## Milestone / PR state
@@ -19,7 +20,7 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 | M3 Community                | **Merged**      | [PR #4](https://github.com/Huy1234secret/Sparko/pull/4) (`8108330`). See `docs/milestones/m3.md`.                                                                         |
 | UI/UX pass over M1–M3       | **Merged**      | [PR #6](https://github.com/Huy1234secret/Sparko/pull/6) (`3303fbe`). See `docs/milestones/ui-pass.md`.                                                                    |
 | M4 Safety/support expansion | **Merged**      | [PR #7](https://github.com/Huy1234secret/Sparko/pull/7) (`396bfdd`). See `docs/milestones/m4.md`.                                                                         |
-| M5 Time and automation      | **PR**          | All local gates pass. See `docs/milestones/m5.md`; PR and CI recorded on merge.                                                                                           |
+| M5 Time and automation      | **Merged**      | [PR #8](https://github.com/Huy1234secret/Sparko/pull/8) (`e9d58a1`). See `docs/milestones/m5.md`.                                                                         |
 | M6–M9                       | Partial backend | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
 
 ## Verification record (M5 source)
