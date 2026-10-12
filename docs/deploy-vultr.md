@@ -86,7 +86,32 @@ Run Deploy again with "Check the public site" ticked, or open `https://panel.coi
 2. Open the owner console.
 3. Check that a harmless test post works in your test server.
 
-**Premium via PayPal:** Sparko's built-in checkout supports Stripe only. Until a PayPal integration exists, take payment in PayPal yourself, then give the server Plus from the owner console (Servers › staff Plus grant) with an end date.
+Premium uses PayPal once it is configured; see the next section.
+
+## PayPal for Premium
+
+Sparko sells Plus as a PayPal subscription. Premium turns on only when PayPal itself confirms the subscription to Sparko's webhook, never because someone returned from the PayPal page. Test in the sandbox first, then repeat with live details.
+
+1. **App credentials.** Sign in to developer.paypal.com with your PayPal Business account. Go to Apps & Credentials, choose Sandbox (later Live), create an app, and note its Client ID and Secret.
+2. **Plan.** In PayPal, create a product and a monthly subscription plan at your price (Pay & Get Paid › Subscriptions, or the sandbox equivalent). Note the Plan ID; it starts with `P-`.
+3. **Webhook.** In the same app, add the webhook `https://panel.coin-sprite.com/api/v1/webhooks/paypal` and subscribe it to these events, then note the Webhook ID:
+   - `BILLING.SUBSCRIPTION.ACTIVATED`, `.UPDATED`, `.RE-ACTIVATED`, `.CANCELLED`, `.SUSPENDED`, `.EXPIRED` and `.PAYMENT.FAILED`
+   - `PAYMENT.SALE.COMPLETED`, `PAYMENT.SALE.REFUNDED` and `PAYMENT.SALE.REVERSED`
+   - `CUSTOMER.DISPUTE.CREATED` and `CUSTOMER.DISPUTE.RESOLVED`
+4. **Server settings.** On the server, run `nano /opt/sparko/shared/.env.production` and add these lines (`sandbox` for testing, `live` for real payments):
+
+   ```
+   PAYPAL_ENV=sandbox
+   PAYPAL_CLIENT_ID=...
+   PAYPAL_CLIENT_SECRET=...
+   PAYPAL_PLAN_ID=P-...
+   PAYPAL_WEBHOOK_ID=...
+   ```
+
+5. **Apply.** Run Deploy again. Then, in a server's Plan & billing page, choose Prepare checkout, pay with a sandbox buyer account, and confirm the server shows Plus.
+6. **Go live.** Replace all five values with the Live ones (`PAYPAL_ENV=live`), and Deploy again.
+
+Refunds and chargebacks in PayPal remove Premium automatically. Cancelling in PayPal keeps it until the paid period ends.
 
 ## Rollback and recovery
 

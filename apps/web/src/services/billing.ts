@@ -35,7 +35,12 @@ export type Entitlement = z.infer<typeof EntitlementSchema>;
 export const BillingSchema = z.object({
   plan: PlanSchema,
   plans: z.object({ free: PlanSchema, plus: PlanSchema }),
-  availability: z.object({ available: z.boolean() }).loose(),
+  availability: z
+    .object({
+      available: z.boolean(),
+      provider: z.enum(['paypal', 'stripe']).nullable().optional(),
+    })
+    .loose(),
   entitlements: z.array(EntitlementSchema),
   events: z.array(
     Row(

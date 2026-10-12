@@ -90,7 +90,7 @@ function unavailable(names: string[]): never {
     { missingConfiguration: names },
   );
 }
-function configured(env: Environment, names: string[]) {
+export function configured(env: Environment, names: string[]) {
   const missing = names.filter((n) => !env[n]);
   if (missing.length) unavailable(missing);
 }
@@ -98,6 +98,24 @@ function day(ctx: DomainContext) {
   return ctx.now.toISOString().slice(0, 10);
 }
 
+export const stripeSettings = [
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_PRICE_PLUS',
+  'STRIPE_API_VERSION',
+];
+export const paypalSettings = [
+  'PAYPAL_CLIENT_ID',
+  'PAYPAL_CLIENT_SECRET',
+  'PAYPAL_PLAN_ID',
+  'PAYPAL_WEBHOOK_ID',
+];
+/** PayPal when it is fully configured, otherwise Stripe, otherwise none. */
+export function billingProvider(env: Environment = process.env) {
+  if (paypalSettings.every((n) => env[n])) return 'paypal' as const;
+  if (stripeSettings.every((n) => env[n])) return 'stripe' as const;
+  return null;
+}
 export function providerAvailability(env: Environment = process.env) {
   const describe = (names: string[]) => ({
     available: names.every((n) => Boolean(env[n])),
@@ -105,12 +123,12 @@ export function providerAvailability(env: Environment = process.env) {
     liveVerified: false,
   });
   return {
-    billing: describe([
-      'STRIPE_SECRET_KEY',
-      'STRIPE_WEBHOOK_SECRET',
-      'STRIPE_PRICE_PLUS',
-      'STRIPE_API_VERSION',
-    ]),
+    billing: {
+      ...describe(
+        billingProvider(env) === 'stripe' ? stripeSettings : paypalSettings,
+      ),
+      provider: billingProvider(env),
+    },
     youtube: describe(['YOUTUBE_API_KEY']),
     twitch: describe(['TWITCH_CLIENT_ID', 'TWITCH_ACCESS_TOKEN']),
     rss: describe(['RSS_ALLOWED_HOSTS']),
@@ -187,7 +205,7 @@ export function validateProviderUrl(raw: string, hosts: readonly string[]) {
     );
   return url;
 }
-type HttpRequest = {
+export type HttpRequest = {
   url: string;
   hosts: readonly string[];
   method?: 'GET' | 'POST';
@@ -300,7 +318,10 @@ export const providerHttp: ProviderTransport = async (input) => {
     req.end();
   });
 };
-async function callJson(transport: ProviderTransport, request: HttpRequest) {
+export async function callJson(
+  transport: ProviderTransport,
+  request: HttpRequest,
+) {
   const response = await transport(request);
   if (response.status < 200 || response.status >= 300)
     throw new DomainError(
@@ -1402,16 +1423,150 @@ export async function resolveStripeEvent(
     event,
     subscription,
     observedAt: new Date().toISOString(),
-    revocation:
-      event.type === 'charge.refunded'
-        ? 'refund'
-        : event.type === 'charge.dispute.created'
-          ? 'chargeback'
-          : event.type === 'charge.dispute.closed' &&
-              event.data.object['status'] === 'won'
-            ? 'dispute-won'
-            : null,
+    revocation: (event.type === 'charge.refunded'
+      ? 'refund'
+      : event.type === 'charge.dispute.created'
+        ? 'chargeback'
+        : event.type === 'charge.dispute.closed' &&
+            event.data.object['status'] === 'won'
+          ? 'dispute-won'
+          : null) as EntitlementObservation['revocation'],
   };
+}
+/**
+ * A provider-neutral reading of one verified billing event together with the
+ * subscription as the provider reports it now. Built only from a signed
+ * callback and a provider-side lookup; no browser route can produce one.
+ */
+export type EntitlementObservation = {
+  provider: 'stripe' | 'paypal';
+  eventId: string;
+  eventType: string;
+  /** Provider event time in seconds, for ordering refunds and disputes. */
+  eventCreated: number;
+  payloadHash: string;
+  livemode: boolean;
+  subscriptionId: string;
+  intentId: string;
+  /** When the provider records who paid, it must match the checkout owner. */
+  userId?: string;
+  status: string;
+  /** Whether the provider status alone allows Premium. */
+  entitled: boolean;
+  cancelAtPeriodEnd: boolean;
+  /** End of the paid period; null keeps the last known end. */
+  expiresAt: string | null;
+  priceId: string;
+  currency: string;
+  minorAmount: string | null;
+  observedAt: string;
+  revocation: 'refund' | 'chargeback' | 'dispute-won' | null;
+};
+/** Records a verified observation and sets the server's Premium entitlement. */
+export async function recordEntitlement(
+  ctx: DomainContext,
+  o: EntitlementObservation,
+) {
+  const intent = await getRecord(ctx, 'billing.intent', o.intentId);
+  if (
+    (o.userId !== undefined && intent.ownerId !== o.userId) ||
+    jsonObject(intent.data)['plan'] !== 'plus'
+  )
+    throw new DomainError(
+      'FORBIDDEN',
+      'This subscription has no authorized checkout intent.',
+      403,
+    );
+  const key = `${o.provider}:${o.eventId}`,
+    previous = await keyed(ctx, 'billing.event', key);
+  if (previous) {
+    if (jsonObject(previous.data)['payloadHash'] !== o.payloadHash)
+      throw new DomainError(
+        'IDEMPOTENCY_CONFLICT',
+        'Billing event ID was reused with different content.',
+        409,
+      );
+    return { duplicate: true };
+  }
+  const current = await keyed(ctx, 'billing.entitlement', o.subscriptionId),
+    old = jsonObject(current?.data);
+  await createRecord(
+    ctx,
+    'billing.event',
+    {
+      provider: o.provider,
+      eventId: o.eventId,
+      payloadHash: o.payloadHash,
+      type: o.eventType,
+      eventCreatedAt: o.eventCreated,
+      subscriptionId: o.subscriptionId,
+      observedAt: o.observedAt,
+      livemode: o.livemode,
+    },
+    { key, ownerId: intent.ownerId! },
+  );
+  const hold = await keyed(ctx, 'billing.hold', o.subscriptionId),
+    holdData = jsonObject(hold?.data),
+    lastHoldEvent = Number(holdData['eventCreatedAt'] ?? 0);
+  // Revocation ordering is independent of subscription fetch ordering. A delayed older dispute
+  // closure cannot clear a newer hold, and a delayed refund still revokes current entitlement.
+  const nextHold =
+    o.revocation && o.eventCreated >= lastHoldEvent
+      ? await save(
+          ctx,
+          'billing.hold',
+          o.subscriptionId,
+          { reason: o.revocation, eventCreatedAt: o.eventCreated },
+          o.revocation === 'dispute-won' ? 'cleared' : 'active',
+          intent.ownerId!,
+        )
+      : hold;
+  const revoked = nextHold?.state === 'active';
+  const knownEnd =
+    o.expiresAt ??
+    (typeof old['expiresAt'] === 'string' ? old['expiresAt'] : null);
+  // With no paid period on record there is nothing left to honour.
+  const expiresAt = knownEnd ?? o.observedAt;
+  const stale =
+    typeof old['observedAt'] === 'string' && old['observedAt'] > o.observedAt;
+  const latest = stale
+    ? old
+    : {
+        provider: o.provider,
+        subscriptionId: o.subscriptionId,
+        plan: 'plus',
+        userId: intent.ownerId,
+        guildId: ctx.guildId,
+        status: o.status,
+        entitled: o.entitled,
+        cancelAtPeriodEnd: o.cancelAtPeriodEnd,
+        expiresAt,
+        observedAt: o.observedAt,
+        priceId: o.priceId,
+        billingCurrency: o.currency,
+        billingMinorAmount: o.minorAmount,
+        virtualCurrency: false,
+      };
+  const entitled =
+    typeof latest['entitled'] === 'boolean'
+      ? latest['entitled']
+      : ['active', 'trialing'].includes(String(latest['status']));
+  const expiry = new Date(z.iso.datetime().parse(latest['expiresAt'])),
+    active = !revoked && entitled && expiry > ctx.now;
+  const entitlement = await save(
+    ctx,
+    'billing.entitlement',
+    o.subscriptionId,
+    { ...latest, active, revoked },
+    active ? 'active' : 'inactive',
+    intent.ownerId!,
+  );
+  await ctx.effect(
+    'billing.entitlement.expire',
+    { subscriptionId: o.subscriptionId, observedAt: latest['observedAt'] },
+    expiry,
+  );
+  return entitlement;
 }
 /** Only called with a signed callback and provider-retrieved current subscription. No browser route can grant access. */
 export async function applyBillingObservation(
@@ -1427,31 +1582,6 @@ export async function applyBillingObservation(
       'Billing observation belongs to another server.',
       403,
     );
-  const intent = await getRecord(
-    ctx,
-    'billing.intent',
-    subscription.metadata.intentId,
-  );
-  if (
-    intent.ownerId !== subscription.metadata.userId ||
-    jsonObject(intent.data)['plan'] !== 'plus'
-  )
-    throw new DomainError(
-      'FORBIDDEN',
-      'This subscription has no authorized checkout intent.',
-      403,
-    );
-  const key = `stripe:${event.id}`,
-    previous = await keyed(ctx, 'billing.event', key);
-  if (previous) {
-    if (jsonObject(previous.data)['payloadHash'] !== hash(event))
-      throw new DomainError(
-        'IDEMPOTENCY_CONFLICT',
-        'Stripe event ID was reused with different content.',
-        409,
-      );
-    return { duplicate: true };
-  }
   const price = subscription.items.data.find(
     (i) => i.price.id === env['STRIPE_PRICE_PLUS'],
   );
@@ -1460,87 +1590,28 @@ export async function applyBillingObservation(
       'INVALID_INPUT',
       'The subscription uses an unrecognized price.',
     );
-  const current = await keyed(ctx, 'billing.entitlement', subscription.id),
-    old = jsonObject(current?.data);
-  await createRecord(
-    ctx,
-    'billing.event',
-    {
-      provider: 'stripe',
-      eventId: event.id,
-      payloadHash: hash(event),
-      type: event.type,
-      eventCreatedAt: event.created,
-      subscriptionId: subscription.id,
-      observedAt,
-      livemode: event.livemode,
-    },
-    { key, ownerId: intent.ownerId! },
-  );
-  const hold = await keyed(ctx, 'billing.hold', subscription.id),
-    holdData = jsonObject(hold?.data),
-    lastHoldEvent = Number(holdData['eventCreatedAt'] ?? 0);
-  // Revocation ordering is independent of subscription fetch ordering. A delayed older dispute
-  // closure cannot clear a newer hold, and a delayed refund still revokes current entitlement.
-  const nextHold =
-    revocation && event.created >= lastHoldEvent
-      ? await save(
-          ctx,
-          'billing.hold',
-          subscription.id,
-          { reason: revocation, eventCreatedAt: event.created },
-          revocation === 'dispute-won' ? 'cleared' : 'active',
-          intent.ownerId!,
-        )
-      : hold;
-  const revoked = nextHold?.state === 'active';
   const end = subscription.current_period_end ?? price.current_period_end;
-  if (!end)
-    throw new DomainError(
-      'INVALID_INPUT',
-      'Subscription period data requires provider reconciliation.',
-    );
-  const stale =
-    typeof old['observedAt'] === 'string' && old['observedAt'] > observedAt;
-  const latest = stale
-    ? old
-    : {
-        provider: 'stripe',
-        subscriptionId: subscription.id,
-        plan: 'plus',
-        userId: intent.ownerId,
-        guildId: ctx.guildId,
-        status: subscription.status,
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        expiresAt: new Date(end * 1000).toISOString(),
-        observedAt,
-        priceId: price.price.id,
-        billingCurrency: price.price.currency,
-        billingMinorAmount:
-          price.price.unit_amount === null
-            ? null
-            : String(price.price.unit_amount),
-        virtualCurrency: false,
-      };
-  const expiry = new Date(z.iso.datetime().parse(latest['expiresAt'])),
-    active =
-      !revoked &&
-      ['active', 'trialing'].includes(String(latest['status'])) &&
-      expiry > ctx.now;
-  const entitlement = await save(
-    ctx,
-    'billing.entitlement',
-    subscription.id,
-    { ...latest, active, revoked },
-    active ? 'active' : 'inactive',
-    intent.ownerId!,
-  );
-  await ctx.effect(
-    'billing.entitlement.expire',
-    { subscriptionId: subscription.id, observedAt: latest['observedAt'] },
-    expiry,
-  );
-  return entitlement;
+  return recordEntitlement(ctx, {
+    provider: 'stripe',
+    eventId: event.id,
+    eventType: event.type,
+    eventCreated: event.created,
+    payloadHash: hash(event),
+    livemode: event.livemode,
+    subscriptionId: subscription.id,
+    intentId: subscription.metadata.intentId,
+    userId: subscription.metadata.userId,
+    status: subscription.status,
+    entitled: ['active', 'trialing'].includes(subscription.status),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    expiresAt: end ? new Date(end * 1000).toISOString() : null,
+    priceId: price.price.id,
+    currency: price.price.currency,
+    minorAmount:
+      price.price.unit_amount === null ? null : String(price.price.unit_amount),
+    observedAt,
+    revocation,
+  });
 }
 export async function effectivePlan(ctx: DomainContext) {
   return planFor(ctx.tx, ctx.guildId, ctx.now);
@@ -2049,12 +2120,7 @@ export const providerRoutes: DomainRoute[] = [
     capability: 'config.manage',
     schema: z.object({ plan: z.literal('plus'), confirmed: z.literal(true) }),
     handler: async (ctx, input) => {
-      configured(process.env, [
-        'STRIPE_SECRET_KEY',
-        'STRIPE_WEBHOOK_SECRET',
-        'STRIPE_PRICE_PLUS',
-        'STRIPE_API_VERSION',
-      ]);
+      if (!billingProvider()) configured(process.env, paypalSettings);
       const data = z
           .object({ plan: z.literal('plus'), confirmed: z.literal(true) })
           .parse(input),

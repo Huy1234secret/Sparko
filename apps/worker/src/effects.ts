@@ -33,6 +33,8 @@ import {
   completeCheckout,
   runProviderJob,
   purgeGuild,
+  billingProvider,
+  createPaypalSubscription,
 } from '@sparko/domain';
 import {
   BRAND_YELLOW,
@@ -1631,7 +1633,11 @@ export class EffectExecutor {
           403,
         );
       await this.assertCurrent();
-      const result = await createStripeCheckout(
+      const checkout =
+        billingProvider() === 'paypal'
+          ? createPaypalSubscription
+          : createStripeCheckout;
+      const result = await checkout(
         { id: intent.id, guildId: work.guildId, userId },
         process.env['PUBLIC_APP_URL'] ?? '',
       );
