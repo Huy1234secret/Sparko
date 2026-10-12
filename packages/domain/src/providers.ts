@@ -31,6 +31,8 @@ import {
   getRecord,
   hash,
   jsonObject,
+  planFor,
+  plans,
   updateRecord,
   type DomainContext,
   type DomainRoute,
@@ -1191,24 +1193,7 @@ export function verifyStripeCallback(
     throw new DomainError('INVALID_INPUT', 'Stripe event payload is invalid.');
   }
 }
-export const plans = {
-  free: {
-    id: 'free',
-    templates: 10,
-    storageBytes: 10000000,
-    automationSteps: 10,
-    transcriptRetentionDays: 7,
-    multiServer: false,
-  },
-  plus: {
-    id: 'plus',
-    templates: 100,
-    storageBytes: 100000000,
-    automationSteps: 30,
-    transcriptRetentionDays: 30,
-    multiServer: true,
-  },
-} as const;
+
 function stripeRequest(
   env: Environment,
   path: string,
@@ -1553,25 +1538,7 @@ export async function applyBillingObservation(
   return entitlement;
 }
 export async function effectivePlan(ctx: DomainContext) {
-  const rows = await ctx.tx.record.findMany({
-    where: {
-      guildId: ctx.guildId,
-      kind: 'billing.entitlement',
-      state: 'active',
-    },
-    take: 100,
-  });
-  return rows.some((row) => {
-    const data = jsonObject(row.data);
-    return (
-      data['active'] === true &&
-      data['revoked'] !== true &&
-      typeof data['expiresAt'] === 'string' &&
-      Date.parse(data['expiresAt']) > ctx.now.getTime()
-    );
-  })
-    ? plans.plus
-    : plans.free;
+  return planFor(ctx.tx, ctx.guildId, ctx.now);
 }
 export async function completeCheckout(
   ctx: DomainContext,
@@ -1792,14 +1759,26 @@ export async function runProviderJob(
     return { nextAt: next.toISOString() };
   }
   if (type === 'billing.entitlement.expire') {
-    const row = await keyed(
-      ctx,
-      'billing.entitlement',
-      Id.parse(data['subscriptionId']),
-    );
+    // Staff grants are addressed by record; provider ones by subscription.
+    const row =
+      typeof data['entitlementId'] === 'string'
+        ? await ctx.tx.record.findFirst({
+            where: {
+              id: data['entitlementId'],
+              guildId: ctx.guildId,
+              kind: 'billing.entitlement',
+            },
+          })
+        : await keyed(
+            ctx,
+            'billing.entitlement',
+            Id.parse(data['subscriptionId']),
+          );
     if (!row) return { missing: true };
     const current = jsonObject(row.data);
     if (
+      // A revoked staff grant stays revoked rather than becoming "expired".
+      (typeof data['entitlementId'] === 'string' && row.state !== 'active') ||
       current['observedAt'] !== data['observedAt'] ||
       Date.parse(String(current['expiresAt'])) > ctx.now.getTime()
     )

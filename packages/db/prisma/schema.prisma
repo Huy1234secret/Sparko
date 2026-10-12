@@ -46,6 +46,7 @@ model Guild {
   memberCount Int?
   createdAt DateTime @default(now())
   configs FeatureConfig[]
+  policies FeaturePolicy[]
   records Record[]
   grants AccessGrant[]
   operations Operation[]
@@ -81,6 +82,19 @@ model FeatureConfig {
   revision Int @default(0)
   appliedRevision Int @default(0)
   config Json
+  updatedAt DateTime @updatedAt
+  @@unique([guildId, featureId])
+}
+/// Owner (Sparko staff) policy per server feature, separate from server configuration.
+model FeaturePolicy {
+  id String @id @default(uuid())
+  guildId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  featureId String
+  allowed Boolean @default(true)
+  reason String
+  actorId String
+  revision Int @default(1)
   updatedAt DateTime @updatedAt
   @@unique([guildId, featureId])
 }
@@ -233,9 +247,25 @@ model SupportTicket {
   category String
   state String @default("open")
   messages Json
+  attachments SupportAttachment[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([ownerId, createdAt, id])
+}
+model SupportAttachment {
+  id String @id @default(uuid())
+  ticketId String
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  messageId String
+  uploaderId String
+  name String
+  bytes Int
+  width Int
+  height Int
+  sha256 String
+  data Bytes
+  createdAt DateTime @default(now())
+  @@index([ticketId])
 }
 model Heartbeat {
   service String @id

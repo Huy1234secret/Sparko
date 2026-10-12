@@ -362,6 +362,7 @@ function fixture() {
           : create({ data: args.create });
       },
     },
+    featurePolicy: { findUnique: async () => null },
     featureConfig: {
       findUnique: async ({
         where,

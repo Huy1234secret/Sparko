@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import {
   Badge,
@@ -67,6 +68,23 @@ export function ConfigForm({
           </div>
           <Badge tone={status.tone}>{status.label}</Badge>
         </div>
+        {data.gate && !data.gate.ownerAllowed && (
+          <Notice tone="danger" title="Paused by Sparko staff">
+            {data.gate.ownerReason} Your settings are kept, but Sparko starts
+            nothing new for this module until staff lift the pause.{' '}
+            <Link className="text-link" to="/account/support">
+              Contact support
+            </Link>
+          </Notice>
+        )}
+        {data.gate && data.gate.ownerAllowed && !data.gate.planEntitled && (
+          <Notice tone="warning" title="Needs the Plus plan">
+            Your settings are kept. This module runs once the server has Plus.{' '}
+            <Link className="text-link" to="/account/billing">
+              See plans and billing
+            </Link>
+          </Notice>
+        )}
         {data.missingPrerequisites.length > 0 && (
           <Notice tone="warning" title="Before this can run">
             <ul>

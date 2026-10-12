@@ -10,6 +10,7 @@ export const getPrivacy = (signal?: AbortSignal) =>
       exports: z.array(
         z.object({
           id: z.string(),
+          kind: z.string().default('full'),
           status: z.string(),
           createdAt: z.string(),
           downloadUrl: z.string().optional(),
@@ -21,20 +22,11 @@ export const getPrivacy = (signal?: AbortSignal) =>
     }),
     signal,
   );
-export const requestExport = (key: string) =>
-  mutate('post', '/account/privacy/export', {}, z.unknown(), key);
+export type ExportKind = 'full' | 'support' | 'servers';
+export const requestExport = (kind: ExportKind, key: string) =>
+  mutate('post', '/account/privacy/export', { kind }, z.unknown(), key);
 export const requestDeletion = (reason: string, key: string) =>
   mutate('post', '/account/privacy/deletion', { reason }, z.unknown(), key);
-export const getSupport = (signal?: AbortSignal) =>
-  read('/account/support', z.array(RecordSchema), signal);
-export const createSupport = (subject: string, body: string, key: string) =>
-  mutate(
-    'post',
-    '/account/support',
-    { subject, message: body, category: 'other' },
-    RecordSchema,
-    key,
-  );
 export const getSessions = (signal?: AbortSignal) =>
   read(
     '/account/sessions',

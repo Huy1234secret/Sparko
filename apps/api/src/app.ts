@@ -7,6 +7,8 @@ import swagger from '@fastify/swagger';
 import { z } from 'zod';
 import {
   Platform,
+  featureGate,
+  planFor,
   ticketRoutes,
   publicationRoutes,
   jsonObject,
@@ -44,6 +46,7 @@ import { createAuth, requireActiveSession } from './auth.js';
 import { registerAccountRoutes } from './account.js';
 import { registerProviderCallbacks } from './providers.js';
 import { registerGrantRoutes } from './grants.js';
+import { registerOwnerRoutes } from './owner.js';
 import {
   validatePublicationResources,
   validateTemplateResources,
@@ -183,6 +186,18 @@ export async function createApp(options: {
     ...providerConfigSchemas,
     ...options.configSchemas,
   };
+  /**
+   * Any delegated staff role may list channel, role and emoji names to pick
+   * from; plain members may not. Writes still check their own capability.
+   */
+  const resourceCapabilities = [
+    ...guildCapabilities,
+    'forms.manage',
+    'forms.review',
+    'moderation.read',
+    'reports.review',
+    'appeals.review',
+  ];
   function key(req: { headers: Record<string, unknown> }) {
     const value = req.headers['idempotency-key'];
     return typeof value === 'string' ? value : '';
@@ -298,15 +313,7 @@ export async function createApp(options: {
   app.get('/api/v1/guilds/:guildId/resources/channels', async (req) => {
     const { guildId } = z.object({ guildId: z.string() }).parse(req.params);
     const actor = await auth.actor(req, guildId);
-    if (
-      ![
-        'config.manage',
-        'templates.edit',
-        'messages.publish',
-        'community.manage',
-        'automation.manage',
-      ].some((capability) => allowed(actor, capability))
-    )
+    if (!resourceCapabilities.some((capability) => allowed(actor, capability)))
       throw new DomainError(
         'FORBIDDEN',
         'You cannot select resources in this server.',
@@ -317,15 +324,7 @@ export async function createApp(options: {
   app.get('/api/v1/guilds/:guildId/resources/roles', async (req) => {
     const { guildId } = z.object({ guildId: z.string() }).parse(req.params);
     const actor = await auth.actor(req, guildId);
-    if (
-      ![
-        'config.manage',
-        'templates.edit',
-        'messages.publish',
-        'community.manage',
-        'automation.manage',
-      ].some((capability) => allowed(actor, capability))
-    )
+    if (!resourceCapabilities.some((capability) => allowed(actor, capability)))
       throw new DomainError(
         'FORBIDDEN',
         'You cannot select resources in this server.',
@@ -373,15 +372,7 @@ export async function createApp(options: {
   app.get('/api/v1/guilds/:guildId/resources/emojis', async (req) => {
     const { guildId } = z.object({ guildId: z.string() }).parse(req.params),
       actor = await auth.actor(req, guildId);
-    if (
-      ![
-        'config.manage',
-        'templates.edit',
-        'messages.publish',
-        'community.manage',
-        'automation.manage',
-      ].some((capability) => allowed(actor, capability))
-    )
+    if (!resourceCapabilities.some((capability) => allowed(actor, capability)))
       throw new DomainError(
         'FORBIDDEN',
         'You cannot select resources in this server.',
@@ -496,10 +487,16 @@ export async function createApp(options: {
     });
     const defaults = schema.safeParse({ enabled: false });
     const savedValidation = saved ? schema.safeParse(saved.config) : null;
+    // Staff policy and plan are separate from the server's own on/off switch.
+    const gate = await db.$transaction(async (tx) => ({
+      ...(await featureGate(tx, p.guildId, p.featureId)),
+      limits: await planFor(tx, p.guildId),
+    }));
     return {
       data: saved
         ? {
             ...saved,
+            gate,
             setupState: savedValidation?.success
               ? 'configured'
               : 'unconfigured',
@@ -513,6 +510,7 @@ export async function createApp(options: {
           }
         : {
             featureId: p.featureId,
+            gate,
             revision: 0,
             appliedRevision: 0,
             config: defaults.success ? defaults.data : { enabled: false },
@@ -863,6 +861,7 @@ export async function createApp(options: {
   });
   registerAccountRoutes(app, db, auth, globalActor);
   registerGrantRoutes(app, db, platform, auth, config, discord);
+  registerOwnerRoutes(app, db, platform, globalActor, Object.keys(schemas));
   registerAssetRoutes(app, db, config, auth);
   await registerProviderCallbacks(
     app,

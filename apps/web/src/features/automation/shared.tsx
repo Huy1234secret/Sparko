@@ -15,11 +15,14 @@ type Loose = Record<string, unknown>;
 export const settingsSchema = (featureId: string) =>
   automationConfigSchemas[featureId] as z.ZodType<Loose, Loose>;
 
-export function useEnabled(guildId: string, featureId: string) {
-  const config = useQuery({
+export function useFeature(guildId: string, featureId: string) {
+  return useQuery({
     queryKey: ['config', guildId, featureId],
     queryFn: ({ signal }) => getConfig(guildId, featureId, signal),
   });
+}
+export function useEnabled(guildId: string, featureId: string) {
+  const config = useFeature(guildId, featureId);
   return config.data ? config.data.config['enabled'] === true : null;
 }
 

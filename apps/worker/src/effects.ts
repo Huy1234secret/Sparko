@@ -6,6 +6,8 @@ import { DomainError, TicketConfigSchema, type Actor } from '@sparko/contracts';
 import {
   Platform,
   completeAutomationEffect,
+  featureActive,
+  planFor,
   guardAutomationEffect,
   jsonObject,
   openTicket,
@@ -1145,7 +1147,12 @@ export class EffectExecutor {
           checksum: createHash('sha256')
             .update(JSON.stringify(captured))
             .digest('hex'),
-          expiresAt: new Date(Date.now() + 30 * 86_400_000),
+          // Retention follows the plan at capture; a later downgrade keeps it.
+          expiresAt: new Date(
+            Date.now() +
+              (await planFor(ctx.tx, work.guildId)).transcriptRetentionDays *
+                86_400_000,
+          ),
         },
       });
       if (!complete && settings.requireTranscriptBeforeCleanup) {
@@ -2892,12 +2899,11 @@ export class EffectExecutor {
         where: { guildId_featureId: { guildId: work.guildId, featureId } },
       });
       const config = jsonObject(configuration?.config);
-      if (!config['enabled'])
-        throw new DomainError(
-          'FEATURE_DISABLED',
-          'This safety module was disabled.',
-          409,
-        );
+      // Same gate as every new action: on, not paused by staff, within plan.
+      await this.platform.read(
+        systemActor(work.guildId, this.discord.botUserId),
+        (ctx) => ctx.requireFeature(featureId),
+      );
       const roleId = Snowflake.parse(
         p['roleId'] ?? config['quarantineRoleId'] ?? config['roleId'],
       );
@@ -3052,7 +3058,14 @@ export class EffectExecutor {
         },
       });
       const cfg = jsonObject(config?.config);
-      if (!cfg['enabled'] || cfg['mode'] !== 'enforce')
+      if (
+        cfg['mode'] !== 'enforce' ||
+        !(await this.platform.read(
+          systemActor(work.guildId, this.discord.botUserId),
+          (ctx) =>
+            featureActive(ctx.tx, ctx.guildId, ID.parse(source['featureId'])),
+        ))
+      )
         throw new DomainError(
           'FORBIDDEN',
           'Automatic enforcement was disabled.',

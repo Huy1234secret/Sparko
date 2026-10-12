@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { createDatabase, json } from '@sparko/db';
 import { encryptProviderSecret } from '@sparko/domain';
@@ -418,6 +419,150 @@ describe('API security against real PostgreSQL', () => {
     });
     expect(privateRead.statusCode).toBe(403);
   });
+  it('keeps support screenshots private, tracks status and exports by kind', async () => {
+    const png = (
+      await readFile(
+        new URL(
+          '../../../packages/assets/media/discord/ticket.png',
+          import.meta.url,
+        ),
+      )
+    ).toString('base64');
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/account/support',
+      headers: headers(MEMBER, 'support-shot'),
+      payload: {
+        subject: 'Broken panel',
+        category: 'bug',
+        message: 'See the screenshot.',
+        attachments: [{ name: 'panel.png', base64: png }],
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    const ticket = created.json().data;
+    const attachment = ticket.messages[0].attachments[0];
+    expect(attachment).toMatchObject({ name: 'panel.png' });
+    // The receipt keeps a content hash, never the image.
+    const receipt = await db.accountRequest.findFirstOrThrow({
+      where: {
+        userId: MEMBER,
+        kind: 'operation:support.create',
+        data: { path: ['key'], equals: 'support-shot' },
+      },
+    });
+    expect(JSON.stringify(receipt.data)).not.toContain(png.slice(0, 64));
+    const own = await app.inject({
+      url: `/api/v1/account/support/${ticket.id}/attachments/${attachment.id}`,
+      headers: headers(MEMBER),
+    });
+    expect(own.statusCode).toBe(200);
+    expect(own.headers['content-type']).toBe('image/png');
+    expect(own.headers['content-disposition']).toContain('attachment');
+    const stranger = await app.inject({
+      url: `/api/v1/account/support/${ticket.id}/attachments/${attachment.id}`,
+      headers: headers(STAFF_A),
+    });
+    expect(stranger.statusCode).toBe(404);
+    const replyOnly = await app.inject({
+      url: `/api/v1/owner/support/${ticket.id}/attachments/${attachment.id}`,
+      headers: headers(STAFF_A),
+    });
+    expect(replyOnly.statusCode).toBe(403);
+    const reader = await app.inject({
+      url: `/api/v1/owner/support/${ticket.id}/attachments/${attachment.id}`,
+      headers: headers(ADMIN),
+    });
+    expect(reader.statusCode).toBe(200);
+    const unsafe = await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/reply`,
+      headers: headers(MEMBER, 'support-svg'),
+      payload: {
+        message: 'An SVG',
+        attachments: [
+          {
+            name: 'x.svg',
+            base64: Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg"/>',
+            ).toString('base64'),
+          },
+        ],
+      },
+    });
+    expect(unsafe.statusCode).toBe(400);
+
+    // Staff reply waits on the member; the member's reply returns it to staff.
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/owner/support/${ticket.id}/reply`,
+      headers: headers(STAFF_A, 'support-staff-1'),
+      payload: { message: 'Which server?' },
+    });
+    const state = async () =>
+      (await db.supportTicket.findUniqueOrThrow({ where: { id: ticket.id } }))
+        .state;
+    expect(await state()).toBe('waiting_on_user');
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/reply`,
+      headers: headers(MEMBER, 'support-member-1'),
+      payload: { message: 'The test one.' },
+    });
+    expect(await state()).toBe('open');
+    const resolved = await app.inject({
+      method: 'POST',
+      url: `/api/v1/owner/support/${ticket.id}/status`,
+      headers: headers(STAFF_A, 'support-resolve'),
+      payload: { state: 'resolved' },
+    });
+    expect(resolved.statusCode).toBe(200);
+    const memberResolve = await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/status`,
+      headers: headers(MEMBER, 'support-member-resolve'),
+      payload: { state: 'resolved' },
+    });
+    expect(memberResolve.statusCode).toBe(400);
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/status`,
+      headers: headers(MEMBER, 'support-close'),
+      payload: { state: 'closed' },
+    });
+    const closedReply = await app.inject({
+      method: 'POST',
+      url: `/api/v1/account/support/${ticket.id}/reply`,
+      headers: headers(MEMBER, 'support-after-close'),
+      payload: { message: 'One more thing' },
+    });
+    expect(closedReply.statusCode).toBe(400);
+
+    const supportOnly = await app.inject({
+      method: 'POST',
+      url: '/api/v1/account/privacy/export',
+      headers: headers(MEMBER, 'export-support'),
+      payload: { kind: 'support' },
+    });
+    expect(supportOnly.json().data.kind).toBe('support');
+    const download = await app.inject({
+      url: `/api/v1/account/privacy/exports/${supportOnly.json().data.id}`,
+      headers: headers(MEMBER),
+    });
+    const data = download.json().data;
+    expect(data.kind).toBe('support');
+    expect(data.tickets).toEqual([]);
+    const exported = data.support.find(
+      (row: { id: string }) => row.id === ticket.id,
+    );
+    expect(exported.attachments[0]).toMatchObject({ name: 'panel.png' });
+    expect(exported.attachments[0]).not.toHaveProperty('data');
+    const listed = await app.inject({
+      url: '/api/v1/account/privacy',
+      headers: headers(MEMBER),
+    });
+    expect(listed.json().data.exports[0].kind).toBe('support');
+  });
   it('restricts global grant delegation to configured owners and known capabilities', async () => {
     const payload = {
       capabilities: ['diagnostics.read'],
@@ -455,6 +600,120 @@ describe('API security against real PostgreSQL', () => {
       headers: headers(MEMBER),
     });
     expect(health.statusCode).toBe(200);
+  });
+  it('separates fleet reads from audited feature policy and staff plan grants', async () => {
+    await db.globalGrant.upsert({
+      where: { userId: STAFF_A },
+      create: { userId: STAFF_A, capabilities: ['fleet.read'] },
+      update: { capabilities: ['fleet.read'], expiresAt: null },
+    });
+    const summary = await app.inject({
+      url: `/api/v1/owner/guilds/${GUILD}`,
+      headers: headers(STAFF_A),
+    });
+    expect(summary.statusCode).toBe(200);
+    expect(summary.json().data.plan.id).toBe('free');
+    const policy = {
+      allowed: false,
+      reason: 'Abuse review',
+      expectedRevision: 0,
+    };
+    const denied = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/owner/guilds/${GUILD}/features/R43/policy`,
+      headers: headers(STAFF_A, 'policy-denied'),
+      payload: policy,
+    });
+    expect(denied.statusCode).toBe(403);
+    const blocked = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/owner/guilds/${GUILD}/features/R43/policy`,
+      headers: headers(ADMIN, 'policy-block'),
+      payload: policy,
+    });
+    expect(blocked.statusCode).toBe(200);
+    const stale = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/owner/guilds/${GUILD}/features/R43/policy`,
+      headers: headers(ADMIN, 'policy-stale'),
+      payload: { ...policy, allowed: true },
+    });
+    expect(stale.statusCode).toBe(409);
+    // The server's own settings page explains the pause; its config is untouched.
+    const config = await app.inject({
+      url: `/api/v1/guilds/${GUILD}/features/R43/config`,
+      headers: headers(ADMIN),
+    });
+    expect(config.json().data.gate).toMatchObject({
+      ownerAllowed: false,
+      ownerReason: 'Abuse review',
+    });
+    expect(
+      await db.auditLog.count({
+        where: { guildId: GUILD, action: 'owner.feature.policy' },
+      }),
+    ).toBe(1);
+    const grant = await app.inject({
+      method: 'POST',
+      url: `/api/v1/owner/guilds/${GUILD}/entitlements`,
+      headers: headers(ADMIN, 'grant-plus'),
+      payload: {
+        plan: 'plus',
+        expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+        reason: 'Community partner',
+      },
+    });
+    expect(grant.statusCode).toBe(200);
+    const granted = await app.inject({
+      url: `/api/v1/owner/guilds/${GUILD}`,
+      headers: headers(STAFF_A),
+    });
+    expect(granted.json().data.plan.id).toBe('plus');
+    const revoke = await app.inject({
+      method: 'POST',
+      url: `/api/v1/owner/guilds/${GUILD}/entitlements/${grant.json().data.id}/revoke`,
+      headers: headers(ADMIN, 'revoke-plus'),
+      payload: { reason: 'Partnership ended', expectedRevision: 1 },
+    });
+    expect(revoke.statusCode).toBe(200);
+    const after = await app.inject({
+      url: `/api/v1/owner/guilds/${GUILD}`,
+      headers: headers(STAFF_A),
+    });
+    expect(after.json().data.plan.id).toBe('free');
+    expect(after.json().data.entitlements[0]).toMatchObject({
+      source: 'staff',
+      revoked: true,
+    });
+    await db.featurePolicy.deleteMany({ where: { guildId: GUILD } });
+    await db.globalGrant.update({
+      where: { userId: STAFF_A },
+      data: {
+        capabilities: ['support.reply'],
+        expiresAt: new Date(Date.now() + 86400000),
+      },
+    });
+  });
+  it('lets delegated staff list resource names that plain members cannot', async () => {
+    const list = () =>
+      app.inject({
+        url: `/api/v1/guilds/${GUILD}/resources/channels`,
+        headers: headers(MEMBER),
+      });
+    expect((await list()).statusCode).toBe(403);
+    const grant = await db.accessGrant.create({
+      data: {
+        guildId: GUILD,
+        subjectType: 'user',
+        subjectId: MEMBER,
+        capabilities: ['tickets.manage'],
+      },
+    });
+    const delegated = await list();
+    expect(delegated.statusCode).toBe(200);
+    expect(delegated.json().data[0]).toMatchObject({ id: CHANNEL });
+    await db.accessGrant.delete({ where: { id: grant.id } });
+    expect((await list()).statusCode).toBe(403);
   });
   it('verifies callback exact raw bytes before writes and rejects replay content changes/revocation', async () => {
     await db.featureConfig.create({

@@ -6,7 +6,8 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 
 - `main` contains M1–M3 ([PR #2](https://github.com/Huy1234secret/Sparko/pull/2), [PR #3](https://github.com/Huy1234secret/Sparko/pull/3), [PR #4](https://github.com/Huy1234secret/Sparko/pull/4)), the vendored project skills ([PR #5](https://github.com/Huy1234secret/Sparko/pull/5)) and the UI/UX pass ([PR #6](https://github.com/Huy1234secret/Sparko/pull/6), `3303fbe`).
 - M4 merged ([PR #7](https://github.com/Huy1234secret/Sparko/pull/7), `396bfdd`). It merged the paused M4 branch `claude/amazing-maxwell-yonuhl` (`cafe717`, kept intact on the remote) onto the UI pass. See `docs/milestones/m4.md`.
-- M5 is delivered from `claude/clever-lovelace-b5a124`, restarted from `396bfdd`. See `docs/milestones/m5.md`.
+- M5 merged ([PR #8](https://github.com/Huy1234secret/Sparko/pull/8), `e9d58a1`). See `docs/milestones/m5.md`.
+- M6 is delivered from `claude/clever-lovelace-b5a124`, restarted from `e9d58a1`. See `docs/milestones/m6.md`.
 - Run `git log --oneline -5` and `git status` before editing. Each milestone is a PR into `main`, merged after CI passes on the exact head; the next milestone restarts the working branch from the merged `main`.
 
 ## Milestone / PR state
@@ -19,12 +20,13 @@ Active continuation (Claude, 2026-10-11). Repository: private `Huy1234secret/Spa
 | M3 Community                | **Merged**      | [PR #4](https://github.com/Huy1234secret/Sparko/pull/4) (`8108330`). See `docs/milestones/m3.md`.                                                                         |
 | UI/UX pass over M1–M3       | **Merged**      | [PR #6](https://github.com/Huy1234secret/Sparko/pull/6) (`3303fbe`). See `docs/milestones/ui-pass.md`.                                                                    |
 | M4 Safety/support expansion | **Merged**      | [PR #7](https://github.com/Huy1234secret/Sparko/pull/7) (`396bfdd`). See `docs/milestones/m4.md`.                                                                         |
-| M5 Time and automation      | **PR**          | All local gates pass. See `docs/milestones/m5.md`; PR and CI recorded on merge.                                                                                           |
-| M6–M9                       | Partial backend | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
+| M5 Time and automation      | **Merged**      | [PR #8](https://github.com/Huy1234secret/Sparko/pull/8) (`e9d58a1`). See `docs/milestones/m5.md`.                                                                         |
+| M6 Gates, plans and support | **PR**          | All local gates pass. See `docs/milestones/m6.md`; PR and CI recorded on merge.                                                                                           |
+| M7–M9                       | Partial backend | See later gaps below and per-feature rows in `docs/feature-traceability.md`.                                                                                              |
 
-## Verification record (M5 source)
+## Verification record (M6 source)
 
-Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 251 unit, 154 PostgreSQL integration and 19 browser tests pass.
+Local, Node 24.19.0, pnpm 11.25.0, Prisma 7.10.0, PostgreSQL 16 / Redis 7 local disposable services (CI uses PostgreSQL 17.6 / Redis 7.4.6): typecheck, lint, format, build and browser boundary pass; 257 unit, 162 PostgreSQL integration and 21 browser tests pass.
 
 All browser/integration tests use a controlled external Discord boundary. They do not prove live Discord acceptance.
 
@@ -52,15 +54,21 @@ Resolved: typed workspaces for polls, events/RSVP, reminders, birthdays, tempora
 
 Still open: fresh role eligibility at waitlist promotion; ambiguous voice-room creation reconciliation; every Gateway-driven automation (messages, joins, voice, invites) and command registration need live observation; lists show Discord user IDs rather than display names.
 
+## M6 outcome and remaining commercial/operator limits
+
+Resolved: one shared feature gate (server switch, stored owner policy, plan) used by HTTP, Gateway, workflows and worker with cleanup exempt; uniform Free/Plus limits with data kept on downgrade; delegated resource discovery; server Plan & billing and `/account/billing`; capability-scoped owner console with per-module pause, staff Plus grants, audited job retry, support queue and operator access; product support lifecycle with private screenshots; privacy export kinds.
+
+Still open: real Stripe sandbox checkout/callbacks/refunds/disputes; moving a subscription between servers; reply notifications for support; scoped diagnostic exports; usage/quota dashboards.
+
 ## Next concrete action
 
-Merge M5, restart the working branch from `main`, then M6: persist owner feature policy separately and enforce shared plan/prerequisite/runtime gates in direct Gateway, workflow and worker paths (see the M6 line below and `docs/feature-traceability.md`).
+Merge M6, restart the working branch from `main`, then M7/M8: typed member and staff workflows for the economy and social modules (see the M7/M8 line below, `docs/economy.md` and `docs/providers.md`).
 
 ## Later exact gaps / external prerequisites
 
 M4–M5 (delivered; residual): full anti-nuke response/restoration (by design unsupported); fresh waitlist eligibility; ambiguous temporary-voice creation reconciliation. Invite ambiguity stays unknown rather than fabricated.
 
-M6: persist owner feature policy separately; enforce shared plan/prerequisite/runtime gates in direct Gateway/workflow/worker paths while allowing cleanup/refunds/privacy maintenance. Uniform plan limits, delegated resource discovery, `/account/billing` route, support-only owner navigation/read scopes, support replies/attachments/status, grants, privacy export kinds and commercial lifecycle UI remain.
+M6 (delivered; residual): provider sandbox commercial evidence, subscription moves, support reply notifications, scoped diagnostic exports and usage dashboards.
 
 M7/M8: typed member/staff workflows; correct endpoints `/economy/me`, `/trades/me`, `/reputation/me` and `/social/sources`; composite inventory/collection/lottery DTOs; R52 navigation; staff refund/order queue; trivia reload recovery; actual opt-in multi-server rollout; provider panels and real voice runtime. See `docs/economy.md` and `docs/providers.md`.
 

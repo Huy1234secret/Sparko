@@ -35,6 +35,10 @@ Checkout is tied to a guild and manager-authorized intent; the provider idempote
 
 Duplicate callback IDs are idempotent and changed payloads conflict. The latest retrieved subscription observation controls current status/period data. Refund/chargeback hold chronology is tracked separately: an older dispute closure cannot clear a newer hold, and a delayed refund revokes the current entitlement even if its subscription fetch completed earlier. Canceled/past-due/expired/revoked state has no effective paid entitlement. Scheduled expiry ignores superseded observations. Account/region availability, real sandbox checkout/callbacks and operator refund/dispute policy still require verification.
 
+## Plans, limits and staff grants
+
+Plan limits live in `plans` (`packages/domain/src/core.ts`) and are enforced by `requirePlanRoom` and `featureGate`; see `docs/milestones/m6.md` for the table. The effective plan is Plus while any provider-verified or staff-granted `billing.entitlement` is active, unrevoked and unexpired; expiry is read from the instant, so a missed expiry job cannot extend access. Staff grants (`entitlements.manage`) record a reason, expire on their own and can be revoked; provider subscriptions are never edited by staff. Losing Plus keeps every record and setting; only new work past a Free limit is refused.
+
 ## Verification and exact live checks
 
 Pure tests exercise byte-sensitive signatures, stale/forged callbacks, ciphertext corruption, unsafe URLs/addresses, RSS entity rejection, all selected social adapter protocols, checkout idempotency/URL safety, current subscription retrieval, AI human review/storage policy, and authorize-all-before-read multi-server behavior. PostgreSQL tests exercise webhook replay/tenant/age/revocation rules, baseline/dedupe/budgets, concurrent AI quota/dispatch and private output, consent rechecks/retention, unavailable music, and billing duplicate/out-of-order/hold/expiry/scope transitions.

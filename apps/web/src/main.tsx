@@ -70,6 +70,11 @@ const MemberPortal = lazy(() =>
     default: module.MemberPage,
   })),
 );
+const AccountBilling = lazy(() =>
+  import('./pages/BillingPages').then((module) => ({
+    default: module.AccountBillingPage,
+  })),
+);
 const Owner = lazy(() =>
   import('./pages/OwnerPages').then((module) => ({
     default: module.OwnerPage,
@@ -153,13 +158,15 @@ export const router = createBrowserRouter([
               { path: 'account/preferences', element: <PreferencesPage /> },
               { path: 'account/privacy', element: <PrivacyAccountPage /> },
               { path: 'account/support', element: <ProductSupportPage /> },
+              { path: 'account/billing', element: <AccountBilling /> },
               { path: 'servers/:guildId/me', element: <MemberPortal /> },
               {
                 path: 'servers/:guildId/tickets',
                 element: <TicketInboxPage member />,
               },
               { path: 'owner', element: <Owner /> },
-              { path: 'owner/health', element: <Owner /> },
+              { path: 'owner/health', element: <Owner section="health" /> },
+              { path: 'owner/grants', element: <Owner section="grants" /> },
               { path: 'owner/fleet', element: <Owner section="fleet" /> },
               { path: 'owner/jobs', element: <Owner section="jobs" /> },
               { path: 'owner/support', element: <Owner section="support" /> },

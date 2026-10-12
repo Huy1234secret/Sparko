@@ -48,6 +48,7 @@ export {
   AnalyticsQuery,
 } from '@sparko/messages/community-contracts';
 import {
+  featureActive,
   createRecord,
   getRecord,
   jsonObject,
@@ -70,7 +71,14 @@ async function config<T>(
   const row = await ctx.tx.featureConfig.findUnique({
     where: { guildId_featureId: { guildId: ctx.guildId, featureId: id } },
   });
-  return schema.parse(row?.config ?? {});
+  const parsed = schema.parse(row?.config ?? {});
+  // A module paused by Sparko staff or outside the plan reads as off for new work.
+  if (
+    jsonObject(parsed)['enabled'] === true &&
+    !(await featureActive(ctx.tx, ctx.guildId, id, ctx.now))
+  )
+    return { ...parsed, enabled: false };
+  return parsed;
 }
 async function keyed(ctx: DomainContext, kind: string, key: string) {
   return ctx.tx.record.findUnique({

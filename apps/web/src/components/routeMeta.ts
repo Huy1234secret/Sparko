@@ -5,12 +5,14 @@ const accountPages: Record<string, string> = {
   preferences: 'Preferences',
   privacy: 'Privacy & data',
   support: 'Product support',
+  billing: 'Plans & billing',
 };
 const ownerPages: Record<string, string> = {
   health: 'Health',
-  fleet: 'Fleet',
+  fleet: 'Servers',
   jobs: 'Jobs',
   support: 'Support queue',
+  grants: 'Operator access',
 };
 const fixedGuildPages: Record<string, Crumb[]> = {
   setup: [{ label: 'Guided setup' }],

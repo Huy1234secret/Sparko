@@ -4,6 +4,7 @@ import type { Actor } from '@sparko/contracts';
 import { testDatabaseUrl } from '../../../tools/test-targets.js';
 import {
   Platform,
+  featureGate,
   jsonObject,
   type DomainRoute,
   type DomainContext,
@@ -116,6 +117,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   for (const id of [guildId, otherGuildId]) {
+    await db.featurePolicy.deleteMany({ where: { guildId: id } });
     await db.outbox.deleteMany({ where: { guildId: id } });
     await db.auditLog.deleteMany({ where: { guildId: id } });
     await db.operation.deleteMany({ where: { guildId: id } });
@@ -1315,5 +1317,201 @@ describe('real PostgreSQL safety/time transactions and authority', () => {
         { type: 'daily', hour: 1, minute: 30 },
       )?.toISOString(),
     ).toBe('2026-11-02T06:30:00.000Z');
+  });
+});
+
+describe('shared feature gate across direct paths', () => {
+  const block = (featureId: string) =>
+    db.featurePolicy.create({
+      data: {
+        guildId,
+        featureId,
+        allowed: false,
+        reason: 'Abuse review',
+        actorId: thirdId,
+      },
+    });
+  it('pauses new work over HTTP and the Gateway while cleanup keeps running', async () => {
+    await call(
+      admin(),
+      'POST',
+      '/replies',
+      {
+        name: 'Rules',
+        match: 'contains',
+        pattern: 'rules',
+        text: 'See #rules',
+      },
+      'gate-reply',
+    );
+    await block('R43');
+    await expect(
+      call(
+        admin(),
+        'POST',
+        '/replies',
+        { name: 'More', match: 'exact', pattern: 'hi', text: 'Hello' },
+        'gate-reply-blocked',
+      ),
+    ).rejects.toMatchObject({
+      code: 'FEATURE_BLOCKED',
+      message: expect.stringContaining('Abuse review'),
+    });
+    await mutate(admin(), 'gate-message', (ctx) =>
+      ingestAutomationEvent(ctx, {
+        type: 'message',
+        id: '723456789012345690',
+        userId: otherId,
+        channelId,
+        content: 'where are the rules',
+        roleIds: [],
+        bot: false,
+        webhook: false,
+        at: new Date().toISOString(),
+      }),
+    );
+    expect(
+      await db.outbox.count({ where: { guildId, type: 'automation.send' } }),
+    ).toBe(0);
+
+    // Reversing an earned invite reward is cleanup and ignores the pause.
+    await db.featureConfig.create({
+      data: {
+        guildId,
+        featureId: 'R41',
+        config: { enabled: true, reverseOnLeave: true },
+      },
+    });
+    await block('R41');
+    const reward = await db.record.create({
+      data: {
+        guildId,
+        kind: 'invite_reward',
+        key: 'gate-reward',
+        ownerId: otherId,
+        state: 'applied',
+        data: { memberId: userId, inviterId: otherId, roleId },
+      },
+    });
+    await mutate(admin(), 'gate-leave', (ctx) =>
+      ingestAutomationEvent(ctx, { type: 'leave', id: 'gate-left', userId }),
+    );
+    expect(
+      (await db.record.findUniqueOrThrow({ where: { id: reward.id } })).state,
+    ).toBe('reversed');
+  });
+  it('stops a running workflow at its next step when staff pause workflows', async () => {
+    const workflow = (
+      await call(
+        admin(),
+        'POST',
+        '/workflows',
+        {
+          name: 'Wait then send',
+          trigger: 'manual',
+          steps: [
+            { type: 'send', channelId, text: 'First' },
+            { type: 'send', channelId, text: 'Second' },
+          ],
+        },
+        'gate-workflow',
+      )
+    ).data as { id: string };
+    const run = (
+      await call(admin(), 'POST', '/workflows/:id/execute', {}, 'gate-run', {
+        id: workflow.id,
+      })
+    ).data as { id: string };
+    const first = await db.outbox.findFirstOrThrow({
+      where: { guildId, type: 'automation.send' },
+    });
+    await block('R45');
+    await mutate(admin(), 'gate-first-done', (ctx) =>
+      completeAutomationEffect(ctx, first.payload, {
+        success: true,
+        messageId: '623456789012345691',
+      }),
+    );
+    const stopped = await db.record.findUniqueOrThrow({
+      where: { id: run.id },
+    });
+    expect(stopped.state).toBe('cancelled');
+    expect(
+      await db.outbox.count({ where: { guildId, type: 'automation.send' } }),
+    ).toBe(1);
+  });
+  it('requires Plus for multi-server tools and honours a staff grant until it expires', async () => {
+    await db.featureConfig.create({
+      data: { guildId, featureId: 'R61', config: { enabled: true } },
+    });
+    const gate = () =>
+      platform.read(admin(), (ctx) =>
+        featureGate(ctx.tx, ctx.guildId, 'R61', ctx.now),
+      );
+    expect(await gate()).toMatchObject({
+      enabled: true,
+      ownerAllowed: true,
+      planEntitled: false,
+      requiredPlan: 'plus',
+      plan: 'free',
+    });
+    await expect(
+      platform.read(admin(), (ctx) => ctx.requireFeature('R61')),
+    ).rejects.toMatchObject({ code: 'PLAN_REQUIRED' });
+    const grant = await db.record.create({
+      data: {
+        guildId,
+        kind: 'billing.entitlement',
+        key: 'staff-grant',
+        ownerId: thirdId,
+        state: 'active',
+        data: {
+          provider: 'staff',
+          plan: 'plus',
+          active: true,
+          revoked: false,
+          expiresAt: future(24),
+        },
+      },
+    });
+    expect(await gate()).toMatchObject({ planEntitled: true, plan: 'plus' });
+    // Expiry is read from the instant itself; a missed job cannot extend access.
+    await db.record.update({
+      where: { id: grant.id },
+      data: {
+        data: {
+          provider: 'staff',
+          plan: 'plus',
+          active: true,
+          revoked: false,
+          expiresAt: new Date(Date.now() - 1000).toISOString(),
+        },
+      },
+    });
+    expect(await gate()).toMatchObject({ planEntitled: false, plan: 'free' });
+  });
+  it('limits workflow length by plan when saving', async () => {
+    const steps = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        type: 'send',
+        channelId,
+        text: `Step ${i + 1}`,
+      }));
+    await expect(
+      call(
+        admin(),
+        'POST',
+        '/workflows',
+        { name: 'Long', trigger: 'manual', steps: steps(11) },
+        'long-free',
+      ),
+    ).rejects.toMatchObject({ code: 'PLAN_LIMIT' });
+    await call(
+      admin(),
+      'POST',
+      '/workflows',
+      { name: 'Fits', trigger: 'manual', steps: steps(10) },
+      'fits-free',
+    );
   });
 });

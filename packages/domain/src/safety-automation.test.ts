@@ -138,6 +138,7 @@ function fixture() {
   const ctx: DomainContext = {
     tx: {
       record,
+      featurePolicy: { findUnique: async () => null },
       featureConfig: {
         findUnique: vi.fn(
           async ({
