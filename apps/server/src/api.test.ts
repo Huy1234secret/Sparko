@@ -369,4 +369,60 @@ describe('server API', () => {
     expect(await transcript.text()).toContain('Probably the verify role.');
     expect((await call('/9001/tickets/99')).status).toBe(404);
   });
+
+  it('publishes Studio messages, keeps versions, and manages templates', async () => {
+    const studio = await body<{
+      message: { layout: string; channel: string; name: string };
+      templates: unknown[];
+      templateLimit: number;
+    }>(await call('/9001/studio'));
+    expect(studio.message).toMatchObject({ layout: 'embed', channel: '501' });
+    expect(studio.templateLimit).toBe(10);
+
+    const v2 = {
+      ...studio.message,
+      layout: 'v2',
+      v2: {
+        container: true,
+        accent: '#FACC15',
+        blocks: [{ id: 'a', type: 'text', content: '## Hi' }],
+      },
+    };
+    const bad = await call('/9001/studio', {
+      method: 'PUT',
+      body: JSON.stringify({ ...v2, v2: { ...v2.v2, blocks: [] } }),
+    });
+    expect(bad.status).toBe(400);
+    expect(
+      (await call('/9001/studio', { method: 'PUT', body: JSON.stringify(v2) }))
+        .status,
+    ).toBe(204);
+    const after = await body<{
+      message: { layout: string };
+      versions: { title: string }[];
+    }>(await call('/9001/studio'));
+    expect(after.message.layout).toBe('v2');
+    expect(after.versions[0]?.title).toBe('Published changes');
+
+    expect(
+      (
+        await call('/9001/studio/templates', {
+          method: 'POST',
+          body: JSON.stringify({ name: 'Weekly', message: v2 }),
+        })
+      ).status,
+    ).toBe(204);
+    const withTemplate = await body<{
+      templates: { id: string; name: string; meta: string }[];
+    }>(await call('/9001/studio'));
+    expect(withTemplate.templates[0]).toMatchObject({ name: 'Weekly' });
+    expect(withTemplate.templates[0]!.meta).toContain('by you');
+    await call(`/9001/studio/templates/${withTemplate.templates[0]!.id}`, {
+      method: 'DELETE',
+    });
+    expect(
+      (await body<{ templates: unknown[] }>(await call('/9001/studio')))
+        .templates,
+    ).toHaveLength(0);
+  });
 });

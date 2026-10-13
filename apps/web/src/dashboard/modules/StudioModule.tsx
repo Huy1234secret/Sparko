@@ -598,7 +598,9 @@ export function StudioModule({
                       Message
                     </h2>
                     <p className="sp-card__sub">
-                      Plain text above the embed. Mentions here notify people.
+                      {v2
+                        ? 'Where it goes and how it’s laid out.'
+                        : 'Plain text above the embed. Mentions here notify people.'}
                     </p>
                   </div>
                 </div>

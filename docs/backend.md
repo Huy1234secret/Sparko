@@ -47,3 +47,11 @@ Modules without their own settings page yet can be switched on and off; what the
 - Assigning, priority, closing (locks and archives the thread, optionally tells the member by DM), reopening and the HTML transcript all work from the dashboard. Tickets whose member stopped replying are warned two hours before the auto-close time and then closed.
 - Staff with Discord's Manage Threads permission see every ticket thread; with "ping these roles" on, the roles are also mentioned (and added) in each new ticket.
 - Ticket messages typed in Discord need the **Message Content Intent** (Developer Portal → Bot). Without it the inbox shows that Discord didn't share the text.
+
+## Message Studio
+
+- Two layouts: the **classic** message (text, one embed, link buttons) and **Components V2** (blocks: text with headings, text with an image or button beside it, image galleries, separators and link-button rows, optionally in a box with a coloured bar).
+- Both are edited in the live preview: click text to change it in place; in Components V2, hover a block to move or remove it and use + to add blocks. Links and options for the selected block are in the side panel.
+- Publishing (`PUT /api/v1/servers/:id/studio`) checks the message the way Discord would (lengths, https links, 6,000-character embeds, 4,000 characters of V2 text, 1–10 gallery images, up to 5 buttons) and queues a job. The bot posts it, then edits the same message on later publishes. Discord can't switch a posted message between layouts, so switching layout posts a new message.
+- Mentions are shown but never ping anyone (`allowed_mentions` is empty).
+- Templates (`/studio/templates`) are saved per server, up to 10 on Free and 100 on Plus; every publish is kept as a version.
