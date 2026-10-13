@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import { Button, useToast } from '../ui';
 import { useTheme } from '../state/theme';
 import { panelHost, supportServer } from './links';
@@ -12,20 +18,17 @@ const navLinks = [
   ['/status', 'Status'],
 ] as const;
 
-/** "Add to Discord" and "Sign in" until the backend is connected. */
+/** "Sign in" opens the dashboard sign-in; "Add to Discord" explains for now. */
 export function useAccountActions() {
   const toast = useToast();
+  const navigate = useNavigate();
   return {
     addBot: () =>
       toast({
         title: 'Discord would open here',
         body: 'You’d pick a server and approve only the permissions Sparko needs.',
       }),
-    signIn: () =>
-      toast({
-        title: 'Sign in with Discord',
-        body: `You’d land on your server picker at ${panelHost}.`,
-      }),
+    signIn: () => navigate('/signin'),
   };
 }
 

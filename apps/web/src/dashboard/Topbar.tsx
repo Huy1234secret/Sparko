@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Avatar, Button, Icon } from '../ui';
-import { useSession } from '../data';
+import { useSession, useSignOut } from '../data';
 import { useTheme } from '../state/theme';
 import { isMac } from './shared';
 
@@ -27,6 +27,7 @@ export function ThemeButton() {
 
 export function AccountMenu() {
   const session = useSession().data;
+  const signOut = useSignOut();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -54,7 +55,12 @@ export function AccountMenu() {
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        <Avatar name={name} color={session.user.avatarColor} size="sm" />
+        <Avatar
+          name={name}
+          color={session.user.avatarColor}
+          size="sm"
+          {...(session.user.avatarUrl ? { src: session.user.avatarUrl } : {})}
+        />
       </button>
       {open && (
         <div className="sp-popover sp-menu" role="menu" aria-label="Account">
@@ -72,10 +78,15 @@ export function AccountMenu() {
             type="button"
             className="sp-option"
             role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              navigate('/signin?signedOut=1');
-            }}
+            disabled={signOut.isPending}
+            onClick={() =>
+              signOut.mutate(undefined, {
+                onSettled: () => {
+                  setOpen(false);
+                  navigate('/signin?signedOut=1');
+                },
+              })
+            }
           >
             <Icon name="log-out" />
             Sign out

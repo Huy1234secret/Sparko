@@ -23,6 +23,7 @@ import { ToastProvider } from '../ui';
 import { routes } from '../router';
 import { createQueryClient } from '../data';
 import { resetMock, setMockDelay } from '../data/mock';
+import { resetBackend } from '../data/live';
 
 const pixel = '/dashboard/900000000000000001';
 const paused = '/dashboard/900000000000000004';
@@ -580,6 +581,81 @@ describe('Message Studio', () => {
     );
     expect(
       screen.getByRole('button', { name: 'Publish changes' }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('real sign-in', () => {
+  const realFetch = globalThis.fetch;
+  const backendWith = (session: unknown, servers: unknown = []) => {
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      const body: Record<string, unknown> = {
+        '/api/v1/health': { ok: true, signIn: true },
+        '/api/v1/session': session,
+        '/api/v1/servers': servers,
+      };
+      return new Response(JSON.stringify(body[String(url)] ?? {}), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+    resetBackend();
+  };
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    resetBackend();
+  });
+
+  it('sends signed-out people to sign in', async () => {
+    backendWith({ user: null });
+    const router = open('/dashboard');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/signin'));
+    expect(
+      await screen.findByRole('button', { name: 'Continue with Discord' }),
+    ).toBeEnabled();
+  });
+
+  it('lists the person’s real servers and their Discord avatar', async () => {
+    backendWith(
+      {
+        user: {
+          id: '111111111111111111',
+          name: 'Quinn',
+          avatarUrl: 'https://cdn.discordapp.com/avatars/1/a.png',
+        },
+      },
+      [
+        {
+          id: '1234',
+          name: 'Real Server',
+          hue: 10,
+          members: 42,
+          plan: 'free',
+          installed: true,
+          icon: 'https://cdn.discordapp.com/icons/1234/x.png',
+        },
+        {
+          id: '5678',
+          name: 'Needs Sparko',
+          hue: 20,
+          members: 7,
+          plan: 'free',
+          installed: false,
+        },
+      ],
+    );
+    const router = open('/dashboard');
+    expect(await screen.findByText('Signed in as Quinn')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your account and servers are real/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add Sparko to Needs Sparko' }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: /Real Server/ }));
+    expect(router.state.location.pathname).toBe('/dashboard/1234');
+    // Module pages show sample settings for the real server.
+    expect(
+      await screen.findByRole('navigation', { name: 'Real Server dashboard' }),
     ).toBeInTheDocument();
   });
 });

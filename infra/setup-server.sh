@@ -150,18 +150,23 @@ fi
 
 say 'Settings (the env file)'
 if [[ ! -s $ENV_FILE ]]; then
-  echo 'Paste the bot token from discord.com/developers > your app > Bot > Reset Token.'
-  read -rsp 'It stays hidden while you paste. Then press Enter: ' token </dev/tty
+  echo 'From discord.com/developers > your app:'
+  read -rp 'OAuth2 > Client ID (it is fine to show): ' client_id </dev/tty
+  read -rsp 'OAuth2 > Reset Secret, paste it (stays hidden), Enter: ' client_secret </dev/tty
   echo
-  [[ -n $token ]] || die 'no token was pasted. Run the script again.'
+  read -rsp 'Bot > Reset Token, paste it (stays hidden), Enter: ' token </dev/tty
+  echo
+  [[ -n $token && -n $client_id && -n $client_secret ]] || die 'something was left empty. Run the script again.'
   (
     umask 077
-    printf 'PUBLIC_APP_URL=https://%s\nDISCORD_BOT_TOKEN=%s\n' "$DOMAIN" "$token" >"$ENV_FILE.new"
+    printf 'PUBLIC_APP_URL=https://%s\nDISCORD_CLIENT_ID=%s\nDISCORD_CLIENT_SECRET=%s\nDISCORD_BOT_TOKEN=%s\n' \
+      "$DOMAIN" "$client_id" "$client_secret" "$token" >"$ENV_FILE.new"
   )
-  unset token
+  unset token client_secret
   chown "$APP_USER:$APP_USER" "$ENV_FILE.new"
   mv "$ENV_FILE.new" "$ENV_FILE"
 fi
+echo "In discord.com/developers > OAuth2 > Redirects, add: https://${DOMAIN}/api/v1/auth/discord/callback"
 
 say 'Build and start the website and bot'
 as_app bash -c "cd '$APP_DIR' && pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=2048 pnpm build"
