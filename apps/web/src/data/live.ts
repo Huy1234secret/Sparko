@@ -60,8 +60,6 @@ async function call<T>(method: string, path: string, body?: unknown) {
 }
 const getJson = <T>(path: string) => call<T>('GET', path);
 
-/** Modules whose settings are still sample data on the real site. */
-const sampleModules = new Set(['studio']);
 const server = (id: string) => `/api/v1/servers/${id}`;
 
 const colourOf = (id: string) =>
@@ -115,7 +113,7 @@ export function withBackend(
       await call('PUT', `${server(id)}/modules/${moduleId}`, state);
     },
     async waitForApply(id, moduleId, options) {
-      if (!(await backend()).live || sampleModules.has(moduleId))
+      if (!(await backend()).live)
         return sample.waitForApply(id, moduleId, options);
       return call(
         options?.retry ? 'POST' : 'GET',
@@ -162,6 +160,22 @@ export function withBackend(
     async reopenTicket(id, n) {
       if (!(await backend()).live) return sample.reopenTicket(id, n);
       await call('POST', `${server(id)}/tickets/${n}/reopen`);
+    },
+    async getStudio(id) {
+      if (!(await backend()).live) return sample.getStudio(id);
+      return getJson(`${server(id)}/studio`);
+    },
+    async publishStudio(id, message) {
+      if (!(await backend()).live) return sample.publishStudio(id, message);
+      await call('PUT', `${server(id)}/studio`, message);
+    },
+    async saveTemplate(id, template) {
+      if (!(await backend()).live) return sample.saveTemplate(id, template);
+      await call('POST', `${server(id)}/studio/templates`, template);
+    },
+    async deleteTemplate(id, templateId) {
+      if (!(await backend()).live) return sample.deleteTemplate(id, templateId);
+      await call('DELETE', `${server(id)}/studio/templates/${templateId}`);
     },
     async checkChannel(id, channelId) {
       if (!(await backend()).live) return sample.checkChannel(id, channelId);

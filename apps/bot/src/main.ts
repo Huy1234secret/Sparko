@@ -17,6 +17,7 @@ import {
   markOnlyInstalled,
   openDb,
   Plain,
+  publishStudio,
   pruneJobs,
   requeueRunning,
   setStatus,
@@ -37,7 +38,8 @@ if (!token) {
 const dashboardUrl = process.env.PUBLIC_APP_URL;
 
 const db = openDb(defaultDbPath(join(import.meta.dirname, '../../..')));
-const tickets = ticketActions(discordRest({ token }), db);
+const rest = discordRest({ token });
+const tickets = ticketActions(rest, db);
 let client: Client;
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
@@ -52,6 +54,7 @@ const handlers: Handlers = {
   welcome: async (job) =>
     checkWelcome(db, client.guilds.cache.get(job.guildId), membersIntent),
   tickets: (job) => tickets.applyPanel(job.guildId),
+  studio: (job) => publishStudio(rest, db, job.guildId),
 };
 
 const record = (guild: Guild, installed: boolean) =>

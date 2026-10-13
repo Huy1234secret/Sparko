@@ -35,6 +35,7 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
+import { BlockSettings, InlineEdit, V2Canvas, v2Issue } from './StudioCanvas';
 import {
   ChannelPicker,
   ColourChoice,
@@ -96,39 +97,142 @@ const initialsOf = (name: string) =>
 export function StudioPreview({
   message,
   server,
+  onEdit,
 }: {
   message: StudioMessage;
   server: Server;
+  /** When set, the title, text, fields and footer can be edited in place. */
+  onEdit?: (patch: Partial<StudioMessage>) => void;
 }) {
   const e = message.embed;
   const image = e.image.trim();
-  const footer = [e.footer.trim(), e.timestamp ? 'Today at 18:42' : '']
-    .filter(Boolean)
-    .join(' • ');
+  const stampText = e.timestamp ? 'Today at 18:42' : '';
+  const editEmbed = (patch: Partial<StudioMessage['embed']>) =>
+    onEdit?.({ embed: { ...e, ...patch } });
+  const editable = (
+    value: string,
+    label: string,
+    set: (v: string) => void,
+    o: { multiline?: boolean; placeholder?: string; maxLength?: number } = {},
+  ) => (
+    <InlineEdit
+      value={value}
+      label={label}
+      onChange={set}
+      {...(o.multiline ? { multiline: true } : {})}
+      {...(o.placeholder ? { placeholder: o.placeholder } : {})}
+      {...(o.maxLength ? { maxLength: o.maxLength } : {})}
+    />
+  );
+  const footerText = e.footer.trim();
   return (
     <DiscordMessage
       content={
-        message.content.trim() ? renderDiscordText(message.content) : undefined
+        onEdit
+          ? editable(
+              message.content,
+              'message text',
+              (content) => onEdit({ content }),
+              {
+                multiline: true,
+                placeholder: 'Click to add text above the embed',
+                maxLength: 2000,
+              },
+            )
+          : message.content.trim()
+            ? renderDiscordText(message.content)
+            : undefined
       }
       {...(message.useEmbed
         ? {
             embed: {
               color: e.color,
               ...(e.author.trim() ? { author: e.author } : {}),
-              ...(e.title.trim() ? { title: e.title } : {}),
-              ...(e.description.trim()
-                ? { description: renderDiscordText(e.description) }
-                : {}),
+              ...(onEdit
+                ? {
+                    title: editable(
+                      e.title,
+                      'embed title',
+                      (title) => editEmbed({ title }),
+                      {
+                        placeholder: 'Click to add a title',
+                        maxLength: 256,
+                      },
+                    ),
+                    description: editable(
+                      e.description,
+                      'embed description',
+                      (description) => editEmbed({ description }),
+                      {
+                        multiline: true,
+                        placeholder: 'Click to add a description',
+                        maxLength: 4096,
+                      },
+                    ),
+                  }
+                : {
+                    ...(e.title.trim() ? { title: e.title } : {}),
+                    ...(e.description.trim()
+                      ? { description: renderDiscordText(e.description) }
+                      : {}),
+                  }),
               ...(e.fields.length
                 ? {
                     fields: e.fields.map((f) => ({
-                      name: f.name || 'Name',
-                      value: f.value || 'Value',
+                      name: onEdit
+                        ? editable(
+                            f.name,
+                            'field name',
+                            (name) =>
+                              editEmbed({
+                                fields: e.fields.map((x) =>
+                                  x.id === f.id ? { ...x, name } : x,
+                                ),
+                              }),
+                            { placeholder: 'Name', maxLength: 256 },
+                          )
+                        : f.name || 'Name',
+                      value: onEdit
+                        ? editable(
+                            f.value,
+                            'field value',
+                            (value) =>
+                              editEmbed({
+                                fields: e.fields.map((x) =>
+                                  x.id === f.id ? { ...x, value } : x,
+                                ),
+                              }),
+                            { placeholder: 'Value', maxLength: 1024 },
+                          )
+                        : f.value || 'Value',
                       inline: f.inline,
                     })),
                   }
                 : {}),
-              ...(footer ? { footer } : {}),
+              ...(onEdit
+                ? {
+                    footer: (
+                      <>
+                        {editable(
+                          e.footer,
+                          'footer',
+                          (footer) => editEmbed({ footer }),
+                          {
+                            placeholder: 'Click to add a footer',
+                            maxLength: 2048,
+                          },
+                        )}
+                        {stampText && ` • ${stampText}`}
+                      </>
+                    ),
+                  }
+                : footerText || stampText
+                  ? {
+                      footer: [footerText, stampText]
+                        .filter(Boolean)
+                        .join(' • '),
+                    }
+                  : {}),
               ...(e.thumbnail
                 ? {
                     thumbnail: (
@@ -348,6 +452,7 @@ export function StudioModule({
   const [tried, setTried] = useState(false);
   const [view, setView] = useState<'desktop' | 'phone'>('desktop');
   const [fixOpen, setFixOpen] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
   const toast = useToast();
 
   if (studio.isPending)
@@ -379,13 +484,16 @@ export function StudioModule({
   const channel = channels.find((c) => c.id === message.channel);
   const locked = !!channel && !channel.canPost;
   const bad = problems(message, hexText);
-  const invalid =
-    bad.empty ||
-    bad.hex ||
-    bad.image ||
-    bad.size ||
-    bad.fields.length > 0 ||
-    bad.buttons.length > 0;
+  const v2 = message.layout === 'v2';
+  const v2Problem = v2 ? v2Issue(message.v2) : null;
+  const invalid = v2
+    ? v2Problem !== null
+    : bad.empty ||
+      bad.hex ||
+      bad.image ||
+      bad.size ||
+      bad.fields.length > 0 ||
+      bad.buttons.length > 0;
   const size = embedSize(embed);
 
   const edit = (patch: Partial<StudioMessage>) => {
@@ -517,371 +625,476 @@ export function StudioModule({
                       error={locked ? 'Sparko can’t post here yet.' : undefined}
                     />
                   </div>
-                  <Textarea
-                    label="Text"
-                    rows={2}
-                    maxLength={2000}
-                    hint="**bold**, #channel and @role work like in Discord."
-                    value={message.content}
-                    error={
-                      tried && bad.empty
-                        ? 'Add some text or an embed. Discord won’t send an empty message.'
-                        : undefined
-                    }
-                    onChange={(e) => edit({ content: e.target.value })}
+                  <Segmented
+                    label="Layout"
+                    value={message.layout}
+                    onChange={(layout) => {
+                      setSelected(null);
+                      edit({ layout });
+                    }}
+                    options={[
+                      { value: 'embed', label: 'Classic embed' },
+                      { value: 'v2', label: 'Components V2' },
+                    ]}
                   />
-                </div>
-              </section>
-
-              <section className="sp-card" aria-labelledby="ms2">
-                <div className="sp-card__head">
-                  <div className="sp-card__titles">
-                    <h2 className="sp-card__title" id="ms2">
-                      Embed
-                    </h2>
-                    <p className="sp-card__sub">
-                      A card with a colour bar, fields and an image.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={message.useEmbed}
-                    onChange={(useEmbed) => edit({ useEmbed })}
-                    description="Include an embed"
-                  />
-                </div>
-                {message.useEmbed && (
-                  <div className="sp-card__body">
-                    <Input
-                      label={
-                        <>
-                          Author line{' '}
-                          <span className="sp-label__opt">(optional)</span>
-                        </>
-                      }
-                      maxLength={256}
-                      value={embed.author}
-                      onChange={(e) => editEmbed({ author: e.target.value })}
-                    />
-                    <Input
-                      label="Title"
-                      maxLength={256}
-                      value={embed.title}
-                      suffix={
-                        <span className="sp-tnum">
-                          {256 - embed.title.length}
-                        </span>
-                      }
-                      onChange={(e) => editEmbed({ title: e.target.value })}
-                    />
+                  <p className="sp-hint">
+                    {v2
+                      ? 'Build the message from blocks: text, images, separators and buttons, in a coloured box. Edit everything right in the preview.'
+                      : 'Text with an embed card underneath. Click the title, text or fields in the preview to edit them there.'}
+                  </p>
+                  {!v2 && (
                     <Textarea
-                      label="Description"
-                      rows={4}
-                      maxLength={4096}
-                      hint="Up to 4,096 characters."
-                      value={embed.description}
-                      onChange={(e) =>
-                        editEmbed({ description: e.target.value })
-                      }
-                    />
-                    <div className="sp-field">
-                      <span className="sp-label">Colour bar</span>
-                      <div className="sp-item-box__row sp-wrap-row">
-                        <ColourChoice
-                          value={embed.color}
-                          onChange={(color) => {
-                            setHexText(null);
-                            editEmbed({ color });
-                          }}
-                        />
-                        <div
-                          className={
-                            'sp-input sp-hex-input' +
-                            (bad.hex ? ' is-error' : '')
-                          }
-                        >
-                          <input
-                            aria-label="Custom colour, hex"
-                            maxLength={7}
-                            value={hexText ?? embed.color}
-                            aria-invalid={bad.hex || undefined}
-                            onChange={(e) => {
-                              const value = e.target.value.trim();
-                              if (isHex(value)) {
-                                setHexText(null);
-                                editEmbed({ color: value.toUpperCase() });
-                              } else {
-                                setHexText(value);
-                                flow.clear();
-                              }
-                            }}
-                          />
-                        </div>
-                      </div>
-                      {bad.hex && (
-                        <p className="sp-field-error">
-                          <Icon name="circle-alert" />
-                          Use a hex colour like #FACC15.
-                        </p>
-                      )}
-                    </div>
-                    <Input
-                      label={
-                        <>
-                          Image link{' '}
-                          <span className="sp-label__opt">(optional)</span>
-                        </>
-                      }
-                      icon="image"
-                      placeholder="https://"
-                      value={embed.image}
+                      label="Text"
+                      rows={2}
+                      maxLength={2000}
+                      hint="**bold**, #channel and @role work like in Discord."
+                      value={message.content}
                       error={
-                        bad.image
-                          ? 'The link must start with https:// so Discord can load it.'
+                        tried && bad.empty
+                          ? 'Add some text or an embed. Discord won’t send an empty message.'
                           : undefined
                       }
-                      onChange={(e) => editEmbed({ image: e.target.value })}
+                      onChange={(e) => edit({ content: e.target.value })}
                     />
-                    <Input
-                      label={
-                        <>
-                          Footer{' '}
-                          <span className="sp-label__opt">(optional)</span>
-                        </>
-                      }
-                      maxLength={2048}
-                      value={embed.footer}
-                      onChange={(e) => editEmbed({ footer: e.target.value })}
-                    />
-                    <div className="sp-switch-list">
-                      <Switch
-                        checked={embed.thumbnail}
-                        onChange={(thumbnail) => editEmbed({ thumbnail })}
-                        label="Server icon in the corner"
-                        description={`Shows ${server.name}’s icon as a thumbnail.`}
-                      />
-                      <Switch
-                        checked={embed.timestamp}
-                        onChange={(timestamp) => editEmbed({ timestamp })}
-                        label="Show the time it was posted"
-                        description="Each member sees it in their own time zone."
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </section>
 
-              {message.useEmbed && (
-                <section className="sp-card" aria-labelledby="ms3">
-                  <div className="sp-card__head">
-                    <div className="sp-card__titles">
-                      <h2 className="sp-card__title" id="ms3">
-                        Fields
-                      </h2>
-                      <p className="sp-card__sub">
-                        Short name-and-value pairs. Side by side ones sit up to
-                        three in a row.
-                      </p>
+              {v2 ? (
+                <>
+                  <section className="sp-card" aria-labelledby="ms-v2">
+                    <div className="sp-card__head">
+                      <div className="sp-card__titles">
+                        <h2 className="sp-card__title" id="ms-v2">
+                          Box
+                        </h2>
+                        <p className="sp-card__sub">
+                          Wrap the blocks in a box with a coloured bar, like an
+                          embed.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={message.v2.container}
+                        onChange={(container) =>
+                          edit({ v2: { ...message.v2, container } })
+                        }
+                        description="Wrap in a box"
+                      />
                     </div>
-                    <span className="sp-hint sp-tnum">
-                      {embed.fields.length} of {maxFields}
-                    </span>
-                  </div>
-                  <div className="sp-card__body" style={{ gap: 12 }}>
-                    {embed.fields.map((f, i) => {
-                      const wrong = tried && bad.fields.includes(f.id);
-                      return (
-                        <div key={f.id} className="sp-item-box">
-                          <div className="sp-pair">
-                            <div
-                              className={
-                                'sp-input' +
-                                (wrong && !f.name.trim() ? ' is-error' : '')
-                              }
-                            >
-                              <input
-                                aria-label={`Field ${i + 1} name`}
-                                placeholder="Name"
-                                maxLength={256}
-                                value={f.name}
-                                onChange={(e) =>
-                                  editField(f.id, { name: e.target.value })
-                                }
-                              />
-                            </div>
-                            <div
-                              className={
-                                'sp-input' +
-                                (wrong && !f.value.trim() ? ' is-error' : '')
-                              }
-                            >
-                              <input
-                                aria-label={`Field ${i + 1} value`}
-                                placeholder="Value"
-                                maxLength={1024}
-                                value={f.value}
-                                onChange={(e) =>
-                                  editField(f.id, { value: e.target.value })
-                                }
-                              />
-                            </div>
-                          </div>
-                          {wrong && (
-                            <p className="sp-field-error">
-                              <Icon name="circle-alert" />
-                              Fields need both a name and a value.
-                            </p>
-                          )}
-                          <div className="sp-item-box__row">
-                            <span style={{ marginRight: 'auto' }}>
-                              <Checkbox
-                                checked={f.inline}
-                                onChange={(inline) =>
-                                  editField(f.id, { inline })
-                                }
-                                label="Side by side"
-                              />
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              iconOnly
-                              icon="arrow-up"
-                              aria-label={`Move field ${i + 1} up`}
-                              disabled={i === 0}
-                              onClick={() => moveField(i, -1)}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              iconOnly
-                              icon="arrow-down"
-                              aria-label={`Move field ${i + 1} down`}
-                              disabled={i === embed.fields.length - 1}
-                              onClick={() => moveField(i, 1)}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              iconOnly
-                              icon="trash-2"
-                              aria-label={`Remove field ${i + 1}`}
-                              onClick={() =>
-                                editEmbed({
-                                  fields: embed.fields.filter(
-                                    (x) => x.id !== f.id,
-                                  ),
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <Button
-                      size="sm"
-                      icon="plus"
-                      style={{ justifySelf: 'start' }}
-                      disabled={embed.fields.length >= maxFields}
-                      onClick={() =>
-                        editEmbed({
-                          fields: [
-                            ...embed.fields,
-                            { id: newId(), name: '', value: '', inline: true },
-                          ],
-                        })
-                      }
-                    >
-                      Add a field
-                    </Button>
-                  </div>
-                </section>
-              )}
-
-              <section className="sp-card" aria-labelledby="ms4">
-                <div className="sp-card__head">
-                  <div className="sp-card__titles">
-                    <h2 className="sp-card__title" id="ms4">
-                      Link buttons
-                    </h2>
-                    <p className="sp-card__sub">Open a website when pressed.</p>
-                  </div>
-                  <span className="sp-hint sp-tnum">
-                    {message.buttons.length} of {maxButtons}
-                  </span>
-                </div>
-                <div className="sp-card__body" style={{ gap: 12 }}>
-                  {message.buttons.map((b, i) => {
-                    const wrong = tried && bad.buttons.includes(b.id);
-                    return (
-                      <div key={b.id} className="sp-stack" style={{ gap: 6 }}>
-                        <div className="sp-link-row">
-                          <div className="sp-input">
-                            <input
-                              aria-label={`Button ${i + 1} label`}
-                              placeholder="Label"
-                              maxLength={80}
-                              value={b.label}
-                              onChange={(e) =>
-                                editButton(b.id, { label: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div
-                            className={'sp-input' + (wrong ? ' is-error' : '')}
-                          >
-                            <input
-                              aria-label={`Button ${i + 1} link`}
-                              placeholder="https://"
-                              value={b.url}
-                              aria-invalid={wrong || undefined}
-                              onChange={(e) =>
-                                editButton(b.id, { url: e.target.value })
-                              }
-                            />
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            iconOnly
-                            icon="trash-2"
-                            aria-label={`Remove button ${i + 1}`}
-                            onClick={() =>
-                              edit({
-                                buttons: message.buttons.filter(
-                                  (x) => x.id !== b.id,
-                                ),
-                              })
+                    {message.v2.container && (
+                      <div className="sp-card__body">
+                        <div className="sp-field">
+                          <span className="sp-label">Colour bar</span>
+                          <ColourChoice
+                            value={message.v2.accent}
+                            onChange={(accent) =>
+                              edit({ v2: { ...message.v2, accent } })
                             }
                           />
                         </div>
-                        {wrong && (
-                          <p className="sp-field-error">
-                            <Icon name="circle-alert" />
-                            Give it a label and a link that starts with
-                            https://.
-                          </p>
-                        )}
                       </div>
-                    );
-                  })}
-                  <Button
-                    size="sm"
-                    icon="plus"
-                    style={{ justifySelf: 'start' }}
-                    disabled={message.buttons.length >= maxButtons}
-                    onClick={() =>
-                      edit({
-                        buttons: [
-                          ...message.buttons,
-                          { id: newId(), label: '', url: '' },
-                        ],
-                      })
-                    }
-                  >
-                    Add a link button
-                  </Button>
-                </div>
-              </section>
+                    )}
+                  </section>
+                  <section className="sp-card" aria-labelledby="ms-block">
+                    <div className="sp-card__head">
+                      <div className="sp-card__titles">
+                        <h2 className="sp-card__title" id="ms-block">
+                          Selected block
+                        </h2>
+                        <p className="sp-card__sub">
+                          {message.v2.blocks.length} of 30 blocks
+                        </p>
+                      </div>
+                    </div>
+                    <div className="sp-card__body">
+                      <BlockSettings
+                        block={message.v2.blocks.find((b) => b.id === selected)}
+                        onChange={(block) =>
+                          edit({
+                            v2: {
+                              ...message.v2,
+                              blocks: message.v2.blocks.map((b) =>
+                                b.id === block.id ? block : b,
+                              ),
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </section>
+                </>
+              ) : (
+                <>
+                  <section className="sp-card" aria-labelledby="ms2">
+                    <div className="sp-card__head">
+                      <div className="sp-card__titles">
+                        <h2 className="sp-card__title" id="ms2">
+                          Embed
+                        </h2>
+                        <p className="sp-card__sub">
+                          A card with a colour bar, fields and an image.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={message.useEmbed}
+                        onChange={(useEmbed) => edit({ useEmbed })}
+                        description="Include an embed"
+                      />
+                    </div>
+                    {message.useEmbed && (
+                      <div className="sp-card__body">
+                        <Input
+                          label={
+                            <>
+                              Author line{' '}
+                              <span className="sp-label__opt">(optional)</span>
+                            </>
+                          }
+                          maxLength={256}
+                          value={embed.author}
+                          onChange={(e) =>
+                            editEmbed({ author: e.target.value })
+                          }
+                        />
+                        <Input
+                          label="Title"
+                          maxLength={256}
+                          value={embed.title}
+                          suffix={
+                            <span className="sp-tnum">
+                              {256 - embed.title.length}
+                            </span>
+                          }
+                          onChange={(e) => editEmbed({ title: e.target.value })}
+                        />
+                        <Textarea
+                          label="Description"
+                          rows={4}
+                          maxLength={4096}
+                          hint="Up to 4,096 characters."
+                          value={embed.description}
+                          onChange={(e) =>
+                            editEmbed({ description: e.target.value })
+                          }
+                        />
+                        <div className="sp-field">
+                          <span className="sp-label">Colour bar</span>
+                          <div className="sp-item-box__row sp-wrap-row">
+                            <ColourChoice
+                              value={embed.color}
+                              onChange={(color) => {
+                                setHexText(null);
+                                editEmbed({ color });
+                              }}
+                            />
+                            <div
+                              className={
+                                'sp-input sp-hex-input' +
+                                (bad.hex ? ' is-error' : '')
+                              }
+                            >
+                              <input
+                                aria-label="Custom colour, hex"
+                                maxLength={7}
+                                value={hexText ?? embed.color}
+                                aria-invalid={bad.hex || undefined}
+                                onChange={(e) => {
+                                  const value = e.target.value.trim();
+                                  if (isHex(value)) {
+                                    setHexText(null);
+                                    editEmbed({ color: value.toUpperCase() });
+                                  } else {
+                                    setHexText(value);
+                                    flow.clear();
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                          {bad.hex && (
+                            <p className="sp-field-error">
+                              <Icon name="circle-alert" />
+                              Use a hex colour like #FACC15.
+                            </p>
+                          )}
+                        </div>
+                        <Input
+                          label={
+                            <>
+                              Image link{' '}
+                              <span className="sp-label__opt">(optional)</span>
+                            </>
+                          }
+                          icon="image"
+                          placeholder="https://"
+                          value={embed.image}
+                          error={
+                            bad.image
+                              ? 'The link must start with https:// so Discord can load it.'
+                              : undefined
+                          }
+                          onChange={(e) => editEmbed({ image: e.target.value })}
+                        />
+                        <Input
+                          label={
+                            <>
+                              Footer{' '}
+                              <span className="sp-label__opt">(optional)</span>
+                            </>
+                          }
+                          maxLength={2048}
+                          value={embed.footer}
+                          onChange={(e) =>
+                            editEmbed({ footer: e.target.value })
+                          }
+                        />
+                        <div className="sp-switch-list">
+                          <Switch
+                            checked={embed.thumbnail}
+                            onChange={(thumbnail) => editEmbed({ thumbnail })}
+                            label="Server icon in the corner"
+                            description={`Shows ${server.name}’s icon as a thumbnail.`}
+                          />
+                          <Switch
+                            checked={embed.timestamp}
+                            onChange={(timestamp) => editEmbed({ timestamp })}
+                            label="Show the time it was posted"
+                            description="Each member sees it in their own time zone."
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  {message.useEmbed && (
+                    <section className="sp-card" aria-labelledby="ms3">
+                      <div className="sp-card__head">
+                        <div className="sp-card__titles">
+                          <h2 className="sp-card__title" id="ms3">
+                            Fields
+                          </h2>
+                          <p className="sp-card__sub">
+                            Short name-and-value pairs. Side by side ones sit up
+                            to three in a row.
+                          </p>
+                        </div>
+                        <span className="sp-hint sp-tnum">
+                          {embed.fields.length} of {maxFields}
+                        </span>
+                      </div>
+                      <div className="sp-card__body" style={{ gap: 12 }}>
+                        {embed.fields.map((f, i) => {
+                          const wrong = tried && bad.fields.includes(f.id);
+                          return (
+                            <div key={f.id} className="sp-item-box">
+                              <div className="sp-pair">
+                                <div
+                                  className={
+                                    'sp-input' +
+                                    (wrong && !f.name.trim() ? ' is-error' : '')
+                                  }
+                                >
+                                  <input
+                                    aria-label={`Field ${i + 1} name`}
+                                    placeholder="Name"
+                                    maxLength={256}
+                                    value={f.name}
+                                    onChange={(e) =>
+                                      editField(f.id, { name: e.target.value })
+                                    }
+                                  />
+                                </div>
+                                <div
+                                  className={
+                                    'sp-input' +
+                                    (wrong && !f.value.trim()
+                                      ? ' is-error'
+                                      : '')
+                                  }
+                                >
+                                  <input
+                                    aria-label={`Field ${i + 1} value`}
+                                    placeholder="Value"
+                                    maxLength={1024}
+                                    value={f.value}
+                                    onChange={(e) =>
+                                      editField(f.id, { value: e.target.value })
+                                    }
+                                  />
+                                </div>
+                              </div>
+                              {wrong && (
+                                <p className="sp-field-error">
+                                  <Icon name="circle-alert" />
+                                  Fields need both a name and a value.
+                                </p>
+                              )}
+                              <div className="sp-item-box__row">
+                                <span style={{ marginRight: 'auto' }}>
+                                  <Checkbox
+                                    checked={f.inline}
+                                    onChange={(inline) =>
+                                      editField(f.id, { inline })
+                                    }
+                                    label="Side by side"
+                                  />
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  iconOnly
+                                  icon="arrow-up"
+                                  aria-label={`Move field ${i + 1} up`}
+                                  disabled={i === 0}
+                                  onClick={() => moveField(i, -1)}
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  iconOnly
+                                  icon="arrow-down"
+                                  aria-label={`Move field ${i + 1} down`}
+                                  disabled={i === embed.fields.length - 1}
+                                  onClick={() => moveField(i, 1)}
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  iconOnly
+                                  icon="trash-2"
+                                  aria-label={`Remove field ${i + 1}`}
+                                  onClick={() =>
+                                    editEmbed({
+                                      fields: embed.fields.filter(
+                                        (x) => x.id !== f.id,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <Button
+                          size="sm"
+                          icon="plus"
+                          style={{ justifySelf: 'start' }}
+                          disabled={embed.fields.length >= maxFields}
+                          onClick={() =>
+                            editEmbed({
+                              fields: [
+                                ...embed.fields,
+                                {
+                                  id: newId(),
+                                  name: '',
+                                  value: '',
+                                  inline: true,
+                                },
+                              ],
+                            })
+                          }
+                        >
+                          Add a field
+                        </Button>
+                      </div>
+                    </section>
+                  )}
+
+                  <section className="sp-card" aria-labelledby="ms4">
+                    <div className="sp-card__head">
+                      <div className="sp-card__titles">
+                        <h2 className="sp-card__title" id="ms4">
+                          Link buttons
+                        </h2>
+                        <p className="sp-card__sub">
+                          Open a website when pressed.
+                        </p>
+                      </div>
+                      <span className="sp-hint sp-tnum">
+                        {message.buttons.length} of {maxButtons}
+                      </span>
+                    </div>
+                    <div className="sp-card__body" style={{ gap: 12 }}>
+                      {message.buttons.map((b, i) => {
+                        const wrong = tried && bad.buttons.includes(b.id);
+                        return (
+                          <div
+                            key={b.id}
+                            className="sp-stack"
+                            style={{ gap: 6 }}
+                          >
+                            <div className="sp-link-row">
+                              <div className="sp-input">
+                                <input
+                                  aria-label={`Button ${i + 1} label`}
+                                  placeholder="Label"
+                                  maxLength={80}
+                                  value={b.label}
+                                  onChange={(e) =>
+                                    editButton(b.id, { label: e.target.value })
+                                  }
+                                />
+                              </div>
+                              <div
+                                className={
+                                  'sp-input' + (wrong ? ' is-error' : '')
+                                }
+                              >
+                                <input
+                                  aria-label={`Button ${i + 1} link`}
+                                  placeholder="https://"
+                                  value={b.url}
+                                  aria-invalid={wrong || undefined}
+                                  onChange={(e) =>
+                                    editButton(b.id, { url: e.target.value })
+                                  }
+                                />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                iconOnly
+                                icon="trash-2"
+                                aria-label={`Remove button ${i + 1}`}
+                                onClick={() =>
+                                  edit({
+                                    buttons: message.buttons.filter(
+                                      (x) => x.id !== b.id,
+                                    ),
+                                  })
+                                }
+                              />
+                            </div>
+                            {wrong && (
+                              <p className="sp-field-error">
+                                <Icon name="circle-alert" />
+                                Give it a label and a link that starts with
+                                https://.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <Button
+                        size="sm"
+                        icon="plus"
+                        style={{ justifySelf: 'start' }}
+                        disabled={message.buttons.length >= maxButtons}
+                        onClick={() =>
+                          edit({
+                            buttons: [
+                              ...message.buttons,
+                              { id: newId(), label: '', url: '' },
+                            ],
+                          })
+                        }
+                      >
+                        Add a link button
+                      </Button>
+                    </div>
+                  </section>
+                </>
+              )}
             </fieldset>
 
             <section className="sp-stack sp-sticky-lg" aria-labelledby="msv">
@@ -921,10 +1134,30 @@ export function StudioModule({
                 }
               >
                 <div className="dc-chat">
-                  <StudioPreview message={message} server={server} />
+                  {v2 ? (
+                    <V2Canvas
+                      v2={message.v2}
+                      onChange={(next) => edit({ v2: next })}
+                      selected={selected}
+                      onSelect={setSelected}
+                      disabled={paused}
+                    />
+                  ) : (
+                    <StudioPreview
+                      message={message}
+                      server={server}
+                      {...(paused ? {} : { onEdit: edit })}
+                    />
+                  )}
                 </div>
               </div>
-              {message.useEmbed && (
+              {v2 && v2Problem && tried && (
+                <p className="sp-field-error">
+                  <Icon name="circle-alert" />
+                  {v2Problem}
+                </p>
+              )}
+              {!v2 && message.useEmbed && (
                 <div className="sp-embed-size">
                   <div className="sp-field__row">
                     <span className="sp-hint">Embed size</span>
@@ -1003,7 +1236,7 @@ export function StudioModule({
         saveLabel="Publish changes"
         error={
           tried && invalid
-            ? 'Fix the highlighted fields first.'
+            ? (v2Problem ?? 'Fix the highlighted fields first.')
             : flow.saveError
         }
         onReset={() => {

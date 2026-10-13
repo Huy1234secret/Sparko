@@ -130,6 +130,17 @@ const migrations = [
     message_id TEXT NOT NULL,
     PRIMARY KEY (guild_id, key)
   );`,
+  // 4: saved message templates.
+  `CREATE TABLE templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    module_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    json TEXT NOT NULL,
+    who_name TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX templates_by_module ON templates (guild_id, module_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

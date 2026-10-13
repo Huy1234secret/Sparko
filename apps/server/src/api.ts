@@ -29,6 +29,7 @@ import {
 } from '@sparko/core';
 import type { createAuth, DiscordGuild } from './auth.ts';
 import { BadRequest, json, readJson } from './http.ts';
+import { studioRoutes } from './studio-api.ts';
 import { ticketRoutes } from './tickets-api.ts';
 
 type Auth = ReturnType<typeof createAuth>;
@@ -234,6 +235,7 @@ export function createApi({
       config: v.config,
     }));
 
+  const studio = studioRoutes({ db, view: (id) => view(id), now });
   const tickets = ticketRoutes({
     db,
     rest: discord,
@@ -327,6 +329,16 @@ export function createApi({
       json(res, 200, {
         ok: !!v?.channels.find((c) => c.id === channelId)?.canPost,
       });
+    } else if (rest.startsWith('/studio')) {
+      const handled = await studio({
+        req,
+        res,
+        method,
+        path: rest,
+        guildId,
+        user,
+      });
+      if (!handled) json(res, 404, { error: 'not_found' });
     } else if (rest.startsWith('/tickets')) {
       const handled = await tickets({
         req,
