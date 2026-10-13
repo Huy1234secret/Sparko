@@ -1,11 +1,25 @@
 import { randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import {
+  deleteSession,
+  findSession,
+  getGuild,
+  installedGuildIds,
+  saveSession,
+  sealer,
+  sha256,
+  type Db,
+  type StoredUser,
+} from '@sparko/core';
+import { cookies, json, redirect } from './http.ts';
 
 /**
  * Discord sign-in and the signed-in person's servers, for the dashboard.
- * Sessions live in memory, so a restart signs everyone out.
+ * Sessions are stored (hashed, with the Discord token encrypted), so a
+ * restart doesn't sign anyone out.
  */
 export type AuthConfig = {
+  db: Db;
   clientId?: string | undefined;
   clientSecret?: string | undefined;
   botToken?: string | undefined;
@@ -15,14 +29,8 @@ export type AuthConfig = {
   now?: () => number;
 };
 
-type User = { id: string; name: string; avatarUrl: string };
-type Session = {
-  user: User;
-  accessToken: string;
-  expires: number;
-  guilds?: { at: number; list: DiscordGuild[] };
-};
-type DiscordGuild = {
+type User = StoredUser;
+export type DiscordGuild = {
   id: string;
   name: string;
   icon: string | null;
@@ -64,18 +72,6 @@ export const botPermissions = (
   ] as const
 ).reduce((a, b) => a | b, 0n);
 
-function cookies(req: IncomingMessage) {
-  const out: Record<string, string> = {};
-  for (const part of (req.headers.cookie ?? '').split(';')) {
-    const at = part.indexOf('=');
-    if (at > 0)
-      out[part.slice(0, at).trim()] = decodeURIComponent(
-        part.slice(at + 1).trim(),
-      );
-  }
-  return out;
-}
-
 /** A tint from the server's id, for initials when it has no icon. */
 const hueOf = (id: string) => Number(BigInt(id) % 360n);
 
@@ -86,38 +82,28 @@ export function createAuth(config: AuthConfig) {
   const secure = origin.startsWith('https:');
   const redirectUri = `${origin}/api/v1/auth/discord/callback`;
   const configured = !!(config.clientId && config.clientSecret);
-  const sessions = new Map<string, Session>();
+  const { db } = config;
+  const vault = sealer(config.clientSecret ?? 'sparko-dev');
+  const guildCache = new Map<string, { at: number; list: DiscordGuild[] }>();
   let botGuilds: { at: number; ids: Set<string> } | undefined;
 
   const cookie = (name: string, value: string, maxAge: number) =>
     `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 
-  function json(res: ServerResponse, status: number, body: unknown) {
-    res.writeHead(status, {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-    });
-    res.end(JSON.stringify(body));
-  }
-  function redirect(res: ServerResponse, to: string, setCookie?: string[]) {
-    res.writeHead(302, {
-      Location: to,
-      'Cache-Control': 'no-store',
-      ...(setCookie ? { 'Set-Cookie': setCookie } : {}),
-    });
-    res.end();
-  }
-
+  /** The signed-in person, if any. */
   function current(req: IncomingMessage) {
-    const id = cookies(req)[sessionCookie];
-    const session = id ? sessions.get(id) : undefined;
-    if (!id || !session) return undefined;
-    if (session.expires < now()) {
-      sessions.delete(id);
+    const raw = cookies(req)[sessionCookie];
+    if (!raw) return undefined;
+    const idHash = sha256(raw);
+    const found = findSession(db, idHash, now());
+    if (!found) return undefined;
+    try {
+      return { idHash, user: found.user, token: vault.open(found.tokenEnc) };
+    } catch {
+      // Sealed with an older secret: sign in again.
+      deleteSession(db, idHash);
       return undefined;
     }
-    return { id, session };
   }
 
   async function discordGet<T>(path: string, auth: string): Promise<T> {
@@ -130,7 +116,7 @@ export function createAuth(config: AuthConfig) {
 
   /** Servers the bot is in, refreshed at most once a minute. */
   async function installedIds() {
-    if (!config.botToken) return new Set<string>();
+    if (!config.botToken) return installedGuildIds(db);
     if (botGuilds && now() - botGuilds.at < 60_000) return botGuilds.ids;
     const ids = new Set<string>();
     let after = '0';
@@ -147,15 +133,32 @@ export function createAuth(config: AuthConfig) {
     return ids;
   }
 
-  async function userGuilds(session: Session) {
-    if (session.guilds && now() - session.guilds.at < 30_000)
-      return session.guilds.list;
+  async function userGuilds(session: { idHash: string; token: string }) {
+    const hit = guildCache.get(session.idHash);
+    if (hit && now() - hit.at < 30_000) return hit.list;
     const list = await discordGet<DiscordGuild[]>(
       '/users/@me/guilds?with_counts=true',
-      `Bearer ${session.accessToken}`,
+      `Bearer ${session.token}`,
     );
-    session.guilds = { at: now(), list };
+    guildCache.set(session.idHash, { at: now(), list });
     return list;
+  }
+
+  const canManage = (g: DiscordGuild) => {
+    const p = BigInt(g.permissions);
+    return g.owner || (p & MANAGE_GUILD) !== 0n || (p & ADMINISTRATOR) !== 0n;
+  };
+
+  /**
+   * The signed-in person, if they may manage this server. Answers for the
+   * API routes: 401 when signed out, 403 when they can't manage it.
+   */
+  async function access(req: IncomingMessage, guildId: string) {
+    const session = current(req);
+    if (!session) return { status: 401 as const };
+    const guild = (await userGuilds(session)).find((g) => g.id === guildId);
+    if (!guild || !canManage(guild)) return { status: 403 as const };
+    return { status: 200 as const, user: session.user, guild };
   }
 
   async function callback(url: URL, req: IncomingMessage, res: ServerResponse) {
@@ -201,10 +204,11 @@ export function createAuth(config: AuthConfig) {
       };
       const id = randomBytes(32).toString('base64url');
       const lifetime = Math.min(sessionDays * 86_400, expiresIn || Infinity);
-      sessions.set(id, {
+      saveSession(db, {
+        idHash: sha256(id),
         user,
-        accessToken,
-        expires: now() + lifetime * 1000,
+        tokenEnc: vault.seal(accessToken),
+        expiresAt: now() + lifetime * 1000,
       });
       return redirect(res, '/dashboard', [
         clear,
@@ -220,19 +224,25 @@ export function createAuth(config: AuthConfig) {
   async function handle(req: IncomingMessage, res: ServerResponse) {
     const url = new URL(req.url ?? '/', origin);
     if (!url.pathname.startsWith('/api/')) return false;
-    await api(url, req, res);
-    return true;
+    return api(url, req, res);
   }
 
-  async function api(url: URL, req: IncomingMessage, res: ServerResponse) {
+  async function api(
+    url: URL,
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<boolean> {
     const route = `${req.method} ${url.pathname}`;
 
     if (route === 'GET /api/v1/health')
       json(res, 200, { ok: true, signIn: configured });
     else if (route === 'GET /api/v1/session')
-      json(res, 200, { user: current(req)?.session.user ?? null });
+      json(res, 200, { user: current(req)?.user ?? null });
     else if (route === 'GET /api/v1/auth/discord') {
-      if (!configured) return redirect(res, '/signin?error=not_configured');
+      if (!configured) {
+        redirect(res, '/signin?error=not_configured');
+        return true;
+      }
       const state = randomBytes(16).toString('base64url');
       const to = new URL('https://discord.com/oauth2/authorize');
       to.search = new URLSearchParams({
@@ -247,52 +257,58 @@ export function createAuth(config: AuthConfig) {
       await callback(url, req, res);
     else if (route === 'POST /api/v1/auth/logout') {
       // Only this site may sign people out (cookies alone don't prove it).
-      if (req.headers.origin !== origin)
-        return json(res, 403, { error: 'forbidden' });
+      if (req.headers.origin !== origin) {
+        json(res, 403, { error: 'forbidden' });
+        return true;
+      }
       const found = current(req);
-      if (found) sessions.delete(found.id);
+      if (found) {
+        deleteSession(db, found.idHash);
+        guildCache.delete(found.idHash);
+      }
       res.writeHead(204, { 'Set-Cookie': cookie(sessionCookie, '', 0) });
       res.end();
     } else if (route === 'GET /api/v1/servers') {
       const found = current(req);
-      if (!found) return json(res, 401, { error: 'signed_out' });
+      if (!found) {
+        json(res, 401, { error: 'signed_out' });
+        return true;
+      }
       try {
         const [guilds, installed] = await Promise.all([
-          userGuilds(found.session),
+          userGuilds(found),
           installedIds(),
         ]);
         json(
           res,
           200,
-          guilds
-            .filter((g) => {
-              const p = BigInt(g.permissions);
-              return (
-                g.owner ||
-                (p & MANAGE_GUILD) !== 0n ||
-                (p & ADMINISTRATOR) !== 0n
-              );
-            })
-            .map((g) => ({
+          guilds.filter(canManage).map((g) => {
+            const saved = getGuild(db, g.id);
+            return {
               id: g.id,
               name: g.name,
               hue: hueOf(g.id),
-              members: g.approximate_member_count ?? 0,
-              plan: 'free',
+              members: g.approximate_member_count ?? saved?.memberCount ?? 0,
+              plan: saved?.plan ?? 'free',
               installed: installed.has(g.id),
+              ...(saved?.paused ? { paused: saved.paused } : {}),
               ...(g.icon
                 ? {
                     icon: `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=128`,
                   }
                 : {}),
-            })),
+            };
+          }),
         );
       } catch (e) {
         console.error('Loading servers failed', e);
         json(res, 502, { error: 'discord_unavailable' });
       }
     } else if (route === 'GET /api/v1/invite') {
-      if (!config.clientId) return redirect(res, '/dashboard');
+      if (!config.clientId) {
+        redirect(res, '/dashboard');
+        return true;
+      }
       const to = new URL('https://discord.com/oauth2/authorize');
       const guild = url.searchParams.get('guild');
       to.search = new URLSearchParams({
@@ -304,8 +320,9 @@ export function createAuth(config: AuthConfig) {
           : {}),
       }).toString();
       redirect(res, to.toString());
-    } else json(res, 404, { error: 'not_found' });
+    } else return false;
+    return true;
   }
 
-  return { handle, configured };
+  return { handle, configured, access, current };
 }

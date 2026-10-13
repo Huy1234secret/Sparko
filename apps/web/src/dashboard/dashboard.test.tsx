@@ -646,7 +646,7 @@ describe('real sign-in', () => {
     const router = open('/dashboard');
     expect(await screen.findByText('Signed in as Quinn')).toBeInTheDocument();
     expect(
-      screen.getByText(/Your account and servers are real/),
+      screen.getByText(/Turning modules on and off is saved for real/),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Add Sparko to Needs Sparko' }),

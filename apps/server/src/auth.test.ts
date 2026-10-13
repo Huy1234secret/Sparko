@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { openDb } from '@sparko/core';
 import { botPermissions, createAuth } from './auth.ts';
 
 const MANAGE = String(0x20);
@@ -61,6 +62,7 @@ const site = 'https://panel.example';
 
 beforeAll(async () => {
   const auth = createAuth({
+    db: openDb(':memory:'),
     clientId: 'client-1',
     clientSecret: 'secret-1',
     botToken: 'bot-token',

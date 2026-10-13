@@ -8,6 +8,7 @@
     "start": "node --disable-warning=ExperimentalWarning src/main.ts"
   },
   "dependencies": {
+    "@sparko/core": "workspace:*",
     "discord.js": "14.27.0"
   }
 }

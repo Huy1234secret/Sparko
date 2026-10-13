@@ -48,6 +48,7 @@ export type Overview = {
   on: Record<string, boolean>;
   steps: SetupStep[];
   health: {
+    /** -1 when the bot hasn't reported in for a while. */
     latencyMs: number;
     checkedAt: string;
     missingPermission: { name: string; affects: string } | null;

@@ -1,7 +1,16 @@
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
+import {
+  defaultDbPath,
+  discordRest,
+  guildViews,
+  openDb,
+  pruneSessions,
+} from '@sparko/core';
+import { createApi } from './api.ts';
 import { createAuth } from './auth.ts';
+import { json } from './http.ts';
 import { createHandler } from './static.ts';
 
 // Exit code 78 means "fix the setup"; pm2 doesn't restart on it.
@@ -18,19 +27,33 @@ if (!existsSync(join(root, 'index.html'))) {
 const port = Number(process.env.WEB_PORT ?? 8080);
 const host = process.env.WEB_HOST ?? '127.0.0.1';
 const handle = createHandler(root);
+const publicUrl = process.env.PUBLIC_APP_URL ?? `http://localhost:${port}`;
+const db = openDb(defaultDbPath(join(import.meta.dirname, '../../..')));
+const botToken = process.env.DISCORD_BOT_TOKEN;
+const views = botToken
+  ? guildViews(discordRest({ token: botToken }))
+  : undefined;
 const auth = createAuth({
+  db,
   clientId: process.env.DISCORD_CLIENT_ID,
   clientSecret: process.env.DISCORD_CLIENT_SECRET,
-  botToken: process.env.DISCORD_BOT_TOKEN,
-  publicUrl: process.env.PUBLIC_APP_URL ?? `http://localhost:${port}`,
+  botToken,
+  publicUrl,
 });
+const api = createApi({ db, auth, views, publicUrl });
+// Expired sign-ins are cleared once an hour.
+setInterval(() => pruneSessions(db, Date.now()), 3_600_000).unref();
 if (!auth.configured)
   console.warn(
     'Discord sign-in is off: set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET in the env file.',
   );
 const server = createServer((req, res) => {
   const respond = async () => {
-    if (!(await auth.handle(req, res))) await handle(req, res);
+    if (await auth.handle(req, res)) return;
+    if (await api(req, res)) return;
+    if (req.url?.startsWith('/api/'))
+      return json(res, 404, { error: 'not_found' });
+    await handle(req, res);
   };
   respond().catch((error: unknown) => {
     console.error(error);
@@ -43,6 +66,10 @@ server.listen(port, host, () =>
   console.log(`Sparko website on http://${host}:${port}, serving ${root}`),
 );
 
-const stop = () => server.close(() => process.exit(0));
+const stop = () =>
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);

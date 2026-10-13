@@ -13,6 +13,7 @@ Both read settings from `/opt/sparko/shared/.env.production` (set `SPARKO_ENV_FI
 - `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`: the Discord app's OAuth2 ID and secret, for signing in to the dashboard. Without them the sign-in page says sign-in isn't switched on.
 - `PUBLIC_APP_URL`: the dashboard address, shown in `/ping` replies.
 - `WEB_PORT` / `WEB_HOST`: where the website listens (default `8080` on `127.0.0.1`).
+- `DATABASE_PATH`: the database file (default `.data/sparko.db` in the app folder). See `docs/backend.md`.
 
 If the website hasn't been built or the token is missing, that process stops with a message in `pm2 logs` instead of restarting over and over.
 
@@ -83,7 +84,7 @@ The dashboard signs people in with Discord. On a server set up before sign-in ex
 
 3. Run `bash /opt/sparko/app/infra/update.sh`.
 
-Signing in shows your real Discord name, avatar and the servers you can manage, and which of them have Sparko. Module settings are still sample data. Sign-ins are kept in memory, so restarting the website signs everyone out.
+Signing in shows your real Discord name, avatar and the servers you can manage, and which of them have Sparko. Module settings are still sample data. Sign-ins are stored, so restarting doesn't sign anyone out.
 
 ## Everyday commands
 
