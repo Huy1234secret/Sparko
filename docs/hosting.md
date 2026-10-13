@@ -86,6 +86,10 @@ The dashboard signs people in with Discord. On a server set up before sign-in ex
 
 Signing in shows your real Discord name, avatar and the servers you can manage, and which of them have Sparko. Module settings are still sample data. Sign-ins are stored, so restarting doesn't sign anyone out.
 
+## Turning on Welcome
+
+Welcome needs to know when people join. On discord.com/developers open your app → **Bot**, turn on **Server Members Intent** under Privileged Gateway Intents, save, then run `pm2 restart sparko-bot`.
+
 ## Everyday commands
 
 Run these as `deploy`:

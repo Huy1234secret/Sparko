@@ -130,7 +130,11 @@ export interface PanelApi {
     change: { on: boolean; config: WelcomeConfig },
   ): Promise<void>;
   /** Waits until a saved change reaches Discord, or says why it couldn't. */
-  waitForApply(serverId: string, moduleId: string): Promise<ApplyResult>;
+  waitForApply(
+    serverId: string,
+    moduleId: string,
+    options?: { retry?: boolean },
+  ): Promise<ApplyResult>;
   /** Re-reads Sparko's server-wide permissions after the owner fixes them. */
   checkPermissions(serverId: string): Promise<boolean>;
   /** Re-reads Sparko's permissions in a channel after the owner fixes them. */

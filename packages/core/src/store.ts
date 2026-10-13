@@ -341,6 +341,19 @@ export function listAudit(db: Db, guildId: string, limit = 6) {
   }));
 }
 
+// Members ---------------------------------------------------------------
+
+/** Records a join. Returns true when this person had joined before. */
+export function markSeen(db: Db, guildId: string, userId: string, now: number) {
+  const r = db
+    .prepare(
+      `INSERT OR IGNORE INTO member_seen (guild_id, user_id, first_at)
+       VALUES (?, ?, ?)`,
+    )
+    .run(guildId, userId, now);
+  return r.changes === 0;
+}
+
 // Setup checklist -----------------------------------------------------------
 
 export function skippedSteps(db: Db, guildId: string) {

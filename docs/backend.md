@@ -17,12 +17,12 @@ The backend is being rebuilt in stages on top of the new dashboard. Everything r
 
 ## Stages
 
-| Stage | What                                                                                                                                              | State   |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| B1    | Database, sign-ins that survive restarts, overview, setup checklist, health, every module's on/off, channels and permission checks, the job queue | This PR |
-| B2    | Welcome: settings, templates and versions saved; the bot greets new members                                                                       | Next    |
-| B3    | Tickets: the panel is posted, tickets open as private threads, staff work them from the dashboard                                                 | Later   |
-| B4    | Message Studio: publish and edit messages, templates, versions, Components V2, editing in the preview                                             | Later   |
+| Stage | What                                                                                                                                              | State                                                              |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| B1    | Database, sign-ins that survive restarts, overview, setup checklist, health, every module's on/off, channels and permission checks, the job queue | Merged ([PR #25](https://github.com/Huy1234secret/Sparko/pull/25)) |
+| B2    | Welcome: settings, templates and versions saved; the bot greets new members                                                                       | Next                                                               |
+| B3    | Tickets: the panel is posted, tickets open as private threads, staff work them from the dashboard                                                 | Later                                                              |
+| B4    | Message Studio: publish and edit messages, templates, versions, Components V2, editing in the preview                                             | Later                                                              |
 
 Modules without their own settings page yet can be switched on and off; what they do in Discord is built as each area's pages are.
 
@@ -31,3 +31,10 @@ Modules without their own settings page yet can be switched on and off; what the
 - The file is `.data/sparko.db` in the app folder (or `DATABASE_PATH`). It's ignored by git, so updates keep it.
 - Back it up with `sqlite3 /opt/sparko/app/.data/sparko.db ".backup /opt/sparko/shared/sparko-backup.db"`, or stop both processes and copy the file.
 - Sign-ins are stored hashed, with the Discord access token encrypted using the app's client secret. Changing the secret signs everyone out.
+
+## Welcome
+
+- The dashboard reads and saves Welcome at `/api/v1/servers/:id/welcome`; settings are checked (delivery, channel, lengths, colour) and only known fields are stored.
+- After a save the bot checks it can post in the chosen channel and explains what's missing if not. "Check again" re-queues the change (`POST …/modules/welcome/apply`).
+- When someone joins, the bot sends the message with `{user}`, `{server}` and `{member_count}` filled in. Only the new member can be pinged. With "Welcome people who rejoin" off, people who joined before aren't greeted again.
+- Discord only tells bots about new members with the **Server Members Intent** on (Developer Portal → your app → Bot → Privileged Gateway Intents). Without it the bot still runs, and saving Welcome says what to turn on.
