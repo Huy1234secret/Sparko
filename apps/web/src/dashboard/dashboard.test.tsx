@@ -585,6 +585,69 @@ describe('Message Studio', () => {
   });
 });
 
+describe('editing in the preview', () => {
+  it('edits the embed title right in the preview', async () => {
+    open(`${pixel}/studio`);
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: 'Edit embed title' },
+        { timeout: 4000 },
+      ),
+    );
+    const inPlace = screen.getByRole('textbox', { name: 'embed title' });
+    await userEvent.clear(inPlace);
+    await userEvent.type(inPlace, 'Summer Jam{Enter}');
+    // The form follows what was typed in the preview.
+    expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue(
+      'Summer Jam',
+    );
+  });
+
+  it('builds a Components V2 message from blocks', async () => {
+    open(`${pixel}/studio`);
+    await userEvent.click(
+      await screen.findByRole(
+        'radio',
+        { name: 'Components V2' },
+        { timeout: 4000 },
+      ),
+    );
+    // Text is edited where it's shown.
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Edit text' })[0]!,
+    );
+    const text = screen.getByRole('textbox', { name: 'text' });
+    await userEvent.clear(text);
+    await userEvent.type(text, '## Summer Jam');
+    await userEvent.tab();
+    expect(document.querySelector('.dc-h2')).toHaveTextContent('Summer Jam');
+
+    // Add an image gallery after the first block; its link goes in the side panel.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add a block after block 1' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Images' }));
+    expect(
+      screen.getByRole('textbox', { name: 'Image 1 link' }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Publish changes' }),
+    );
+    expect(
+      screen.getAllByText('Image links must start with https://.').length,
+    ).toBeGreaterThan(0);
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Image 1 link' }),
+      'img.example/a.png',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove block 2' }),
+    );
+    expect(screen.queryByRole('textbox', { name: 'Image 1 link' })).toBeNull();
+  }, 20_000);
+});
+
 describe('real sign-in', () => {
   const realFetch = globalThis.fetch;
   const backendWith = (session: unknown, servers: unknown = []) => {
@@ -646,7 +709,9 @@ describe('real sign-in', () => {
     const router = open('/dashboard');
     expect(await screen.findByText('Signed in as Quinn')).toBeInTheDocument();
     expect(
-      screen.getByText(/Turning modules on and off is saved for real/),
+      screen.getByText(
+        /Welcome, Tickets and Message Studio work in Discord now/,
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Add Sparko to Needs Sparko' }),

@@ -206,9 +206,38 @@ export type TicketsState = {
   versions: Version<TicketPanel>[];
 };
 
+export type LinkButton = { id: string; label: string; url: string };
+/** One piece of a Components V2 message. */
+export type V2Block =
+  | { id: string; type: 'text'; content: string }
+  | {
+      id: string;
+      type: 'section';
+      content: string;
+      accessory:
+        | { type: 'thumbnail'; url: string }
+        | { type: 'button'; label: string; url: string };
+    }
+  | {
+      id: string;
+      type: 'gallery';
+      images: { id: string; url: string; description: string }[];
+    }
+  | {
+      id: string;
+      type: 'separator';
+      divider: boolean;
+      spacing: 'small' | 'large';
+    }
+  | { id: string; type: 'buttons'; buttons: LinkButton[] };
+
 export type StudioMessage = {
   name: string;
   channel: string;
+  /** "embed" is the classic message; "v2" uses Components V2 blocks. */
+  layout: 'embed' | 'v2';
+  /** The Components V2 layout: blocks, optionally in a coloured container. */
+  v2: { container: boolean; accent: string; blocks: V2Block[] };
   content: string;
   useEmbed: boolean;
   embed: {

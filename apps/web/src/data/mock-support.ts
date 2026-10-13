@@ -303,6 +303,30 @@ const studioDefault = (server: Server, channelId: string): StudioMessage => ({
     ],
   },
   buttons: [{ id: 'b1', label: 'Jam rules', url: 'https://pixelplaza.gg/jam' }],
+  layout: 'embed',
+  v2: {
+    container: true,
+    accent: '#FACC15',
+    blocks: [
+      {
+        id: 'v1',
+        type: 'text',
+        content: '## Spring Art Jam\nDraw anything with the theme **bloom**.',
+      },
+      { id: 'v2', type: 'separator', divider: true, spacing: 'small' },
+      {
+        id: 'v3',
+        type: 'section',
+        content:
+          '**Deadline:** Sunday 22:00\n**Prize:** Artist role + 2,000 XP',
+        accessory: {
+          type: 'button',
+          label: 'Jam rules',
+          url: 'https://pixelplaza.gg/jam',
+        },
+      },
+    ],
+  },
 });
 const simple = (
   base: StudioMessage,
