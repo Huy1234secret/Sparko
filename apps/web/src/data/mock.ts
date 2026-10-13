@@ -12,6 +12,7 @@ import type {
   WelcomeConfig,
   WelcomeState,
 } from './types';
+import { createSupportMock } from './mock-support';
 
 /**
  * Sample data for building the dashboard before the backend is reconnected.
@@ -118,7 +119,7 @@ const channels: Channel[] = [
   ['ticket-logs', 'Staff'],
   ['welcome', 'Information'],
   ['rules', 'Information', false],
-  ['announcements', 'Information', false],
+  ['announcements', 'Information'],
   ['arrivals', 'Community'],
   ['general', 'Community'],
   ['introductions', 'Community'],
@@ -251,7 +252,9 @@ function stateOf(serverId: string): ServerState {
         versions,
       },
       // On the first server Sparko can't post in #welcome until it's fixed.
-      blockedChannels: new Set(isFirst ? [channels[2]!.id] : []),
+      blockedChannels: new Set(
+        isFirst ? [channels[2]!.id, channels[4]!.id] : [],
+      ),
       permissionFixed: !isFirst,
     };
     s.on['welcome'] = s.welcome.on;
@@ -350,7 +353,7 @@ function health(s: ServerState): Overview['health'] {
   };
 }
 
-export const mockApi: PanelApi = {
+const coreApi = {
   getSession: () => wait(copy(session)),
   listServers: () => wait(copy(servers)),
   async getOverview(serverId) {
@@ -488,11 +491,15 @@ export const mockApi: PanelApi = {
   },
   async waitForApply(serverId, moduleId): Promise<ApplyResult> {
     const s = stateOf(serverId);
+    const postsIn =
+      moduleId === 'welcome'
+        ? s.welcome.on && s.welcome.config.delivery !== 'dm'
+          ? s.welcome.config.channel
+          : undefined
+        : postingChannel(serverId, moduleId);
     const blocked =
-      moduleId === 'welcome' &&
-      s.welcome.on &&
-      s.welcome.config.delivery !== 'dm' &&
-      !channelsFor(s).find((c) => c.id === s.welcome.config.channel)?.canPost;
+      postsIn !== undefined &&
+      !channelsFor(s).find((c) => c.id === postsIn)?.canPost;
     return wait<ApplyResult>(
       blocked
         ? { status: 'error', message: 'Sparko can’t post in that channel yet.' }
@@ -511,9 +518,24 @@ export const mockApi: PanelApi = {
     s.blockedChannels.delete(channelId);
     return wait(true, delayMs * 2);
   },
-};
+} satisfies Partial<PanelApi>;
 
 /** Resets the sample data; for tests. */
 export function resetMock() {
   state.clear();
+  resetSupport();
 }
+
+const {
+  api: supportApi,
+  reset: resetSupport,
+  postingChannel,
+} = createSupportMock({
+  wait: <T>(value: T, slow?: boolean) =>
+    wait(value, slow ? delayMs * 2 : delayMs),
+  copy,
+  server: serverById,
+  channels: (serverId) => channelsFor(stateOf(serverId)),
+  you: () => session.user,
+});
+export const mockApi: PanelApi = { ...coreApi, ...supportApi };

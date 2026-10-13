@@ -341,3 +341,244 @@ describe('Welcome', () => {
     );
   });
 });
+
+describe('Tickets', () => {
+  it('lists tickets needing a reply, longest waits first, and searches them', async () => {
+    open(`${pixel}/tickets`);
+    const table = await screen.findByRole('table');
+    const rows = within(table).getAllByRole('row').slice(1);
+    // #208 and #213 have waited over an hour; #213 is urgent so comes first.
+    expect(rows[0]).toHaveTextContent('#213');
+    expect(rows[1]).toHaveTextContent('#208');
+    expect(rows).toHaveLength(4);
+    await userEvent.click(screen.getByRole('radio', { name: /Closed/ }));
+    expect(screen.getByText('Lost my colour role')).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: 'Search tickets' }),
+      'zzz',
+    );
+    expect(screen.getByText('No tickets match “zzz”')).toBeInTheDocument();
+  });
+
+  it('opens a ticket, assigns it, replies, adds a note and closes it', async () => {
+    const router = open(`${pixel}/tickets`);
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: /#214 Can’t see #events/ },
+        { timeout: 4000 },
+      ),
+    );
+    expect(router.state.location.pathname).toBe(`${pixel}/tickets/214`);
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Can’t see #events after verifying',
+        level: 1,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('log')).getByText('Ticket #214'),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Assign/ }));
+    await userEvent.click(screen.getByRole('option', { name: /Rhea/ }));
+    expect(
+      await screen.findByText('Rhea is handling this ticket'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Take over' }));
+    expect(
+      await screen.findByRole('button', { name: /Assigned to you/ }),
+    ).toBeInTheDocument();
+
+    const reply = screen.getByRole('textbox', { name: 'Reply to tomoko' });
+    await userEvent.type(reply, 'Try verifying again now.');
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    const log = screen.getByRole('log');
+    expect(
+      await within(log).findByText('Try verifying again now.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Waiting on member')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Staff note' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Staff note' }),
+      'Role sync was slow.',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Add note' }));
+    expect(await within(log).findByText(/Staff note from/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close ticket' }));
+    const dialog = screen.getByRole('dialog', { name: 'Close ticket #214?' });
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: /Something else/ }),
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Close ticket' }),
+    );
+    expect(
+      within(dialog).getByText(
+        'Add a short reason so the team knows what happened.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: 'Reason' }),
+      'Fixed by role sync',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Close ticket' }),
+    );
+    expect(
+      await screen.findByText(/Closed by you · Fixed by role sync/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Reply/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+    expect(
+      await screen.findByRole('textbox', { name: 'Reply to tomoko' }),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('validates the ticket panel and previews each button’s opener', async () => {
+    open(`${pixel}/tickets?tab=settings`);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Report a member' }),
+    );
+    expect(
+      screen.getByText(/Who is it, and what happened\?/),
+    ).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Title' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(screen.getByText('Give the panel a title.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Fix the highlighted fields first.'),
+    ).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Title' }),
+      'Get help',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText('Live in #support', {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('says when a ticket doesn’t exist', async () => {
+    open(`${pixel}/tickets/999`);
+    expect(
+      await screen.findByText('Ticket #999 not found', {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('Message Studio', () => {
+  it('previews edits live and checks fields, links and colours before publishing', async () => {
+    open(`${pixel}/studio`);
+    const title = await screen.findByRole(
+      'textbox',
+      { name: /^Title/ },
+      { timeout: 4000 },
+    );
+    await userEvent.clear(title);
+    await userEvent.type(title, 'Summer Jam');
+    expect(document.querySelector('.dc-embed__title')).toHaveTextContent(
+      'Summer Jam',
+    );
+
+    await userEvent.clear(screen.getByRole('textbox', { name: /Image link/ }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /Image link/ }),
+      'x',
+    );
+    expect(
+      screen.getByText(
+        'The link must start with https:// so Discord can load it.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('textbox', { name: /Image link/ }));
+
+    const hex = screen.getByRole('textbox', { name: 'Custom colour, hex' });
+    await userEvent.clear(hex);
+    await userEvent.type(hex, '#12');
+    expect(
+      screen.getByText('Use a hex colour like #FACC15.'),
+    ).toBeInTheDocument();
+    await userEvent.type(hex, '3456');
+    expect(screen.queryByText('Use a hex colour like #FACC15.')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add a field' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Field 4 name' }),
+      'Judges',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Publish changes' }),
+    );
+    expect(
+      screen.getByText('Fields need both a name and a value.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Fix the highlighted fields first.'),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('publishes, reports the locked channel, and updates once it is fixed', async () => {
+    open(`${pixel}/studio`);
+    expect(
+      await screen.findByText(
+        'Sparko can’t post in #announcements',
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /^Text/ }),
+      ' See you there.',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Publish changes' }),
+    );
+    expect(
+      await screen.findByText('Couldn’t apply', {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(
+      await screen.findByText('Updated in #announcements', {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: /Versions/ }));
+    expect(screen.getByText('Published changes')).toBeInTheDocument();
+  });
+
+  it('uses, saves and deletes templates', async () => {
+    open(`${pixel}/studio?tab=items`);
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: 'Delete Server rules' },
+        { timeout: 4000 },
+      ),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.queryByText('Server rules')).toBeNull());
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save current as a template' }),
+    );
+    expect(
+      await screen.findByText('Saved “Spring art jam announcement”'),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use Weekly recap' }),
+    );
+    expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue(
+      'This week in Pixel Plaza',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Publish changes' }),
+    ).toBeInTheDocument();
+  });
+});

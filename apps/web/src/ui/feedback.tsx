@@ -326,17 +326,22 @@ export function Modal({
 }) {
   const titleId = useId();
   const dialog = useRef<HTMLDivElement>(null);
+  // Kept in a ref so an inline onClose doesn't re-run the focus effect.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     dialog.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close.current();
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
       previous?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div
@@ -464,11 +469,13 @@ export function SaveBar({
   onSave,
   onReset,
   message,
+  saveLabel = 'Save changes',
 }: {
   state?: 'dirty' | 'saving' | 'error' | 'saved';
   onSave?: () => void;
   onReset?: () => void;
   message?: ReactNode;
+  saveLabel?: string;
 }) {
   const [icon, text] = {
     dirty: ['triangle-alert', 'You have unsaved changes'],
@@ -503,7 +510,7 @@ export function SaveBar({
           loadingLabel="Saving…"
           onClick={onSave}
         >
-          {state === 'error' ? 'Try again' : 'Save changes'}
+          {state === 'error' ? 'Try again' : saveLabel}
         </Button>
       </div>
     </div>

@@ -1,18 +1,14 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
-  Avatar,
   Badge,
   Button,
-  Combobox,
   DiscordMessage,
   DiscordPreview,
   EmptyState,
   Icon,
   Input,
-  Modal,
   Notice,
   RadioCards,
-  Segmented,
   Switch,
   useToast,
 } from '../../ui';
@@ -37,13 +33,8 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
+import { ChannelPicker, ColourChoice, VersionHistory } from './parts';
 
-const colours = [
-  ['Sparko yellow', '#FACC15'],
-  ['Blurple', '#5865F2'],
-  ['Mint', '#57F287'],
-  ['Coral', '#ED4245'],
-] as const;
 const tokens = ['{user}', '{server}', '{member_count}', '#rules'];
 const maxLength = 2000;
 
@@ -93,7 +84,6 @@ export function WelcomeModule({
   } | null>(null);
   const [tried, setTried] = useState(false);
   const [fixOpen, setFixOpen] = useState(false);
-  const [restoreId, setRestoreId] = useState<string | null>(null);
   const message = useRef<HTMLTextAreaElement>(null);
   const toast = useToast();
 
@@ -174,7 +164,6 @@ export function WelcomeModule({
       : config.delivery === 'both'
         ? `#${channel?.name ?? '…'} and DM`
         : `#${channel?.name ?? '…'}`;
-  const restoring = welcome.data.versions.find((v) => v.id === restoreId);
   const fix = fixes.channel(channel?.name ?? 'the channel');
 
   return (
@@ -289,10 +278,8 @@ export function WelcomeModule({
                     },
                   ]}
                 />
-                <Combobox
-                  label="Channel"
-                  searchPlaceholder="Search channels"
-                  placeholder="Pick a channel"
+                <ChannelPicker
+                  channels={channels}
                   disabled={!postsInChannel}
                   value={config.channel}
                   onChange={(id) => edit({ channel: id })}
@@ -304,15 +291,6 @@ export function WelcomeModule({
                       ? undefined
                       : 'Not needed when sending only a direct message.'
                   }
-                  footer="Locked channels are ones Sparko can’t post in yet."
-                  items={channels.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    icon: 'hash',
-                    group: c.category,
-                    disabled: !c.canPost && c.id !== config.channel,
-                    ...(c.canPost ? {} : { note: 'Sparko can’t post' }),
-                  }))}
                 />
               </div>
             </section>
@@ -416,20 +394,9 @@ export function WelcomeModule({
                       <span className="sp-label" id="w-colour">
                         Colour bar
                       </span>
-                      <Segmented
-                        label="Colour bar"
-                        className="sp-colour-seg"
+                      <ColourChoice
                         value={config.color}
                         onChange={(color) => edit({ color })}
-                        options={colours.map(([name, hex]) => ({
-                          value: hex,
-                          label: (
-                            <>
-                              <span className="sp-dot" style={{ color: hex }} />
-                              {name}
-                            </>
-                          ),
-                        }))}
                       />
                     </div>
                   </>
@@ -566,88 +533,20 @@ export function WelcomeModule({
       )}
 
       {tab === 'history' && (
-        <section className="sp-card" aria-labelledby="hs-h">
-          <div className="sp-card__head">
-            <div className="sp-card__titles">
-              <h2 className="sp-card__title" id="hs-h">
-                Saved versions
-              </h2>
-              <p className="sp-card__sub">
-                Every save is kept. Restoring loads it into the editor; nothing
-                changes in Discord until you save.
-              </p>
-            </div>
-          </div>
-          <div className="sp-rows">
-            {welcome.data.versions.map((v, i) => (
-              <div key={v.id} className="sp-row">
-                <span style={{ gridRow: 'span 2' }}>
-                  <Avatar name={v.who} color={v.whoColor} size="sm" />
-                </span>
-                <span className="sp-row__title">
-                  {v.title} {i === 0 && <Badge size="sm">Current</Badge>}
-                </span>
-                <span className="sp-row__desc">
-                  {v.who} · {v.when}
-                </span>
-                <span className="sp-row__end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon="rotate-ccw"
-                    disabled={i === 0}
-                    aria-label={`Restore “${v.title}”`}
-                    onClick={() => setRestoreId(v.id)}
-                  >
-                    Restore
-                  </Button>
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
+        <VersionHistory
+          versions={welcome.data.versions}
+          onRestore={(config) => {
+            setDraft({ on: current.on, config });
+            flow.clear();
+            setTab('settings');
+            toast({
+              title: 'Version loaded',
+              body: 'Check the preview, then save to use it.',
+            });
+          }}
+        />
       )}
 
-      <Modal
-        open={!!restoring}
-        onClose={() => setRestoreId(null)}
-        icon="rotate-ccw"
-        title="Load this version into the editor?"
-        description={
-          restoring
-            ? `${restoring.title} · ${restoring.who}, ${restoring.when}`
-            : undefined
-        }
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setRestoreId(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                if (restoring) {
-                  setDraft({ on: current.on, config: restoring.config });
-                  flow.clear();
-                }
-                setRestoreId(null);
-                setTab('settings');
-                toast({
-                  title: 'Version loaded',
-                  body: 'Check the preview, then save to use it.',
-                });
-              }}
-            >
-              Load into editor
-            </Button>
-          </>
-        }
-      >
-        <p className="sp-hint">
-          Your current unsaved edits are replaced. Nothing changes in Discord
-          until you save.
-        </p>
-      </Modal>
       <FixPermissionModal
         open={fixOpen}
         {...fix}

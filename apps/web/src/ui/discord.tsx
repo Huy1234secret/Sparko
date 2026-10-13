@@ -8,7 +8,10 @@ export type DiscordEmbed = {
   description?: ReactNode;
   fields?: { name: ReactNode; value: ReactNode; inline?: boolean }[];
   footer?: ReactNode;
-  thumbnail?: string;
+  /** An image link, or something to show in the thumbnail box instead. */
+  thumbnail?: ReactNode;
+  /** The large image under the embed, as a placeholder or an <img>. */
+  image?: ReactNode;
 };
 export type DiscordButton = {
   label: string;
@@ -22,26 +25,37 @@ export type DiscordRow = DiscordButton[] | { select: string };
 export function DiscordMessage({
   author = 'Sparko',
   avatar,
+  avatarColor,
   bot = true,
   time = 'Today at 18:42',
   content,
   embed,
   components = [],
   className,
+  children,
 }: {
   author?: string;
   avatar?: string;
+  /** A person's avatar colour, 1–6, instead of Sparko's. */
+  avatarColor?: number;
   bot?: boolean;
   time?: string;
   content?: ReactNode;
   embed?: DiscordEmbed;
   components?: DiscordRow[];
   className?: string;
+  /** Extra content under the message, like an attachment. */
+  children?: ReactNode;
 }) {
   return (
     <div className={cx('dc-msg', className)}>
-      <div className="dc-avatar">
-        {avatar ? <img src={avatar} alt="" /> : author[0]}
+      <div
+        className={cx(
+          'dc-avatar',
+          !!avatarColor && `dc-avatar--person sp-avatar--${avatarColor}`,
+        )}
+      >
+        {avatar ? <img src={avatar} alt="" /> : author[0]?.toUpperCase()}
       </div>
       <div className="dc-head">
         <span className="dc-name">{author}</span>
@@ -94,13 +108,18 @@ export function DiscordMessage({
           </div>
           {embed.thumbnail && (
             <div className="dc-embed__thumb">
-              <img
-                src={embed.thumbnail}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              {typeof embed.thumbnail === 'string' ? (
+                <img
+                  src={embed.thumbnail}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                embed.thumbnail
+              )}
             </div>
           )}
+          {embed.image && <div className="dc-embed__image">{embed.image}</div>}
           {embed.footer && (
             <div className="dc-embed__footer">
               <span className="dc-embed__footer-icon" />
@@ -141,6 +160,7 @@ export function DiscordMessage({
           )}
         </div>
       )}
+      {children}
     </div>
   );
 }
@@ -151,4 +171,22 @@ export function DiscordPreview({ children }: { children: ReactNode }) {
       <div className="dc-chat">{children}</div>
     </div>
   );
+}
+
+/** Discord-style text: @mentions and #channels highlighted, **bold** made bold. */
+export function renderDiscordText(text: string): ReactNode[] {
+  return text
+    .split(/(@everyone|@here|@[A-Za-z][\w.-]*|#[a-z0-9-]+|\*\*[^*]+\*\*)/g)
+    .filter(Boolean)
+    .map((part, i) =>
+      part.startsWith('@') || part.startsWith('#') ? (
+        <span key={i} className="dc-mention">
+          {part}
+        </span>
+      ) : part.startsWith('**') && part.endsWith('**') && part.length > 4 ? (
+        <b key={i}>{part.slice(2, -2)}</b>
+      ) : (
+        part
+      ),
+    );
 }

@@ -5,7 +5,7 @@ import { moduleById } from '../content/modules';
 import { CommandPalette } from './CommandPalette';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { useCurrentServer } from './shared';
+import { useActiveModuleId, useCurrentServer } from './shared';
 
 /** Full-height frame for every dashboard page, with the sample-data notice. */
 export function DashboardFrame({ children }: { children: React.ReactNode }) {
@@ -21,7 +21,8 @@ export function DashboardFrame({ children }: { children: React.ReactNode }) {
 }
 
 export function ServerLayout() {
-  const { moduleId } = useParams();
+  const { ticketNumber } = useParams();
+  const moduleId = useActiveModuleId();
   const { serverId, server, servers } = useCurrentServer();
   const [navPath, setNavPath] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -98,9 +99,19 @@ export function ServerLayout() {
             <Icon name="chevron-right" />
           </li>
         )}
+        {ticketNumber && (
+          <li className="sp-topbar__desktop-only">
+            <Link className="sp-crumb" to={`/dashboard/${server.id}/tickets`}>
+              Tickets
+            </Link>
+            <Icon name="chevron-right" />
+          </li>
+        )}
         <li>
           <span className="sp-crumb" aria-current="page">
-            {module?.label ?? (moduleId ? 'Not found' : 'Overview')}
+            {ticketNumber
+              ? `Ticket #${ticketNumber}`
+              : (module?.label ?? (moduleId ? 'Not found' : 'Overview'))}
           </span>
         </li>
       </ol>
@@ -122,7 +133,9 @@ export function ServerLayout() {
             onSearch={() => setSearchOpen(true)}
           />
           <div className="sp-content">
-            <Outlet key={`${serverId}/${moduleId ?? ''}`} />
+            <Outlet
+              key={`${serverId}/${moduleId ?? ''}/${ticketNumber ?? ''}`}
+            />
           </div>
         </main>
       </div>

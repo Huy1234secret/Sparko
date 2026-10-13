@@ -257,14 +257,16 @@ export function SavePipeline({
 
 export type ModuleTab = 'settings' | 'items' | 'history';
 /** The module's tab, kept in the address so links and Back work. */
-export function useModuleTab() {
+export function useModuleTab(defaultTab: ModuleTab = 'settings') {
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab');
   const tab: ModuleTab =
-    raw === 'items' || raw === 'history' ? raw : 'settings';
+    raw === 'settings' || raw === 'items' || raw === 'history'
+      ? raw
+      : defaultTab;
   const setTab = (next: ModuleTab) => {
     const out = new URLSearchParams(params);
-    if (next === 'settings') out.delete('tab');
+    if (next === defaultTab) out.delete('tab');
     else out.set('tab', next);
     setParams(out, { replace: true });
   };
@@ -314,18 +316,21 @@ export function ModuleSaveBar({
   error,
   onSave,
   onReset,
+  saveLabel,
 }: {
   visible: boolean;
   saving: boolean;
   error: string | null;
   onSave: () => void;
   onReset: () => void;
+  saveLabel?: string;
 }): ReactNode {
   if (!visible) return null;
   return (
     <SaveBar
       state={saving ? 'saving' : error ? 'error' : 'dirty'}
       message={error ?? undefined}
+      {...(saveLabel ? { saveLabel } : {})}
       onSave={onSave}
       onReset={onReset}
     />
