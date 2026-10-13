@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Sparko is the all-in-one Discord bot that explains itself: moderation, tickets, welcome messages, levels and more, in plain language with live previews."
+    />
+    <meta name="theme-color" content="#111110" />
+    <link rel="icon" href="/sparko.svg" type="image/svg+xml" />
+    <title>Sparko · The Discord bot that explains itself</title>
+    <script>
+      // Apply the saved theme before the first paint so the page never flashes.
+      try {
+        const saved = localStorage.getItem('sparko-theme');
+        const theme =
+          saved === 'light' || saved === 'dark'
+            ? saved
+            : matchMedia('(prefers-color-scheme: light)').matches
+              ? 'light'
+              : 'dark';
+        document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

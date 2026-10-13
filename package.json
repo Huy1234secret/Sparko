@@ -1,0 +1,28 @@
+{
+  "name": "sparko",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24.19.0 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @sparko/web dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint apps --max-warnings 0",
+    "format:check": "prettier --check apps docs *.json *.yaml .github",
+    "format": "prettier --write apps docs *.json *.yaml .github",
+    "build": "pnpm -r build",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "prettier": "3.7.4",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.1",
+    "vitest": "5.0.3"
+  }
+}
