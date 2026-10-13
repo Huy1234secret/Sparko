@@ -186,4 +186,61 @@ describe('server API', () => {
       await body(await call('/9001/channels/502/check', { method: 'POST' })),
     ).toEqual({ ok: false });
   });
+
+  it('saves Welcome with a version, checks it, and retries after a fix', async () => {
+    const empty = await body<{
+      on: boolean;
+      config: { channel: string; delivery: string };
+      channels: { id: string }[];
+      templates: unknown[];
+    }>(await call('/9001/welcome'));
+    expect(empty.config.channel).toBe('501');
+    expect(empty.templates.length).toBeGreaterThan(0);
+
+    const bad = await call('/9001/welcome', {
+      method: 'PUT',
+      body: JSON.stringify({
+        on: true,
+        config: { ...empty.config, color: 'red' },
+      }),
+    });
+    expect(bad.status).toBe(400);
+    expect((await body<{ message: string }>(bad)).message).toContain('colour');
+
+    const config = { ...empty.config, channel: '502', message: 'Hi {user}' };
+    const put = await call('/9001/welcome', {
+      method: 'PUT',
+      body: JSON.stringify({ on: true, config, extra: 'ignored' }),
+    });
+    expect(put.status).toBe(204);
+    const saved = await body<{
+      on: boolean;
+      config: { message: string };
+      versions: { title: string; who: string; whoColor: number }[];
+    }>(await call('/9001/welcome'));
+    expect(saved.on).toBe(true);
+    expect(saved.config.message).toBe('Hi {user}');
+    expect(saved.versions[0]).toMatchObject({
+      title: 'Updated the welcome message',
+      who: 'Quinn',
+    });
+
+    // The bot couldn't post there…
+    let job = claimJob(db)!;
+    while (job.kind !== 'welcome') {
+      finishJob(db, job.id, null, Date.now());
+      job = claimJob(db)!;
+    }
+    finishJob(db, job.id, 'Sparko can’t post in #rules yet.', Date.now());
+    expect(await body(await call('/9001/modules/welcome/apply'))).toMatchObject(
+      { status: 'error', message: 'Sparko can’t post in #rules yet.' },
+    );
+    // …the owner fixes it and asks again: a new attempt is queued.
+    const retry = call('/9001/modules/welcome/apply', { method: 'POST' });
+    await new Promise((done) => setTimeout(done, 50));
+    const again = claimJob(db)!;
+    expect(again.kind).toBe('welcome');
+    finishJob(db, again.id, null, Date.now());
+    expect(await body(await retry)).toEqual({ status: 'live' });
+  });
 });

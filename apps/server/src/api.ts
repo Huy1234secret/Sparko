@@ -10,7 +10,13 @@ import {
   getStatus,
   has,
   latestJob,
+  cleanWelcome,
   listAudit,
+  listVersions,
+  welcomeDefault,
+  welcomeProblem,
+  welcomeTemplates,
+  type WelcomeConfig,
   Perm,
   permName,
   setStepSkipped,
@@ -209,6 +215,19 @@ export function createApi({
     };
   }
 
+  const colourOf = (id: string | null) =>
+    (((id ? Number(id.slice(-4)) : 0) % 6) + 1) as 1 | 2 | 3 | 4 | 5 | 6;
+  /** Saved versions as the dashboard shows them; the newest is current. */
+  const versionsOf = (guildId: string, mod: string) =>
+    listVersions(db, guildId, mod).map((v) => ({
+      id: v.id,
+      title: v.title,
+      who: v.who,
+      whoColor: colourOf(v.whoId),
+      when: ago(v.at, now()),
+      config: v.config,
+    }));
+
   /** Waits for the bot to apply the latest change, up to applyWaitMs. */
   async function applied(guildId: string, mod: string) {
     const until = now() + applyWaitMs;
@@ -295,6 +314,58 @@ export function createApi({
       json(res, 200, {
         ok: !!v?.channels.find((c) => c.id === channelId)?.canPost,
       });
+    } else if (method === 'GET' && rest === '/welcome') {
+      const v = await view(guildId);
+      const channels = (v?.channels ?? []).map(
+        ({ id, name, category, canPost }) => ({ id, name, category, canPost }),
+      );
+      const saved = getModule<WelcomeConfig>(db, guildId, 'welcome');
+      const plus = getGuild(db, guildId)?.plan === 'plus';
+      json(res, 200, {
+        on: saved.on,
+        config:
+          saved.config ??
+          welcomeDefault(
+            guild.name,
+            channels.find((c) => c.canPost)?.id ?? channels[0]?.id ?? '',
+          ),
+        channels,
+        templates: welcomeTemplates,
+        templateLimit: plus ? 100 : 10,
+        versions: versionsOf(guildId, 'welcome'),
+      });
+    } else if (method === 'PUT' && rest === '/welcome') {
+      const body = await readJson<{ on?: unknown; config?: unknown }>(req);
+      if (typeof body?.on !== 'boolean')
+        throw new BadRequest('Say whether Welcome is on or off.');
+      const problem = welcomeProblem(body.config);
+      if (problem) throw new BadRequest(problem);
+      const config = cleanWelcome(body.config as WelcomeConfig);
+      const at = now();
+      writeModule(db, guildId, 'welcome', { on: body.on, config }, at);
+      addVersion(
+        db,
+        {
+          guildId,
+          moduleId: 'welcome',
+          title: body.on ? 'Updated the welcome message' : 'Turned Welcome off',
+          who: user,
+          config,
+        },
+        at,
+      );
+      addAudit(
+        db,
+        {
+          guildId,
+          who: user.name,
+          what: body.on ? 'updated Welcome' : 'turned off Welcome',
+          icon: 'hand',
+        },
+        at,
+      );
+      enqueueJob(db, { guildId, moduleId: 'welcome', kind: 'welcome' }, at);
+      res.writeHead(204).end();
     } else {
       const mod = rest.match(/^\/modules\/([^/]+)(\/apply)?$/);
       if (!mod || !moduleId.test(mod[1]!)) {
@@ -304,7 +375,17 @@ export function createApi({
       const id = mod[1]!;
       if (method === 'GET' && mod[2])
         json(res, 200, await applied(guildId, id));
-      else if (method === 'GET')
+      else if (method === 'POST' && mod[2]) {
+        // After an owner fixes a problem, try the saved change again.
+        const last = latestJob(db, guildId, id);
+        if (last?.status === 'error')
+          enqueueJob(
+            db,
+            { guildId, moduleId: id, kind: last.kind, payload: last.payload },
+            now(),
+          );
+        json(res, 200, await applied(guildId, id));
+      } else if (method === 'GET')
         json(res, 200, { on: getModule(db, guildId, id).on });
       else if (method === 'PUT') {
         const body = await readJson<{ on?: unknown }>(req);

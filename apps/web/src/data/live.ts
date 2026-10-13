@@ -59,7 +59,7 @@ async function call<T>(method: string, path: string, body?: unknown) {
 const getJson = <T>(path: string) => call<T>('GET', path);
 
 /** Modules whose settings are still sample data on the real site. */
-const sampleModules = new Set(['welcome', 'tickets', 'studio']);
+const sampleModules = new Set(['tickets', 'studio']);
 const server = (id: string) => `/api/v1/servers/${id}`;
 
 const colourOf = (id: string) =>
@@ -112,10 +112,30 @@ export function withBackend(
         return sample.saveModule(id, moduleId, state);
       await call('PUT', `${server(id)}/modules/${moduleId}`, state);
     },
-    async waitForApply(id, moduleId) {
+    async waitForApply(id, moduleId, options) {
       if (!(await backend()).live || sampleModules.has(moduleId))
-        return sample.waitForApply(id, moduleId);
-      return getJson(`${server(id)}/modules/${moduleId}/apply`);
+        return sample.waitForApply(id, moduleId, options);
+      return call(
+        options?.retry ? 'POST' : 'GET',
+        `${server(id)}/modules/${moduleId}/apply`,
+      );
+    },
+    async getWelcome(id) {
+      if (!(await backend()).live) return sample.getWelcome(id);
+      return getJson(`${server(id)}/welcome`);
+    },
+    async saveWelcome(id, change) {
+      if (!(await backend()).live) return sample.saveWelcome(id, change);
+      await call('PUT', `${server(id)}/welcome`, change);
+    },
+    async checkChannel(id, channelId) {
+      if (!(await backend()).live) return sample.checkChannel(id, channelId);
+      return (
+        await call<{ ok: boolean }>(
+          'POST',
+          `${server(id)}/channels/${channelId}/check`,
+        )
+      ).ok;
     },
     async checkPermissions(id) {
       if (!(await backend()).live) return sample.checkPermissions(id);

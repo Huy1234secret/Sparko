@@ -73,7 +73,9 @@ export function useSaveFlow(serverId: string, moduleId: string) {
   const retryApply = useCallback(async () => {
     if (phaseRef.current !== 'error') return;
     setPhase('applying');
-    const result = await api.waitForApply(serverId, moduleId);
+    const result = await api.waitForApply(serverId, moduleId, {
+      retry: true,
+    });
     if (!alive.current) return;
     if (result.status === 'live') {
       setError(null);

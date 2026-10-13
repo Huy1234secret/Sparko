@@ -81,6 +81,13 @@ const migrations = [
     value_json TEXT NOT NULL,
     updated_at INTEGER NOT NULL
   );`,
+  // 2: people Sparko has already welcomed, for "welcome people who rejoin".
+  `CREATE TABLE member_seen (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    first_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );`,
 ];
 
 export function openDb(path: string): Db {
