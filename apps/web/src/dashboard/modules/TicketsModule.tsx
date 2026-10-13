@@ -682,19 +682,19 @@ export function TicketsModule({
                 >
                   {config.data.roles.map((r) => (
                     <button
-                      key={r}
+                      key={r.id}
                       type="button"
                       className="sp-chip sp-chip--toggle"
-                      aria-pressed={panel.roles.includes(r)}
+                      aria-pressed={panel.roles.includes(r.id)}
                       onClick={() =>
                         edit({
-                          roles: panel.roles.includes(r)
-                            ? panel.roles.filter((x) => x !== r)
-                            : [...panel.roles, r],
+                          roles: panel.roles.includes(r.id)
+                            ? panel.roles.filter((x) => x !== r.id)
+                            : [...panel.roles, r.id],
                         })
                       }
                     >
-                      @{r}
+                      @{r.name}
                     </button>
                   ))}
                 </div>
@@ -795,7 +795,9 @@ export function TicketsModule({
                             <br />
                             {panel.roles.map((r) => (
                               <span key={r} className="dc-mention">
-                                @{r}{' '}
+                                @
+                                {config.data.roles.find((x) => x.id === r)
+                                  ?.name ?? 'role'}{' '}
                               </span>
                             ))}
                           </>

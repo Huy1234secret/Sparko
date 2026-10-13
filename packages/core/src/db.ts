@@ -88,6 +88,48 @@ const migrations = [
     first_at INTEGER NOT NULL,
     PRIMARY KEY (guild_id, user_id)
   );`,
+  // 3: tickets, their messages, and messages Sparko keeps up to date.
+  `CREATE TABLE tickets (
+    guild_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    thread_id TEXT NOT NULL UNIQUE,
+    member_id TEXT NOT NULL,
+    member_name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    topic TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'new',
+    priority TEXT NOT NULL DEFAULT 'normal',
+    assignee_id TEXT,
+    assignee_name TEXT,
+    opened_at INTEGER NOT NULL,
+    last_at INTEGER NOT NULL,
+    last_by TEXT NOT NULL DEFAULT 'member',
+    warned_at INTEGER,
+    closed_by TEXT,
+    close_reason TEXT,
+    PRIMARY KEY (guild_id, number)
+  );
+  CREATE INDEX tickets_open ON tickets (status, last_at);
+  CREATE TABLE ticket_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    author_id TEXT,
+    author_name TEXT NOT NULL,
+    staff INTEGER NOT NULL DEFAULT 0,
+    text TEXT NOT NULL,
+    file TEXT,
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX ticket_messages_by_ticket ON ticket_messages (guild_id, number, id);
+  CREATE TABLE posted (
+    guild_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    PRIMARY KEY (guild_id, key)
+  );`,
 ];
 
 export function openDb(path: string): Db {

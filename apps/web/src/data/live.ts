@@ -39,6 +39,8 @@ async function call<T>(method: string, path: string, body?: unknown) {
     method,
     headers: {
       accept: 'application/json',
+      // Dates come back in the viewer's own time zone.
+      'x-timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -59,7 +61,7 @@ async function call<T>(method: string, path: string, body?: unknown) {
 const getJson = <T>(path: string) => call<T>('GET', path);
 
 /** Modules whose settings are still sample data on the real site. */
-const sampleModules = new Set(['tickets', 'studio']);
+const sampleModules = new Set(['studio']);
 const server = (id: string) => `/api/v1/servers/${id}`;
 
 const colourOf = (id: string) =>
@@ -128,6 +130,39 @@ export function withBackend(
       if (!(await backend()).live) return sample.saveWelcome(id, change);
       await call('PUT', `${server(id)}/welcome`, change);
     },
+    async getTickets(id) {
+      if (!(await backend()).live) return sample.getTickets(id);
+      return getJson(`${server(id)}/tickets`);
+    },
+    async saveTickets(id, change) {
+      if (!(await backend()).live) return sample.saveTickets(id, change);
+      await call('PUT', `${server(id)}/tickets`, change);
+    },
+    async listTickets(id) {
+      if (!(await backend()).live) return sample.listTickets(id);
+      return getJson(`${server(id)}/tickets/list`);
+    },
+    async getTicket(id, n) {
+      if (!(await backend()).live) return sample.getTicket(id, n);
+      return getJson(`${server(id)}/tickets/${n}`);
+    },
+    async sendTicketMessage(id, n, message) {
+      if (!(await backend()).live)
+        return sample.sendTicketMessage(id, n, message);
+      await call('POST', `${server(id)}/tickets/${n}/messages`, message);
+    },
+    async updateTicket(id, n, change) {
+      if (!(await backend()).live) return sample.updateTicket(id, n, change);
+      await call('PATCH', `${server(id)}/tickets/${n}`, change);
+    },
+    async closeTicket(id, n, close) {
+      if (!(await backend()).live) return sample.closeTicket(id, n, close);
+      await call('POST', `${server(id)}/tickets/${n}/close`, close);
+    },
+    async reopenTicket(id, n) {
+      if (!(await backend()).live) return sample.reopenTicket(id, n);
+      await call('POST', `${server(id)}/tickets/${n}/reopen`);
+    },
     async checkChannel(id, channelId) {
       if (!(await backend()).live) return sample.checkChannel(id, channelId);
       return (
@@ -150,3 +185,5 @@ export function withBackend(
 export const signInUrl = '/api/v1/auth/discord';
 export const inviteUrl = (serverId?: string) =>
   `/api/v1/invite${serverId ? `?guild=${serverId}` : ''}`;
+export const ticketTranscriptUrl = (serverId: string, n: number) =>
+  `/api/v1/servers/${serverId}/tickets/${n}/transcript`;

@@ -5,3 +5,5 @@ export * from './permissions.ts';
 export * from './secrets.ts';
 export * from './store.ts';
 export * from './welcome.ts';
+export * from './tickets.ts';
+export * from './ticket-actions.ts';

@@ -1,14 +1,14 @@
-import { claimJob, finishJob, type Db, type Job } from '@sparko/core';
+import { claimJob, finishJob, Plain, type Db, type Job } from '@sparko/core';
 
 /** What the bot does for each kind of change saved in the dashboard. */
 export type Handlers = Record<string, (job: Job) => Promise<void>>;
 
 /** An error whose message is already written for the server owner. */
-export class Explained extends Error {}
+export { Plain as Explained };
 
 /** Turns a Discord or code error into words people can act on. */
 export function explain(error: unknown) {
-  if (error instanceof Explained) return error.message;
+  if (error instanceof Plain) return error.message;
   const e = error as { code?: number; message?: string };
   if (e?.code === 50013 || e?.code === 50001)
     return 'Sparko is missing a permission it needs for this. Check its role in Discord.';

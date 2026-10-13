@@ -4,13 +4,19 @@ import {
   Client,
   Events,
   GatewayIntentBits,
+  MessageFlags,
+  type ButtonInteraction,
   type Guild,
 } from 'discord.js';
 import {
   addAudit,
   defaultDbPath,
+  discordRest,
+  ticketActions,
+  ticketButtonPrefix,
   markOnlyInstalled,
   openDb,
+  Plain,
   pruneJobs,
   requeueRunning,
   setStatus,
@@ -31,9 +37,12 @@ if (!token) {
 const dashboardUrl = process.env.PUBLIC_APP_URL;
 
 const db = openDb(defaultDbPath(join(import.meta.dirname, '../../..')));
+const tickets = ticketActions(discordRest({ token }), db);
 let client: Client;
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
+/** And only shares message text with the Message Content Intent on. */
+let contentIntent = true;
 
 /** What the bot does for each change saved in the dashboard. */
 const handlers: Handlers = {
@@ -42,6 +51,7 @@ const handlers: Handlers = {
   module: async () => {},
   welcome: async (job) =>
     checkWelcome(db, client.guilds.cache.get(job.guildId), membersIntent),
+  tickets: (job) => tickets.applyPanel(job.guildId),
 };
 
 const record = (guild: Guild, installed: boolean) =>
@@ -94,6 +104,14 @@ function wire(c: Client) {
   });
 
   c.on(Events.InteractionCreate, (interaction) => {
+    if (
+      interaction.isButton() &&
+      interaction.customId.startsWith(ticketButtonPrefix) &&
+      interaction.inGuild()
+    ) {
+      void openTicket(interaction);
+      return;
+    }
     if (!interaction.isChatInputCommand()) return;
     handleCommand(interaction, { dashboardUrl }).catch((error: unknown) =>
       console.error(`/${interaction.commandName} failed`, error),
@@ -117,6 +135,23 @@ function wire(c: Client) {
     record(guild, false);
   });
   c.on(Events.Error, (error) => console.error(error));
+  c.on(Events.MessageCreate, (message) => {
+    if (message.author.bot || !message.channel.isThread()) return;
+    const file = message.attachments.first()?.name ?? null;
+    tickets.recordMessage({
+      threadId: message.channel.id,
+      author: {
+        id: message.author.id,
+        name: message.member?.displayName ?? message.author.username,
+      },
+      text:
+        message.content ||
+        (contentIntent
+          ? ''
+          : '(Discord didn’t share this message’s text. Turn on the Message Content Intent.)'),
+      file,
+    });
+  });
   c.on(Events.GuildMemberAdd, (member) => {
     welcomeMember(db, member).catch((error: unknown) =>
       console.error(
@@ -127,11 +162,50 @@ function wire(c: Client) {
   });
 }
 
-async function connect(withMembers: boolean) {
+/** A member pressed a ticket panel button. */
+async function openTicket(interaction: ButtonInteraction<'cached' | 'raw'>) {
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const opened = await tickets.openTicket({
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      topicId: interaction.customId.slice(ticketButtonPrefix.length),
+      member: {
+        id: interaction.user.id,
+        name:
+          (interaction.member && 'displayName' in interaction.member
+            ? interaction.member.displayName
+            : null) ??
+          interaction.user.globalName ??
+          interaction.user.username,
+      },
+    });
+    await interaction.editReply(
+      opened.existing
+        ? `You already have a ticket open: <#${opened.threadId}>`
+        : `Your ticket is open: <#${opened.threadId}>`,
+    );
+  } catch (error) {
+    if (!(error instanceof Plain))
+      console.error('Opening a ticket failed', error);
+    await interaction
+      .editReply(
+        error instanceof Plain
+          ? error.message
+          : 'Sparko couldn’t open a ticket just now. Try again in a moment.',
+      )
+      .catch(() => {});
+  }
+}
+
+async function connect(members: boolean, content: boolean) {
   const c = new Client({
-    intents: withMembers
-      ? [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
-      : [GatewayIntentBits.Guilds],
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      ...(members ? [GatewayIntentBits.GuildMembers] : []),
+      ...(content ? [GatewayIntentBits.MessageContent] : []),
+    ],
   });
   wire(c);
   await c.login(token);
@@ -147,20 +221,37 @@ const stop = () => {
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
 
-try {
-  client = await connect(true);
-} catch (error) {
-  const e = error as { code?: unknown; message?: string };
-  if (
-    e.code !== 'DisallowedIntents' &&
-    !/disallowed intent/i.test(e.message ?? '')
-  )
-    throw error;
-  // Keep running without member events; Welcome explains what to turn on.
-  console.warn(
-    'The Server Members Intent is off, so Welcome can’t see new members. Turn it on under Bot in the Discord Developer Portal, then run "pm2 restart sparko-bot".',
-  );
-  membersIntent = false;
-  client = await connect(false);
+// Discord refuses privileged intents that aren't turned on for the app, so
+// try with both, then each, then neither; features explain what's missing.
+for (const [members, content] of [
+  [true, true],
+  [true, false],
+  [false, true],
+  [false, false],
+] as const) {
+  try {
+    client = await connect(members, content);
+    membersIntent = members;
+    contentIntent = content;
+    break;
+  } catch (error) {
+    const e = error as { code?: unknown; message?: string };
+    if (
+      e.code !== 'DisallowedIntents' &&
+      !/disallowed intent/i.test(e.message ?? '')
+    )
+      throw error;
+  }
 }
-setStatus(db, 'intents', { members: membersIntent }, Date.now());
+if (!membersIntent || !contentIntent)
+  console.warn(
+    `Turn on ${[!membersIntent && 'Server Members Intent', !contentIntent && 'Message Content Intent'].filter(Boolean).join(' and ')} under Bot in the Discord Developer Portal, then run "pm2 restart sparko-bot". Welcome needs the first; ticket messages typed in Discord need the second.`,
+  );
+// Auto-close quiet tickets.
+setInterval(() => void tickets.sweep(), 5 * 60_000).unref();
+setStatus(
+  db,
+  'intents',
+  { members: membersIntent, content: contentIntent },
+  Date.now(),
+);
