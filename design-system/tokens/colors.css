@@ -1,0 +1,214 @@
+/* Sparko — colour tokens.
+   Dark is the default theme (:root). Light: set data-theme="light" on <html> or any subtree.
+   Themes nest: a [data-theme="dark"] subtree inside light restores dark.
+   Composite tokens (rings, shadows) are re-declared per theme so nested themes resolve correctly. */
+
+:root {
+  color-scheme: dark;
+  /* Brand constants (theme-independent) */
+  --sp-yellow-300: #FDE047;
+  --sp-yellow-400: #FACC15;
+  --sp-yellow-500: #EAB308;
+  --sp-yellow-600: #CA8A04;
+  --sp-yellow-700: #A16207;
+  --sp-yellow-800: #866D09;
+  --sp-ink: #1C1917;
+  --sp-paper: #FAFAF5;
+
+  /* Surfaces */
+  --sp-canvas: #111110;
+  --sp-subtle: #171715;
+  --sp-surface: #1C1C19;
+  --sp-raised: #262620;
+  --sp-raised-hover: #2F2F28;
+  --sp-line: #30302A;
+  --sp-line-strong: #6E6D62;
+  --sp-line-hover: #8C8B7F;
+  /* Text */
+  --sp-text: #FAFAF5;
+  --sp-muted: #AAA99D;
+  /* Brand */
+  --sp-brand: #FACC15;
+  --sp-brand-hover: #EAB308;
+  --sp-brand-press: #CA8A04;
+  --sp-brand-soft: rgb(250 204 21 / 0.09);
+  --sp-brand-line: rgb(250 204 21 / 0.32);
+  --sp-brand-text: #FACC15;
+  --sp-brand-edge: #FACC15;
+  --sp-on-brand: #1C1917;
+  /* Status */
+  --sp-success: #87DBA6;
+  --sp-success-soft: rgb(44 139 80 / 0.11);
+  --sp-success-line: rgb(135 219 166 / 0.3);
+  --sp-danger: #FFAAA4;
+  --sp-danger-soft: rgb(239 68 68 / 0.09);
+  --sp-danger-line: rgb(255 170 164 / 0.32);
+  --sp-danger-fill: #D4372F;
+  --sp-danger-fill-hover: #BC2E27;
+  --sp-on-danger: #FFFFFF;
+  --sp-warning: #EFCB79;
+  --sp-warning-soft: rgb(234 179 8 / 0.1);
+  --sp-warning-line: rgb(239 203 121 / 0.32);
+  --sp-info: #9CC3FF;
+  --sp-info-soft: rgb(59 130 246 / 0.08);
+  --sp-info-line: rgb(156 195 255 / 0.3);
+  /* Focus */
+  --sp-focus: rgb(250 204 21 / 0.4);
+  --sp-focus-edge: #FACC15;
+  /* Overlay + misc */
+  --sp-scrim: rgb(6 6 5 / 0.72);
+  --sp-tooltip-bg: #3A3A33;
+  --sp-tooltip-text: #FAFAF5;
+  --sp-skeleton: #262620;
+  --sp-ring: 0 0 0 1px var(--sp-focus-edge), 0 0 0 4px var(--sp-focus);
+  --sp-ring-offset: 0 0 0 2px var(--sp-canvas), 0 0 0 3px var(--sp-focus-edge), 0 0 0 6px var(--sp-focus);
+  --sp-ring-inset: inset 0 0 0 1px var(--sp-focus-edge), inset 0 0 0 3px var(--sp-focus);
+  --sp-shadow-card: none;
+  --sp-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --sp-shadow-overlay: 0 0 0 1px rgb(0 0 0 / 0.25), 0 16px 40px -12px rgb(0 0 0 / 0.75);
+  /* Discord message preview (mirrors Discord's dark theme) */
+  --sp-dc-bg: #313338;
+  --sp-dc-hover: #2E3035;
+  --sp-dc-text: #DBDEE1;
+  --sp-dc-header: #F2F3F5;
+  --sp-dc-muted: #949BA4;
+  --sp-dc-embed: #2B2D31;
+  --sp-dc-embed-border: transparent;
+  --sp-dc-link: #00A8FC;
+  --sp-dc-blurple: #5865F2;
+  --sp-dc-blurple-hover: #4752C4;
+  --sp-dc-secondary: #4E5058;
+  --sp-dc-secondary-hover: #6D6F78;
+  --sp-dc-success: #248046;
+  --sp-dc-danger: #DA373C;
+  --sp-dc-select: #1E1F22;
+  --sp-dc-select-border: #1E1F22;
+  --sp-dc-mention-bg: rgb(88 101 242 / 0.3);
+  --sp-dc-mention-text: #C9CDFB;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --sp-canvas: #111110;
+  --sp-subtle: #171715;
+  --sp-surface: #1C1C19;
+  --sp-raised: #262620;
+  --sp-raised-hover: #2F2F28;
+  --sp-line: #30302A;
+  --sp-line-strong: #6E6D62;
+  --sp-line-hover: #8C8B7F;
+  --sp-text: #FAFAF5;
+  --sp-muted: #AAA99D;
+  --sp-brand: #FACC15;
+  --sp-brand-hover: #EAB308;
+  --sp-brand-press: #CA8A04;
+  --sp-brand-soft: rgb(250 204 21 / 0.09);
+  --sp-brand-line: rgb(250 204 21 / 0.32);
+  --sp-brand-text: #FACC15;
+  --sp-brand-edge: #FACC15;
+  --sp-on-brand: #1C1917;
+  --sp-success: #87DBA6;
+  --sp-success-soft: rgb(44 139 80 / 0.11);
+  --sp-success-line: rgb(135 219 166 / 0.3);
+  --sp-danger: #FFAAA4;
+  --sp-danger-soft: rgb(239 68 68 / 0.09);
+  --sp-danger-line: rgb(255 170 164 / 0.32);
+  --sp-danger-fill: #D4372F;
+  --sp-danger-fill-hover: #BC2E27;
+  --sp-on-danger: #FFFFFF;
+  --sp-warning: #EFCB79;
+  --sp-warning-soft: rgb(234 179 8 / 0.1);
+  --sp-warning-line: rgb(239 203 121 / 0.32);
+  --sp-info: #9CC3FF;
+  --sp-info-soft: rgb(59 130 246 / 0.08);
+  --sp-info-line: rgb(156 195 255 / 0.3);
+  --sp-focus: rgb(250 204 21 / 0.4);
+  --sp-focus-edge: #FACC15;
+  --sp-scrim: rgb(6 6 5 / 0.72);
+  --sp-tooltip-bg: #3A3A33;
+  --sp-tooltip-text: #FAFAF5;
+  --sp-skeleton: #262620;
+  --sp-ring: 0 0 0 1px var(--sp-focus-edge), 0 0 0 4px var(--sp-focus);
+  --sp-ring-offset: 0 0 0 2px var(--sp-canvas), 0 0 0 3px var(--sp-focus-edge), 0 0 0 6px var(--sp-focus);
+  --sp-ring-inset: inset 0 0 0 1px var(--sp-focus-edge), inset 0 0 0 3px var(--sp-focus);
+  --sp-shadow-card: none;
+  --sp-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --sp-shadow-overlay: 0 0 0 1px rgb(0 0 0 / 0.25), 0 16px 40px -12px rgb(0 0 0 / 0.75);
+  --sp-dc-bg: #313338;
+  --sp-dc-hover: #2E3035;
+  --sp-dc-text: #DBDEE1;
+  --sp-dc-header: #F2F3F5;
+  --sp-dc-muted: #949BA4;
+  --sp-dc-embed: #2B2D31;
+  --sp-dc-embed-border: transparent;
+  --sp-dc-link: #00A8FC;
+  --sp-dc-secondary: #4E5058;
+  --sp-dc-secondary-hover: #6D6F78;
+  --sp-dc-select: #1E1F22;
+  --sp-dc-select-border: #1E1F22;
+  --sp-dc-mention-bg: rgb(88 101 242 / 0.3);
+  --sp-dc-mention-text: #C9CDFB;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --sp-canvas: #FFFCF3;
+  --sp-subtle: #FAF8F0;
+  --sp-surface: #FFFFFF;
+  --sp-raised: #F4F2E9;
+  --sp-raised-hover: #ECE9DE;
+  --sp-line: #E5E2D8;
+  --sp-line-strong: #8F8B7C;
+  --sp-line-hover: #6F6B5E;
+  --sp-text: #1C1917;
+  --sp-muted: #686459;
+  --sp-brand: #FACC15;
+  --sp-brand-hover: #EAB308;
+  --sp-brand-press: #CA8A04;
+  --sp-brand-soft: #FEF9C3;
+  --sp-brand-line: rgb(202 138 4 / 0.38);
+  --sp-brand-text: #866D09;
+  --sp-brand-edge: #A16207;
+  --sp-on-brand: #1C1917;
+  --sp-success: #20773E;
+  --sp-success-soft: #E6F5EB;
+  --sp-success-line: rgb(32 119 62 / 0.28);
+  --sp-danger: #B42F2A;
+  --sp-danger-soft: #FFEFEE;
+  --sp-danger-line: rgb(180 47 42 / 0.28);
+  --sp-danger-fill: #B42F2A;
+  --sp-danger-fill-hover: #9A2621;
+  --sp-on-danger: #FFFFFF;
+  --sp-warning: #865D06;
+  --sp-warning-soft: #FDF3D7;
+  --sp-warning-line: rgb(134 93 6 / 0.3);
+  --sp-info: #1D4ED8;
+  --sp-info-soft: #EFF6FF;
+  --sp-info-line: rgb(29 78 216 / 0.25);
+  --sp-focus: rgb(161 98 7 / 0.4);
+  --sp-focus-edge: #A16207;
+  --sp-scrim: rgb(28 25 23 / 0.4);
+  --sp-tooltip-bg: #1C1917;
+  --sp-tooltip-text: #FAFAF5;
+  --sp-skeleton: #EEEBE1;
+  --sp-ring: 0 0 0 1px var(--sp-focus-edge), 0 0 0 4px var(--sp-focus);
+  --sp-ring-offset: 0 0 0 2px var(--sp-canvas), 0 0 0 3px var(--sp-focus-edge), 0 0 0 6px var(--sp-focus);
+  --sp-ring-inset: inset 0 0 0 1px var(--sp-focus-edge), inset 0 0 0 3px var(--sp-focus);
+  --sp-shadow-card: 0 1px 2px rgb(68 52 20 / 0.05);
+  --sp-shadow-sm: 0 1px 2px rgb(68 52 20 / 0.1);
+  --sp-shadow-overlay: 0 0 0 1px rgb(68 52 20 / 0.04), 0 16px 40px -12px rgb(68 52 20 / 0.26);
+  --sp-dc-bg: #FFFFFF;
+  --sp-dc-hover: #F7F7F8;
+  --sp-dc-text: #313338;
+  --sp-dc-header: #060607;
+  --sp-dc-muted: #5C5E66;
+  --sp-dc-embed: #F2F3F5;
+  --sp-dc-embed-border: #E3E5E8;
+  --sp-dc-link: #006CE7;
+  --sp-dc-secondary: #6D6F78;
+  --sp-dc-secondary-hover: #4E5058;
+  --sp-dc-select: #EBEBED;
+  --sp-dc-select-border: #E3E5E8;
+  --sp-dc-mention-bg: rgb(88 101 242 / 0.15);
+  --sp-dc-mention-text: #505CDC;
+}

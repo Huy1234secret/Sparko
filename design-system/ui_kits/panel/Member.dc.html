@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sparko · Pixel Plaza · Your pages</title>
+<link rel="stylesheet" href="../../sparko.bundle.css">
+<script src="../../assets/icons/sp-icon.js"></script>
+<style>html,body{margin:0}body{background:#111110}sp-icon{display:inline-block;width:18px;height:18px}a{color:var(--sp-brand-text)}a:hover{color:var(--sp-text)}</style>
+</helmet>
+<div data-theme="{{ theme }}" class="sp-cq" style="min-height:100vh;display:flex;flex-direction:column;background:var(--sp-canvas);color:var(--sp-text)">
+  <header style="position:sticky;top:0;z-index:30;background:var(--sp-canvas);border-bottom:1px solid var(--sp-line)">
+    <div style="max-width:1120px;margin:0 auto;padding:10px 20px 0;box-sizing:border-box;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:12px;min-height:44px">
+        <span style="font:700 18px/1 var(--sp-font-sans);letter-spacing:-0.03em">Sparko</span>
+        <span aria-hidden="true" style="width:1px;height:20px;background:var(--sp-line)"></span>
+        <span style="display:flex;align-items:center;gap:8px;min-width:0;flex:1"><span class="sp-server sp-server--tint" style="--h:85;--size:28px;border-radius:8px;font-size:11px;flex:none">PP</span><b style="font:600 14px/20px var(--sp-font-sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pixel Plaza</b></span>
+        <button class="sp-btn sp-btn--ghost sp-btn--icon" aria-label="{{ themeLabel }}" onClick="{{ toggleTheme }}"><sp-icon class="sp-i" name="{{ themeIcon }}"></sp-icon></button>
+        <div class="sp-menu-anchor" data-popover="1"><button class="sp-avatar sp-avatar--6 sp-avatar--sm" aria-label="Account: mossy_bun" aria-haspopup="menu" aria-expanded="{{ acctOpen }}" onClick="{{ toggleAcct }}">M</button>
+          <sc-if value="{{ acctOpen }}"><div class="sp-popover sp-menu" role="menu"><div class="sp-option-group" style="text-transform:none;letter-spacing:0">mossy_bun</div><button class="sp-option" role="menuitem" onClick="{{ openInDiscord }}"><sp-icon class="sp-i" name="external-link"></sp-icon>Open Pixel Plaza in Discord</button><button class="sp-option" role="menuitem" onClick="{{ signOut }}"><sp-icon class="sp-i" name="log-out"></sp-icon>Sign out</button></div></sc-if>
+        </div>
+      </div>
+      <nav class="sp-tabs" aria-label="Your pages" style="border-bottom:0">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3"><button class="sp-tab" aria-current="{{ t.cur }}" onClick="{{ t.go }}"><sp-icon class="sp-i sp-i--sm" name="{{ t.icon }}"></sp-icon>{{ t.label }}<sc-if value="{{ t.count }}"><span class="sp-count">{{ t.count }}</span></sc-if></button></sc-for>
+      </nav>
+    </div>
+  </header>
+
+  <main style="max-width:1120px;width:100%;margin:0 auto;padding:28px 20px 72px;box-sizing:border-box;display:grid;gap:28px;align-content:start">
+    <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+      <div aria-busy="true" aria-label="Loading your page" style="display:grid;gap:20px"><span class="sp-skel sp-skel--title" style="width:260px"></span><div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))"><span class="sp-skel sp-skel--block" style="height:150px"></span><span class="sp-skel sp-skel--block" style="height:150px"></span></div><span class="sp-skel sp-skel--block" style="height:220px"></span></div>
+    </sc-if>
+    <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+      <div class="sp-card"><div class="sp-empty sp-empty--error" role="alert"><div class="sp-empty__art"><sp-icon class="sp-i" name="cloud-off"></sp-icon></div><div class="sp-empty__title">Couldn’t load your page</div><p class="sp-empty__desc">Sparko didn’t hear back from Discord in time. Your XP, Sparks and tickets are safe.</p><span class="sp-empty__code">Error 504 · req_9b2f71</span><div class="sp-empty__actions"><button class="sp-btn sp-btn--secondary" onClick="{{ retry }}"><sp-icon class="sp-i" name="refresh-cw"></sp-icon>Try again</button></div></div></div>
+    </sc-if>
+    <sc-if value="{{ isNotMember }}" hint-placeholder-val="{{ false }}">
+      <div class="sp-card"><div class="sp-empty sp-sparks"><div class="sp-empty__art"><sp-icon class="sp-i" name="users"></sp-icon></div><div class="sp-empty__title">You’re not in Pixel Plaza</div><p class="sp-empty__desc">These pages show your level, Sparks and tickets for one server. Join it in Discord, then come back here.</p><div class="sp-empty__actions"><button class="sp-btn sp-btn--primary" onClick="{{ openInDiscord }}">Join Pixel Plaza</button></div></div></div>
+    </sc-if>
+
+    <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ true }}">
+      <section aria-labelledby="pf-h" style="display:grid;gap:20px">
+        <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Your profile</span><h1 id="pf-h" class="sp-page-head__title">Hi, mossy_bun</h1></div>
+        <div style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));align-items:start">
+          <div style="display:grid;gap:12px">
+            <div style="container-type:inline-size">
+              <div role="img" aria-label="{{ rc.aria }}" style="{{ rc.cardStyle }}">
+                <span class="sp-avatar--6" style="{{ rc.avStyle }}">M</span>
+                <span style="display:grid;gap:8px;min-width:0">
+                  <span style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-width:0"><span style="font:700 clamp(15px,4.4cqi,21px)/1.2 var(--sp-font-sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">mossy_bun</span><span style="display:flex;gap:12px;flex:none;font:600 clamp(11px,2.8cqi,13px)/1 var(--sp-font-sans);color:#B9B0A2"><span>RANK <b style="font:700 clamp(16px,5cqi,24px)/1 var(--sp-font-sans);color:#F5F1EA">#3</b></span><span>LEVEL <b style="{{ rc.lvStyle }}">{{ lv.lv }}</b></span></span></span>
+                  <span style="display:block;height:clamp(10px,3cqi,14px);border-radius:999px;background:#35312B;overflow:hidden"><span style="{{ rc.barStyle }}"></span></span>
+                  <span style="display:flex;justify-content:space-between;gap:8px;font:500 clamp(11px,2.6cqi,12px)/1 var(--sp-font-mono);color:#B9B0A2"><span>{{ lv.into }} / {{ lv.need }} XP</span><span>Pixel Plaza</span></span>
+                </span>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="sp-label" id="acc-l" style="margin-right:4px">Your accent</span><div class="sp-seg" role="radiogroup" aria-labelledby="acc-l" style="flex-wrap:wrap"><sc-for list="{{ accents }}" as="a" hint-placeholder-count="4"><button class="sp-seg__item" role="radio" aria-checked="{{ a.sel }}" aria-label="{{ a.name }}" onClick="{{ a.pick }}"><span class="sp-dot" style="color:{{ a.hex }}"></span>{{ a.name }}</button></sc-for></div></div>
+          </div>
+          <div class="sp-card"><div class="sp-card__body" style="gap:14px">
+            <dl style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0">
+              <div style="display:grid;gap:2px"><dt class="sp-hint">Level</dt><dd style="margin:0;font:var(--sp-text-stat)" class="sp-tnum">{{ lv.lv }}</dd></div>
+              <div style="display:grid;gap:2px"><dt class="sp-hint">Rank</dt><dd style="margin:0;font:var(--sp-text-stat)" class="sp-tnum">#3</dd></div>
+              <div style="display:grid;gap:2px"><dt class="sp-hint">Sparks</dt><dd style="margin:0;font:var(--sp-text-stat)" class="sp-tnum">{{ balShort }}</dd></div>
+            </dl>
+            <p style="margin:0;font:400 14px/22px var(--sp-font-sans);text-wrap:pretty">{{ lvNextText }}</p>
+            <div style="display:flex;gap:10px;align-items:center;padding:12px;border-radius:10px;background:var(--sp-subtle);border:1px solid var(--sp-line)"><sp-icon class="sp-i" name="award" style="color:var(--sp-brand-text);flex:none"></sp-icon><span style="font:400 14px/20px var(--sp-font-sans)"><b>Level 20</b> gives you <b>@Gallery curator</b> and 2× entries in art jams.</span></div>
+          </div></div>
+        </div>
+      </section>
+
+      <section class="sp-card" aria-labelledby="rl-h">
+        <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="rl-h">Your roles</h2><p class="sp-card__sub">Changes apply in Discord straight away.</p></div></div>
+        <div class="sp-card__body" style="gap:22px">
+          <sc-if value="{{ roleErr }}"><div class="sp-notice sp-notice--danger" role="alert"><sp-icon class="sp-i sp-notice__icon" name="circle-x"></sp-icon><div class="sp-notice__title">Couldn’t change @{{ roleErr }}</div><div class="sp-notice__body">Discord didn’t answer. Nothing changed, so you can try again.</div><div class="sp-notice__actions"><button class="sp-link-btn" onClick="{{ retryRole }}">Try again</button></div></div></sc-if>
+          <fieldset style="border:0;margin:0;padding:0;display:grid;gap:10px"><legend class="sp-label" style="margin-bottom:8px">Name colour <span class="sp-label__opt">· pick one</span></legend>
+            <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ colours }}" as="c" hint-placeholder-count="4"><label class="sp-chip sp-chip--toggle" aria-pressed="{{ c.has }}" style="cursor:pointer;gap:8px"><input class="sp-sr-only" type="radio" name="colour" checked="{{ c.has }}" onChange="{{ c.pick }}"><span aria-hidden="true" style="{{ c.dot }}"></span>{{ c.role }}<sc-if value="{{ c.busy }}"><span class="sp-spinner" aria-label="Applying"></span></sc-if></label></sc-for><button class="sp-btn sp-btn--ghost sp-btn--sm" disabled="{{ noColour }}" onClick="{{ clearColour }}">No colour</button></div>
+          </fieldset>
+          <fieldset style="border:0;margin:0;padding:0;display:grid;gap:10px"><legend class="sp-label" style="margin-bottom:8px">Pronouns <span class="sp-label__opt">· pick any</span></legend>
+            <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ pronouns }}" as="c" hint-placeholder-count="4"><button class="sp-chip sp-chip--toggle" aria-pressed="{{ c.has }}" onClick="{{ c.pick }}">{{ c.role }}<sc-if value="{{ c.busy }}"><span class="sp-spinner" aria-label="Applying"></span></sc-if></button></sc-for></div>
+          </fieldset>
+          <div style="display:grid;gap:4px"><span class="sp-label" style="margin-bottom:4px">Notifications</span>
+            <sc-for list="{{ pings }}" as="c" hint-placeholder-count="3"><label class="sp-switch" style="justify-content:space-between;width:100%;padding:6px 0"><span class="sp-switch__text"><span>{{ c.label }}</span><span class="sp-switch__desc">{{ c.desc }}</span></span><sc-if value="{{ c.busy }}"><span class="sp-spinner" aria-label="Applying"></span></sc-if><input class="sp-choice-input" type="checkbox" role="switch" checked="{{ c.has }}" onChange="{{ c.pick }}"><span class="sp-switch__track"><span class="sp-switch__thumb"></span></span></label></sc-for>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="hn-h" style="display:grid;gap:16px">
+        <h2 id="hn-h" style="margin:0;font:var(--sp-text-h2)">Happening in Pixel Plaza</h2>
+        <div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));align-items:start">
+          <article class="sp-card" aria-labelledby="pl-h"><div class="sp-card__body" style="gap:12px">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="sp-page-head__eyebrow" style="margin:0"><span>{{ pollMeta }}</span></span><span class="sp-badge sp-badge--sm sp-badge--success">Open</span></div>
+            <h3 id="pl-h" style="margin:0;font:var(--sp-text-h3)">Next art jam theme?</h3>
+            <sc-if value="{{ pollNotVoted }}"><div role="radiogroup" aria-labelledby="pl-h" style="display:grid;gap:8px"><sc-for list="{{ pollOpts }}" as="o" hint-placeholder-count="4"><button class="sp-btn sp-btn--secondary" role="radio" aria-checked="false" style="justify-content:flex-start" onClick="{{ o.vote }}">{{ o.t }}</button></sc-for></div><p class="sp-hint">You’ll see results after you vote. Votes are anonymous.</p></sc-if>
+            <sc-if value="{{ pollVoted }}"><div style="display:grid;gap:10px"><sc-for list="{{ pollOpts }}" as="o"><div style="display:grid;gap:4px"><div style="display:flex;justify-content:space-between;gap:8px;font:400 14px/20px var(--sp-font-sans)"><span style="{{ o.labelStyle }}">{{ o.t }}<sc-if value="{{ o.mine }}"> <span class="sp-badge sp-badge--sm sp-badge--brand">Your vote</span></sc-if></span><span class="sp-tnum" style="color:var(--sp-muted)">{{ o.pct }}%</span></div><div class="sp-progress sp-progress--sm" role="progressbar" aria-label="{{ o.t }}" aria-valuenow="{{ o.pct }}" aria-valuemin="0" aria-valuemax="100"><div class="sp-progress__bar" style="{{ o.barStyle }}"></div></div></div></sc-for></div><button class="sp-link-btn" style="justify-self:start" onClick="{{ unvote }}">Change my vote</button></sc-if>
+          </div></article>
+          <article class="sp-card" aria-labelledby="gv-h"><div class="sp-card__body" style="gap:12px">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="sp-page-head__eyebrow" style="margin:0">Giveaway · 1 day 6 h left</span><span class="sp-badge sp-badge--sm sp-badge--success">Running</span></div>
+            <h3 id="gv-h" style="margin:0;font:var(--sp-text-h3)">Custom role colour for a month</h3>
+            <p class="sp-hint" style="margin:0;display:flex;gap:6px;align-items:center"><sp-icon class="sp-i sp-i--sm" name="circle-check" style="color:var(--sp-success)"></sp-icon>You meet the rules: level 5 or higher.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between"><span style="font:400 14px/20px var(--sp-font-sans)"><b class="sp-tnum">{{ gvEntries }}</b> entries · 2 winners</span><sc-if value="{{ gvOut }}"><button class="sp-btn sp-btn--primary" aria-busy="{{ gvBusy }}" onClick="{{ gvEnter }}"><sc-if value="{{ gvBusy }}"><span class="sp-spinner"></span></sc-if><sc-if value="{{ gvIdle }}"><sp-icon class="sp-i" name="party-popper"></sp-icon></sc-if>Enter</button></sc-if><sc-if value="{{ gvIn }}"><span style="display:flex;gap:8px;align-items:center"><span class="sp-badge sp-badge--success"><sp-icon class="sp-i" name="check"></sp-icon>You’re in</span><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ gvLeave }}">Leave</button></span></sc-if></div>
+          </div></article>
+        </div>
+        <div class="sp-card" style="padding:0;overflow:hidden">
+          <div class="sp-card__head"><div class="sp-card__titles"><h3 class="sp-card__title">Upcoming events</h3><p class="sp-card__sub">Times are in your time zone. Sparko DMs you 1 day and 1 hour before.</p></div></div>
+          <sc-for list="{{ events }}" as="e" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:56px minmax(0,1fr);gap:14px;padding:16px 20px;border-top:1px solid var(--sp-line);align-items:start">
+              <div aria-hidden="true" style="display:grid;justify-items:center;padding:6px 0;border-radius:10px;background:var(--sp-raised)"><span style="font:700 11px/14px var(--sp-font-sans);letter-spacing:0.06em;text-transform:uppercase;color:var(--sp-muted)">{{ e.mon }}</span><span style="font:700 22px/26px var(--sp-font-sans)">{{ e.day }}</span></div>
+              <div style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;min-width:0">
+                <span style="display:grid;gap:2px;min-width:0;flex:1 1 220px"><b style="font:600 15px/22px var(--sp-font-sans)">{{ e.title }}</b><span class="sp-hint">{{ e.when }} · {{ e.where }} · {{ e.countText }}</span><sc-if value="{{ e.statusText }}"><span style="font:500 13px/18px var(--sp-font-sans);color:{{ e.statusColor }}">{{ e.statusText }}</span></sc-if></span>
+                <sc-if value="{{ e.open }}"><div class="sp-seg" role="radiogroup" aria-label="Your RSVP for {{ e.title }}"><sc-for list="{{ e.opts }}" as="o"><button class="sp-seg__item" role="radio" aria-checked="{{ o.sel }}" onClick="{{ o.pick }}">{{ o.label }}</button></sc-for></div></sc-if>
+                <sc-if value="{{ e.isFull }}"><sc-if value="{{ e.waiting }}"><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ e.leaveWait }}">Leave the waitlist</button></sc-if><sc-if value="{{ e.notWaiting }}"><button class="sp-btn sp-btn--secondary sp-btn--sm" onClick="{{ e.joinWait }}">Join the waitlist</button></sc-if></sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isWallet }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Wallet & shop</span><h1 class="sp-page-head__title">Your Sparks</h1><p class="sp-page-head__desc">Sparks are just for fun in Pixel Plaza. They can’t be bought with or turned into real money.</p></div>
+      <sc-if value="{{ ecoOff }}"><div class="sp-card"><div class="sp-empty"><div class="sp-empty__art"><sp-icon class="sp-i" name="circle-pause"></sp-icon></div><div class="sp-empty__title">The shop is closed for now</div><p class="sp-empty__desc">Pixel Plaza’s staff turned off Sparks for a while. Your balance of ✦ 4,820 and everything you own are kept.</p></div></div></sc-if>
+      <sc-if value="{{ ecoOn }}">
+        <div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));align-items:stretch">
+          <section class="sp-card" aria-labelledby="bal-h"><div class="sp-card__body" style="gap:14px">
+            <h2 id="bal-h" class="sp-hint" style="margin:0;font-weight:500">Balance</h2>
+            <span style="font:700 44px/1 var(--sp-font-sans);letter-spacing:-0.03em" class="sp-tnum" aria-live="polite">✦ {{ bal }}</span>
+            <div style="display:flex;flex-wrap:wrap;gap:8px"><button class="sp-btn sp-btn--secondary" aria-haspopup="dialog" onClick="{{ openSend }}"><sp-icon class="sp-i" name="send"></sp-icon>Send Sparks</button></div>
+          </div></section>
+          <section class="sp-card" aria-labelledby="dl-h"><div class="sp-card__body" style="gap:14px">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><h2 id="dl-h" style="margin:0;font:var(--sp-text-h3)">Daily reward</h2><span class="sp-badge sp-badge--sm sp-badge--warning"><sp-icon class="sp-i" name="flame"></sp-icon>{{ streakText }}</span></div>
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px" role="img" aria-label="{{ streakAria }}"><sc-for list="{{ streakDays }}" as="d" hint-placeholder-count="7"><span style="{{ d.style }}">{{ d.n }}</span></sc-for></div>
+            <sc-if value="{{ canClaim }}"><button class="sp-btn sp-btn--primary" aria-busy="{{ claiming }}" onClick="{{ claim }}"><sc-if value="{{ claiming }}"><span class="sp-spinner"></span></sc-if><sc-if value="{{ notClaiming }}"><sp-icon class="sp-i" name="gift"></sp-icon></sc-if>{{ claimLabel }}</button></sc-if>
+            <sc-if value="{{ claimed }}"><p style="margin:0;display:flex;gap:8px;align-items:center;font:500 14px/20px var(--sp-font-sans)"><sp-icon class="sp-i" name="circle-check" style="color:var(--sp-success)"></sp-icon>Claimed today. Come back in {{ nextClaim }} to keep your streak.</p></sc-if>
+          </div></section>
+        </div>
+
+        <section aria-labelledby="shop-h" style="display:grid;gap:16px">
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between"><h2 id="shop-h" style="margin:0;font:var(--sp-text-h2)">Shop</h2><div class="sp-seg" role="radiogroup" aria-label="Show" style="flex-wrap:wrap"><sc-for list="{{ shopFilters }}" as="f" hint-placeholder-count="4"><button class="sp-seg__item" role="radio" aria-checked="{{ f.sel }}" onClick="{{ f.pick }}">{{ f.label }}</button></sc-for></div></div>
+          <div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))">
+            <sc-for list="{{ shop }}" as="it" hint-placeholder-count="6">
+              <article class="sp-card" style="display:grid;grid-template-rows:auto 1fr auto;padding:0;overflow:hidden">
+                <div aria-hidden="true" style="{{ it.artStyle }}"><sp-icon class="sp-i sp-i--xl" name="{{ it.icon }}"></sp-icon></div>
+                <div style="padding:14px 16px 0;display:grid;gap:6px;align-content:start"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><h3 style="margin:0;font:600 15px/22px var(--sp-font-sans)">{{ it.name }}</h3><sc-if value="{{ it.tag }}"><span class="{{ it.tagCls }}">{{ it.tag }}</span></sc-if></div><p class="sp-hint" style="margin:0;text-wrap:pretty">{{ it.desc }}</p></div>
+                <div style="padding:14px 16px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"><b class="sp-tnum" style="font:700 16px/22px var(--sp-font-sans)">✦ {{ it.priceText }}</b><button class="{{ it.btnCls }}" disabled="{{ it.blocked }}" aria-haspopup="dialog" onClick="{{ it.buy }}">{{ it.btn }}</button></div>
+              </article>
+            </sc-for>
+          </div>
+        </section>
+
+        <div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));align-items:start">
+          <section class="sp-card" aria-labelledby="inv-h" style="padding:0;overflow:hidden">
+            <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="inv-h">Your stuff</h2></div></div>
+            <div class="sp-rows">
+              <sc-for list="{{ inv }}" as="iv" hint-placeholder-count="2"><div class="sp-row"><span class="sp-row__icon" style="grid-row:span 2;background:var(--sp-raised);color:var(--sp-text)"><sp-icon class="sp-i" name="{{ iv.icon }}"></sp-icon></span><span class="sp-row__title">{{ iv.name }}<sc-if value="{{ iv.qtyText }}"> <span class="sp-hint" style="font-weight:400">{{ iv.qtyText }}</span></sc-if></span><span class="sp-row__desc">{{ iv.desc }}</span><span class="sp-row__end" style="grid-row:1 / span 2"><sc-if value="{{ iv.canUse }}"><button class="sp-btn sp-btn--secondary sp-btn--sm" onClick="{{ iv.use }}">{{ iv.useLabel }}</button></sc-if><sc-if value="{{ iv.active }}"><span class="sp-badge sp-badge--sm sp-badge--success">{{ iv.active }}</span></sc-if></span></div></sc-for>
+              <sc-if value="{{ invNone }}"><div class="sp-empty sp-empty--compact"><div class="sp-empty__art"><sp-icon class="sp-i" name="package"></sp-icon></div><div class="sp-empty__title">Nothing yet</div><p class="sp-empty__desc">Things you buy show up here.</p></div></sc-if>
+            </div>
+          </section>
+          <section class="sp-card" aria-labelledby="tx-h" style="padding:0;overflow:hidden">
+            <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="tx-h">Recent activity</h2></div></div>
+            <div class="sp-rows"><sc-for list="{{ txs }}" as="t" hint-placeholder-count="4"><div class="sp-row"><span class="sp-row__icon" style="grid-row:span 2;background:var(--sp-raised);color:var(--sp-text)"><sp-icon class="sp-i" name="{{ t.icon }}"></sp-icon></span><span class="sp-row__title">{{ t.text }}</span><span class="sp-row__desc">{{ t.when }}</span><span class="sp-row__end sp-tnum" style="{{ t.amtStyle }}">{{ t.amt }}</span></div></sc-for></div>
+          </section>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{ isTickets }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ ticketList }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between"><div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">My tickets</span><h1 class="sp-page-head__title">Get help from staff</h1><p class="sp-page-head__desc">Each ticket is a private thread only you and Pixel Plaza’s staff can see.</p></div><button class="sp-btn sp-btn--primary" disabled="{{ hasOpenTicket }}" aria-describedby="one-open" aria-haspopup="dialog" onClick="{{ openNew }}"><sp-icon class="sp-i" name="plus"></sp-icon>Open a ticket</button></div>
+        <sc-if value="{{ hasOpenTicket }}"><p class="sp-hint" id="one-open" style="margin:-12px 0 0;text-align:right">You can have one open ticket at a time. Add to #{{ openN }} instead.</p></sc-if>
+        <sc-if value="{{ hasTickets }}" hint-placeholder-val="{{ true }}">
+          <div class="sp-card" style="padding:0;overflow:hidden"><div class="sp-rows">
+            <sc-for list="{{ myTickets }}" as="t" hint-placeholder-count="2">
+              <button class="sp-row" onClick="{{ t.open }}" style="width:100%;border:0;background:transparent;text-align:left;cursor:pointer;color:inherit;font:inherit" style-hover="background:var(--sp-subtle)"><span class="sp-row__icon" style="grid-row:span 2;background:var(--sp-raised);color:var(--sp-text)"><sp-icon class="sp-i" name="ticket"></sp-icon></span><span class="sp-row__title"><span class="sp-tnum" style="color:var(--sp-muted);font-weight:500">#{{ t.n }}</span> {{ t.topic }}</span><span class="sp-row__desc">{{ t.sub }}</span><span class="sp-row__end" style="grid-row:1 / span 2;display:flex;gap:8px;align-items:center"><span class="{{ t.badge }}">{{ t.statusLabel }}</span><sp-icon class="sp-i sp-i--sm" name="chevron-right"></sp-icon></span></button>
+            </sc-for>
+          </div></div>
+        </sc-if>
+        <sc-if value="{{ noTickets }}" hint-placeholder-val="{{ false }}"><div class="sp-card"><div class="sp-empty sp-sparks"><div class="sp-empty__art"><sp-icon class="sp-i" name="ticket"></sp-icon></div><div class="sp-empty__title">No tickets yet</div><p class="sp-empty__desc">If something’s wrong, like a missing role or a member bothering you, open a ticket and a staff member will reply here and in Discord.</p></div></div></sc-if>
+      </sc-if>
+
+      <sc-if value="{{ ticketView }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;gap:10px"><button class="sp-link-btn" style="justify-self:start;display:inline-flex;gap:4px;align-items:center" onClick="{{ backToList }}"><sp-icon class="sp-i sp-i--sm" name="arrow-left"></sp-icon>My tickets</button>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between"><div style="display:grid;gap:6px"><span class="sp-page-head__eyebrow"><span>{{ tkEyebrow }}</span></span><h1 class="sp-page-head__title" style="text-wrap:balance">{{ tk.topic }}</h1><span style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="{{ tk.badge }}" role="status">{{ tk.statusLabel }}</span><span class="sp-hint">{{ tk.helperText }}</span></span></div>
+            <sc-if value="{{ tk.isOpen }}"><button class="sp-btn sp-btn--secondary" onClick="{{ askClose }}"><sp-icon class="sp-i" name="circle-check"></sp-icon>My problem is solved</button></sc-if>
+          </div>
+        </div>
+        <sc-if value="{{ closeAsk }}"><div class="sp-notice sp-notice--info" role="alert"><sp-icon class="sp-i sp-notice__icon" name="circle-check"></sp-icon><div class="sp-notice__title">Close this ticket?</div><div class="sp-notice__body">The thread is locked and you get a copy of the conversation by DM. You can reopen it within 7 days.</div><div class="sp-notice__actions"><button class="sp-btn sp-btn--primary sp-btn--sm" onClick="{{ doClose }}">Close ticket</button><button class="sp-btn sp-btn--ghost sp-btn--sm" autoFocus="{{ true }}" onClick="{{ keepOpen }}">Keep it open</button></div></div></sc-if>
+        <section class="sp-card" aria-label="Conversation" style="padding:0;overflow:hidden">
+          <div class="dc-chat" style="border-radius:0" role="log" aria-label="Messages in ticket {{ tk.n }}">
+            <sc-for list="{{ thread }}" as="m" hint-placeholder-count="3"><div class="dc-msg" style="{{ m.style }}"><div class="{{ m.avCls }}" style="background:var(--av, var(--sp-brand));color:var(--sp-ink)">{{ m.initial }}</div><div class="dc-head"><span class="dc-name">{{ m.name }}</span><sc-if value="{{ m.tag }}"><span class="dc-tag">{{ m.tag }}</span></sc-if><span class="dc-time">{{ m.time }}</span></div><div class="dc-content" style="text-wrap:pretty">{{ m.text }}</div><sc-if value="{{ m.failed }}"><div style="display:flex;gap:12px;align-items:center;margin-top:4px;font:400 13px/18px var(--sp-font-sans)"><span style="color:var(--sp-danger);font-weight:600">Didn’t send.</span><button class="sp-link-btn" onClick="{{ m.retry }}">Try again</button></div></sc-if></div></sc-for>
+          </div>
+          <sc-if value="{{ tk.isOpen }}"><div style="display:grid;gap:10px;padding:16px;border-top:1px solid var(--sp-line)"><div class="sp-input sp-input--multiline"><textarea rows="3" maxLength="2000" aria-label="Reply to staff" placeholder="Write a reply…" value="{{ draft }}" onChange="{{ setDraft }}" onKeyDown="{{ draftKey }}"></textarea></div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span class="sp-hint">Staff see this in Discord right away.</span><button class="sp-btn sp-btn--primary" disabled="{{ draftEmpty }}" onClick="{{ send }}"><sp-icon class="sp-i" name="send"></sp-icon>Send</button></div></div></sc-if>
+          <sc-if value="{{ tk.closed }}"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:16px;border-top:1px solid var(--sp-line);background:var(--sp-subtle)"><sp-icon class="sp-i" name="archive" style="color:var(--sp-muted)"></sp-icon><span style="flex:1 1 220px;font:400 14px/20px var(--sp-font-sans)">{{ tk.closedText }}</span><sc-if value="{{ tk.canReopen }}"><button class="sp-btn sp-btn--secondary sp-btn--sm" onClick="{{ reopen }}">Reopen</button></sc-if></div></sc-if>
+        </section>
+      </sc-if>
+    </sc-if>
+  </main>
+
+  <div class="sp-toast-region" aria-live="polite">
+    <sc-for list="{{ toasts }}" as="t"><div class="{{ t.cls }}" role="status"><sp-icon class="sp-i sp-toast__icon" name="{{ t.icon }}"></sp-icon><div class="sp-toast__title">{{ t.title }}</div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm sp-toast__close" aria-label="Dismiss" onClick="{{ t.close }}"><sp-icon class="sp-i sp-i--sm" name="x"></sp-icon></button><div class="sp-toast__body">{{ t.body }}</div></div></sc-for>
+  </div>
+
+  <sc-if value="{{ buyOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-scrim" onMouseDown="{{ scrimClose }}"><div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="buy-t">
+      <span class="sp-sheet-grip"></span>
+      <div class="sp-modal__head"><span class="sp-modal__icon"><sp-icon class="sp-i" name="{{ buy.icon }}"></sp-icon></span><div class="sp-modal__titles"><h2 class="sp-modal__title" id="buy-t">Buy {{ buy.name }}?</h2><p class="sp-modal__desc">{{ buy.after }}</p></div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="Close" onClick="{{ closeModal }}"><sp-icon class="sp-i" name="x"></sp-icon></button></div>
+      <div class="sp-modal__body"><dl class="sp-dl"><dt>Price</dt><dd class="sp-tnum">✦ {{ buy.priceText }}</dd><dt>You have</dt><dd class="sp-tnum">✦ {{ bal }}</dd><dt>Left after</dt><dd class="sp-tnum" style="font-weight:600">✦ {{ buy.leftText }}</dd></dl></div>
+      <div class="sp-modal__foot"><button class="sp-btn sp-btn--ghost" disabled="{{ buying }}" onClick="{{ closeModal }}">Cancel</button><button class="sp-btn sp-btn--primary" aria-busy="{{ buying }}" autoFocus="{{ true }}" onClick="{{ confirmBuy }}"><sc-if value="{{ buying }}"><span class="sp-spinner"></span></sc-if>{{ buyBtn }}</button></div>
+    </div></div>
+  </sc-if>
+
+  <sc-if value="{{ sendOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-scrim" onMouseDown="{{ scrimClose }}"><div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="snd-t">
+      <span class="sp-sheet-grip"></span>
+      <div class="sp-modal__head"><span class="sp-modal__icon"><sp-icon class="sp-i" name="send"></sp-icon></span><div class="sp-modal__titles"><h2 class="sp-modal__title" id="snd-t">Send Sparks</h2><p class="sp-modal__desc">{{ sendLimitText }}</p></div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="Close" onClick="{{ closeModal }}"><sp-icon class="sp-i" name="x"></sp-icon></button></div>
+      <div class="sp-modal__body" style="display:grid;gap:16px">
+        <div class="sp-field"><label class="sp-label" for="snd-to">To</label><div class="sp-input sp-input--select"><select id="snd-to" value="{{ sx.to }}" onChange="{{ setTo }}"><option value="pebble">pebble</option><option value="arlo">arlo</option><option value="jun.k">jun.k</option><option value="tomoko">tomoko</option></select></div></div>
+        <div class="sp-field"><label class="sp-label" for="snd-n">Amount</label><div class="{{ sendNBox }}" style="max-width:200px"><input id="snd-n" type="number" min="1" autoFocus="{{ true }}" value="{{ sx.n }}" onChange="{{ setN }}" aria-invalid="{{ sendBad }}" aria-describedby="snd-h"><span class="sp-input__suffix">Sparks</span></div><sc-if value="{{ sendBad }}"><p class="sp-field-error" id="snd-h"><sp-icon class="sp-i" name="circle-alert"></sp-icon>{{ sendErr }}</p></sc-if><sc-if value="{{ sendOk }}"><p class="sp-hint" id="snd-h">{{ sendAfter }}</p></sc-if></div>
+        <div class="sp-field"><label class="sp-label" for="snd-note">Note <span class="sp-label__opt">(optional)</span></label><div class="sp-input"><input id="snd-note" maxLength="100" placeholder="for the jam prize!" value="{{ sx.note }}" onChange="{{ setNote }}"></div></div>
+      </div>
+      <div class="sp-modal__foot"><button class="sp-btn sp-btn--ghost" onClick="{{ closeModal }}">Cancel</button><button class="sp-btn sp-btn--primary" onClick="{{ doSend }}">{{ sendBtn }}</button></div>
+    </div></div>
+  </sc-if>
+
+  <sc-if value="{{ newOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-scrim" onMouseDown="{{ scrimClose }}"><div class="sp-modal sp-modal--lg" role="dialog" aria-modal="true" aria-labelledby="nt-t">
+      <span class="sp-sheet-grip"></span>
+      <div class="sp-modal__head"><span class="sp-modal__icon"><sp-icon class="sp-i" name="ticket"></sp-icon></span><div class="sp-modal__titles"><h2 class="sp-modal__title" id="nt-t">Open a ticket</h2><p class="sp-modal__desc">Only you and Pixel Plaza’s staff will see it.</p></div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="Close" onClick="{{ closeModal }}"><sp-icon class="sp-i" name="x"></sp-icon></button></div>
+      <div class="sp-modal__body" style="display:grid;gap:18px">
+        <fieldset class="sp-radio-cards" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><legend class="sp-label" style="margin-bottom:8px">What’s it about?</legend><sc-for list="{{ topics }}" as="t" hint-placeholder-count="3"><label class="sp-radio-card"><input class="sp-choice-input" type="radio" name="nt-topic" checked="{{ t.sel }}" onChange="{{ t.pick }}"><span class="sp-check__box"></span><span class="sp-radio-card__title">{{ t.label }}</span></label></sc-for></fieldset>
+        <div class="sp-field"><label class="sp-label" for="nt-x">{{ ntQ }}</label><div class="{{ ntBox }}"><textarea id="nt-x" rows="4" maxLength="2000" value="{{ ntx.text }}" onChange="{{ setNt }}" aria-invalid="{{ ntBad }}"></textarea></div><sc-if value="{{ ntBad }}"><p class="sp-field-error"><sp-icon class="sp-i" name="circle-alert"></sp-icon>Tell staff a little about it, at least a sentence.</p></sc-if><p class="sp-hint">Staff usually reply within an hour.</p></div>
+      </div>
+      <div class="sp-modal__foot"><button class="sp-btn sp-btn--ghost" disabled="{{ ntBusy }}" onClick="{{ closeModal }}">Cancel</button><button class="sp-btn sp-btn--primary" aria-busy="{{ ntBusy }}" onClick="{{ submitNt }}"><sc-if value="{{ ntBusy }}"><span class="sp-spinner"></span></sc-if>{{ ntBtn }}</button></div>
+    </div></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;},&quot;startPage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;profile&quot;,&quot;wallet&quot;,&quot;tickets&quot;],&quot;default&quot;:&quot;profile&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;demoState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;loading&quot;,&quot;error&quot;,&quot;notMember&quot;,&quot;roleFail&quot;,&quot;claimed&quot;,&quot;broke&quot;,&quot;economyOff&quot;,&quot;noTickets&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const lvNeed = n => 5 * n * n + 50 * n + 100;
+const lvFrom = xp => { let l = 0; while (xp >= lvNeed(l)) { xp -= lvNeed(l); l++; } return { lv: l, into: xp, need: lvNeed(l) }; };
+const ACCENTS = [['Sparko yellow', '#FACC15'], ['Blurple', '#7983F5'], ['Mint', '#57F287'], ['Coral', '#F47B7D']];
+const COLOURS = [['Red', '#ED4245'], ['Blue', '#5B8DEF'], ['Green', '#3BA55D'], ['Purple', '#9B6CF0']];
+const PRONOUNS = ['he/him', 'she/her', 'they/them', 'Ask my pronouns'];
+const PINGS = [['Event pings', 'Events', 'When an event is about to start.'], ['Art jam pings', 'Art jams', 'When a jam opens or results are in.'], ['Announcement pings', 'Big news', 'Only important announcements.']];
+const POLL = { opts: ['Underwater', 'Tiny worlds', 'Retro arcade', 'Botanical'], votes: [48, 61, 33, 22] };
+const EVENTS = [{ id: 1, title: 'Drawing night: tiny worlds', date: '2026-10-16', time: '20:00', where: 'Stage', going: 34, cap: 0 }, { id: 2, title: 'Portfolio review circle', date: '2026-10-19', time: '19:00', where: 'Chill VC', going: 12, cap: 12, wait: 4 }, { id: 3, title: 'Spring jam kickoff', date: '2026-10-24', time: '15:00', where: 'Stage', going: 61, cap: 0 }];
+const SHOP = [
+  { id: 'neon', name: 'Neon name', kind: 'roles', icon: 'sparkles', desc: 'A bright yellow name colour for 30 days.', price: 2500, hue: 85 },
+  { id: 'icon', name: 'Custom role icon', kind: 'roles', icon: 'image', desc: 'A small icon next to your name, picked by you.', price: 5200, hue: 280 },
+  { id: 'curator', name: 'Gallery curator', kind: 'roles', icon: 'award', desc: 'Pin art in #art-share. Unlocks at level 20.', price: 3000, minLv: 20, hue: 150 },
+  { id: 'boost', name: 'XP boost · 1 hour', kind: 'boosts', icon: 'zap', desc: 'Double XP from chatting for one hour.', price: 800, stack: true, hue: 50 },
+  { id: 'jam', name: 'Extra jam entry', kind: 'fun', icon: 'palette', desc: 'Submit one more piece to this month’s art jam.', price: 300, stock: 4, stack: true, hue: 20 },
+  { id: 'founder', name: 'Founder badge', kind: 'fun', icon: 'crown', desc: 'From the server’s first year. Gone for good.', price: 1000, stock: 0, hue: 330 }
+];
+const TICKETS = [
+  { n: 212, topic: 'Art jam entry didn’t post', cat: 'Events', status: 'open', helper: 'quinn.dev', opened: 'Today at 16:50', msgs: [{ who: 'Sparko', bot: true, text: 'Thanks for opening a ticket. Which jam, and what did you submit?', time: 'Today at 16:50' }, { who: 'mossy_bun', text: 'I submitted my piece with /jam submit but it never showed up in #art-share.', time: 'Today at 16:51' }, { who: 'quinn.dev', staff: true, text: 'Thanks! I can see it in the queue. It got stuck when Sparko restarted. I’ve pushed it through, can you check #art-share?', time: 'Today at 17:02' }] },
+  { n: 198, topic: 'Lost my colour role', cat: 'Roles', status: 'closed', closedBy: 'Rhea', reason: 'Solved', opened: '2 Oct', closedAt: '2 Oct', msgs: [{ who: 'mossy_bun', text: 'My Blue role vanished after the update.', time: '2 Oct at 10:30' }, { who: 'Rhea', staff: true, text: 'Fixed! The colour menu had reset. It’s back now.', time: '2 Oct at 10:44' }] }
+];
+const TOPICS = [['access', 'Access & roles', 'Which channel or role is missing for you?'], ['report', 'Report a member', 'Who is it, and what happened? Screenshots help a lot.'], ['other', 'Something else', 'What can we help with?']];
+const AV = { Sparko: 0, 'mossy_bun': 6, 'quinn.dev': 2, Rhea: 5 };
+
+class Component extends DCLogic {
+  state = (() => {
+    let qp = {}; try { qp = Object.fromEntries(new URLSearchParams(window.location.search)); } catch (e) {}
+    const demo = qp.state || this.props.demoState || 'none';
+    return {
+      theme: qp.theme || this.props.theme || 'dark', page: qp.page || this.props.startPage || 'profile', demo, loading: demo === 'loading', errored: demo === 'error',
+      acctOpen: false, accent: '#FACC15', have: ['Blue', 'she/her', 'Event pings'], busyRole: null, roleErr: null, failNext: demo === 'roleFail',
+      vote: null, gvIn: false, gvBusy: false, rsvp: { 1: 'going', 2: null, 3: null }, waitlist: {},
+      bal: demo === 'broke' ? 120 : 4820, streak: 4, claimedToday: demo === 'claimed', claiming: false, sentToday: 300, shopF: 'all', owned: { neon: 1, boost: 1 }, boostOn: false, stock: { jam: 4, founder: 0 },
+      txs: [['shopping-bag', 'Bought Neon name', '3 days ago', -2500], ['gift', 'Daily reward · 4-day streak', 'Yesterday', 195], ['award', 'Art jam entry bonus', '2 days ago', 500], ['send', 'From pebble: “for the colour idea”', 'Last week', 300]],
+      buyId: null, buying: false, sx: null, tickets: demo === 'noTickets' ? [] : TICKETS, tid: null, draft: '', closeAsk: false, ntx: null, ntBusy: false, toasts: [], modal: null
+    };
+  })();
+  _id = 0;
+  componentDidMount() {
+    this._key = e => { if (e.key === 'Escape') { if (this.state.modal) this.setState({ modal: null }); else this.setState({ acctOpen: false, closeAsk: false }); } };
+    this._down = e => { if (this.state.acctOpen && !(e.target.closest && e.target.closest('[data-popover]'))) this.setState({ acctOpen: false }); };
+    document.addEventListener('keydown', this._key); document.addEventListener('mousedown', this._down);
+    if (this.state.loading) this.later(() => this.setState({ loading: false }), 1200);
+  }
+  componentWillUnmount() { document.removeEventListener('keydown', this._key); document.removeEventListener('mousedown', this._down); (this._t || []).forEach(clearTimeout); }
+  later(fn, ms) { (this._t = this._t || []).push(setTimeout(fn, ms)); }
+  toast(tone, title, body) { const id = ++this._id; const icon = { success: 'circle-check', danger: 'circle-x', info: 'info' }[tone]; this.setState(s => ({ toasts: [...s.toasts.slice(-2), { id, tone, icon, title, body }] })); this.later(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 5000); }
+  go(page) { this.setState({ page, tid: null, closeAsk: false, acctOpen: false }); try { window.scrollTo(0, 0); } catch (e) {} }
+  setRoles(role, next, msg) {
+    this.setState({ busyRole: role, roleErr: null });
+    this.later(() => { if (this.state.failNext) return this.setState({ busyRole: null, roleErr: role, failNext: false, retryArgs: [role, next, msg] }); this.setState({ busyRole: null, have: next }); this.toast('success', msg, 'You’ll see it in Discord now.'); }, 700);
+  }
+  updT(n, p) { this.setState(s => ({ tickets: s.tickets.map(t => t.n === n ? { ...t, ...p } : t) })); }
+  send = () => {
+    const s = this.state; const text = s.draft.trim(); if (!text) return; const t = s.tickets.find(x => x.n === s.tid);
+    const m = { who: 'mossy_bun', text, time: 'Sending…', id: ++this._id };
+    this.updT(t.n, { msgs: [...t.msgs, m] }); this.setState({ draft: '' });
+    this.later(() => this.setState(st => ({ tickets: st.tickets.map(x => x.n === t.n ? { ...x, msgs: x.msgs.map(y => y.id === m.id ? { ...y, time: 'Just now' } : y) } : x) })), 600);
+  };
+  renderVals() {
+    const s = this.state; const dark = s.theme === 'dark'; const lv = lvFrom(12800);
+    const ready = !s.loading && !s.errored && s.demo !== 'notMember';
+    const openT = s.tickets.find(t => t.status === 'open');
+    const tk0 = s.tickets.find(t => t.n === s.tid);
+    const accText = s.accent;
+    const daily = Math.round(150 * (1 + 0.1 * Math.min(6, s.streak)));
+    const sx = s.sx || { to: 'pebble', n: '', note: '', tried: false }; const sN = +sx.n; const capLeft = 5000 - s.sentToday;
+    const sErr = sx.n === '' || !Number.isInteger(sN) || sN < 1 ? 'Enter a whole number above 0.' : sN > s.bal ? `You have ✦ ${fmt(s.bal)}.` : sN > capLeft ? `You can send ✦ ${fmt(capLeft)} more today.` : '';
+    const buyIt = SHOP.find(i => i.id === s.buyId) || SHOP[0];
+    const ntx = s.ntx || { topic: 'access', text: '', tried: false }; const ntBad = ntx.tried && ntx.text.trim().length < 10;
+    const tabs = [['profile', 'Profile', 'user', null], ['wallet', 'Wallet & shop', 'wallet', null], ['tickets', 'My tickets', 'ticket', openT ? 1 : null]];
+    return {
+      theme: s.theme, themeIcon: dark ? 'sun' : 'moon', themeLabel: dark ? 'Switch to light theme' : 'Switch to dark theme', toggleTheme: () => this.setState({ theme: dark ? 'light' : 'dark' }),
+      acctOpen: s.acctOpen, toggleAcct: () => this.setState({ acctOpen: !s.acctOpen }), openInDiscord: () => { this.setState({ acctOpen: false }); this.toast('info', 'Discord would open here', 'Straight into Pixel Plaza.'); }, signOut: () => { this.setState({ acctOpen: false }); this.toast('success', 'Signed out', 'See you soon.'); },
+      tabs: tabs.map(([k, label, icon, count]) => ({ label, icon, count, cur: s.page === k ? 'page' : undefined, go: () => this.go(k) })),
+      isLoading: s.loading, isError: s.errored, isNotMember: s.demo === 'notMember', retry: () => { this.setState({ errored: false, loading: true }); this.later(() => this.setState({ loading: false }), 900); },
+      isProfile: ready && s.page === 'profile', isWallet: ready && s.page === 'wallet', isTickets: ready && s.page === 'tickets',
+      lv: { lv: lv.lv, into: fmt(lv.into), need: fmt(lv.need) }, balShort: s.bal >= 10000 ? (s.bal / 1000).toFixed(1) + 'k' : fmt(s.bal),
+      lvNextText: `${fmt(lv.need - lv.into)} XP to level ${lv.lv + 1}. That’s about ${Math.ceil((lv.need - lv.into) / 20)} more messages, counted at most once a minute.`,
+      rc: { aria: `Your rank card: level ${lv.lv}, rank 3, ${fmt(lv.into)} of ${fmt(lv.need)} XP to the next level`,
+        cardStyle: { display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', gap: 'clamp(12px,4cqi,20px)', alignItems: 'center', padding: 'clamp(14px,5cqi,24px)', borderRadius: '16px', background: 'radial-gradient(#35312B 1.2px, transparent 1.6px) 0 0 / 14px 14px, #1C1A17', color: '#F5F1EA' },
+        avStyle: { width: 'clamp(52px,17cqi,80px)', aspectRatio: '1', borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--av)', color: '#1C1A17', font: '700 clamp(20px,6cqi,30px)/1 var(--sp-font-sans)', boxShadow: `0 0 0 3px #1C1A17, 0 0 0 6px ${s.accent}` },
+        barStyle: { display: 'block', height: '100%', width: Math.round(lv.into * 100 / lv.need) + '%', borderRadius: '999px', background: s.accent, transition: 'width var(--sp-dur-slow) var(--sp-ease-out)' },
+        lvStyle: { font: '700 clamp(16px,5cqi,24px)/1 var(--sp-font-sans)', color: accText } },
+      accents: ACCENTS.map(([name, hex]) => ({ name, hex, sel: s.accent === hex, pick: () => { this.setState({ accent: hex }); this.toast('success', 'Accent updated', '/rank uses it from now on.'); } })),
+      roleErr: s.roleErr, retryRole: () => { const [r, n, m] = s.retryArgs; this.setRoles(r, n, m); },
+      colours: COLOURS.map(([role, hex]) => ({ role, has: s.have.includes(role), busy: s.busyRole === role, dot: { width: '12px', height: '12px', borderRadius: '50%', background: hex, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.2)' }, pick: () => { if (s.busyRole || s.have.includes(role)) return; const old = COLOURS.map(c => c[0]).find(c => s.have.includes(c)); this.setRoles(role, [...s.have.filter(r => !COLOURS.some(c => c[0] === r)), role], old ? `Swapped @${old} for @${role}` : `You now have @${role}`); } })),
+      noColour: !COLOURS.some(c => s.have.includes(c[0])) || !!s.busyRole, clearColour: () => { const old = COLOURS.map(c => c[0]).find(c => s.have.includes(c)); this.setRoles(old, s.have.filter(r => r !== old), `Removed @${old}`); },
+      pronouns: PRONOUNS.map(role => ({ role, has: s.have.includes(role), busy: s.busyRole === role, pick: () => { if (s.busyRole) return; const has = s.have.includes(role); this.setRoles(role, has ? s.have.filter(r => r !== role) : [...s.have, role], has ? `Removed @${role}` : `You now have @${role}`); } })),
+      pings: PINGS.map(([role, label, desc]) => ({ label, desc, has: s.have.includes(role), busy: s.busyRole === role, pick: () => { if (s.busyRole) return; const has = s.have.includes(role); this.setRoles(role, has ? s.have.filter(r => r !== role) : [...s.have, role], has ? `${label} pings are off` : `${label} pings are on`); } })),
+      tkEyebrow: tk0 ? `Ticket #${tk0.n} · ${tk0.cat}` : '',
+      pollMeta: `Poll · ${fmt(POLL.votes.reduce((a, z) => a + z, 0) + (s.vote !== null ? 1 : 0))} votes · closes in 2 days`, pollNotVoted: s.vote === null, pollVoted: s.vote !== null, unvote: () => this.setState({ vote: null }),
+      pollOpts: POLL.opts.map((t, i) => { const v = POLL.votes.map((x, j) => x + (s.vote === j ? 1 : 0)); const tot = v.reduce((a, z) => a + z, 0); const pct = Math.round(v[i] * 100 / tot); const lead = v[i] === Math.max(...v); return { t, pct, mine: s.vote === i, labelStyle: { fontWeight: lead ? 600 : 400 }, barStyle: { width: pct + '%', background: s.vote === i ? undefined : 'var(--sp-line-strong)' }, vote: () => { this.setState({ vote: i }); this.toast('success', 'Vote counted', `You picked ${t}.`); } }; }),
+      gvEntries: fmt(214 + (s.gvIn ? 1 : 0)), gvIn: s.gvIn, gvOut: !s.gvIn, gvBusy: s.gvBusy, gvIdle: !s.gvBusy,
+      gvEnter: () => { this.setState({ gvBusy: true }); this.later(() => { this.setState({ gvBusy: false, gvIn: true }); this.toast('success', 'You’re entered', 'Winners are picked tomorrow at 00:30. Good luck!'); }, 600); }, gvLeave: () => this.setState({ gvIn: false }),
+      events: EVENTS.map(e => { const d = new Date(e.date + 'T' + e.time); const mine = s.rsvp[e.id]; const full = e.cap && e.going >= e.cap && mine !== 'going'; const going = e.going + (mine === 'going' && e.id !== 1 ? 1 : 0); const w = s.waitlist[e.id];
+        return { ...e, mon: d.toLocaleDateString('en-GB', { month: 'short' }), day: d.getDate(), when: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), countText: e.cap ? `${going} of ${e.cap} spots taken` : `${going} going`,
+          open: !full, isFull: !!full, waiting: !!w, notWaiting: !w, statusText: full ? (w ? `You’re #${(e.wait || 0) + 1} on the waitlist. Sparko DMs you if a spot opens.` : 'Full. Join the waitlist to get the next spot.') : mine === 'going' ? 'You’re going' : '', statusColor: full ? 'var(--sp-warning)' : 'var(--sp-success)',
+          joinWait: () => { this.setState(st => ({ waitlist: { ...st.waitlist, [e.id]: true } })); this.toast('success', 'You’re on the waitlist', `You’re #${(e.wait || 0) + 1}. If someone drops out, the spot is yours.`); }, leaveWait: () => this.setState(st => ({ waitlist: { ...st.waitlist, [e.id]: false } })),
+          opts: [['going', 'Going'], ['maybe', 'Maybe'], ['no', 'Can’t go']].map(([k, label]) => ({ label, sel: mine === k, pick: () => { this.setState(st => ({ rsvp: { ...st.rsvp, [e.id]: mine === k ? null : k } })); if (mine !== k && k === 'going') this.toast('success', `You’re going to ${e.title}`, 'You’ll get @Attending and a reminder before it starts.'); } })) }; }),
+      ecoOff: s.demo === 'economyOff', ecoOn: s.demo !== 'economyOff', bal: fmt(s.bal),
+      openSend: () => this.setState({ modal: 'send', sx: { to: 'pebble', n: '', note: '', tried: false } }),
+      streakText: `${s.streak + (s.claimedToday ? 1 : 0)}-day streak`, streakAria: `Streak: ${s.streak + (s.claimedToday ? 1 : 0)} of 7 days`,
+      streakDays: [1, 2, 3, 4, 5, 6, 7].map(n => { const done = n <= s.streak + (s.claimedToday ? 1 : 0); const today = n === s.streak + 1 && !s.claimedToday; return { n, style: { display: 'grid', placeItems: 'center', height: '36px', borderRadius: '8px', font: '600 13px/1 var(--sp-font-sans)', background: done ? 'var(--sp-brand)' : 'var(--sp-raised)', color: done ? 'var(--sp-ink)' : 'var(--sp-muted)', boxShadow: today ? 'inset 0 0 0 2px var(--sp-brand-edge)' : 'none' } }; }),
+      canClaim: !s.claimedToday, claimed: s.claimedToday, claiming: s.claiming, notClaiming: !s.claiming, claimLabel: s.claiming ? 'Claiming…' : `Claim ✦ ${fmt(daily)}`, nextClaim: '23 h 12 min',
+      claim: () => { this.setState({ claiming: true }); this.later(() => { this.setState(st => ({ claiming: false, claimedToday: true, bal: st.bal + daily, txs: [['gift', `Daily reward · ${st.streak + 1}-day streak`, 'Just now', daily], ...st.txs] })); this.toast('success', `+✦ ${fmt(daily)}`, `That’s day ${s.streak + 1}. Day 7 pays ✦ ${fmt(150 * 1.6)}.`); }, 600); },
+      shopFilters: [['all', 'All'], ['roles', 'Roles'], ['boosts', 'Boosts'], ['fun', 'Fun']].map(([k, label]) => ({ label, sel: s.shopF === k, pick: () => this.setState({ shopF: k }) })),
+      shop: SHOP.filter(i => s.shopF === 'all' || i.kind === s.shopF).map(i => { const owned = !i.stack && s.owned[i.id]; const stock = i.stock === undefined ? null : s.stock[i.id]; const lvBlock = i.minLv && lv.lv < i.minLv; const short = i.price - s.bal;
+        const btn = owned ? 'Owned' : stock === 0 ? 'Sold out' : lvBlock ? `Level ${i.minLv} needed` : short > 0 ? `Need ✦ ${fmt(short)} more` : 'Buy';
+        return { ...i, priceText: fmt(i.price), btn, blocked: btn !== 'Buy', btnCls: btn === 'Buy' ? 'sp-btn sp-btn--primary sp-btn--sm' : 'sp-btn sp-btn--secondary sp-btn--sm', tag: stock === 0 ? 'Sold out' : stock ? `${stock} left` : owned ? 'Yours' : '', tagCls: stock === 0 ? 'sp-badge sp-badge--sm sp-pill sp-pill--muted' : owned ? 'sp-badge sp-badge--sm sp-badge--success' : 'sp-badge sp-badge--sm sp-badge--warning',
+          artStyle: { display: 'grid', placeItems: 'center', height: '96px', background: `oklch(0.9 0.06 ${i.hue})`, color: `oklch(0.32 0.08 ${i.hue})` }, buy: () => this.setState({ modal: 'buy', buyId: i.id }) }; }),
+      buyOpen: s.modal === 'buy', buying: s.buying, buyBtn: s.buying ? 'Buying…' : `Buy for ✦ ${fmt(buyIt.price)}`,
+      buy: { name: buyIt.name, icon: buyIt.icon, priceText: fmt(buyIt.price), leftText: fmt(s.bal - buyIt.price), after: buyIt.kind === 'roles' ? 'You get the role straight away.' : buyIt.kind === 'boosts' ? 'It goes in Your stuff. Use it whenever you like.' : 'It goes in Your stuff.' },
+      confirmBuy: () => { this.setState({ buying: true }); this.later(() => { this.setState(st => ({ buying: false, modal: null, bal: st.bal - buyIt.price, owned: { ...st.owned, [buyIt.id]: (st.owned[buyIt.id] || 0) + 1 }, stock: buyIt.stock !== undefined ? { ...st.stock, [buyIt.id]: st.stock[buyIt.id] - 1 } : st.stock, txs: [['shopping-bag', `Bought ${buyIt.name}`, 'Just now', -buyIt.price], ...st.txs] })); this.toast('success', `You bought ${buyIt.name}`, buyIt.kind === 'roles' ? 'The role is on your account in Discord now.' : 'Find it in Your stuff.'); }, 700); },
+      inv: Object.entries(s.owned).filter(([, q]) => q > 0).map(([id, q]) => { const it = SHOP.find(x => x.id === id); return { id, name: it.name, icon: it.icon, qty: q, desc: it.kind === 'roles' ? (id === 'neon' ? 'Role · 27 days left' : 'Role · 30 days left') : it.desc, use: it.stack ? id : null, role: it.kind === 'roles' }; }).map(iv => ({ ...iv, qtyText: iv.qty > 1 ? `× ${iv.qty}` : '', canUse: !!iv.use && !(iv.use === 'boost' && s.boostOn), useLabel: iv.use === 'jam' ? 'Use on next entry' : 'Use now', active: iv.use === 'boost' && s.boostOn ? 'Active · 59 min left' : iv.role ? 'Equipped' : '',
+        use: () => { if (iv.use === 'boost') { this.setState(st => ({ boostOn: true, owned: { ...st.owned, boost: st.owned.boost - 1 } })); this.toast('success', 'XP boost is on', 'Double XP from chatting for the next hour.'); } else { this.setState(st => ({ owned: { ...st.owned, [iv.use]: st.owned[iv.use] - 1 } })); this.toast('success', 'Extra entry ready', 'Your next /jam submit won’t count against your limit.'); } } })),
+      invNone: !Object.values(s.owned).some(q => q > 0), txs: s.txs.map(([icon, text, when, n]) => ({ icon, text, when, amt: `${n > 0 ? '+' : '−'}✦ ${fmt(Math.abs(n))}`, amtStyle: { gridRow: '1 / span 2', fontWeight: 600, color: n > 0 ? 'var(--sp-success)' : 'var(--sp-text)' } })),
+      sendOpen: s.modal === 'send', sx, sendLimitText: `You can send ✦ ${fmt(capLeft)} more today. Sparks can’t be sent back, so check the name.`, setTo: e => { const v = e.target.value; this.setState(st => ({ sx: { ...st.sx, to: v } })); }, setN: e => { const v = e.target.value; this.setState(st => ({ sx: { ...st.sx, n: v } })); }, setNote: e => { const v = e.target.value; this.setState(st => ({ sx: { ...st.sx, note: v } })); },
+      sendBad: sx.tried && !!sErr, sendOk: !(sx.tried && sErr) && !sErr, sendErr: sErr, sendNBox: 'sp-input' + (sx.tried && sErr ? ' is-error' : ''), sendAfter: `You’ll have ✦ ${fmt(s.bal - sN)} left.`, sendBtn: sN > 0 && !sErr ? `Send ✦ ${fmt(sN)} to ${sx.to}` : 'Send',
+      doSend: () => { if (sErr) return this.setState(st => ({ sx: { ...st.sx, tried: true } })); this.setState(st => ({ modal: null, bal: st.bal - sN, sentToday: st.sentToday + sN, txs: [['send', `To ${sx.to}${sx.note.trim() ? `: “${sx.note.trim()}”` : ''}`, 'Just now', -sN], ...st.txs] })); this.toast('success', `Sent ✦ ${fmt(sN)} to ${sx.to}`, 'They got a DM from Sparko.'); },
+      ticketList: !tk0, ticketView: !!tk0, hasTickets: s.tickets.length > 0, noTickets: !s.tickets.length, hasOpenTicket: !!openT, openN: openT ? openT.n : '',
+      myTickets: s.tickets.map(t => ({ ...t, sub: t.status === 'open' ? (t.helper ? `${t.helper} is helping · opened ${t.opened}` : `Waiting for staff · opened ${t.opened}`) : `Closed ${t.closedAt} · ${t.reason}`, badge: t.status === 'open' ? 'sp-badge sp-badge--sm sp-badge--info' : 'sp-badge sp-badge--sm sp-pill sp-pill--muted', statusLabel: t.status === 'open' ? 'Open' : 'Closed', open: () => this.setState({ tid: t.n, draft: '', closeAsk: false }) })),
+      backToList: () => this.setState({ tid: null, closeAsk: false }),
+      tk: tk0 ? { ...tk0, isOpen: tk0.status === 'open', closed: tk0.status !== 'open', badge: tk0.status === 'open' ? 'sp-badge sp-badge--info' : 'sp-badge sp-pill sp-pill--muted', statusLabel: tk0.status === 'open' ? 'Open' : 'Closed', helperText: tk0.status === 'open' ? (tk0.helper ? `${tk0.helper} from staff is helping` : 'A staff member will reply soon') : `Opened ${tk0.opened}`, closedText: `Closed by ${tk0.closedBy} · ${tk0.reason}. You got a copy of this conversation by DM.`, canReopen: tk0.closedBy === 'you' } : {},
+      thread: tk0 ? tk0.msgs.map(m => ({ name: m.who, initial: m.who[0].toUpperCase(), text: m.text, time: m.time, tag: m.bot ? 'App' : m.staff ? 'Staff' : '', avCls: 'dc-avatar' + (m.bot ? '' : ` sp-avatar--${AV[m.who] || 3}`), style: m.time === 'Sending…' ? { opacity: 0.6 } : {}, failed: false })) : [],
+      draft: s.draft, setDraft: e => this.setState({ draft: e.target.value }), draftEmpty: !s.draft.trim(), send: this.send, draftKey: e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); this.send(); } },
+      closeAsk: s.closeAsk, askClose: () => this.setState({ closeAsk: true }), keepOpen: () => this.setState({ closeAsk: false }),
+      doClose: () => { this.updT(tk0.n, { status: 'closed', closedBy: 'you', reason: 'Solved', closedAt: 'today' }); this.setState({ closeAsk: false }); this.toast('success', `Ticket #${tk0.n} closed`, 'A copy is on its way to your DMs. Thanks for letting staff know!'); },
+      reopen: () => { this.updT(tk0.n, { status: 'open' }); this.toast('info', `Ticket #${tk0.n} reopened`, 'Staff were told you need more help.'); },
+      openNew: () => this.setState({ modal: 'new', ntx: { topic: 'access', text: '', tried: false } }), newOpen: s.modal === 'new', ntx,
+      topics: TOPICS.map(([k, label]) => ({ label, sel: ntx.topic === k, pick: () => this.setState(st => ({ ntx: { ...st.ntx, topic: k } })) })), ntQ: TOPICS.find(t => t[0] === ntx.topic)[2],
+      setNt: e => { const v = e.target.value; this.setState(st => ({ ntx: { ...st.ntx, text: v } })); }, ntBad, ntBox: 'sp-input sp-input--multiline' + (ntBad ? ' is-error' : ''), ntBusy: s.ntBusy, ntBtn: s.ntBusy ? 'Opening…' : 'Open ticket',
+      submitNt: () => { if (ntx.text.trim().length < 10) return this.setState(st => ({ ntx: { ...st.ntx, tried: true } })); this.setState({ ntBusy: true }); this.later(() => { const t = TOPICS.find(x => x[0] === ntx.topic); const tkNew = { n: 215, topic: ntx.text.trim().split(/[.!?\n]/)[0].slice(0, 60), cat: t[1], status: 'open', helper: null, opened: 'just now', msgs: [{ who: 'Sparko', bot: true, text: `Thanks for opening a ticket. ${t[2]}`, time: 'Just now' }, { who: 'mossy_bun', text: ntx.text.trim(), time: 'Just now' }] }; this.setState(st => ({ ntBusy: false, modal: null, tickets: [tkNew, ...st.tickets], tid: 215 })); this.toast('success', 'Ticket #215 is open', 'A private thread opened in #support. Staff usually reply within an hour.'); }, 800); },
+      closeModal: () => this.setState({ modal: null }), scrimClose: e => { if (e.target === e.currentTarget && !s.buying && !s.ntBusy) this.setState({ modal: null }); },
+      toasts: s.toasts.map(t => ({ ...t, cls: `sp-toast sp-toast--${t.tone}`, close: () => this.setState(st => ({ toasts: st.toasts.filter(x => x.id !== t.id) })) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

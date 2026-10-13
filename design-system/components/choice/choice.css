@@ -1,0 +1,83 @@
+/* Switch, checkbox, radio, radio cards, segmented control. Native inputs are visually hidden, never removed. */
+.sp-choice-input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+
+/* Switch */
+.sp-switch { position: relative; display: inline-flex; align-items: center; gap: 12px; min-height: var(--sp-tap); cursor: pointer; font: 400 14px/20px var(--sp-font-sans); color: var(--sp-text); }
+.sp-switch__track {
+  position: relative; flex: none; width: 40px; height: 24px; border-radius: var(--sp-radius-full);
+  background: var(--sp-raised); border: 1px solid var(--sp-line-strong);
+  transition: background-color var(--sp-dur-fast) var(--sp-ease-out), border-color var(--sp-dur-fast) var(--sp-ease-out), box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-switch__thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--sp-muted); transition: transform var(--sp-dur-base) var(--sp-ease-out), background-color var(--sp-dur-fast) var(--sp-ease-out); }
+.sp-switch:hover .sp-switch__track, .sp-switch.is-hover .sp-switch__track { border-color: var(--sp-line-hover); }
+.sp-choice-input:checked + .sp-switch__track { background: var(--sp-brand); border-color: var(--sp-brand-edge); }
+.sp-choice-input:checked + .sp-switch__track .sp-switch__thumb { transform: translateX(16px); background: var(--sp-on-brand); }
+.sp-switch:hover .sp-choice-input:checked + .sp-switch__track, .sp-switch.is-hover .sp-choice-input:checked + .sp-switch__track { background: var(--sp-brand-hover); }
+.sp-switch:active .sp-switch__thumb, .sp-switch.is-active .sp-switch__thumb { width: 19px; }
+.sp-switch:active .sp-choice-input:checked + .sp-switch__track .sp-switch__thumb, .sp-switch.is-active .sp-choice-input:checked + .sp-switch__track .sp-switch__thumb { transform: translateX(13px); }
+.sp-choice-input:focus-visible + .sp-switch__track, .sp-switch.is-focus .sp-switch__track { box-shadow: var(--sp-ring-offset); }
+.sp-switch.is-error .sp-switch__track { border-color: var(--sp-danger); }
+.sp-switch.is-disabled, .sp-switch:has(:disabled) { opacity: 0.45; cursor: not-allowed; }
+.sp-switch.is-loading { cursor: progress; }
+.sp-switch.is-loading .sp-switch__thumb { background: transparent; border: 2px solid var(--sp-muted); border-right-color: transparent; animation: sp-spin 0.7s linear infinite; }
+.sp-switch.is-loading .sp-choice-input:checked + .sp-switch__track .sp-switch__thumb { border-color: var(--sp-on-brand); border-right-color: transparent; }
+.sp-switch__text { display: grid; gap: 2px; }
+.sp-switch__desc, .sp-check__desc { font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); }
+
+/* Checkbox + radio */
+.sp-check { position: relative; display: inline-flex; align-items: flex-start; gap: 12px; min-height: var(--sp-tap); padding: 12px 0; cursor: pointer; font: 400 14px/20px var(--sp-font-sans); color: var(--sp-text); }
+.sp-check__box {
+  position: relative; flex: none; display: grid; place-items: center; width: 20px; height: 20px;
+  border: 1.5px solid var(--sp-line-strong); border-radius: var(--sp-radius-xs); background: var(--sp-surface); color: var(--sp-on-brand);
+  transition: background-color var(--sp-dur-fast) var(--sp-ease-out), border-color var(--sp-dur-fast) var(--sp-ease-out), box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-check__box .sp-i { width: 14px; height: 14px; opacity: 0; transform: scale(0.6); transition: opacity var(--sp-dur-fast) var(--sp-ease-out), transform var(--sp-dur-fast) var(--sp-ease-out); }
+.sp-check--radio .sp-check__box { border-radius: 50%; }
+.sp-check--radio .sp-check__box::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--sp-on-brand); transform: scale(0); transition: transform var(--sp-dur-fast) var(--sp-ease-out); }
+.sp-check:hover .sp-check__box, .sp-check.is-hover .sp-check__box { border-color: var(--sp-line-hover); }
+.sp-choice-input:checked + .sp-check__box, .sp-check.is-indeterminate .sp-check__box { background: var(--sp-brand); border-color: var(--sp-brand-edge); }
+.sp-choice-input:checked + .sp-check__box .sp-i, .sp-check.is-indeterminate .sp-check__box .sp-i { opacity: 1; transform: none; }
+.sp-check--radio .sp-choice-input:checked + .sp-check__box::after { transform: scale(1); }
+.sp-check:active .sp-check__box, .sp-check.is-active .sp-check__box { transform: scale(0.92); }
+.sp-choice-input:focus-visible + .sp-check__box, .sp-check.is-focus .sp-check__box { box-shadow: var(--sp-ring-offset); }
+.sp-check.is-error .sp-check__box { border-color: var(--sp-danger); }
+.sp-check.is-disabled, .sp-check:has(:disabled) { opacity: 0.45; cursor: not-allowed; }
+.sp-check__text { display: grid; gap: 2px; }
+
+/* Radio cards */
+.sp-radio-cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); border: 0; margin: 0; padding: 0; min-width: 0; }
+.sp-radio-card {
+  position: relative; display: grid; grid-template-columns: 20px 1fr; gap: 4px 12px; align-content: start; min-height: var(--sp-tap); padding: 16px;
+  background: var(--sp-surface); border: 1px solid var(--sp-line); border-radius: var(--sp-radius-card); cursor: pointer; color: var(--sp-text);
+  transition: border-color var(--sp-dur-fast) var(--sp-ease-out), background-color var(--sp-dur-fast) var(--sp-ease-out), box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-radio-card .sp-check__box { grid-row: span 2; border-radius: 50%; margin-top: 1px; }
+.sp-radio-card .sp-check__box::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--sp-on-brand); transform: scale(0); transition: transform var(--sp-dur-fast) var(--sp-ease-out); }
+.sp-radio-card__title { font: 600 14px/20px var(--sp-font-sans); display: flex; align-items: center; gap: 8px; }
+.sp-radio-card__desc { font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); }
+.sp-radio-card:hover, .sp-radio-card.is-hover { border-color: var(--sp-line-hover); }
+.sp-radio-card:has(:checked), .sp-radio-card.is-checked { border-color: var(--sp-brand-edge); background: var(--sp-brand-soft); box-shadow: inset 0 0 0 1px var(--sp-brand-edge); }
+.sp-radio-card:has(:checked) .sp-check__box, .sp-radio-card.is-checked .sp-check__box { background: var(--sp-brand); border-color: var(--sp-brand-edge); }
+.sp-radio-card:has(:checked) .sp-check__box::after, .sp-radio-card.is-checked .sp-check__box::after { transform: scale(1); }
+.sp-radio-card:active, .sp-radio-card.is-active { background: var(--sp-raised); }
+.sp-radio-card:has(:focus-visible), .sp-radio-card.is-focus { box-shadow: var(--sp-ring); }
+.sp-radio-card:has(:checked):has(:focus-visible), .sp-radio-card.is-checked.is-focus { box-shadow: inset 0 0 0 1px var(--sp-brand-edge), var(--sp-ring); }
+.sp-radio-card.is-error { border-color: var(--sp-danger); }
+.sp-radio-card.is-disabled, .sp-radio-card:has(:disabled) { opacity: 0.45; cursor: not-allowed; }
+.sp-radio-card__aside { position: absolute; top: 14px; right: 14px; }
+
+/* Segmented control */
+.sp-seg { display: inline-flex; gap: 4px; padding: 3px; background: var(--sp-raised); border: 1px solid var(--sp-line); border-radius: var(--sp-radius-control); max-width: 100%; }
+.sp-seg__item {
+  position: relative; flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px;
+  border: 1px solid transparent; border-radius: var(--sp-radius-xs); background: transparent; color: var(--sp-muted);
+  font: 500 13px/18px var(--sp-font-sans); white-space: nowrap; cursor: pointer;
+  transition: background-color var(--sp-dur-fast) var(--sp-ease-out), color var(--sp-dur-fast) var(--sp-ease-out), border-color var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-seg__item::after { content: ""; position: absolute; inset: -4px -2px; }
+.sp-seg__item:hover, .sp-seg__item.is-hover { color: var(--sp-text); background: var(--sp-raised-hover); }
+.sp-seg__item[aria-checked="true"], .sp-seg__item[aria-selected="true"] { background: var(--sp-surface); color: var(--sp-text); border-color: var(--sp-line-strong); box-shadow: var(--sp-shadow-sm); }
+.sp-seg__item:active, .sp-seg__item.is-active { background: var(--sp-line); }
+.sp-seg__item:focus-visible, .sp-seg__item.is-focus { outline: none; box-shadow: var(--sp-ring); z-index: 1; }
+.sp-seg__item:disabled { opacity: 0.45; cursor: not-allowed; background: transparent; color: var(--sp-muted); }
+.sp-seg.is-disabled { opacity: 0.45; pointer-events: none; }

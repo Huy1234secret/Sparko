@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sparko panel — core screens</title>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&amp;display=swap">
+<style>body{margin:0;background:#0B0B0A}a{color:#FACC15}a:hover{color:#FAFAF5}</style>
+</helmet>
+<div style="padding:48px;display:grid;gap:48px;font-family:Inter,system-ui,sans-serif;color:#FAFAF5;width:max-content">
+  <header style="display:grid;gap:6px;max-width:900px">
+    <h1 style="margin:0;font:600 24px/32px Inter;letter-spacing:-0.018em">Panel · Sign in, overview, Support, Messages and Safety and the module pattern</h1>
+    <p style="margin:0;font:400 14px/22px Inter;color:#AAA99D;text-wrap:pretty">Every frame is the live Panel.dc.html. Try: sign in, open the sidebar server switcher, finish the setup checklist, fix the missing Manage Roles permission, edit Welcome and save to watch Saved → Applying to Discord → Live, restore a saved version, or press Ctrl/⌘ K.</p>
+  </header>
+  <sc-for list="{{ rows }}" as="row" hint-placeholder-count="2">
+    <section style="display:grid;gap:16px">
+      <h2 style="margin:0;font:600 12px/16px Inter;letter-spacing:0.06em;text-transform:uppercase;color:#AAA99D">{{ row.label }}</h2>
+      <div style="display:flex;gap:32px;align-items:flex-start">
+        <div style="display:grid;gap:8px"><span style="font:500 12px/16px ui-monospace,Menlo,monospace;color:#AAA99D">1440 × 900 · {{ row.dTitle }}</span><iframe title="{{ row.dTitle }}" src="{{ row.dSrc }}" loading="lazy" style="width:1440px;height:900px;border:1px solid #30302A;border-radius:14px;background:#111110;display:block"></iframe></div>
+        <div style="display:grid;gap:8px"><span style="font:500 12px/16px ui-monospace,Menlo,monospace;color:#AAA99D">390 × 844 · {{ row.mTitle }}</span><iframe title="{{ row.mTitle }}" src="{{ row.mSrc }}" loading="lazy" style="width:390px;height:844px;border:1px solid #30302A;border-radius:28px;background:#111110;display:block"></iframe></div>
+      </div>
+    </section>
+  </sc-for>
+  <section style="display:grid;gap:16px">
+    <h2 style="margin:0;font:600 12px/16px Inter;letter-spacing:0.06em;text-transform:uppercase;color:#AAA99D">States · 390 px</h2>
+    <div style="display:flex;gap:24px;align-items:flex-start">
+      <sc-for list="{{ states }}" as="s" hint-placeholder-count="6">
+        <div style="display:grid;gap:8px"><span style="font:500 12px/16px ui-monospace,Menlo,monospace;color:#AAA99D">{{ s.label }}</span><iframe title="{{ s.label }}" src="{{ s.src }}" loading="lazy" style="width:390px;height:844px;border:1px solid #30302A;border-radius:28px;background:#111110;display:block"></iframe></div>
+      </sc-for>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const u = (theme, page, state) => `Panel.dc.html?theme=${theme}&page=${page}${state ? '&state=' + state : ''}`;
+    return {
+      rows: [
+        { label: 'Sign in', dTitle: 'Dark', dSrc: u('dark', 'signin'), mTitle: 'Light', mSrc: u('light', 'signin') },
+        { label: 'Dark', dTitle: 'Server overview', dSrc: u('dark', 'overview'), mTitle: 'Welcome module', mSrc: u('dark', 'welcome') },
+        { label: 'Light', dTitle: 'Welcome module', dSrc: u('light', 'welcome'), mTitle: 'Server overview', mSrc: u('light', 'overview') },
+        { label: 'Tickets · dark', dTitle: 'Inbox', dSrc: u('dark', 'tickets'), mTitle: 'Ticket #213', mSrc: u('dark', 'ticket') + '&t=213' },
+        { label: 'Tickets · light', dTitle: 'Ticket #213 (report, ban flow)', dSrc: u('light', 'ticket') + '&t=213', mTitle: 'Inbox', mSrc: u('light', 'tickets') },
+        { label: 'Ticket panel setup', dTitle: 'Dark', dSrc: u('dark', 'tickets') + '&tab=settings', mTitle: 'Light', mSrc: u('light', 'tickets') + '&tab=settings' },
+        { label: 'Message Studio', dTitle: 'Editor · dark', dSrc: u('dark', 'studio'), mTitle: 'Editor · light', mSrc: u('light', 'studio') },
+        { label: 'Workflows', dTitle: 'Builder · dark', dSrc: u('dark', 'workflows'), mTitle: 'List · light', mSrc: u('light', 'workflows') + '&tab=items' },
+        { label: 'Custom commands', dTitle: 'Editor · light', dSrc: u('light', 'commands') + '&tab=settings', mTitle: 'List · dark', mSrc: u('dark', 'commands') },
+        { label: 'Social & RSS alerts', dTitle: 'Dark', dSrc: u('dark', 'social'), mTitle: 'Light', mSrc: u('light', 'social') },
+        { label: 'Audit log', dTitle: 'Light', dSrc: u('light', 'audit'), mTitle: 'Dark', mSrc: u('dark', 'audit') },
+        { label: 'Analytics', dTitle: 'Dark', dSrc: u('dark', 'analytics'), mTitle: 'Light', mSrc: u('light', 'analytics') },
+        { label: 'Configuration backups', dTitle: 'Light', dSrc: u('light', 'backups'), mTitle: 'Dark', mSrc: u('dark', 'backups') },
+        { label: 'Multi-server (Plus)', dTitle: 'Copy tool · dark', dSrc: u('dark', 'multiserver', 'plus'), mTitle: 'Upsell · light', mSrc: u('light', 'multiserver') },
+        { label: 'Plan & billing', dTitle: 'Free · light', dSrc: u('light', 'billing'), mTitle: 'Plus · dark', mSrc: u('dark', 'billing', 'plus') },
+        { label: 'Account', dTitle: 'Profile · dark', dSrc: 'Account.dc.html?theme=dark', mTitle: 'Sessions · light', mSrc: 'Account.dc.html?theme=light&page=sessions' },
+        { label: 'Owner console', dTitle: 'Servers · dark', dSrc: 'Console.dc.html?theme=dark&page=servers', mTitle: 'Overview · light', mSrc: 'Console.dc.html?theme=light' },
+        { label: 'Levels & XP', dTitle: 'XP rules · dark', dSrc: u('dark', 'levels'), mTitle: 'Leaderboard · light', mSrc: u('light', 'levels') + '&tab=items' },
+        { label: 'Rank cards', dTitle: 'Design · light', dSrc: u('light', 'rankcards'), mTitle: 'Design · dark', mSrc: u('dark', 'rankcards') },
+        { label: 'Giveaways', dTitle: 'Dark', dSrc: u('dark', 'giveaways'), mTitle: 'Light', mSrc: u('light', 'giveaways') },
+        { label: 'Economy (staff)', dTitle: 'Overview · dark', dSrc: u('dark', 'economy') + '&tab=items', mTitle: 'Settings · light', mSrc: u('light', 'economy') },
+        { label: 'Polls', dTitle: 'Light', dSrc: u('light', 'polls'), mTitle: 'Dark', mSrc: u('dark', 'polls') },
+        { label: 'Events & RSVP', dTitle: 'Dark', dSrc: u('dark', 'events'), mTitle: 'Light', mSrc: u('light', 'events') },
+        { label: 'Role menus', dTitle: 'Editor · light', dSrc: u('light', 'rolemenus') + '&tab=settings', mTitle: 'Menus · dark', mSrc: u('dark', 'rolemenus') },
+        { label: 'Member · Profile', dTitle: 'Dark', dSrc: 'Member.dc.html?theme=dark&page=profile', mTitle: 'Light', mSrc: 'Member.dc.html?theme=light&page=profile' },
+        { label: 'Member · Wallet & shop', dTitle: 'Light', dSrc: 'Member.dc.html?theme=light&page=wallet', mTitle: 'Dark', mSrc: 'Member.dc.html?theme=dark&page=wallet' },
+        { label: 'Member · My tickets', dTitle: 'Dark', dSrc: 'Member.dc.html?theme=dark&page=tickets', mTitle: 'Light', mSrc: 'Member.dc.html?theme=light&page=tickets' },
+        { label: 'Auto moderation + simulator', dTitle: 'Dark', dSrc: u('dark', 'automod'), mTitle: 'Light', mSrc: u('light', 'automod') },
+        { label: 'Moderation cases', dTitle: 'Case log · light', dSrc: u('light', 'cases'), mTitle: 'Case log · dark', mSrc: u('dark', 'cases') },
+        { label: 'Reports & appeals', dTitle: 'Queue · dark', dSrc: u('dark', 'reports'), mTitle: 'Queue · light', mSrc: u('light', 'reports') },
+        { label: 'Raid guard', dTitle: 'Light', dSrc: u('light', 'raid'), mTitle: 'Dark', mSrc: u('dark', 'raid') },
+        { label: 'Anti-nuke', dTitle: 'Dark', dSrc: u('dark', 'antinuke'), mTitle: 'Light', mSrc: u('light', 'antinuke') },
+        { label: 'Verification', dTitle: 'Light', dSrc: u('light', 'verify'), mTitle: 'Dark', mSrc: u('dark', 'verify') },
+        { label: 'Server picker', dTitle: 'Dark', dSrc: u('dark', 'servers'), mTitle: 'Light', mSrc: u('light', 'servers') }
+      ],
+      states: [
+        ['Sign-in cancelled on Discord', 'dark', 'signin', 'cancelled'],
+        ['Sign-in error', 'light', 'signin', 'signinError'],
+        ['Session expired', 'dark', 'signin', 'expired'],
+        ['No tickets yet', 'dark', 'tickets', 'ticketsEmpty'],
+        ['Ticket threads blocked', 'light', 'tickets', 'threadPerm'],
+        ['Reply fails (send one)', 'dark', 'ticket', 'replyFail'],
+        ['Ban blocked by role order (ban kestrel)', 'light', 'ticket', 'banBlocked', 213],
+        ['Studio: fix before publishing', 'dark', 'studio', 'studioInvalid'],
+        ['Studio: can’t post in #announcements', 'light', 'studio', 'studioPerm'],
+        ['PayPal: you cancelled', 'light', 'billing', 'payCancelled'],
+        ['PayPal: payment declined', 'dark', 'billing', 'payFailed'],
+        ['Plus: payment overdue', 'light', 'billing', 'pastDue'],
+        ['Account: deletion scheduled', 'dark', 'ACCOUNT:privacy', 'deletePending'],
+        ['Console: confirm it’s you', 'light', 'CONSOLE:overview', 'reauth'],
+        ['Console: incident open', 'dark', 'CONSOLE:overview', 'incident'],
+        ['Member: role change fails', 'dark', 'MEMBER:profile', 'roleFail'],
+        ['Member: low balance', 'light', 'MEMBER:wallet', 'broke'],
+        ['Member: economy turned off', 'dark', 'MEMBER:wallet', 'economyOff'],
+        ['Member: not in the server', 'light', 'MEMBER:profile', 'notMember'],
+        ['Raid in progress', 'dark', 'raid', 'raidActive'],
+        ['Sparko role below Admin', 'light', 'antinuke', 'nukeRole'],
+        ['Missing permission in #welcome', 'dark', 'welcome', 'missingPerm'],
+        ['Someone else changed this', 'light', 'welcome', 'conflict'],
+        ['Paused by Sparko staff', 'dark', 'welcome', 'paused'],
+        ['Needs Plus', 'light', 'multiserver', ''],
+        ['No Manage Server permission', 'dark', 'overview', 'noAccess'],
+        ['Error with retry', 'light', 'tickets', 'error'],
+        ['Loading', 'dark', 'overview', 'loading'],
+        ['Empty with first action', 'light', 'giveaways', '']
+      ].map(([label, t, p, st, n]) => ({ label, src: p.startsWith('MEMBER:') ? `Member.dc.html?theme=${t}&page=${p.slice(7)}&state=${st}` : p.startsWith('ACCOUNT:') ? `Account.dc.html?theme=${t}&page=${p.slice(8)}&state=${st}` : p.startsWith('CONSOLE:') ? `Console.dc.html?theme=${t}&page=${p.slice(8)}&state=${st}` : u(t, p, st) + (n ? '&ticket=' + n : '') }))
+    };
+  }
+}
+</script>
+</body>
+</html>

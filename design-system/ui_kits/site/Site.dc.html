@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sparko · The Discord bot that explains itself</title>
+<link rel="stylesheet" href="../../sparko.bundle.css">
+<script src="../../assets/icons/sp-icon.js"></script>
+<style>html,body{margin:0;background:#111110}sp-icon{display:inline-block;width:18px;height:18px}a{color:var(--sp-brand-text)}a:hover{color:var(--sp-text)}</style>
+</helmet>
+<div data-theme="{{ theme }}" class="sw">
+  <a class="sp-btn sp-btn--primary sw-skip" href="#main">Skip to content</a>
+  <header class="sw-nav">
+    <div class="sw-wrap">
+      <div class="sw-nav__row">
+        <button class="sw-logo" onClick="{{ goHome }}" aria-label="Sparko home"><span class="sw-logo__mark"></span>Sparko</button>
+        <nav class="sw-links" aria-label="Main">
+          <sc-for list="{{ links }}" as="l" hint-placeholder-count="5"><button class="sw-link" aria-current="{{ l.current }}" onClick="{{ l.go }}">{{ l.label }}</button></sc-for>
+        </nav>
+        <div class="sw-nav__end">
+          <button class="sp-btn sp-btn--ghost sp-btn--icon" aria-label="{{ themeLabel }}" onClick="{{ toggleTheme }}"><sp-icon class="sp-i" name="{{ themeIcon }}"></sp-icon></button>
+          <button class="sp-btn sp-btn--ghost sw-desk" onClick="{{ signIn }}">Sign in with Discord</button>
+          <button class="sp-btn sp-btn--primary sw-desk" onClick="{{ addBot }}">Add to Discord</button>
+          <button class="sp-btn sp-btn--secondary sp-btn--icon sw-menu-btn" aria-label="Menu" aria-expanded="{{ menuOpen }}" onClick="{{ toggleMenu }}"><sp-icon class="sp-i" name="{{ menuIcon }}"></sp-icon></button>
+        </div>
+      </div>
+      <nav class="{{ sheetClass }}" aria-label="Mobile">
+        <sc-for list="{{ links }}" as="l"><button class="sw-link" aria-current="{{ l.current }}" onClick="{{ l.go }}">{{ l.label }}</button></sc-for>
+        <div style="display:grid;gap:8px;margin-top:8px"><button class="sp-btn sp-btn--primary sp-btn--block" onClick="{{ addBot }}">Add to Discord</button><button class="sp-btn sp-btn--secondary sp-btn--block" onClick="{{ signIn }}">Sign in with Discord</button></div>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <section class="sw-hero" aria-labelledby="hero-h">
+        <div class="sw-wrap sw-hero__grid">
+          <div class="sw-hero__copy">
+            <span class="sp-badge sp-pill sp-badge--brand" style="justify-self:start;height:30px;padding:0 12px 0 10px;font-size:13px"><sp-icon class="sp-i sp-i--sm" name="sparkles"></sp-icon>Nearly every module is free</span>
+            <h1 class="sw-display" id="hero-h">The Discord bot that <span class="sw-mark">explains itself.</span></h1>
+            <p class="sw-lede">Moderation, tickets, welcome messages, levels and 40 more modules. Every setting is written in plain language, and you see every message exactly as Discord will show it before you save.</p>
+            <div class="sw-hero__ctas"><button class="sp-btn sp-btn--primary sp-btn--lg" onClick="{{ addBot }}"><sp-icon class="sp-i" name="plus"></sp-icon>Add Sparko to Discord</button><button class="sp-btn sp-btn--secondary sp-btn--lg" onClick="{{ goFeatures }}">See every feature</button></div>
+            <div class="sw-hero__proof"><span><sp-icon class="sp-i sp-i--sm" name="circle-check"></sp-icon>Set up in about 5 minutes</span><span><sp-icon class="sp-i sp-i--sm" name="circle-check"></sp-icon>Never asks for Administrator</span><span><sp-icon class="sp-i sp-i--sm" name="circle-check"></sp-icon>Undo any change</span></div>
+          </div>
+          <div class="sw-stage" aria-label="Live Discord preview">
+            <div class="sw-stage__bar">
+              <div class="sp-seg" role="tablist" aria-label="Preview a module" style="flex-wrap:wrap">
+                <sc-for list="{{ scenes }}" as="sc" hint-placeholder-count="4"><button class="sp-seg__item" role="tab" aria-selected="{{ sc.sel }}" onClick="{{ sc.pick }}">{{ sc.label }}</button></sc-for>
+              </div>
+              <button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="{{ pauseLabel }}" aria-pressed="{{ paused }}" onClick="{{ togglePause }}"><sp-icon class="sp-i sp-i--sm" name="{{ pauseIcon }}"></sp-icon></button>
+            </div>
+            <div class="sw-stage__frame">
+              <div class="sw-stage__chan"><sp-icon class="sp-i" name="hash"></sp-icon>{{ scene.channel }}</div>
+              <div class="dc-chat dc-preview-frame" role="tabpanel" aria-live="polite">
+                <sc-if value="{{ sceneUser }}"><div class="dc-msg"><div class="dc-avatar" style="background:oklch(0.86 0.08 230)">{{ scene.userInitial }}</div><div class="dc-head"><span class="dc-name">{{ scene.user }}</span><span class="dc-time">Today at 18:41</span></div><div class="dc-content">{{ scene.userText }}</div></div></sc-if>
+                <div class="dc-msg sw-swap" key="{{ scene.key }}">
+                  <div class="dc-avatar">S</div>
+                  <div class="dc-head"><span class="dc-name">Sparko</span><span class="dc-tag"><sp-icon class="sp-i" name="check"></sp-icon>App</span><span class="dc-time">Today at 18:42</span></div>
+                  <sc-if value="{{ scene.content }}"><div class="dc-content"><span class="dc-mention">{{ scene.mention }}</span> {{ scene.content }}</div></sc-if>
+                  <div class="dc-embed" style="--dc-color:{{ scene.color }}">
+                    <div class="dc-embed__main">
+                      <div class="dc-embed__author"><span class="dc-embed__author-icon">PP</span>Pixel Plaza</div>
+                      <div class="dc-embed__title">{{ scene.title }}</div>
+                      <div class="dc-embed__desc">{{ scene.desc }}</div>
+                      <div class="dc-fields"><sc-for list="{{ scene.fields }}" as="f"><div class="dc-field dc-field--inline"><div class="dc-field__name">{{ f.n }}</div><div class="dc-field__value">{{ f.v }}</div></div></sc-for></div>
+                    </div>
+                    <div class="dc-embed__footer"><span class="dc-embed__footer-icon"></span>{{ scene.footer }}</div>
+                  </div>
+                  <div class="dc-components"><div class="dc-row"><sc-for list="{{ scene.buttons }}" as="b"><button class="{{ b.cls }}" tabindex="-1">{{ b.label }}</button></sc-for></div></div>
+                </div>
+              </div>
+            </div>
+            <p class="sw-stage__note">{{ scene.note }}</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="sw-section sw-band" aria-labelledby="why-h">
+        <div class="sw-wrap">
+          <div class="sw-head"><span class="sw-eyebrow">Why servers switch</span><h2 class="sw-h2" id="why-h">Other bots make you guess. Sparko shows you.</h2></div>
+          <div class="sw-grid sw-grid--4">
+            <article class="sw-card"><span class="sw-card__icon"><sp-icon class="sp-i" name="message-square-text"></sp-icon></span><h3 class="sw-h3">Plain language</h3><p class="sw-body">No jargon, no raw JSON. Every setting says what it does.</p>
+              <div class="sw-card__demo"><label class="sp-switch" style="justify-content:space-between;width:100%;min-height:0"><span class="sp-switch__text"><span style="font-size:13px;font-weight:500">Welcome people who rejoin</span><span class="sp-switch__desc" style="font-size:12px">Off means nobody is greeted twice.</span></span><input class="sp-choice-input" type="checkbox" role="switch" aria-label="Demo switch"><span class="sp-switch__track"><span class="sp-switch__thumb"></span></span></label></div></article>
+            <article class="sw-card"><span class="sw-card__icon"><sp-icon class="sp-i" name="eye"></sp-icon></span><h3 class="sw-h3">Live previews</h3><p class="sw-body">Messages look exactly like they will in Discord, before you save.</p>
+              <div class="sw-card__demo"><div class="sp-input" style="min-height:36px;font-size:13px"><input aria-label="Demo message" value="{{ demoMsg }}" onChange="{{ setDemoMsg }}" style="height:34px"></div><div style="font:400 13px/18px var(--sp-font-discord);color:var(--sp-dc-text);background:var(--sp-dc-bg);padding:8px 10px;border-radius:8px"><span class="dc-mention">@tomoko</span> {{ demoRest }}</div></div></article>
+            <article class="sw-card"><span class="sw-card__icon"><sp-icon class="sp-i" name="shield-check"></sp-icon></span><h3 class="sw-h3">Safe by default</h3><p class="sw-body">Test rules in a simulator before they’re live. Restore any earlier setup.</p>
+              <div class="sw-card__demo"><code class="sp-mono" style="font-size:12px;color:var(--sp-muted)">“free nitro → discord.gg/x7f”</code><span class="sp-badge sp-badge--danger" style="justify-self:start"><sp-icon class="sp-i" name="ban"></sp-icon>Would be removed · Invite links</span></div></article>
+            <article class="sw-card"><span class="sw-card__icon"><sp-icon class="sp-i" name="activity"></sp-icon></span><h3 class="sw-h3">Honest status</h3><p class="sw-body">You always know if it’s saved, applying, live, or what to fix.</p>
+              <div class="sw-card__demo" style="gap:8px;font:500 13px/18px var(--sp-font-sans)"><span style="display:flex;gap:8px;align-items:center;color:var(--sp-success)"><sp-icon class="sp-i sp-i--sm" name="circle-check"></sp-icon>Saved</span><span style="display:flex;gap:8px;align-items:center;color:var(--sp-success)"><sp-icon class="sp-i sp-i--sm" name="circle-check"></sp-icon>Applied to Discord</span><span style="display:flex;gap:8px;align-items:center;color:var(--sp-success)"><sp-icon class="sp-i sp-i--sm" name="circle-check"></sp-icon>Live in #welcome</span></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="sw-section" aria-labelledby="mods-h">
+        <div class="sw-wrap">
+          <div class="sw-head"><span class="sw-eyebrow">47 modules, one dashboard</span><h2 class="sw-h2" id="mods-h">Everything your server needs, grouped the way you think.</h2></div>
+          <div class="sw-grid sw-grid--4">
+            <sc-for list="{{ groupCards }}" as="g" hint-placeholder-count="8">
+              <button class="sw-card sw-card--link" onClick="{{ g.go }}"><span class="sw-card__icon sw-card__icon--plain"><sp-icon class="sp-i" name="{{ g.icon }}"></sp-icon></span><span style="display:grid;gap:4px"><span class="sw-h3">{{ g.label }}</span><span class="sw-body" style="font-size:14px">{{ g.blurb }}</span></span><span class="sw-chips"><sc-for list="{{ g.chips }}" as="c"><span class="sp-badge">{{ c }}</span></sc-for></span><span class="sw-more">{{ g.more }}<sp-icon class="sp-i sp-i--sm" name="arrow-right"></sp-icon></span></button>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+
+      <section class="sw-section sw-band" aria-labelledby="setup-h">
+        <div class="sw-wrap">
+          <div class="sw-head"><span class="sw-eyebrow">Setup in minutes</span><h2 class="sw-h2" id="setup-h">From invite to live in about five minutes.</h2><p class="sw-lede">A guided checklist walks you through the essentials. Skip anything, come back later.</p></div>
+          <ol class="sw-steps">
+            <li class="sw-step"><div class="sw-step__n"><b>1</b><span class="sw-step__time">~30 sec</span></div><h3 class="sw-h3">Add Sparko</h3><p class="sw-body">Sign in with Discord and pick a server. Sparko only asks for the permissions your modules use.</p></li>
+            <li class="sw-step"><div class="sw-step__n"><b>2</b><span class="sw-step__time">~3 min</span></div><h3 class="sw-h3">Follow the checklist</h3><p class="sw-body">Pick a log channel, switch on Auto moderation and write a welcome. Each step shows a preview first.</p></li>
+            <li class="sw-step"><div class="sw-step__n"><b>3</b><span class="sw-step__time">instant</span></div><h3 class="sw-h3">Go live</h3><p class="sw-body">Save and watch it apply. If a permission is missing, Sparko tells you exactly where to fix it.</p></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="sw-section" aria-labelledby="pt-h">
+        <div class="sw-wrap">
+          <div class="sw-head sw-head--center"><span class="sw-eyebrow">Pricing</span><h2 class="sw-h2" id="pt-h">Free for nearly everything.</h2><p class="sw-lede">Plus adds multi-server tools and higher limits, from US$2.99 a month billed yearly.</p></div>
+          <div class="sw-price-grid">
+            <div class="sp-price"><div class="sp-price__head"><div class="sp-price__name">Free</div><p class="sp-price__desc">46 of 47 modules, for one server or many.</p></div><div class="sp-price__amount"><span class="sp-price__value">US$0</span><span class="sp-price__unit">forever</span></div><div class="sp-price__cta"><button class="sp-btn sp-btn--secondary sp-btn--block" onClick="{{ addBot }}">Add Sparko free</button></div></div>
+            <div class="sp-price sp-price--featured sp-sparks"><div class="sp-price__head"><div class="sp-price__name">Plus<span class="sp-badge sp-badge--plus">First month US$1.49</span></div><p class="sp-price__desc">Copy settings across servers, 10× the limits.</p></div><div class="sp-price__amount"><span class="sp-price__value">US$3.99</span><span class="sp-price__unit">/ month</span></div><div class="sp-price__cta"><button class="sp-btn sp-btn--primary sp-btn--block" onClick="{{ goPricing }}">Compare plans</button></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sw-section sw-band" aria-labelledby="faq-h">
+        <div class="sw-wrap">
+          <div class="sw-head sw-head--center"><h2 class="sw-h2" id="faq-h">Questions, answered</h2></div>
+          <div class="sw-faq"><sc-for list="{{ faqHome }}" as="f" hint-placeholder-count="6"><details><summary>{{ f.q }}<sp-icon class="sp-i" name="plus"></sp-icon></summary><p class="sw-faq__a">{{ f.a }}</p></details></sc-for></div>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isFeatures }}" hint-placeholder-val="{{ false }}">
+      <div class="sw-wrap">
+        <header class="sw-page-hero"><span class="sw-eyebrow">Features</span><h1 class="sw-h1">47 modules. 46 of them free.</h1><p class="sw-lede">Turn on only what you need. Each module has plain-language settings, a live preview and full history.</p></header>
+        <div class="sw-toolbar">
+          <div class="sp-input" style="flex:1 1 260px;max-width:380px"><sp-icon class="sp-i" name="search"></sp-icon><input aria-label="Search features" placeholder="Search features, like “tickets”" value="{{ fq }}" onChange="{{ setFq }}"></div>
+          <div class="sw-chips" style="gap:8px"><sc-for list="{{ groupFilters }}" as="gf" hint-placeholder-count="9"><button class="sp-chip sp-chip--toggle" aria-pressed="{{ gf.on }}" onClick="{{ gf.pick }}">{{ gf.label }}</button></sc-for></div>
+        </div>
+        <sc-for list="{{ catalogue }}" as="g" hint-placeholder-count="3">
+          <section aria-label="{{ g.label }}"><div class="sw-group-h"><h2 class="sw-h3" style="font-size:20px">{{ g.label }}</h2><span class="sp-count">{{ g.count }}</span></div>
+            <div class="sw-grid sw-grid--3"><sc-for list="{{ g.items }}" as="m"><button class="sw-card sw-card--link sw-mod" onClick="{{ m.go }}"><span class="sw-card__icon sw-card__icon--plain"><sp-icon class="sp-i" name="{{ m.icon }}"></sp-icon></span><span class="sw-mod__name">{{ m.label }}<sc-if value="{{ m.plus }}"><span class="sp-badge sp-badge--sm sp-badge--plus">Plus</span></sc-if></span><span class="sw-mod__desc">{{ m.desc }}</span></button></sc-for></div>
+          </section>
+        </sc-for>
+        <sc-if value="{{ fNone }}"><div class="sp-card" style="margin:24px 0"><div class="sp-empty"><div class="sp-empty__art"><sp-icon class="sp-i" name="search"></sp-icon></div><div class="sp-empty__title">No features match “{{ fq }}”</div><p class="sp-empty__desc">Try a simpler word like “roles” or “levels”, or ask in the support server.</p><div class="sp-empty__actions"><button class="sp-btn sp-btn--secondary" onClick="{{ clearFq }}">Show all features</button></div></div></div></sc-if>
+        <div style="height:96px"></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isFeature }}" hint-placeholder-val="{{ false }}">
+      <div class="sw-wrap">
+        <nav aria-label="Breadcrumb" style="padding-top:24px"><ol class="sp-crumbs"><li><button class="sp-crumb" style="border:0;background:none;font:inherit;cursor:pointer" onClick="{{ goFeatures }}">Features</button><sp-icon class="sp-i" name="chevron-right"></sp-icon></li><li><span class="sp-crumb">{{ feat.group }}</span><sp-icon class="sp-i" name="chevron-right"></sp-icon></li><li><span class="sp-crumb" aria-current="page">{{ feat.label }}</span></li></ol></nav>
+        <section class="sw-split" style="padding:40px 0 72px">
+          <div style="display:grid;gap:20px;align-content:start">
+            <span class="sw-card__icon" style="width:52px;height:52px"><sp-icon class="sp-i sp-i--xl" name="{{ feat.icon }}"></sp-icon></span>
+            <h1 class="sw-h1">{{ feat.headline }}</h1>
+            <p class="sw-lede">{{ feat.desc }}</p>
+            <ul class="sw-checks"><sc-for list="{{ feat.points }}" as="pt"><li><sp-icon class="sp-i" name="check"></sp-icon><span>{{ pt }}</span></li></sc-for></ul>
+            <div class="sw-hero__ctas"><button class="sp-btn sp-btn--primary sp-btn--lg" onClick="{{ addBot }}">Add Sparko to Discord</button><span class="sp-badge sp-badge--success" style="align-self:center">{{ feat.planNote }}</span></div>
+          </div>
+          <sc-if value="{{ isStudio }}">
+            <div class="sw-builder" aria-label="Try Message Studio">
+              <div class="sw-builder__form">
+                <div style="display:flex;justify-content:space-between;align-items:center"><b style="font:600 14px/20px var(--sp-font-sans)">Try it</b><span class="sp-sync sp-sync--live"><span class="sp-dot"></span>Preview</span></div>
+                <div class="sp-field"><label class="sp-label" for="st-t">Title</label><div class="sp-input"><input id="st-t" value="{{ studio.title }}" onChange="{{ setStTitle }}"></div></div>
+                <div class="sp-field"><label class="sp-label" for="st-d">Description</label><div class="sp-input sp-input--multiline"><textarea id="st-d" rows="3" value="{{ studio.desc }}" onChange="{{ setStDesc }}"></textarea></div></div>
+                <div class="sp-field"><span class="sp-label" id="st-c">Colour bar</span><div class="sp-seg" role="radiogroup" aria-labelledby="st-c" style="flex-wrap:wrap;align-self:start"><sc-for list="{{ stColors }}" as="c"><button class="sp-seg__item" role="radio" aria-checked="{{ c.sel }}" aria-label="{{ c.name }}" onClick="{{ c.pick }}"><span class="sp-dot" style="color:{{ c.hex }};width:12px;height:12px"></span></button></sc-for></div></div>
+                <div class="sp-field"><label class="sp-label" for="st-b">Button label</label><div class="sp-input"><input id="st-b" value="{{ studio.btn }}" onChange="{{ setStBtn }}"></div></div>
+              </div>
+              <div class="sw-builder__preview dc-preview-frame"><div class="dc-chat" style="padding:0;border-radius:0"><div class="dc-msg" style="margin-top:0"><div class="dc-avatar">S</div><div class="dc-head"><span class="dc-name">Sparko</span><span class="dc-tag"><sp-icon class="sp-i" name="check"></sp-icon>App</span><span class="dc-time">Today at 18:42</span></div><div class="dc-embed" style="--dc-color:{{ studio.color }}"><div class="dc-embed__main"><div class="dc-embed__title">{{ studio.title }}</div><div class="dc-embed__desc">{{ studio.desc }}</div><div class="dc-fields"><div class="dc-field dc-field--inline"><div class="dc-field__name">When</div><div class="dc-field__value">Sat, 19:00</div></div><div class="dc-field dc-field--inline"><div class="dc-field__name">Where</div><div class="dc-field__value"><span class="dc-mention">#art-share</span></div></div></div></div><div class="dc-embed__footer"><span class="dc-embed__footer-icon"></span>Pixel Plaza</div></div><div class="dc-components"><div class="dc-row"><button class="dc-btn dc-btn--primary" tabindex="-1">{{ studio.btn }}</button><button class="dc-btn" tabindex="-1">Remind me</button></div></div></div></div></div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ notStudio }}">
+            <div class="sw-card sp-sparks" style="min-height:320px;place-content:center;justify-items:center;text-align:center;background:var(--sp-brand-soft);border-color:var(--sp-brand-line)"><span class="sw-card__icon" style="width:64px;height:64px"><sp-icon class="sp-i sp-i--xl" name="{{ feat.icon }}"></sp-icon></span><b class="sw-h3">{{ feat.label }}</b><p class="sw-body" style="max-width:36ch">Product screenshot goes here.</p></div>
+          </sc-if>
+        </section>
+        <sc-if value="{{ isStudio }}">
+          <section class="sw-split sw-split--flip" style="padding:0 0 72px">
+            <div style="display:grid;gap:14px"><span class="sw-eyebrow">Templates</span><h2 class="sw-h2">Save it once, reuse it everywhere.</h2><p class="sw-body">Templates work in Welcome, Scheduled messages, Tickets and more. Free includes 10; Plus includes 100.</p></div>
+            <div class="sp-card"><div class="sp-rows"><div class="sp-row"><span class="sp-row__icon"><sp-icon class="sp-i" name="file-text"></sp-icon></span><span class="sp-row__title">Weekend art jam</span><span class="sp-row__desc">Used in Scheduled messages · Sat 19:00</span></div><div class="sp-row"><span class="sp-row__icon"><sp-icon class="sp-i" name="file-text"></sp-icon></span><span class="sp-row__title">Default welcome</span><span class="sp-row__desc">Used in Welcome</span></div><div class="sp-row"><span class="sp-row__icon"><sp-icon class="sp-i" name="file-text"></sp-icon></span><span class="sp-row__title">Ticket closed</span><span class="sp-row__desc">Used in Tickets</span></div></div><div class="sp-card__foot" style="justify-content:space-between"><span class="sp-hint">3 of 10 templates on Free</span><div class="sp-progress sp-progress--sm" style="width:120px"><div class="sp-progress__bar" style="width:30%"></div></div></div></div>
+          </section>
+          <section class="sw-split" style="padding:0 0 72px">
+            <div style="display:grid;gap:14px"><span class="sw-eyebrow">Versions &amp; publishing</span><h2 class="sw-h2">Edit published messages without reposting.</h2><p class="sw-body">Sparko keeps every saved version. Change the message, preview it, and Sparko updates it in Discord; reactions and replies stay put.</p></div>
+            <div class="sp-card"><div class="sp-rows"><div class="sp-row sp-row--success"><span class="sp-row__icon"><sp-icon class="sp-i" name="circle-check"></sp-icon></span><span class="sp-row__title">Live in #rules</span><span class="sp-row__desc">Server rules · edited today by Ayo</span></div><div class="sp-row"><span class="sp-row__icon"><sp-icon class="sp-i" name="rotate-ccw"></sp-icon></span><span class="sp-row__title">Version from 11 Oct</span><span class="sp-row__desc">Rhea · added the art-sharing rule</span><span class="sp-row__end"><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ noopToast }}">Restore</button></span></div></div></div>
+          </section>
+        </sc-if>
+        <section style="padding:0 0 96px"><div class="sw-group-h"><h2 class="sw-h3" style="font-size:20px">More in {{ feat.group }}</h2></div><div class="sw-grid sw-grid--3"><sc-for list="{{ related }}" as="m"><button class="sw-card sw-card--link sw-mod" onClick="{{ m.go }}"><span class="sw-card__icon sw-card__icon--plain"><sp-icon class="sp-i" name="{{ m.icon }}"></sp-icon></span><span class="sw-mod__name">{{ m.label }}</span><span class="sw-mod__desc">{{ m.desc }}</span></button></sc-for></div></section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isPricing }}" hint-placeholder-val="{{ false }}">
+      <div class="sw-wrap">
+        <header class="sw-page-hero" style="justify-items:center;text-align:center"><span class="sw-eyebrow">Pricing</span><h1 class="sw-h1">Free for nearly everything.</h1><p class="sw-lede">Every module except multi-server tools is free. Plus raises the limits for busy servers and lets you copy settings between servers.</p></header>
+        <div class="sw-period"><div class="sp-seg" role="radiogroup" aria-label="Billing period"><sc-for list="{{ periods }}" as="p" hint-placeholder-count="3"><button class="sp-seg__item" role="radio" aria-checked="{{ p.sel }}" onClick="{{ p.pick }}">{{ p.label }}<sc-if value="{{ p.save }}"><span class="sp-badge sp-badge--sm sp-badge--success">{{ p.save }}</span></sc-if></button></sc-for></div></div>
+        <div class="sw-price-grid">
+          <article class="sp-price"><div class="sp-price__head"><div class="sp-price__name">Free</div><p class="sp-price__desc">For any server, big or small.</p></div><div class="sp-price__amount"><span class="sp-price__value">US$0</span><span class="sp-price__unit">forever</span></div>
+            <ul class="sp-price__features"><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>All modules except multi-server tools</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>10 message templates</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>10 MB storage</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>10 steps per workflow</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>Ticket transcripts kept 7 days</li></ul>
+            <div class="sp-price__cta"><button class="sp-btn sp-btn--secondary sp-btn--block" onClick="{{ addBot }}">Add Sparko free</button></div></article>
+          <article class="sp-price sp-price--featured sp-sparks"><div class="sp-price__head"><div class="sp-price__name">Plus<span class="sp-badge sp-badge--plus">{{ period.badge }}</span></div><p class="sp-price__desc">For servers that outgrow the limits, or run more than one.</p></div>
+            <div class="sp-price__amount"><span class="sp-price__value">{{ period.price }}</span><span class="sp-price__unit">{{ period.unit }}</span></div><p class="sw-per-month">{{ period.note }}</p>
+            <ul class="sp-price__features"><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>Everything in Free</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>Multi-server tools: copy settings with a preview</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>100 message templates</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>100 MB storage</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>25 steps per workflow</li><li><sp-icon class="sp-i sp-i--sm" name="check"></sp-icon>Ticket transcripts kept 30 days</li></ul>
+            <div class="sp-price__cta"><button class="sp-btn sp-btn--primary sp-btn--block" aria-busy="{{ buying }}" onClick="{{ buy }}"><sc-if value="{{ buying }}"><span class="sp-spinner"></span></sc-if>{{ buyLabel }}</button><p class="sp-price__note">Paid through PayPal. Cancel or change period any time.</p></div></article>
+        </div>
+        <section style="padding:72px 0 0;max-width:880px;margin:0 auto" aria-labelledby="cmp-h">
+          <h2 class="sw-h3" id="cmp-h" style="font-size:20px;margin-bottom:16px">Compare limits</h2>
+          <div class="sp-table-wrap"><table class="sp-table"><thead><tr><th scope="col">What you get</th><th scope="col">Free</th><th scope="col">Plus</th></tr></thead><tbody>
+            <sc-for list="{{ compare }}" as="r" hint-placeholder-count="7"><tr><td data-label="Feature" data-primary="true" style="font-weight:500">{{ r.k }}</td><td data-label="Free">{{ r.f }}</td><td data-label="Plus">{{ r.p }}</td></tr></sc-for>
+          </tbody></table></div>
+        </section>
+        <section class="sw-section" aria-labelledby="bfaq-h"><div class="sw-head sw-head--center"><h2 class="sw-h2" id="bfaq-h">Billing questions</h2></div><div class="sw-faq"><sc-for list="{{ faqBilling }}" as="f"><details><summary>{{ f.q }}<sp-icon class="sp-i" name="plus"></sp-icon></summary><p class="sw-faq__a">{{ f.a }}</p></details></sc-for></div></section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCommands }}" hint-placeholder-val="{{ false }}">
+      <div class="sw-wrap" style="padding-bottom:96px">
+        <header class="sw-page-hero"><span class="sw-eyebrow">Commands</span><h1 class="sw-h1">Every slash command, in one place.</h1><p class="sw-lede">Type / in Discord to see them. Server owners can turn any command off or limit who can use it from the dashboard.</p></header>
+        <div class="sw-toolbar">
+          <div class="sp-input" style="flex:1 1 260px;max-width:380px"><sp-icon class="sp-i" name="search"></sp-icon><input aria-label="Search commands" placeholder="Search commands, like “ban”" value="{{ cq }}" onChange="{{ setCq }}"><span class="sp-input__end sp-tnum" style="font-size:13px">{{ cmdCount }}</span></div>
+          <div class="sw-chips" style="gap:8px"><sc-for list="{{ cmdCats }}" as="c" hint-placeholder-count="7"><button class="sp-chip sp-chip--toggle" aria-pressed="{{ c.on }}" onClick="{{ c.pick }}">{{ c.label }}</button></sc-for></div>
+        </div>
+        <div class="sw-cmds">
+          <sc-for list="{{ cmds }}" as="c" hint-placeholder-count="8">
+            <details class="sw-cmd"><summary><span class="sw-cmd__name">{{ c.name }}</span><span class="sw-cmd__desc">{{ c.desc }}</span><span class="sp-badge">{{ c.cat }}</span><sp-icon class="sp-i sw-cmd__chev" name="chevron-down"></sp-icon></summary>
+              <div class="sw-cmd__body">
+                <div class="sw-usage" aria-label="Example"><span style="color:var(--sp-dc-muted)">Example</span>{{ c.usage }}</div>
+                <dl class="sw-opts"><sc-for list="{{ c.opts }}" as="o"><dt>{{ o.k }}</dt><dd>{{ o.v }}</dd></sc-for><dt>who</dt><dd>{{ c.perm }}</dd></dl>
+              </div>
+            </details>
+          </sc-for>
+          <sc-if value="{{ cmdNone }}"><div class="sp-card"><div class="sp-empty"><div class="sp-empty__art"><sp-icon class="sp-i" name="terminal"></sp-icon></div><div class="sp-empty__title">No commands match “{{ cq }}”</div><p class="sp-empty__desc">Server owners can also make their own with Custom commands.</p><div class="sp-empty__actions"><button class="sp-btn sp-btn--secondary" onClick="{{ clearCq }}">Show all commands</button></div></div></div></sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <div class="sw-wrap" style="padding-bottom:96px">
+      <div class="sw-cta"><h2 class="sw-h2">Be live before your coffee cools.</h2><p>Add Sparko, follow the checklist, and see every message before your members do.</p><div class="sw-hero__ctas" style="justify-content:center"><button class="sp-btn sp-btn--lg sw-btn-ink" onClick="{{ addBot }}"><sp-icon class="sp-i" name="plus"></sp-icon>Add Sparko to Discord</button><button class="sp-btn sp-btn--lg sp-btn--ghost" style="color:var(--sp-on-brand)" onClick="{{ support }}">Ask in the support server</button></div></div>
+    </div>
+  </main>
+
+  <footer class="sw-footer">
+    <div class="sw-wrap">
+      <div class="sw-footer__grid">
+        <div style="display:grid;gap:12px;align-content:start"><button class="sw-logo" style="justify-self:start" onClick="{{ goHome }}"><span class="sw-logo__mark"></span>Sparko</button><p class="sw-body" style="max-width:34ch;font-size:14px">The all-in-one Discord bot that explains itself.</p></div>
+        <div><h3>Product</h3><ul><li><button class="sw-link" onClick="{{ goFeatures }}">Features</button></li><li><button class="sw-link" onClick="{{ goPricing }}">Pricing</button></li><li><button class="sw-link" onClick="{{ goCommands }}">Commands</button></li><li><button class="sw-link" onClick="{{ noopToast }}">Changelog</button></li></ul></div>
+        <div><h3>Help</h3><ul><li><button class="sw-link" onClick="{{ noopToast }}">Docs</button></li><li><button class="sw-link" onClick="{{ noopToast }}">Status</button></li><li><button class="sw-link" onClick="{{ support }}">Support server</button></li></ul></div>
+        <div><h3>Legal</h3><ul><li><button class="sw-link" onClick="{{ noopToast }}">Privacy Policy</button></li><li><button class="sw-link" onClick="{{ noopToast }}">Terms of Service</button></li></ul></div>
+      </div>
+      <div class="sw-footer__base"><span>© 2026 Sparko. Not affiliated with Discord Inc.</span><span>panel.coin-sprite.com</span></div>
+    </div>
+  </footer>
+
+  <div class="sp-toast-region" aria-live="polite"><sc-for list="{{ toasts }}" as="t"><div class="sp-toast sp-toast--info" role="status"><sp-icon class="sp-i sp-toast__icon" name="info"></sp-icon><div class="sp-toast__title">{{ t.title }}</div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm sp-toast__close" aria-label="Dismiss" onClick="{{ t.close }}"><sp-icon class="sp-i sp-i--sm" name="x"></sp-icon></button><div class="sp-toast__body">{{ t.body }}</div></div></sc-for></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;},&quot;startPage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;features&quot;,&quot;feature&quot;,&quot;pricing&quot;,&quot;commands&quot;],&quot;default&quot;:&quot;home&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const GROUPS = [
+ ['Support', ['tickets|Tickets|ticket|Private help threads between members and your staff, with claiming, priority and transcripts.|Create a ticket panel', 'forms|Forms & applications|file-text|Collect staff applications, event sign-ups or reports with a simple form.|Create a form', 'staffflows|Staff workflows|list-checks|Checklists your staff follow for common jobs, like handling a report.|Create a checklist']],
+ ['Messages', ['studio|Message Studio|message-square-text|Build Discord messages and embeds visually, see them exactly as members will, then publish.|Create a message']],
+ ['Safety', ['cases|Moderation cases|gavel|Every warn, timeout, kick and ban, with who did it and why.|Open the case log', 'automod|Auto moderation|shield|Rules that catch spam, invite links and banned words. Try them in the simulator before they go live.|Add a rule', 'raid|Raid guard|shield-alert|Slows joins and locks channels when lots of new accounts arrive at once.|Choose what happens in a raid', 'antinuke|Anti-nuke|shield-check|Stops anyone, even admins, from deleting channels or roles in bulk.|Choose protected actions', 'reports|Reports & appeals|flag|Members report messages and banned members appeal. Your staff review both here.|Set up reports', 'verify|Verification|lock|New members confirm they’re a person before they can chat.|Set up verification']],
+ ['Community', ['welcome|Welcome|user-plus|Greet new members with a message or embed the moment they join.|', 'leave|Leave & boost messages|log-out|Post a message when someone leaves or boosts the server.|Write a message', 'rolemenus|Self-service role menus|smile|Members pick their own roles with buttons or a dropdown.|Create a role menu', 'autoroles|Automatic roles|users|Give roles when someone joins, after a delay, or once they verify.|Add a rule', 'suggestions|Suggestions|message-square|Members suggest ideas, everyone votes, and staff mark them done.|Pick a suggestions channel', 'qa|Questions & answers|circle-help|Answer common questions automatically with saved replies.|Add a question', 'starboard|Starboard|star|Messages that get enough stars are reposted to a highlights channel.|Pick a highlights channel', 'polls|Polls|activity|Quick polls with buttons and live results.|Create a poll', 'events|Events & RSVP|calendar|Schedule events, collect RSVPs and remind people before they start.|Schedule an event', 'birthdays|Birthdays|gift|Members save their birthday and Sparko celebrates on the day.|Pick a birthday channel', 'tempvoice|Temporary voice channels|volume-2|Join a hub channel to get your own voice room, removed when it’s empty.|Choose a hub channel', 'invites|Invite tracking|link|See who invited whom and reward your best inviters.|Start tracking invites']],
+ ['Engagement', ['levels|Levels & XP|trending-up|Members earn XP for chatting and level up over time.|Set XP rules', 'crates|XP crates|gift|Surprise drops members open for bonus XP or items.|Create a crate', 'rewardroles|Reward roles|award|Give a role when someone reaches a level.|Add a reward', 'rankcards|Rank cards|image|Design the card members see when they use /rank.|Design a card', 'counting|Counting|hash|A channel where members count up together, one number at a time.|Pick a counting channel', 'giveaways|Giveaways|party-popper|Run giveaways with entry rules and fair, random winners.|Start a giveaway', 'seasons|Seasons|sun|Reset leaderboards on a schedule and reward the top members.|Plan a season', 'achievements|Achievements|award|Badges members unlock for milestones.|Create an achievement', 'economy|Virtual economy|layers|A server currency members earn and spend. It has no real-world value.|Name your currency', 'daily|Daily & work rewards|clock|Members claim coins once a day or with /work.|Set reward amounts', 'shop|Shop & inventory|puzzle|Sell roles and items for server currency.|Add an item', 'trades|Trades & auctions|arrow-up-down|Members swap items or auction them to each other.|Turn on trading', 'collections|Collections|layers|Sets of items members collect for a bonus.|Create a collection', 'minigames|Mini-games|zap|Trivia, word games and more, right in chat.|Pick games', 'lottery|Virtual lottery|ticket|Members buy tickets with server currency and one wins the pot.|Start a lottery', 'rep|Reputation|heart|Members thank each other with +rep.|Turn on reputation']],
+ ['Automation', ['scheduled|Scheduled messages|calendar|Post a message at a set time, once or on repeat.|Schedule a message', 'autoreplies|Auto replies|corner-down-left|Reply automatically when someone says a keyword.|Add a reply', 'sticky|Sticky messages|flag|Keep one message at the bottom of a channel.|Add a sticky message', 'workflows|Workflows|zap|When something happens, check a condition, then do something. Built visually, no code.|Build a workflow', 'commands|Custom commands|terminal|Make your own slash commands with replies and actions.|Create a command', 'reminders|Reminders|bell|Members set reminders and Sparko pings them on time.|Turn on reminders', 'social|Social & RSS alerts|globe|Post when a YouTube video, Twitch stream, GitHub release or RSS item goes live.|Add an alert', 'webhooks|External events|plug|Let other apps send events into Sparko with a webhook.|Create a webhook']],
+ ['Insights', ['analytics|Analytics|activity|Members, messages and module use over time.|', 'audit|Audit log|scroll-text|Who changed what in this dashboard, and when.|']],
+ ['Server settings', ['access|Dashboard access|lock|Choose which roles can manage which modules.|Add a role', 'backups|Configuration backups|save|Snapshot your setup, compare versions and restore any of them.|Take a snapshot', 'multiserver|Multi-server tools|server|Copy settings to your other servers, with a preview first.|', 'widgets|Public widgets|monitor|Show a live member count or leaderboard on your website.|Create a widget', 'billing|Plan & billing|crown|Your plan, limits and payments.|', 'music|Music|music|Play music in voice channels.|Pick a DJ role', 'ai|AI assistance|sparkles|Draft messages and summarize tickets with AI. You review everything before it’s sent.|Turn on AI drafts']]
+];
+const GMETA = { Support: ['ticket', 'Tickets, forms and staff checklists.'], Messages: ['message-square-text', 'A visual builder for messages and embeds.'], Safety: ['shield', 'Moderation, AutoMod, raid and nuke protection.'], Community: ['users', 'Welcome, roles, polls, events and more.'], Engagement: ['trending-up', 'Levels, economy, giveaways and games.'], Automation: ['zap', 'Schedules, auto replies and no-code workflows.'], Insights: ['activity', 'Analytics and a full audit log.'], 'Server settings': ['settings', 'Access, backups, widgets and billing.'] };
+const MODS = []; GROUPS.forEach(([g, items]) => items.forEach(s => { const [id, label, icon, desc] = s.split('|'); MODS.push({ id, label, icon, desc, group: g, plus: id === 'multiserver' }); }));
+const SCENES = [
+  { k: 'welcome', label: 'Welcome', channel: 'welcome', color: '#FACC15', mention: '@tomoko', content: 'just landed!', title: 'Welcome to Pixel Plaza', desc: 'You’re member #8,215. Read #rules, then say hi in #introductions.', fields: [['Start here', '#rules'], ['Need help?', '#support']], footer: 'Welcome · Today at 18:42', buttons: [['Pick your roles', 'primary'], ['Server guide', '']], note: 'Welcome · edited in plain language, previewed before it’s sent.' },
+  { k: 'tickets', label: 'Tickets', channel: 'support', color: '#5865F2', user: 'kestrel', userText: 'I can’t see #events anymore?', title: 'Ticket #213 opened', desc: 'Thanks, kestrel. A staff member will reply here. Most tickets are answered within 15 minutes.', fields: [['Priority', 'Normal'], ['Claimed by', 'Rhea'], ['Wait', '2 min']], footer: 'Tickets · transcript saved when closed', buttons: [['Claim', 'success'], ['Close with reason', 'danger']], note: 'Tickets · claim, assign, set priority and keep transcripts.' },
+  { k: 'automod', label: 'AutoMod', channel: 'mod-log', color: '#ED4245', title: 'Message removed in #general', desc: 'spammy_dan posted an invite link. Rule: Invite links (tested in the simulator on 2 Oct).', fields: [['Action', 'Deleted · 10 min timeout'], ['Strike', '1 of 3']], footer: 'Auto moderation · Case #1043', buttons: [['Undo', ''], ['Timeout 1 hour', 'danger']], note: 'Auto moderation · every rule can be tested before it’s live.' },
+  { k: 'levels', label: 'Levels', channel: 'general', color: '#57F287', mention: '@mossy_bun', content: 'levelled up!', title: 'Level 20 reached', desc: 'mossy_bun earned the Regular role and 250 coins.', fields: [['Rank', '#14 of 8,214'], ['Next level', '1,240 XP']], footer: 'Levels & XP · Reward roles', buttons: [['View rank card', 'primary']], note: 'Levels & XP · with reward roles and seasons.' }
+];
+const FAQ_HOME = [
+  ['Is Sparko really free?', 'Yes. Every module except multi-server tools is free, for as many servers as you like. Plus only raises limits like templates, storage and transcript history.'],
+  ['Does Sparko need Administrator?', 'Never. Sparko asks only for the permissions your modules use, and if one is missing it tells you exactly where to switch it on.'],
+  ['Can I undo a change?', 'Yes. Every save is kept as a version, and Configuration backups let you snapshot, compare and restore your whole setup.'],
+  ['Will I break something while setting up?', 'Unlikely. You see a live preview of every message, and Auto moderation rules can be tested in a simulator before they go live.'],
+  ['I already use another bot. Can I switch?', 'Yes. Turn on Sparko modules one at a time, and switch the same feature off in your old bot when you’re happy.'],
+  ['Is the virtual economy real money?', 'No. Server currency, items and the lottery have no real-world value and can’t be bought or cashed out.']
+];
+const FAQ_BILL = [
+  ['How do I pay?', 'Plus is paid through PayPal. You can use a PayPal balance or a card through PayPal.'],
+  ['What happens after the US$1.49 first month?', 'Monthly Plus continues at US$3.99 a month. You can switch to every 6 months or yearly at any time.'],
+  ['Can I cancel?', 'Any time, from Plan & billing in your account. Plus stays on until the end of the period you paid for.'],
+  ['What happens to my data if I go back to Free?', 'Nothing is deleted straight away. Anything over the Free limits becomes read-only until you remove it or upgrade again.']
+];
+const PERIODS = [{ k: 'm', label: 'Monthly', price: 'US$3.99', unit: '/ month', badge: 'First month US$1.49', note: 'Your first month is US$1.49, then US$3.99 a month.' }, { k: '6', label: '6 months', save: 'Save 10%', price: 'US$21.55', unit: '/ 6 months', badge: 'Save 10%', note: 'About US$3.59 a month, billed every 6 months.' }, { k: 'y', label: 'Yearly', save: 'Save 25%', price: 'US$35.91', unit: '/ year', badge: 'Save 25%', note: 'About US$2.99 a month, billed once a year.' }];
+const COMPARE = [['Modules', '46 of 47', 'All 47'], ['Multi-server tools', '—', 'Included'], ['Message templates', '10', '100'], ['Storage', '10 MB', '100 MB'], ['Steps per workflow', '10', '25'], ['Ticket transcripts kept', '7 days', '30 days'], ['Live previews, versions and backups', 'Included', 'Included']];
+const CMDS = [
+  '/ban|Moderation|Members with Ban Members|Ban a member and log a case with the reason.|/ban user:@spammy_dan reason:Invite spam delete:1 day|user:Who to ban;reason:Saved to the case and the audit log;delete:How much of their recent history to remove',
+  '/timeout|Moderation|Members with Moderate Members|Stop someone chatting for a while.|/timeout user:@kestrel duration:1h reason:Caps after a warning|user:Who to time out;duration:From 1 minute to 28 days;reason:Saved to the case',
+  '/warn|Moderation|Members with Moderate Members|Give a warning that’s saved to their record.|/warn user:@duncan_r reason:Off-topic in #support|user:Who to warn;reason:They see this in a DM if you allow it',
+  '/kick|Moderation|Members with Kick Members|Remove someone. They can rejoin with an invite.|/kick user:@pixelpaws reason:Alt account|user:Who to kick;reason:Saved to the case',
+  '/case|Moderation|Members with Moderate Members|Look up, edit or close a case.|/case number:1042|number:The case number from the log',
+  '/purge|Moderation|Members with Manage Messages|Delete recent messages in bulk.|/purge count:50 user:@spammy_dan|count:Up to 100 messages;user:Only delete this member’s messages',
+  '/ticket open|Tickets|Everyone|Open a private ticket with your staff.|/ticket open topic:Can’t see #events|topic:A short title for your ticket',
+  '/ticket claim|Tickets|Ticket staff|Take a ticket so others know you’re on it.|/ticket claim|',
+  '/ticket close|Tickets|Ticket staff|Close a ticket with a reason. The transcript is saved.|/ticket close reason:Solved: added the Events role|reason:Shown to the member and saved with the transcript',
+  '/rank|Levels|Everyone|Show your rank card.|/rank user:@mossy_bun|user:Someone else’s card (optional)',
+  '/leaderboard|Levels|Everyone|See the most active members this season.|/leaderboard page:2|page:Which page of the leaderboard',
+  '/xp give|Levels|Members with Manage Server|Add or remove XP by hand.|/xp give user:@tomoko amount:500|user:Who gets the XP;amount:Use a negative number to remove XP',
+  '/balance|Economy|Everyone|See your wallet and bank.|/balance|',
+  '/daily|Economy|Everyone|Claim your daily coins.|/daily|',
+  '/work|Economy|Everyone|Earn coins, once every few hours.|/work|',
+  '/shop|Economy|Everyone|Browse and buy items and roles.|/shop item:Neon name colour|item:Buy straight away (optional)',
+  '/remind|Utility|Everyone|Get a ping later.|/remind in:2h text:Stream starts|in:When, like 10m, 2h or tomorrow 9am;text:What to remind you about',
+  '/poll|Utility|Everyone, unless limited|Start a quick poll with buttons.|/poll question:Next jam theme? options:Space, Ocean, Forest|question:What you’re asking;options:Up to 10, separated by commas',
+  '/suggest|Utility|Everyone|Post an idea for the server to vote on.|/suggest idea:A #photography channel|idea:Your suggestion',
+  '/giveaway start|Fun|Members with Manage Server|Start a giveaway with fair, random winners.|/giveaway start prize:Nitro Basic winners:1 ends:3d|prize:What people can win;winners:How many winners;ends:How long it runs',
+  '/birthday set|Fun|Everyone|Save your birthday so the server can celebrate.|/birthday set date:14 March|date:Day and month; the year is never shown',
+  '/rep|Fun|Everyone|Thank someone with +rep.|/rep user:@rhea|user:Who to thank'
+];
+const FEAT_EXTRA = { studio: { headline: 'Build Discord messages you can see before you send.', points: ['Drag-free visual editor for text, embeds, buttons and menus', 'Exactly the preview Discord shows, in dark and light', 'Templates, saved versions and edit-after-publish'] } };
+
+class Component extends DCLogic {
+  state = (() => { let qp = {}; try { qp = Object.fromEntries(new URLSearchParams(location.search)); } catch (e) {}
+    return { theme: qp.theme || this.props.theme || 'dark', page: qp.page || this.props.startPage || 'home', fid: qp.id || 'studio', menu: false, scene: 0, paused: false, manual: false, demoMsg: 'welcome to {server}!', fq: '', fg: 'All', cq: '', cc: 'All', period: 'm', buying: false, toasts: [], studio: { title: 'Weekend art jam', desc: 'Bring a sketch, any medium. Theme drops at 19:00 in #art-share.', color: '#FACC15', btn: 'I’m in' } }; })();
+  _tid = 0;
+  componentDidMount() {
+    this._rm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this._iv = setInterval(() => { const s = this.state; if (!s.paused && !s.manual && !this._rm && s.page === 'home' && !document.hidden) this.setState({ scene: (s.scene + 1) % SCENES.length }); }, 5000);
+    this._key = e => { if (e.key === 'Escape') this.setState({ menu: false }); }; document.addEventListener('keydown', this._key);
+  }
+  componentWillUnmount() { clearInterval(this._iv); document.removeEventListener('keydown', this._key); }
+  componentDidUpdate(pp) { if (pp.theme !== this.props.theme && this.props.theme) this.setState({ theme: this.props.theme }); }
+  go(page, fid) { this.setState({ page, fid: fid || this.state.fid, menu: false }); try { window.scrollTo(0, 0); } catch (e) {} }
+  toast(title, body) { const id = ++this._tid; this.setState(s => ({ toasts: [...s.toasts.slice(-1), { id, title, body }] })); setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 4500); }
+  renderVals() {
+    const s = this.state; const dark = s.theme === 'dark'; const sc = SCENES[s.scene];
+    const feat = MODS.find(m => m.id === s.fid) || MODS[0]; const fx = FEAT_EXTRA[feat.id] || {};
+    const fq = s.fq.trim().toLowerCase();
+    const catalogue = GROUPS.map(([g]) => ({ label: g, items: MODS.filter(m => m.group === g && (s.fg === 'All' || s.fg === g) && (!fq || (m.label + ' ' + m.desc).toLowerCase().includes(fq))) })).filter(g => g.items.length).map(g => ({ ...g, count: g.items.length, items: g.items.map(m => ({ ...m, go: () => this.go('feature', m.id) })) }));
+    const cq = s.cq.trim().toLowerCase().replace(/^\//, '');
+    const cmds = CMDS.map(x => { const [name, cat, perm, desc, usage, opts] = x.split('|'); return { name, cat, perm, desc, usage, opts: (opts || '').split(';').filter(Boolean).map(o => { const i = o.indexOf(':'); return { k: o.slice(0, i), v: o.slice(i + 1) }; }) }; }).filter(c => (s.cc === 'All' || c.cat === s.cc) && (!cq || (c.name + ' ' + c.desc).toLowerCase().includes(cq)));
+    const period = PERIODS.find(p => p.k === s.period);
+    const links = [['features', 'Features'], ['pricing', 'Pricing'], ['commands', 'Commands'], ['docs', 'Docs'], ['status', 'Status']].map(([k, label]) => ({ label, current: s.page === k || (k === 'features' && s.page === 'feature') ? 'page' : undefined, go: () => ['docs', 'status'].includes(k) ? this.toast(`${label} is a separate site`, 'It opens in a new tab on the real site.') : this.go(k) }));
+    const demoRest = s.demoMsg.replace(/\{server\}/g, 'Pixel Plaza').replace(/\{user\}/g, '@tomoko');
+    return {
+      theme: s.theme, themeIcon: dark ? 'sun' : 'moon', themeLabel: dark ? 'Switch to light theme' : 'Switch to dark theme', toggleTheme: () => this.setState({ theme: dark ? 'light' : 'dark' }),
+      links, menuOpen: s.menu, menuIcon: s.menu ? 'x' : 'menu', toggleMenu: () => this.setState({ menu: !s.menu }), sheetClass: 'sw-sheet' + (s.menu ? ' is-open' : ''),
+      goHome: () => this.go('home'), goFeatures: () => this.go('features'), goPricing: () => this.go('pricing'), goCommands: () => this.go('commands'),
+      addBot: () => this.toast('Discord would open here', 'You’d pick a server and approve only the permissions Sparko needs.'), signIn: () => this.toast('Sign in with Discord', 'You’d land on your server picker at panel.coin-sprite.com.'), support: () => this.toast('Opening the support server', 'The Sparko team answers in #help.'), noopToast: () => this.toast('Coming in a later area', 'This page isn’t designed yet.'),
+      isHome: s.page === 'home', isFeatures: s.page === 'features', isFeature: s.page === 'feature', isPricing: s.page === 'pricing', isCommands: s.page === 'commands',
+      scenes: SCENES.map((x, i) => ({ label: x.label, sel: i === s.scene, pick: () => this.setState({ scene: i, manual: true }) })),
+      scene: { ...sc, key: sc.k, userInitial: (sc.user || ' ')[0].toUpperCase(), fields: sc.fields.map(([n, v]) => ({ n, v })), buttons: sc.buttons.map(([label, t]) => ({ label, cls: 'dc-btn' + (t ? ' dc-btn--' + t : '') })) }, sceneUser: !!sc.user,
+      paused: s.paused || s.manual, pauseIcon: s.paused || s.manual ? 'arrow-right' : 'circle-pause', pauseLabel: s.paused || s.manual ? 'Play the preview tour' : 'Pause the preview tour', togglePause: () => this.setState({ paused: !(s.paused || s.manual), manual: false }),
+      demoMsg: s.demoMsg, setDemoMsg: e => this.setState({ demoMsg: e.target.value }), demoRest,
+      groupCards: GROUPS.map(([g, items]) => ({ label: g, icon: GMETA[g][0], blurb: GMETA[g][1], chips: items.slice(0, 3).map(x => x.split('|')[1]), more: items.length > 3 ? `All ${items.length} modules` : 'See details', go: () => { this.setState({ fg: g, fq: '' }); this.go('features'); } })),
+      faqHome: FAQ_HOME.map(([q, a]) => ({ q, a })), faqBilling: FAQ_BILL.map(([q, a]) => ({ q, a })),
+      fq: s.fq, setFq: e => this.setState({ fq: e.target.value }), clearFq: () => this.setState({ fq: '', fg: 'All' }), catalogue, fNone: !catalogue.length,
+      groupFilters: ['All', ...GROUPS.map(g => g[0])].map(g => ({ label: g, on: s.fg === g, pick: () => this.setState({ fg: g }) })),
+      feat: { ...feat, headline: fx.headline || `${feat.label}, without the guesswork.`, points: fx.points || ['Plain-language settings with a short explanation', 'Live preview of anything Sparko posts', 'Every change saved as a version you can restore'], planNote: feat.plus ? 'Included in Plus' : 'Free on every server' },
+      isStudio: feat.id === 'studio', notStudio: feat.id !== 'studio',
+      related: MODS.filter(m => m.group === feat.group && m.id !== feat.id).slice(0, 3).concat(feat.group === 'Messages' ? MODS.filter(m => ['welcome', 'scheduled', 'tickets'].includes(m.id)) : []).slice(0, 3).map(m => ({ ...m, go: () => this.go('feature', m.id) })),
+      studio: s.studio, setStTitle: e => this.setState({ studio: { ...s.studio, title: e.target.value } }), setStDesc: e => this.setState({ studio: { ...s.studio, desc: e.target.value } }), setStBtn: e => this.setState({ studio: { ...s.studio, btn: e.target.value || ' ' } }),
+      stColors: [['Yellow', '#FACC15'], ['Blurple', '#5865F2'], ['Mint', '#57F287'], ['Coral', '#ED4245'], ['Pink', '#EB459E']].map(([name, hex]) => ({ name, hex, sel: s.studio.color === hex, pick: () => this.setState({ studio: { ...s.studio, color: hex } }) })),
+      periods: PERIODS.map(p => ({ label: p.label, save: p.save, sel: p.k === s.period, pick: () => this.setState({ period: p.k }) })), period,
+      buying: s.buying, buyLabel: s.buying ? 'Opening PayPal…' : `Get Plus · ${period.label.toLowerCase()}`, buy: () => { this.setState({ buying: true }); setTimeout(() => { this.setState({ buying: false }); this.toast('Sign in, then PayPal', `You’d sign in with Discord, pick a server and pay ${period.price} through PayPal.`); }, 900); },
+      compare: COMPARE.map(([k, f, p]) => ({ k, f, p })),
+      cq: s.cq, setCq: e => this.setState({ cq: e.target.value }), clearCq: () => this.setState({ cq: '', cc: 'All' }), cmds, cmdNone: !cmds.length, cmdCount: `${cmds.length} commands`,
+      cmdCats: ['All', 'Moderation', 'Tickets', 'Levels', 'Economy', 'Utility', 'Fun'].map(c => ({ label: c, on: s.cc === c, pick: () => this.setState({ cc: c }) })),
+      toasts: s.toasts.map(t => ({ ...t, close: () => this.setState(st => ({ toasts: st.toasts.filter(x => x.id !== t.id) })) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

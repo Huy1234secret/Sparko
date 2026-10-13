@@ -1,0 +1,54 @@
+/* Inline notices, Plus upsell banner, "paused by Sparko staff" banner. No coloured left-border accents: tone = tint + 1px tinted border + icon. */
+.sp-notice {
+  --tone: var(--sp-info); --tone-soft: var(--sp-info-soft); --tone-line: var(--sp-info-line);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 12px; align-items: start; padding: 12px 12px 12px 14px;
+  border: 1px solid var(--tone-line); border-radius: var(--sp-radius-control); background: var(--tone-soft); color: var(--sp-text);
+  font: 400 14px/20px var(--sp-font-sans);
+}
+.sp-notice--success { --tone: var(--sp-success); --tone-soft: var(--sp-success-soft); --tone-line: var(--sp-success-line); }
+.sp-notice--warning { --tone: var(--sp-warning); --tone-soft: var(--sp-warning-soft); --tone-line: var(--sp-warning-line); }
+.sp-notice--danger { --tone: var(--sp-danger); --tone-soft: var(--sp-danger-soft); --tone-line: var(--sp-danger-line); }
+.sp-notice__icon { grid-row: span 2; margin-top: 1px; color: var(--tone); }
+.sp-notice__title { font-weight: 600; color: var(--tone); }
+.sp-notice__body { grid-column: 2; color: var(--sp-text); font-size: 13px; line-height: 18px; text-wrap: pretty; }
+.sp-notice__actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; }
+.sp-notice__close { grid-column: 3; grid-row: 1 / span 2; margin: -6px -4px 0 0; }
+.sp-notice--compact { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.sp-notice--compact .sp-notice__icon { grid-row: auto; margin: 0; }
+
+/* Plus upsell */
+.sp-plus {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 16px 16px 20px; overflow: hidden;
+  border: 1px solid var(--sp-brand-line); border-radius: var(--sp-radius-card); background: var(--sp-brand-soft); color: var(--sp-text);
+}
+.sp-plus__mark { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: var(--sp-radius-control); background: var(--sp-brand); color: var(--sp-on-brand); }
+.sp-plus__text { display: grid; gap: 2px; flex: 1 1 260px; min-width: 0; }
+.sp-plus__title { font: 600 15px/22px var(--sp-font-sans); display: flex; align-items: center; gap: 8px; }
+.sp-plus__desc { font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); text-wrap: pretty; }
+.sp-plus__actions { display: flex; align-items: center; gap: 8px; }
+.sp-plus--compact { padding: 14px; gap: 12px; }
+.sp-plus--compact .sp-plus__text { flex-basis: 100%; }
+.sp-plus--compact .sp-plus__actions { width: 100%; }
+.sp-plus--compact .sp-plus__actions .sp-btn { flex: 1; }
+@container (max-width: 640px) {
+  .sp-plus__actions { width: 100%; }
+  .sp-plus__actions .sp-btn--primary { flex: 1; }
+}
+
+/* Paused by Sparko staff — not dismissible */
+.sp-paused {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 14px 16px;
+  border: 1px solid var(--sp-danger-line); border-radius: var(--sp-radius-control); background: var(--sp-danger-soft); color: var(--sp-text);
+}
+.sp-paused__icon { grid-row: span 2; color: var(--sp-danger); margin-top: 1px; }
+.sp-paused__title { font: 600 14px/20px var(--sp-font-sans); color: var(--sp-danger); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.sp-paused__body { grid-column: 2; font: 400 13px/18px var(--sp-font-sans); text-wrap: pretty; }
+.sp-paused__ref { font: 400 12px/16px var(--sp-font-mono); color: var(--sp-muted); }
+.sp-paused__actions { grid-column: 3; grid-row: 1 / span 2; display: flex; gap: 8px; align-self: center; }
+.sp-paused--bar { border-radius: 0; border-width: 0 0 1px; padding: 12px 24px; }
+@container (max-width: 640px) {
+  .sp-paused { grid-template-columns: auto minmax(0, 1fr); }
+  .sp-paused--bar { padding: 12px 16px; }
+  .sp-paused__actions { grid-column: 1 / -1; grid-row: auto; margin-top: 8px; }
+  .sp-paused__actions .sp-btn { flex: 1; }
+}

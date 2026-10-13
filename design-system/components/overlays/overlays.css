@@ -1,0 +1,53 @@
+/* Scrim, modal (bottom sheet under 640px), drawer, popover menu. */
+.sp-scrim { position: fixed; inset: 0; z-index: var(--sp-z-overlay); display: grid; place-items: center; padding: 24px; background: var(--sp-scrim); animation: sp-fade var(--sp-dur-base) var(--sp-ease-out); }
+.sp-modal {
+  display: flex; flex-direction: column; width: min(480px, 100%); max-height: calc(100% - 16px); overflow: hidden;
+  background: var(--sp-surface); border: 1px solid var(--sp-line); border-radius: var(--sp-radius-card); box-shadow: var(--sp-shadow-overlay); color: var(--sp-text);
+  animation: sp-pop var(--sp-dur-slow) var(--sp-ease-out);
+}
+.sp-modal--lg { width: min(640px, 100%); }
+.sp-modal__head { display: flex; align-items: flex-start; gap: 12px; padding: 20px 16px 0 24px; }
+.sp-modal__icon { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: var(--sp-radius-control); background: var(--sp-danger-soft); color: var(--sp-danger); }
+.sp-modal__titles { flex: 1; min-width: 0; display: grid; gap: 4px; padding-top: 8px; }
+.sp-modal__title { margin: 0; font: var(--sp-text-h2); letter-spacing: var(--sp-tracking-h2); }
+.sp-modal__desc { margin: 0; font: var(--sp-text-body); color: var(--sp-muted); text-wrap: pretty; }
+.sp-modal__body { padding: 20px 24px; overflow: auto; display: grid; gap: 16px; }
+.sp-modal__foot { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px 20px; border-top: 1px solid var(--sp-line); background: var(--sp-subtle); }
+.sp-sheet-grip { display: none; }
+@container (max-width: 640px) {
+  .sp-scrim { place-items: end stretch; padding: 0; }
+  .sp-modal { width: 100%; max-height: 92%; border-radius: var(--sp-radius-card) var(--sp-radius-card) 0 0; border-bottom: 0; animation-name: sp-sheet; }
+  .sp-sheet-grip { display: block; width: 36px; height: 4px; margin: 8px auto 0; border-radius: 2px; background: var(--sp-line-strong); }
+  .sp-modal__head { padding-top: 12px; }
+  .sp-modal__foot { flex-direction: column-reverse; padding-bottom: 24px; }
+  .sp-modal__foot .sp-btn { width: 100%; }
+}
+
+/* Drawer */
+.sp-scrim--drawer { display: flex; justify-content: flex-end; align-items: stretch; padding: 0; }
+.sp-drawer {
+  display: flex; flex-direction: column; width: min(440px, 100%); height: 100%;
+  background: var(--sp-surface); border-left: 1px solid var(--sp-line); box-shadow: var(--sp-shadow-overlay); color: var(--sp-text);
+  animation: sp-slide var(--sp-dur-slow) var(--sp-ease-out);
+}
+.sp-drawer__head { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px 10px 24px; border-bottom: 1px solid var(--sp-line); }
+.sp-drawer__title { flex: 1; min-width: 0; margin: 0; font: var(--sp-text-h2); letter-spacing: var(--sp-tracking-h2); }
+.sp-drawer__body { flex: 1; min-height: 0; overflow: auto; padding: 24px; display: grid; gap: 20px; align-content: start; }
+.sp-drawer__foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 24px; border-top: 1px solid var(--sp-line); background: var(--sp-subtle); }
+@container (max-width: 640px) {
+  .sp-drawer { width: 100%; border-left: 0; }
+  .sp-drawer__head { padding-left: 16px; }
+  .sp-drawer__body { padding: 20px 16px; }
+  .sp-drawer__foot { padding: 12px 16px 20px; }
+  .sp-drawer__foot .sp-btn { flex: 1; }
+}
+
+/* Definition list used in drawers */
+.sp-dl { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px 16px; margin: 0; font: 400 14px/20px var(--sp-font-sans); }
+.sp-dl dt { color: var(--sp-muted); }
+.sp-dl dd { margin: 0; min-width: 0; }
+
+/* Popover menu */
+.sp-menu-anchor { position: relative; display: inline-flex; }
+.sp-menu { min-width: 220px; }
+.sp-menu-anchor > .sp-menu { position: absolute; top: calc(100% + 6px); right: 0; }

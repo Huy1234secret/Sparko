@@ -1,0 +1,69 @@
+/* Discord message preview — mirrors Discord's message anatomy (cozy mode) so previews are trustworthy.
+   Follows the surrounding data-theme (dark → Discord dark, light → Discord light). Uses no Discord logos or proprietary font files. */
+.dc-chat { background: var(--sp-dc-bg); color: var(--sp-dc-text); font-family: var(--sp-font-discord); font-size: 16px; line-height: 1.375; padding: 16px 0; border-radius: var(--sp-radius-card); overflow: hidden; -webkit-font-smoothing: antialiased; }
+.dc-msg { position: relative; padding: 2px 48px 2px 72px; min-height: 44px; margin-top: 17px; }
+.dc-chat > .dc-msg:first-child { margin-top: 0; }
+.dc-msg:hover { background: var(--sp-dc-hover); }
+.dc-avatar { position: absolute; left: 16px; top: 2px; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--sp-brand); color: var(--sp-on-brand); font: 600 16px/1 var(--sp-font-sans); }
+.dc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.dc-head { display: flex; align-items: baseline; flex-wrap: wrap; line-height: 22px; }
+.dc-name { font-size: 16px; font-weight: 500; color: var(--sp-dc-header); }
+.dc-tag { display: inline-flex; align-items: center; gap: 2px; height: 15px; margin-left: 4px; padding: 0 4px; position: relative; top: -1px; border-radius: 3px; background: var(--sp-dc-blurple); color: #fff; font-size: 10px; font-weight: 600; line-height: 15px; text-transform: uppercase; vertical-align: middle; align-self: center; }
+.dc-tag .sp-i { width: 11px; height: 11px; }
+.dc-time { margin-left: 4px; font-size: 12px; font-weight: 500; color: var(--sp-dc-muted); line-height: 22px; }
+.dc-content { font-size: 16px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dc-mention { padding: 0 2px; border-radius: 3px; background: var(--sp-dc-mention-bg); color: var(--sp-dc-mention-text); font-weight: 500; }
+.dc-link { color: var(--sp-dc-link); text-decoration: none; }
+.dc-link:hover { text-decoration: underline; }
+.dc-code { padding: 0 3px; border-radius: 4px; background: var(--sp-dc-embed); font-family: var(--sp-font-mono); font-size: 85%; }
+
+.dc-embed {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; max-width: 516px; margin-top: 2px; padding: 8px 16px 16px 12px;
+  background: var(--sp-dc-embed); border: 1px solid var(--sp-dc-embed-border); border-left: 4px solid var(--dc-color, #1E1F22); border-radius: 4px;
+}
+.dc-embed__main { min-width: 0; display: grid; }
+.dc-embed__author { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 14px; font-weight: 600; line-height: 22px; color: var(--sp-dc-header); }
+.dc-embed__author-icon { width: 24px; height: 24px; border-radius: 50%; background: var(--sp-brand); flex: none; display: grid; place-items: center; color: var(--sp-on-brand); font: 600 11px/1 var(--sp-font-sans); }
+.dc-embed__title { margin-top: 8px; font-size: 16px; font-weight: 600; line-height: 22px; color: var(--sp-dc-header); }
+.dc-embed__title a { color: var(--sp-dc-link); text-decoration: none; }
+.dc-embed__desc { margin-top: 8px; font-size: 14px; line-height: 18px; white-space: pre-wrap; color: var(--sp-dc-text); }
+.dc-fields { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.dc-field { grid-column: 1 / -1; min-width: 0; font-size: 14px; line-height: 18px; }
+.dc-field--inline { grid-column: span 4; }
+.dc-field__name { margin-bottom: 2px; font-weight: 600; color: var(--sp-dc-header); }
+.dc-field__value { color: var(--sp-dc-text); white-space: pre-wrap; }
+.dc-embed__thumb { grid-column: 2; grid-row: 1 / 6; width: 80px; height: 80px; margin: 8px 0 0 16px; border-radius: 4px; overflow: hidden; background: var(--sp-dc-select); }
+.dc-embed__image { grid-column: 1 / -1; margin-top: 16px; border-radius: 4px; overflow: hidden; aspect-ratio: 16 / 9; max-width: 400px; }
+.dc-embed__footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; font-weight: 500; line-height: 16px; color: var(--sp-dc-text); }
+.dc-embed__footer-icon { width: 20px; height: 20px; border-radius: 50%; background: var(--sp-brand); flex: none; }
+.dc-embed__footer .dc-sep { margin: 0 4px; }
+
+.dc-components { display: grid; gap: 8px; margin-top: 8px; max-width: 516px; }
+.dc-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.dc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 60px; height: 32px; padding: 2px 16px;
+  border: 0; border-radius: 8px; color: #fff; font-family: var(--sp-font-discord); font-size: 14px; font-weight: 500; line-height: 16px; cursor: pointer;
+  background: var(--sp-dc-secondary); transition: background-color var(--sp-dur-fast) var(--sp-ease-out);
+}
+.dc-btn:hover { background: var(--sp-dc-secondary-hover); }
+.dc-btn .sp-i { width: 16px; height: 16px; }
+.dc-btn--primary { background: var(--sp-dc-blurple); } .dc-btn--primary:hover { background: var(--sp-dc-blurple-hover, #4752C4); }
+.dc-btn--success { background: var(--sp-dc-success); } .dc-btn--success:hover { background: #1A6334; }
+.dc-btn--danger { background: var(--sp-dc-danger); } .dc-btn--danger:hover { background: #A12828; }
+.dc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.dc-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--sp-dc-bg), 0 0 0 4px #00A8FC; }
+.dc-emoji { font-size: 18px; line-height: 1; }
+.dc-select {
+  display: flex; align-items: center; gap: 8px; width: 100%; max-width: 400px; height: 44px; padding: 8px 8px 8px 12px;
+  border: 1px solid var(--sp-dc-select-border); border-radius: 8px; background: var(--sp-dc-select); color: var(--sp-dc-muted);
+  font-family: var(--sp-font-discord); font-size: 16px; font-weight: 500; line-height: 20px; cursor: pointer; text-align: left;
+}
+.dc-select span { flex: 1; }
+.dc-select .sp-i { color: var(--sp-dc-header); }
+.dc-select:focus-visible { outline: none; box-shadow: 0 0 0 2px #00A8FC; }
+.dc-preview-frame { container-type: inline-size; }
+@container (max-width: 480px) {
+  .dc-msg { padding-right: 16px; padding-left: 64px; }
+  .dc-avatar { left: 12px; }
+  .dc-field--inline { grid-column: span 6; }
+}

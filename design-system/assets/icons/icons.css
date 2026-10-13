@@ -1,0 +1,10 @@
+/* Lucide icons (lucide-static@0.469.0, ISC), stroke 2.
+   Static HTML: inline <svg class="sp-i" …> from assets/icons/*.svg.  Live UI: <sp-icon class="sp-i" name="hash"></sp-icon> (assets/icons/sp-icon.js). */
+sp-icon { display: inline-block; flex: none; width: 18px; height: 18px; }
+.sp-i { display: inline-block; flex: none; width: 18px; height: 18px; vertical-align: middle; }
+svg.sp-i, .sp-i > svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sp-i > svg { display: block; width: 100%; height: 100%; }
+.sp-i--xs { width: 14px; height: 14px; }
+.sp-i--sm { width: 16px; height: 16px; }
+.sp-i--lg { width: 20px; height: 20px; }
+.sp-i--xl { width: 24px; height: 24px; }

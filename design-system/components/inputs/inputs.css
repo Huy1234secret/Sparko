@@ -1,0 +1,46 @@
+/* Field, label, hint, input, textarea, select. .sp-input is the box; the native control sits inside it. */
+.sp-field { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.sp-field__row { display: flex; justify-content: space-between; gap: 12px; }
+.sp-label { display: flex; align-items: center; gap: 6px; font: 500 13px/18px var(--sp-font-sans); color: var(--sp-text); }
+.sp-label__opt { font-weight: 400; color: var(--sp-muted); }
+.sp-hint { margin: 0; font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); }
+.sp-field-error { display: flex; align-items: flex-start; gap: 6px; margin: 0; font: 500 13px/18px var(--sp-font-sans); color: var(--sp-danger); }
+.sp-field-error .sp-i { width: 16px; height: 16px; margin-top: 1px; }
+
+.sp-input {
+  position: relative; display: flex; align-items: center; gap: 8px; min-height: var(--sp-control-h); padding: 0 12px;
+  background: var(--sp-raised); border: 1px solid var(--sp-line-strong); border-radius: var(--sp-radius-control);
+  color: var(--sp-text); font: 400 14px/20px var(--sp-font-sans);
+  transition: border-color var(--sp-dur-fast) var(--sp-ease-out), box-shadow var(--sp-dur-fast) var(--sp-ease-out), background-color var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-input > .sp-i { color: var(--sp-muted); }
+.sp-input input, .sp-input textarea, .sp-input select {
+  flex: 1; min-width: 0; width: 100%; height: 42px; margin: 0; padding: 0; border: 0; outline: 0; border-radius: 0;
+  background: transparent; color: inherit; font: inherit; box-shadow: none;
+}
+.sp-input textarea { height: auto; min-height: 96px; padding: 10px 0; resize: vertical; line-height: 22px; }
+.sp-input--multiline { align-items: stretch; }
+.sp-input ::placeholder { color: var(--sp-muted); opacity: 1; }
+.sp-input:hover, .sp-input.is-hover { border-color: var(--sp-line-hover); }
+.sp-input:focus-within, .sp-input.is-focus, .sp-input[aria-expanded="true"] { border-color: var(--sp-focus-edge); box-shadow: 0 0 0 3px var(--sp-focus); }
+button.sp-input:focus:not(:focus-visible):not([aria-expanded="true"]) { border-color: var(--sp-line-strong); box-shadow: none; }
+.sp-input.is-error, .sp-input:has([aria-invalid="true"]) { border-color: var(--sp-danger); }
+.sp-input.is-disabled, .sp-input:has(:disabled), .sp-input:disabled { opacity: 0.5; background: var(--sp-subtle); border-color: var(--sp-line); cursor: not-allowed; }
+.sp-input :disabled { cursor: not-allowed; }
+.sp-input__suffix { color: var(--sp-muted); font-size: 13px; white-space: nowrap; }
+.sp-input__end { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--sp-muted); }
+
+/* Native select */
+.sp-input--select { padding-right: 40px; }
+.sp-input--select select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+.sp-input--select select option { background: var(--sp-surface); color: var(--sp-text); }
+.sp-input--select::after { content: ""; position: absolute; right: 17px; top: 50%; width: 7px; height: 7px; margin-top: -6px; border-right: 2px solid var(--sp-muted); border-bottom: 2px solid var(--sp-muted); border-radius: 1px; transform: rotate(45deg); pointer-events: none; }
+.sp-input__chev { position: absolute; right: 12px; top: 50%; margin-top: -9px; color: var(--sp-muted); pointer-events: none; transition: transform var(--sp-dur-fast) var(--sp-ease-out); }
+[aria-expanded="true"] > .sp-input__chev { transform: rotate(180deg); }
+
+/* Button used as a trigger (combobox, pickers) */
+button.sp-input { width: 100%; padding-right: 40px; cursor: pointer; text-align: left; }
+.sp-input__value { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sp-input__placeholder { color: var(--sp-muted); }
+.sp-input--chips { flex-wrap: wrap; height: auto; padding: 7px 40px 7px 7px; gap: 6px; }
+.sp-input--lg { min-height: 52px; font-size: 16px; }

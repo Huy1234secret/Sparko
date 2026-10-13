@@ -1,0 +1,2 @@
+/* Inter (UI). Mono uses the system SF Mono / Menlo stack. The Discord preview uses the system "gg sans" if installed, else Helvetica/Arial — no webfont. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap");

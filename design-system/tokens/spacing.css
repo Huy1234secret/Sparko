@@ -1,0 +1,32 @@
+/* Sparko — spacing (4/8 grid), sizing, radius, layout. */
+:root {
+  --sp-space-1: 4px;
+  --sp-space-2: 8px;
+  --sp-space-3: 12px;
+  --sp-space-4: 16px;
+  --sp-space-5: 20px;
+  --sp-space-6: 24px;
+  --sp-space-8: 32px;
+  --sp-space-10: 40px;
+  --sp-space-12: 48px;
+  --sp-space-16: 64px;
+  --sp-space-20: 80px;
+
+  /* Tap targets: every interactive element is >= 44px in both axes (visual or via hit-area extension). */
+  --sp-tap: 44px;
+  --sp-control-h: 44px;
+  --sp-control-h-sm: 36px;
+
+  --sp-radius-xs: 6px;      /* checkbox, kbd, inner segments */
+  --sp-radius-chip: 8px;    /* chips, badges, tooltips, menu items */
+  --sp-radius-control: 10px;/* buttons, inputs, notices */
+  --sp-radius-card: 14px;   /* cards, popovers, modals, drawers */
+  --sp-radius-full: 999px;  /* pills, switches, avatars */
+
+  --sp-sidebar-w: 264px;
+  --sp-topbar-h: 64px;
+  --sp-content-max: 1120px;
+  --sp-bp-mobile: 640px;    /* modals become sheets, drawers go full width, save bar stacks */
+  --sp-bp-table: 900px;     /* tables stack into cards */
+  --sp-bp-nav: 800px;       /* sidebar collapses into a menu */
+}
