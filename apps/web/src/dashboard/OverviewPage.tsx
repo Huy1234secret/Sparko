@@ -210,15 +210,27 @@ function Health({ overview }: { overview: Overview }) {
         </Button>
       </div>
       <div className="sp-rows">
-        <div className="sp-row sp-row--success">
-          <span className="sp-row__icon">
-            <Icon name="activity" />
-          </span>
-          <span className="sp-row__title">Sparko is online</span>
-          <span className="sp-row__desc">
-            Replying in {health.latencyMs} ms
-          </span>
-        </div>
+        {health.latencyMs >= 0 ? (
+          <div className="sp-row sp-row--success">
+            <span className="sp-row__icon">
+              <Icon name="activity" />
+            </span>
+            <span className="sp-row__title">Sparko is online</span>
+            <span className="sp-row__desc">
+              Replying in {health.latencyMs} ms
+            </span>
+          </div>
+        ) : (
+          <div className="sp-row sp-row--danger">
+            <span className="sp-row__icon">
+              <Icon name="circle-x" />
+            </span>
+            <span className="sp-row__title">Sparko’s bot is offline</span>
+            <span className="sp-row__desc">
+              Saved changes apply as soon as it’s back.
+            </span>
+          </div>
+        )}
         {health.missingPermission ? (
           <div className="sp-row sp-row--warning">
             <span className="sp-row__icon">

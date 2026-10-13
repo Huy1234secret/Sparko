@@ -27,11 +27,40 @@ export function resetBackend() {
   probe = undefined;
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(path, { headers: { accept: 'application/json' } });
-  if (!res.ok) throw new Error(`${path} answered ${res.status}`);
-  return (await res.json()) as T;
+const problems: Record<string, string> = {
+  signed_out: 'You’ve been signed out. Sign in again to keep going.',
+  not_allowed: 'You need the Manage Server permission in this server.',
+  not_installed: 'Sparko isn’t in this server any more.',
+  forbidden: 'That request didn’t come from the dashboard.',
+};
+
+async function call<T>(method: string, path: string, body?: unknown) {
+  const res = await fetch(path, {
+    method,
+    headers: {
+      accept: 'application/json',
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  if (!res.ok) {
+    const info = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+    };
+    throw new Error(
+      info.message ??
+        problems[info.error ?? ''] ??
+        `The server answered ${res.status}. Try again in a moment.`,
+    );
+  }
+  return (res.status === 204 ? undefined : await res.json()) as T;
 }
+const getJson = <T>(path: string) => call<T>('GET', path);
+
+/** Modules whose settings are still sample data on the real site. */
+const sampleModules = new Set(['welcome', 'tickets', 'studio']);
+const server = (id: string) => `/api/v1/servers/${id}`;
 
 const colourOf = (id: string) =>
   ((Number(id.slice(-4)) % 6) + 1) as AvatarColor;
@@ -61,6 +90,38 @@ export function withBackend(
     async signOut() {
       if (!(await backend()).live) return sample.signOut();
       await fetch('/api/v1/auth/logout', { method: 'POST' });
+    },
+    async getOverview(id) {
+      if (!(await backend()).live) return sample.getOverview(id);
+      return getJson(`${server(id)}/overview`);
+    },
+    async skipStep(id, stepId, skipped) {
+      if (!(await backend()).live) return sample.skipStep(id, stepId, skipped);
+      await call('PUT', `${server(id)}/steps/${stepId}`, { skipped });
+    },
+    async checkHealth(id) {
+      if (!(await backend()).live) return sample.checkHealth(id);
+      return getJson(`${server(id)}/health`);
+    },
+    async getModule(id, moduleId) {
+      if (!(await backend()).live) return sample.getModule(id, moduleId);
+      return getJson(`${server(id)}/modules/${moduleId}`);
+    },
+    async saveModule(id, moduleId, state) {
+      if (!(await backend()).live)
+        return sample.saveModule(id, moduleId, state);
+      await call('PUT', `${server(id)}/modules/${moduleId}`, state);
+    },
+    async waitForApply(id, moduleId) {
+      if (!(await backend()).live || sampleModules.has(moduleId))
+        return sample.waitForApply(id, moduleId);
+      return getJson(`${server(id)}/modules/${moduleId}/apply`);
+    },
+    async checkPermissions(id) {
+      if (!(await backend()).live) return sample.checkPermissions(id);
+      return (
+        await call<{ ok: boolean }>('POST', `${server(id)}/permissions/check`)
+      ).ok;
     },
   };
 }

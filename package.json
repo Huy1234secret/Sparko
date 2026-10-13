@@ -10,9 +10,9 @@
   "scripts": {
     "dev": "pnpm --filter @sparko/web dev",
     "typecheck": "pnpm -r typecheck",
-    "lint": "eslint apps --max-warnings 0",
-    "format:check": "prettier --check apps docs *.json *.yaml .github",
-    "format": "prettier --write apps docs *.json *.yaml .github",
+    "lint": "eslint apps packages --max-warnings 0",
+    "format:check": "prettier --check apps packages docs *.json *.yaml .github",
+    "format": "prettier --write apps packages docs *.json *.yaml .github",
     "build": "pnpm -r build",
     "test": "vitest run",
     "start": "pm2 start ecosystem.config.cjs"

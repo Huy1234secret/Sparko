@@ -32,11 +32,18 @@ importers:
 
   apps/bot:
     dependencies:
+      '@sparko/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       discord.js:
         specifier: 14.27.0
         version: 14.27.0
 
-  apps/server: {}
+  apps/server:
+    dependencies:
+      '@sparko/core':
+        specifier: workspace:*
+        version: link:../../packages/core
 
   apps/web:
     dependencies:
@@ -80,6 +87,8 @@ importers:
       vite:
         specifier: 8.3.4
         version: 8.3.4(@types/node@24.10.1)
+
+  packages/core: {}
 
 packages:
 
