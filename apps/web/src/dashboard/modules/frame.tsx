@@ -316,18 +316,21 @@ export function ModuleSaveBar({
   error,
   onSave,
   onReset,
+  saveLabel,
 }: {
   visible: boolean;
   saving: boolean;
   error: string | null;
   onSave: () => void;
   onReset: () => void;
+  saveLabel?: string;
 }): ReactNode {
   if (!visible) return null;
   return (
     <SaveBar
       state={saving ? 'saving' : error ? 'error' : 'dirty'}
       message={error ?? undefined}
+      {...(saveLabel ? { saveLabel } : {})}
       onSave={onSave}
       onReset={onReset}
     />

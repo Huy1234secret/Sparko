@@ -476,3 +476,122 @@
     padding-left: 16px;
   }
 }
+
+/* Message Studio */
+.sp-field-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: start;
+}
+.sp-wrap-row {
+  flex-wrap: wrap;
+}
+.sp-hex-input {
+  width: 130px;
+}
+.sp-hex-input input {
+  font-family: var(--sp-font-mono);
+}
+.sp-pair {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+}
+.sp-link-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  align-items: center;
+}
+.sp-dc-thumb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font: 700 22px/1 var(--sp-font-sans);
+  color: var(--sp-dc-header);
+}
+.sp-dc-image {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 12px;
+  background: var(--sp-dc-select);
+  color: var(--sp-dc-text);
+  font-size: 13px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.dc-preview-frame.sp-phone {
+  max-width: 390px;
+  justify-self: center;
+  width: 100%;
+}
+.sp-embed-size {
+  display: grid;
+  gap: 6px;
+}
+.sp-progress__bar.is-over {
+  background: var(--sp-danger);
+}
+.sp-template-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.sp-template {
+  display: grid;
+  overflow: hidden;
+  padding: 0;
+  align-content: start;
+}
+.sp-template__preview {
+  padding: 14px;
+  background: var(--sp-dc-bg);
+}
+.sp-template__embed {
+  max-width: none;
+  padding: 6px 12px 12px 10px;
+}
+.sp-template__embed .dc-embed__title {
+  font-size: 14px;
+}
+.sp-template__embed .dc-embed__desc {
+  font-size: 13px;
+}
+.sp-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sp-template__body {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+.sp-template__titles {
+  display: grid;
+  gap: 2px;
+}
+.sp-template__name {
+  margin: 0;
+  font: 600 14px/20px var(--sp-font-sans);
+}
+.sp-template__confirm {
+  display: grid;
+  gap: 8px;
+  font: 400 13px/18px var(--sp-font-sans);
+}
+@media (max-width: 599px) {
+  .sp-pair,
+  .sp-link-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-link-row > .sp-btn {
+    justify-self: end;
+  }
+}

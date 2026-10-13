@@ -2,7 +2,6 @@ import { useRef, useState, type ReactNode } from 'react';
 import {
   Badge,
   Button,
-  Combobox,
   DiscordMessage,
   DiscordPreview,
   EmptyState,
@@ -34,7 +33,7 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
-import { ColourChoice, VersionHistory } from './parts';
+import { ChannelPicker, ColourChoice, VersionHistory } from './parts';
 
 const tokens = ['{user}', '{server}', '{member_count}', '#rules'];
 const maxLength = 2000;
@@ -279,10 +278,8 @@ export function WelcomeModule({
                     },
                   ]}
                 />
-                <Combobox
-                  label="Channel"
-                  searchPlaceholder="Search channels"
-                  placeholder="Pick a channel"
+                <ChannelPicker
+                  channels={channels}
                   disabled={!postsInChannel}
                   value={config.channel}
                   onChange={(id) => edit({ channel: id })}
@@ -294,15 +291,6 @@ export function WelcomeModule({
                       ? undefined
                       : 'Not needed when sending only a direct message.'
                   }
-                  footer="Locked channels are ones Sparko can’t post in yet."
-                  items={channels.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    icon: 'hash',
-                    group: c.category,
-                    disabled: !c.canPost && c.id !== config.channel,
-                    ...(c.canPost ? {} : { note: 'Sparko can’t post' }),
-                  }))}
                 />
               </div>
             </section>

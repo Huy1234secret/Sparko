@@ -1,6 +1,50 @@
 import { useState } from 'react';
-import { Avatar, Badge, Button, Modal, Segmented } from '../../ui';
-import type { Version } from '../../data';
+import { Avatar, Badge, Button, Combobox, Modal, Segmented } from '../../ui';
+import type { Channel, Version } from '../../data';
+
+/**
+ * The channel dropdown every module uses: searchable, grouped by category,
+ * with channels Sparko can't post in locked (unless already picked).
+ */
+export function ChannelPicker({
+  channels,
+  value,
+  onChange,
+  label = 'Channel',
+  hint,
+  error,
+  disabled,
+}: {
+  channels: Channel[];
+  value: string;
+  onChange: (id: string) => void;
+  label?: string;
+  hint?: string | undefined;
+  error?: string | undefined;
+  disabled?: boolean;
+}) {
+  return (
+    <Combobox
+      label={label}
+      searchPlaceholder="Search channels"
+      placeholder="Pick a channel"
+      disabled={!!disabled}
+      value={value}
+      onChange={onChange}
+      error={error}
+      hint={hint}
+      footer="Locked channels are ones Sparko can’t post in yet."
+      items={channels.map((c) => ({
+        value: c.id,
+        label: c.name,
+        icon: 'hash',
+        group: c.category,
+        disabled: !c.canPost && c.id !== value,
+        ...(c.canPost ? {} : { note: 'Sparko can’t post' }),
+      }))}
+    />
+  );
+}
 
 export const embedColours = [
   ['Sparko yellow', '#FACC15'],

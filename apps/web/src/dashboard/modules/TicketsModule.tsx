@@ -40,7 +40,7 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
-import { ColourChoice, newId, VersionHistory } from './parts';
+import { ChannelPicker, ColourChoice, newId, VersionHistory } from './parts';
 
 export const statusInfo: Record<
   TicketStatus,
@@ -493,15 +493,11 @@ export function TicketsModule({
                 </div>
               </div>
               <div className="sp-card__body">
-                <Select
-                  label="Channel"
-                  hint="Locked channels are ones Sparko can’t post in yet."
+                <ChannelPicker
+                  channels={config.data.channels}
                   value={panel.channel}
-                  onChange={(e) => edit({ channel: e.target.value })}
-                  options={config.data.channels.map((c) => ({
-                    value: c.id,
-                    label: `#${c.name}${c.canPost ? '' : ' (Sparko can’t post)'}`,
-                  }))}
+                  onChange={(id) => edit({ channel: id })}
+                  error={blocked ? 'Sparko can’t post here yet.' : undefined}
                 />
               </div>
             </section>

@@ -24,6 +24,7 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
+import { StudioModule } from './StudioModule';
 import { TicketsModule } from './TicketsModule';
 import { WelcomeModule } from './WelcomeModule';
 
@@ -253,6 +254,8 @@ export function ModulePage() {
     );
   if (module.id === 'welcome')
     return <WelcomeModule module={module} server={server} />;
+  if (module.id === 'studio')
+    return <StudioModule module={module} server={server} />;
   if (module.id === 'tickets')
     return <TicketsModule module={module} server={server} />;
   return <GenericModule module={module} server={server} />;

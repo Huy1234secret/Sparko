@@ -469,11 +469,13 @@ export function SaveBar({
   onSave,
   onReset,
   message,
+  saveLabel = 'Save changes',
 }: {
   state?: 'dirty' | 'saving' | 'error' | 'saved';
   onSave?: () => void;
   onReset?: () => void;
   message?: ReactNode;
+  saveLabel?: string;
 }) {
   const [icon, text] = {
     dirty: ['triangle-alert', 'You have unsaved changes'],
@@ -508,7 +510,7 @@ export function SaveBar({
           loadingLabel="Saving…"
           onClick={onSave}
         >
-          {state === 'error' ? 'Try again' : 'Save changes'}
+          {state === 'error' ? 'Try again' : saveLabel}
         </Button>
       </div>
     </div>

@@ -8,7 +8,10 @@ export type DiscordEmbed = {
   description?: ReactNode;
   fields?: { name: ReactNode; value: ReactNode; inline?: boolean }[];
   footer?: ReactNode;
-  thumbnail?: string;
+  /** An image link, or something to show in the thumbnail box instead. */
+  thumbnail?: ReactNode;
+  /** The large image under the embed, as a placeholder or an <img>. */
+  image?: ReactNode;
 };
 export type DiscordButton = {
   label: string;
@@ -105,13 +108,18 @@ export function DiscordMessage({
           </div>
           {embed.thumbnail && (
             <div className="dc-embed__thumb">
-              <img
-                src={embed.thumbnail}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              {typeof embed.thumbnail === 'string' ? (
+                <img
+                  src={embed.thumbnail}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                embed.thumbnail
+              )}
             </div>
           )}
+          {embed.image && <div className="dc-embed__image">{embed.image}</div>}
           {embed.footer && (
             <div className="dc-embed__footer">
               <span className="dc-embed__footer-icon" />

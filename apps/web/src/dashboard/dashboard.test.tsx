@@ -470,3 +470,115 @@ describe('Tickets', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('Message Studio', () => {
+  it('previews edits live and checks fields, links and colours before publishing', async () => {
+    open(`${pixel}/studio`);
+    const title = await screen.findByRole(
+      'textbox',
+      { name: /^Title/ },
+      { timeout: 4000 },
+    );
+    await userEvent.clear(title);
+    await userEvent.type(title, 'Summer Jam');
+    expect(document.querySelector('.dc-embed__title')).toHaveTextContent(
+      'Summer Jam',
+    );
+
+    await userEvent.clear(screen.getByRole('textbox', { name: /Image link/ }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /Image link/ }),
+      'x',
+    );
+    expect(
+      screen.getByText(
+        'The link must start with https:// so Discord can load it.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('textbox', { name: /Image link/ }));
+
+    const hex = screen.getByRole('textbox', { name: 'Custom colour, hex' });
+    await userEvent.clear(hex);
+    await userEvent.type(hex, '#12');
+    expect(
+      screen.getByText('Use a hex colour like #FACC15.'),
+    ).toBeInTheDocument();
+    await userEvent.type(hex, '3456');
+    expect(screen.queryByText('Use a hex colour like #FACC15.')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add a field' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Field 4 name' }),
+      'Judges',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Publish changes' }),
+    );
+    expect(
+      screen.getByText('Fields need both a name and a value.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Fix the highlighted fields first.'),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('publishes, reports the locked channel, and updates once it is fixed', async () => {
+    open(`${pixel}/studio`);
+    expect(
+      await screen.findByText(
+        'Sparko can’t post in #announcements',
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /^Text/ }),
+      ' See you there.',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Publish changes' }),
+    );
+    expect(
+      await screen.findByText('Couldn’t apply', {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(
+      await screen.findByText('Updated in #announcements', {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: /Versions/ }));
+    expect(screen.getByText('Published changes')).toBeInTheDocument();
+  });
+
+  it('uses, saves and deletes templates', async () => {
+    open(`${pixel}/studio?tab=items`);
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: 'Delete Server rules' },
+        { timeout: 4000 },
+      ),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.queryByText('Server rules')).toBeNull());
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save current as a template' }),
+    );
+    expect(
+      await screen.findByText('Saved “Spring art jam announcement”'),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use Weekly recap' }),
+    );
+    expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue(
+      'This week in Pixel Plaza',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Publish changes' }),
+    ).toBeInTheDocument();
+  });
+});
