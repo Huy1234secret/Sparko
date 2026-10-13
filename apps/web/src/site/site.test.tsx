@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -17,7 +23,8 @@ beforeAll(async () => {
     addEventListener: () => {},
     removeEventListener: () => {},
   });
-  window.scrollTo = vi.fn();
+  // Like current Chrome, where scrolling returns a promise.
+  window.scrollTo = vi.fn(() => Promise.resolve()) as never;
   await import('../../../../design-system/assets/icons/sp-icon.js');
 });
 afterEach(cleanup);
@@ -176,5 +183,29 @@ describe('public site', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await userEvent.keyboard('{Escape}');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('crashes', () => {
+  it('moves between every top menu page without crashing', async () => {
+    const router = open('/');
+    const nav = await screen.findByRole('navigation', { name: 'Main' });
+    for (const [name, path] of [
+      ['Features', '/features'],
+      ['Pricing', '/pricing'],
+      ['Commands', '/commands'],
+      ['Docs', '/docs'],
+      ['Status', '/status'],
+    ] as const) {
+      const before = screen.getByRole('heading', { level: 1 }).textContent;
+      await userEvent.click(within(nav).getByRole('link', { name }));
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(path);
+        expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe(
+          before,
+        );
+      });
+      expect(screen.queryByText(/Something went wrong/)).toBeNull();
+    }
   });
 });

@@ -33,8 +33,9 @@ beforeAll(async () => {
     addEventListener: () => {},
     removeEventListener: () => {},
   });
-  window.scrollTo = vi.fn();
-  Element.prototype.scrollTo = vi.fn();
+  // Like current Chrome, where scrolling returns a promise.
+  window.scrollTo = vi.fn(() => Promise.resolve()) as never;
+  Element.prototype.scrollTo = vi.fn(() => Promise.resolve()) as never;
   await import('../../../../design-system/assets/icons/sp-icon.js');
 });
 beforeEach(() => {
