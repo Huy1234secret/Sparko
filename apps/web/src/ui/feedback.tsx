@@ -495,7 +495,7 @@ export function SaveBar({
       </div>
       <div className="sp-savebar__actions">
         <Button variant="ghost" disabled={state === 'saving'} onClick={onReset}>
-          Reset
+          Discard
         </Button>
         <Button
           variant="primary"

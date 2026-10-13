@@ -10,7 +10,20 @@ const page =
 const info = (name: keyof typeof import('./site/InfoPages')) =>
   page(async () => ({ default: (await import('./site/InfoPages'))[name] }));
 
+const dashboard = (name: keyof typeof import('./dashboard')) =>
+  page(async () => ({ default: (await import('./dashboard'))[name] }));
+
 export const routes: RouteObject[] = [
+  { path: 'signin', lazy: dashboard('SignInPage') },
+  { path: 'dashboard', lazy: dashboard('ServerPickerPage') },
+  {
+    path: 'dashboard/:serverId',
+    lazy: dashboard('ServerLayout'),
+    children: [
+      { index: true, lazy: dashboard('OverviewPage') },
+      { path: ':moduleId', lazy: dashboard('ModulePage') },
+    ],
+  },
   {
     element: <SiteLayout />,
     children: [
