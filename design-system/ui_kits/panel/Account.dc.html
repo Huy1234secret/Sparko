@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sparko · Your account</title>
+<link rel="stylesheet" href="../../sparko.bundle.css">
+<script src="../../assets/icons/sp-icon.js"></script>
+<style>html,body{margin:0}body{background:#111110}sp-icon{display:inline-block;width:18px;height:18px}a{color:var(--sp-brand-text)}a:hover{color:var(--sp-text)}</style>
+</helmet>
+<div data-theme="{{ theme }}" class="sp-cq" style="min-height:100vh;display:flex;flex-direction:column;background:var(--sp-canvas);color:var(--sp-text)">
+  <header style="position:sticky;top:0;z-index:30;background:var(--sp-canvas);border-bottom:1px solid var(--sp-line)">
+    <div style="max-width:1040px;margin:0 auto;padding:10px 20px 0;box-sizing:border-box;display:grid;gap:6px">
+      <div style="display:flex;align-items:center;gap:12px;min-height:44px">
+        <span style="font:700 18px/1 var(--sp-font-sans);letter-spacing:-0.03em">Sparko</span>
+        <span aria-hidden="true" style="width:1px;height:20px;background:var(--sp-line)"></span>
+        <b style="font:600 14px/20px var(--sp-font-sans);flex:1">Your account</b>
+        <a href="Panel.dc.html?page=servers" class="sp-btn sp-btn--ghost sp-btn--sm" style="text-decoration:none"><sp-icon class="sp-i sp-i--sm" name="arrow-left"></sp-icon>Your servers</a>
+        <button class="sp-btn sp-btn--ghost sp-btn--icon" aria-label="{{ themeLabel }}" onClick="{{ toggleTheme }}"><sp-icon class="sp-i" name="{{ themeIcon }}"></sp-icon></button>
+      </div>
+      <nav class="sp-tabs" aria-label="Account pages" style="border-bottom:0;overflow-x:auto">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5"><button class="sp-tab" aria-current="{{ t.cur }}" onClick="{{ t.go }}"><sp-icon class="sp-i sp-i--sm" name="{{ t.icon }}"></sp-icon>{{ t.label }}</button></sc-for>
+      </nav>
+    </div>
+  </header>
+
+  <main style="max-width:1040px;width:100%;margin:0 auto;padding:28px 20px 72px;box-sizing:border-box;display:grid;gap:24px;align-content:start">
+    <sc-if value="{{ deletePending }}" hint-placeholder-val="{{ false }}"><div class="sp-notice sp-notice--danger" role="alert"><sp-icon class="sp-i sp-notice__icon" name="trash-2"></sp-icon><div class="sp-notice__title">Your account will be deleted on 20 Oct 2026</div><div class="sp-notice__body">Until then you can still use Sparko. If you change your mind, cancel below.</div><div class="sp-notice__actions"><button class="sp-btn sp-btn--secondary sp-btn--sm" onClick="{{ cancelDelete }}">Keep my account</button></div></div></sc-if>
+    <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}"><div aria-busy="true" aria-label="Loading your account" style="display:grid;gap:16px"><span class="sp-skel sp-skel--title" style="width:220px"></span><span class="sp-skel sp-skel--block" style="height:160px"></span><span class="sp-skel sp-skel--block" style="height:220px"></span></div></sc-if>
+    <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}"><div class="sp-card"><div class="sp-empty sp-empty--error" role="alert"><div class="sp-empty__art"><sp-icon class="sp-i" name="cloud-off"></sp-icon></div><div class="sp-empty__title">Couldn’t load your account</div><p class="sp-empty__desc">Discord didn’t answer in time. Nothing was changed.</p><span class="sp-empty__code">Error 504 · req_a41c09</span><div class="sp-empty__actions"><button class="sp-btn sp-btn--secondary" onClick="{{ retry }}"><sp-icon class="sp-i" name="refresh-cw"></sp-icon>Try again</button></div></div></div></sc-if>
+
+    <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Profile</span><h1 class="sp-page-head__title">quinn.dev</h1></div>
+      <section class="sp-card" aria-labelledby="pr-h"><div class="sp-card__body" style="display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+        <span class="sp-avatar sp-avatar--2 sp-avatar--lg" style="--size:64px;font-size:24px">Q</span>
+        <span style="display:grid;gap:4px;flex:1 1 220px"><h2 id="pr-h" style="margin:0;font:var(--sp-text-h3)">quinn.dev</h2><span class="sp-hint">Signed in with Discord · ID 2841 0937 1150 4471</span><span class="sp-hint">Your name and picture come from Discord. Change them there.</span></span>
+        <button class="sp-btn sp-btn--secondary" aria-busy="{{ refreshing }}" onClick="{{ refresh }}"><sc-if value="{{ refreshing }}"><span class="sp-spinner"></span></sc-if><sc-if value="{{ notRefreshing }}"><sp-icon class="sp-i" name="refresh-cw"></sp-icon></sc-if>Update from Discord</button>
+      </div></section>
+      <section class="sp-card" aria-labelledby="pf-h">
+        <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="pf-h">Preferences</h2><p class="sp-card__sub">Saved straight away, on every device you use.</p></div></div>
+        <div class="sp-card__body" style="gap:20px">
+          <sc-for list="{{ prefs }}" as="pr" hint-placeholder-count="4"><div class="sp-field"><span class="sp-label" id="{{ pr.id }}">{{ pr.label }}</span><div class="sp-seg" role="radiogroup" aria-labelledby="{{ pr.id }}" style="align-self:start;flex-wrap:wrap"><sc-for list="{{ pr.opts }}" as="o"><button class="sp-seg__item" role="radio" aria-checked="{{ o.sel }}" onClick="{{ o.pick }}">{{ o.label }}</button></sc-for></div><sc-if value="{{ pr.hint }}"><p class="sp-hint">{{ pr.hint }}</p></sc-if></div></sc-for>
+          <div class="sp-field"><label class="sp-label" for="lang">Language</label><div class="sp-input sp-input--select" style="max-width:280px"><select id="lang" value="{{ lang }}" onChange="{{ setLang }}"><option value="en-GB">English (UK)</option><option value="en-US">English (US)</option><option value="de">Deutsch</option><option value="es">Español</option><option value="fr">Français</option><option value="pt-BR">Português (Brasil)</option></select></div><p class="sp-hint">Only the dashboard. Sparko’s messages in Discord use your server’s language.</p></div>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isNotif }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Notifications</span><h1 class="sp-page-head__title">How Sparko reaches you</h1><p class="sp-page-head__desc">Emails go to q••••@gmail.com, the address on your Discord account.</p></div>
+      <section class="sp-card" aria-labelledby="nt-h" style="padding:0;overflow:hidden">
+        <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="nt-h">For servers you manage</h2></div></div>
+        <div role="table" aria-labelledby="nt-h">
+          <div role="row" style="display:grid;grid-template-columns:minmax(0,1fr) 88px 88px;gap:8px;padding:8px 20px;border-top:1px solid var(--sp-line);font:600 12px/16px var(--sp-font-sans);color:var(--sp-muted)"><span role="columnheader">Event</span><span role="columnheader" style="text-align:center">Discord DM</span><span role="columnheader" style="text-align:center">Email</span></div>
+          <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="5">
+            <div role="row" style="display:grid;grid-template-columns:minmax(0,1fr) 88px 88px;gap:8px;align-items:center;padding:12px 20px;border-top:1px solid var(--sp-line)">
+              <span role="cell" style="display:grid;gap:2px"><b style="font:600 14px/20px var(--sp-font-sans)">{{ n.label }}</b><span class="sp-hint">{{ n.desc }}</span></span>
+              <span role="cell" style="display:grid;place-items:center"><label class="sp-check" style="padding:0;min-height:44px;min-width:44px;justify-content:center"><input class="sp-choice-input" type="checkbox" aria-label="{{ n.label }} by Discord DM" checked="{{ n.dm }}" disabled="{{ n.locked }}" onChange="{{ n.toggleDm }}"><span class="sp-check__box"><sp-icon class="sp-i" name="check"></sp-icon></span></label></span>
+              <span role="cell" style="display:grid;place-items:center"><label class="sp-check" style="padding:0;min-height:44px;min-width:44px;justify-content:center"><input class="sp-choice-input" type="checkbox" aria-label="{{ n.label }} by email" checked="{{ n.email }}" disabled="{{ n.locked }}" onChange="{{ n.toggleEmail }}"><span class="sp-check__box"><sp-icon class="sp-i" name="check"></sp-icon></span></label></span>
+            </div>
+          </sc-for>
+        </div>
+        <p class="sp-hint" style="padding:12px 20px 16px;margin:0;border-top:1px solid var(--sp-line)">Payment emails can’t be turned off. They’re receipts and warnings about failed payments.</p>
+      </section>
+      <section class="sp-card" aria-labelledby="qh-h"><div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="qh-h">Quiet hours</h2><p class="sp-card__sub">DMs wait until morning. Raid and anti-nuke alerts still come through.</p></div><label class="sp-switch"><input class="sp-choice-input" type="checkbox" role="switch" aria-label="Quiet hours" checked="{{ quiet }}" onChange="{{ toggleQuiet }}"><span class="sp-switch__track"><span class="sp-switch__thumb"></span></span></label></div><sc-if value="{{ quiet }}"><div class="sp-card__body"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font:400 14px/20px var(--sp-font-sans)">From<div class="sp-input sp-input--select" style="width:auto"><select aria-label="Quiet from" value="{{ qFrom }}" onChange="{{ setQFrom }}"><option value="22:00">22:00</option><option value="23:00">23:00</option><option value="00:00">00:00</option></select></div>to<div class="sp-input sp-input--select" style="width:auto"><select aria-label="Quiet until" value="{{ qTo }}" onChange="{{ setQTo }}"><option value="07:00">07:00</option><option value="08:00">08:00</option><option value="09:00">09:00</option></select></div>your time</div></div></sc-if></section>
+    </sc-if>
+
+    <sc-if value="{{ isSessions }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between"><div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Sessions</span><h1 class="sp-page-head__title">Where you’re signed in</h1><p class="sp-page-head__desc">Sessions end by themselves after 30 days without use.</p></div><sc-if value="{{ hasOthers }}"><button class="sp-btn sp-btn--secondary" onClick="{{ askOutAll }}"><sp-icon class="sp-i" name="log-out"></sp-icon>Sign out everywhere else</button></sc-if></div>
+      <sc-if value="{{ outAllAsk }}"><div class="sp-notice sp-notice--warning" role="alert"><sp-icon class="sp-i sp-notice__icon" name="triangle-alert"></sp-icon><div class="sp-notice__title">Sign out of {{ otherCount }} other sessions?</div><div class="sp-notice__body">You stay signed in here. Anyone using those devices has to sign in with Discord again.</div><div class="sp-notice__actions"><button class="sp-btn sp-btn--primary sp-btn--sm" onClick="{{ outAll }}">Sign them out</button><button class="sp-btn sp-btn--ghost sp-btn--sm" autoFocus="{{ true }}" onClick="{{ keepAll }}">Cancel</button></div></div></sc-if>
+      <div class="sp-card" style="padding:0;overflow:hidden">
+        <sc-for list="{{ sessions }}" as="se" hint-placeholder-count="3">
+          <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:16px 20px;border-top:1px solid var(--sp-line)">
+            <span class="sp-row__icon" style="background:var(--sp-raised);color:var(--sp-text)"><sp-icon class="sp-i" name="{{ se.icon }}"></sp-icon></span>
+            <span style="display:grid;gap:2px;flex:1 1 240px;min-width:0"><b style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font:600 14px/20px var(--sp-font-sans)">{{ se.device }}<sc-if value="{{ se.current }}"><span class="sp-badge sp-badge--sm sp-badge--success">This device</span></sc-if><sc-if value="{{ se.odd }}"><span class="sp-badge sp-badge--sm sp-badge--warning">New place</span></sc-if></b><span class="sp-hint">{{ se.meta }}</span><sc-if value="{{ se.odd }}"><span style="font:400 13px/18px var(--sp-font-sans);color:var(--sp-warning)">Not you? Sign it out, then change your Discord password.</span></sc-if></span>
+            <sc-if value="{{ se.notCurrent }}"><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ se.out }}">Sign out</button></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isServers }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Servers & billing</span><h1 class="sp-page-head__title">Servers you manage</h1><p class="sp-page-head__desc">Access comes from your Discord roles. Server owners can change it in Dashboard access.</p></div>
+      <div class="sp-card" style="padding:0;overflow:hidden">
+        <sc-for list="{{ servers }}" as="sv" hint-placeholder-count="4">
+          <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:14px 20px;border-top:1px solid var(--sp-line)">
+            <span class="sp-server sp-server--tint" style="--h:{{ sv.hue }};--size:40px;border-radius:12px;font-size:14px">{{ sv.ini }}</span>
+            <span style="display:grid;gap:2px;flex:1 1 220px;min-width:0"><b style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font:600 14px/20px var(--sp-font-sans)">{{ sv.name }}<span class="{{ sv.planCls }}">{{ sv.plan }}</span></b><span class="sp-hint">{{ sv.access }}</span></span>
+            <sc-if value="{{ sv.confirming }}"><span role="alert" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="sp-hint">Leave {{ sv.name }}’s dashboard? You keep your roles in Discord.</span><button class="sp-btn sp-btn--danger sp-btn--sm" onClick="{{ sv.leave }}">Leave</button><button class="sp-btn sp-btn--ghost sp-btn--sm" autoFocus="{{ true }}" onClick="{{ sv.keep }}">Cancel</button></span></sc-if>
+            <sc-if value="{{ sv.idle }}"><span style="display:flex;gap:6px"><a class="sp-btn sp-btn--secondary sp-btn--sm" style="text-decoration:none" href="{{ sv.href }}">Open</a><sc-if value="{{ sv.canLeave }}"><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ sv.askLeave }}">Leave</button></sc-if></span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <section class="sp-card" aria-labelledby="sub-h" style="padding:0;overflow:hidden">
+        <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="sub-h">Plans you pay for</h2><p class="sp-card__sub">Plus belongs to a server, but the payment comes from your PayPal.</p></div></div>
+        <sc-for list="{{ subs }}" as="sb" hint-placeholder-count="1"><div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:14px 20px;border-top:1px solid var(--sp-line)"><span class="sp-row__icon" style="background:var(--sp-brand-soft);color:var(--sp-brand-text)"><sp-icon class="sp-i" name="crown"></sp-icon></span><span style="display:grid;gap:2px;flex:1 1 220px"><b style="font:600 14px/20px var(--sp-font-sans)">{{ sb.name }} · Plus</b><span class="sp-hint">{{ sb.meta }}</span></span><a class="sp-btn sp-btn--secondary sp-btn--sm" style="text-decoration:none" href="Panel.dc.html?page=billing">Manage</a></div></sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isPrivacy }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Privacy & data</span><h1 class="sp-page-head__title">Your data</h1><p class="sp-page-head__desc">Sparko keeps your Discord name, ID and picture, your preferences, and what you changed in dashboards. Never your messages or password.</p></div>
+      <section class="sp-card" aria-labelledby="dl-h"><div class="sp-card__body" style="gap:12px">
+        <h2 id="dl-h" style="margin:0;font:var(--sp-text-h3)">Download your data</h2>
+        <p class="sp-hint" style="margin:0">A ZIP with everything Sparko has about you, as readable JSON files.</p>
+        <sc-if value="{{ exIdle }}"><button class="sp-btn sp-btn--secondary" style="justify-self:start" onClick="{{ startExport }}"><sp-icon class="sp-i" name="download"></sp-icon>Prepare my download</button></sc-if>
+        <sc-if value="{{ exWorking }}"><div style="display:grid;gap:8px;max-width:420px" aria-live="polite"><div style="display:flex;justify-content:space-between;font:400 14px/20px var(--sp-font-sans)"><span>Preparing…</span><span class="sp-tnum">{{ exPct }}%</span></div><div class="sp-progress sp-progress--sm" role="progressbar" aria-label="Preparing your download" aria-valuenow="{{ exPct }}" aria-valuemin="0" aria-valuemax="100"><div class="sp-progress__bar" style="{{ exBar }}"></div></div><p class="sp-hint" style="margin:0">You can leave this page. Sparko DMs you when it’s ready.</p></div></sc-if>
+        <sc-if value="{{ exReady }}"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><button class="sp-btn sp-btn--primary" onClick="{{ downloadEx }}"><sp-icon class="sp-i" name="download"></sp-icon>Download (2.4 MB)</button><span class="sp-hint">The link works for 7 days.</span></div></sc-if>
+      </div></section>
+      <section class="sp-card" aria-labelledby="del-h" style="border-color:var(--sp-danger)"><div class="sp-card__body" style="gap:12px">
+        <h2 id="del-h" style="margin:0;font:var(--sp-text-h3)">Delete your Sparko account</h2>
+        <ul style="margin:0;padding:0;list-style:none;display:grid;gap:6px;font:400 14px/20px var(--sp-font-sans)"><li style="display:flex;gap:8px"><sp-icon class="sp-i sp-i--sm" name="trash-2" style="flex:none;margin-top:2px;color:var(--sp-danger)"></sp-icon>Deleted: your preferences, sessions and notification settings.</li><li style="display:flex;gap:8px"><sp-icon class="sp-i sp-i--sm" name="circle-check" style="flex:none;margin-top:2px;color:var(--sp-muted)"></sp-icon>Kept: servers’ settings, and audit log entries, shown as “Deleted user”.</li><li style="display:flex;gap:8px"><sp-icon class="sp-i sp-i--sm" name="crown" style="flex:none;margin-top:2px;color:var(--sp-muted)"></sp-icon>Plus for Cozy Corner Café stops renewing. It stays on until 2 Mar 2027.</li></ul>
+        <sc-if value="{{ notPending }}"><button class="sp-btn sp-btn--ghost" style="justify-self:start;color:var(--sp-danger)" aria-haspopup="dialog" onClick="{{ askDelete }}">Delete my account…</button></sc-if>
+      </div></section>
+    </sc-if>
+  </main>
+
+  <div class="sp-toast-region" aria-live="polite"><sc-for list="{{ toasts }}" as="t"><div class="{{ t.cls }}" role="status"><sp-icon class="sp-i sp-toast__icon" name="{{ t.icon }}"></sp-icon><div class="sp-toast__title">{{ t.title }}</div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm sp-toast__close" aria-label="Dismiss" onClick="{{ t.close }}"><sp-icon class="sp-i sp-i--sm" name="x"></sp-icon></button><div class="sp-toast__body">{{ t.body }}</div></div></sc-for></div>
+
+  <sc-if value="{{ delOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-scrim" onMouseDown="{{ scrimClose }}"><div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="dm-t">
+      <span class="sp-sheet-grip"></span>
+      <div class="sp-modal__head"><span class="sp-modal__icon" style="background:var(--sp-danger-soft);color:var(--sp-danger)"><sp-icon class="sp-i" name="trash-2"></sp-icon></span><div class="sp-modal__titles"><h2 class="sp-modal__title" id="dm-t">Delete your account?</h2><p class="sp-modal__desc">Sparko waits 7 days before deleting, in case you change your mind.</p></div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="Close" onClick="{{ closeModal }}"><sp-icon class="sp-i" name="x"></sp-icon></button></div>
+      <div class="sp-modal__body" style="display:grid;gap:12px"><div class="sp-field"><label class="sp-label" for="dm-x">Type <b>quinn.dev</b> to confirm</label><div class="{{ delBox }}"><input id="dm-x" autoFocus="{{ true }}" autoComplete="off" value="{{ delText }}" onChange="{{ setDelText }}" aria-invalid="{{ delBad }}"></div><sc-if value="{{ delBad }}"><p class="sp-field-error"><sp-icon class="sp-i" name="circle-alert"></sp-icon>That doesn’t match your username.</p></sc-if></div></div>
+      <div class="sp-modal__foot"><button class="sp-btn sp-btn--primary" onClick="{{ closeModal }}">Keep my account</button><button class="sp-btn sp-btn--danger" disabled="{{ delNoMatch }}" onClick="{{ confirmDelete }}">Delete in 7 days</button></div>
+    </div></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;},&quot;startPage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;profile&quot;,&quot;notifs&quot;,&quot;sessions&quot;,&quot;servers&quot;,&quot;privacy&quot;],&quot;default&quot;:&quot;profile&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;demoState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;loading&quot;,&quot;error&quot;,&quot;deletePending&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const PREFS = [['theme', 'Theme', [['dark', 'Dark'], ['light', 'Light'], ['device', 'Match my device']], ''], ['motion', 'Motion', [['device', 'Match my device'], ['reduce', 'Always reduce'], ['full', 'Full']], 'Reduce turns off slides and fades in the dashboard.'], ['clock', 'Time format', [['24', '24-hour'], ['12', '12-hour']], ''], ['density', 'Lists', [['comfy', 'Comfortable'], ['compact', 'Compact']], 'Compact fits more rows in tables like the case log.']];
+const NOTIFS = [['pay', 'Payments', 'Receipts, renewals and failed payments', true, true, true], ['broken', 'A module stops working', 'For example, Sparko loses a permission it needs', true, true, false], ['raid', 'Raids and anti-nuke', 'Sparko stepped in to protect a server', true, false, false], ['tickets', 'Tickets assigned to you', 'When someone assigns you a ticket', true, false, false], ['weekly', 'Weekly summary', 'Joins, messages and busy modules, every Monday', false, true, false], ['news', 'Sparko news', 'New modules, a few times a year', false, false, false]];
+const SESS = [{ id: 1, device: 'Chrome on macOS', icon: 'laptop', meta: 'London, UK · active now', current: true }, { id: 2, device: 'Safari on iPhone', icon: 'smartphone', meta: 'London, UK · 2 hours ago' }, { id: 3, device: 'Firefox on Windows', icon: 'monitor', meta: 'Berlin, Germany · 3 days ago', odd: true }];
+const SERVERS = [{ id: 'pp', name: 'Pixel Plaza', hue: 85, plan: 'Free', access: 'Owner · full access', owner: true }, { id: 'cc', name: 'Cozy Corner Café', hue: 30, plan: 'Plus', access: 'Owner · full access', owner: true }, { id: 'no', name: 'Night Owls Gaming', hue: 260, plan: 'Free', access: 'Manager through @Admin · all modules' }, { id: 'sh', name: 'Study Hall 24/7', hue: 150, plan: 'Paused', access: 'Manager through @Mods · Safety and Support only' }];
+class Component extends DCLogic {
+  state = (() => { let qp = {}; try { qp = Object.fromEntries(new URLSearchParams(window.location.search)); } catch (e) {} const demo = qp.state || this.props.demoState || 'none';
+    return { theme: qp.theme || this.props.theme || 'dark', page: qp.page || this.props.startPage || 'profile', demo, loading: demo === 'loading', errored: demo === 'error', pending: demo === 'deletePending',
+      prefs: { theme: qp.theme || 'dark', motion: 'device', clock: '24', density: 'comfy' }, lang: 'en-GB', refreshing: false,
+      notifs: Object.fromEntries(NOTIFS.map(n => [n[0], { dm: n[3], email: n[4] }])), quiet: true, qFrom: '23:00', qTo: '08:00',
+      sessions: SESS, outAllAsk: false, servers: SERVERS, leaveAsk: null, ex: 'idle', exPct: 0, modal: null, delText: '', delTried: false, toasts: [] }; })();
+  _id = 0;
+  componentDidMount() { this._key = e => { if (e.key === 'Escape') this.setState({ modal: null, outAllAsk: false, leaveAsk: null }); }; document.addEventListener('keydown', this._key); if (this.state.loading) this.later(() => this.setState({ loading: false }), 1100); }
+  componentWillUnmount() { document.removeEventListener('keydown', this._key); (this._t || []).forEach(clearTimeout); }
+  later(fn, ms) { (this._t = this._t || []).push(setTimeout(fn, ms)); }
+  toast(tone, title, body) { const id = ++this._id; const icon = { success: 'circle-check', danger: 'circle-x', info: 'info' }[tone]; this.setState(s => ({ toasts: [...s.toasts.slice(-2), { id, tone, icon, title, body }] })); this.later(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 5000); }
+  tick() { if (this.state.ex !== 'working') return; if (this.state.exPct >= 100) return this.setState({ ex: 'ready' }); this.setState(s => ({ exPct: Math.min(100, s.exPct + 20) })); this.later(() => this.tick(), 450); }
+  renderVals() {
+    const s = this.state; const dark = s.theme === 'dark'; const ready = !s.loading && !s.errored;
+    const others = s.sessions.filter(x => !x.current);
+    return {
+      theme: s.theme, themeIcon: dark ? 'sun' : 'moon', themeLabel: dark ? 'Switch to light theme' : 'Switch to dark theme', toggleTheme: () => this.setState(st => ({ theme: dark ? 'light' : 'dark', prefs: { ...st.prefs, theme: dark ? 'light' : 'dark' } })),
+      tabs: [['profile', 'Profile', 'user'], ['notifs', 'Notifications', 'bell'], ['sessions', 'Sessions', 'laptop'], ['servers', 'Servers & billing', 'server'], ['privacy', 'Privacy & data', 'lock']].map(([k, label, icon]) => ({ label, icon, cur: s.page === k ? 'page' : undefined, go: () => this.setState({ page: k }) })),
+      isLoading: s.loading, isError: s.errored, retry: () => { this.setState({ errored: false, loading: true }); this.later(() => this.setState({ loading: false }), 900); },
+      isProfile: ready && s.page === 'profile', isNotif: ready && s.page === 'notifs', isSessions: ready && s.page === 'sessions', isServers: ready && s.page === 'servers', isPrivacy: ready && s.page === 'privacy',
+      deletePending: s.pending, notPending: !s.pending, cancelDelete: () => { this.setState({ pending: false }); this.toast('success', 'Your account is staying', 'Nothing will be deleted.'); },
+      refreshing: s.refreshing, notRefreshing: !s.refreshing, refresh: () => { this.setState({ refreshing: true }); this.later(() => { this.setState({ refreshing: false }); this.toast('success', 'Up to date', 'Your name and picture match Discord.'); }, 800); },
+      prefs: PREFS.map(([k, label, opts, hint]) => ({ id: 'pf-' + k, label, hint, opts: opts.map(([v, l]) => ({ label: l, sel: s.prefs[k] === v, pick: () => { this.setState(st => ({ prefs: { ...st.prefs, [k]: v }, theme: k === 'theme' && v !== 'device' ? v : st.theme })); this.toast('success', 'Saved', `${label}: ${l}.`); } })) })),
+      lang: s.lang, setLang: e => { this.setState({ lang: e.target.value }); this.toast('success', 'Saved', 'The dashboard language changes the next time a page loads.'); },
+      notifs: NOTIFS.map(([k, label, desc, , , locked]) => ({ label, desc, locked, dm: s.notifs[k].dm, email: s.notifs[k].email, toggleDm: () => this.setState(st => ({ notifs: { ...st.notifs, [k]: { ...st.notifs[k], dm: !st.notifs[k].dm } } })), toggleEmail: () => this.setState(st => ({ notifs: { ...st.notifs, [k]: { ...st.notifs[k], email: !st.notifs[k].email } } })) })),
+      quiet: s.quiet, toggleQuiet: () => this.setState({ quiet: !s.quiet }), qFrom: s.qFrom, qTo: s.qTo, setQFrom: e => this.setState({ qFrom: e.target.value }), setQTo: e => this.setState({ qTo: e.target.value }),
+      sessions: s.sessions.map(x => ({ ...x, odd: !!x.odd, current: !!x.current, notCurrent: !x.current, out: () => { this.setState(st => ({ sessions: st.sessions.filter(y => y.id !== x.id) })); this.toast('success', `Signed out ${x.device}`, x.odd ? 'If that wasn’t you, change your Discord password too.' : 'That device needs to sign in again.'); } })),
+      hasOthers: others.length > 0, otherCount: others.length, outAllAsk: s.outAllAsk, askOutAll: () => this.setState({ outAllAsk: true }), keepAll: () => this.setState({ outAllAsk: false }),
+      outAll: () => { this.setState(st => ({ outAllAsk: false, sessions: st.sessions.filter(y => y.current) })); this.toast('success', `Signed out ${others.length} sessions`, 'Only this device is signed in now.'); },
+      servers: s.servers.map(x => ({ ...x, ini: x.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), planCls: 'sp-badge sp-badge--sm ' + (x.plan === 'Plus' ? 'sp-badge--plus' : x.plan === 'Paused' ? 'sp-badge--danger' : 'sp-pill sp-pill--muted'), href: `Panel.dc.html?page=overview&srv=${x.id}`, canLeave: !x.owner, confirming: s.leaveAsk === x.id, idle: s.leaveAsk !== x.id,
+        askLeave: () => this.setState({ leaveAsk: x.id }), keep: () => this.setState({ leaveAsk: null }), leave: () => { this.setState(st => ({ leaveAsk: null, servers: st.servers.filter(y => y.id !== x.id) })); this.toast('success', `You left ${x.name}’s dashboard`, 'An owner can give you access again.'); } })),
+      subs: [{ name: 'Cozy Corner Café', meta: 'Yearly · US$35.91 · renews 2 Mar 2027 · PayPal q••••@gmail.com' }],
+      exIdle: s.ex === 'idle', exWorking: s.ex === 'working', exReady: s.ex === 'ready', exPct: s.exPct, exBar: { width: s.exPct + '%' },
+      startExport: () => { this.setState({ ex: 'working', exPct: 0 }); this.later(() => this.tick(), 300); }, downloadEx: () => this.toast('info', 'Your ZIP would download', 'sparko-quinn.dev-2026-10-13.zip'),
+      askDelete: () => this.setState({ modal: 'del', delText: '', delTried: false }), delOpen: s.modal === 'del', delText: s.delText, setDelText: e => this.setState({ delText: e.target.value }),
+      delNoMatch: s.delText.trim() !== 'quinn.dev', delBad: s.delText.length >= 9 && s.delText.trim() !== 'quinn.dev', delBox: 'sp-input' + (s.delText.length >= 9 && s.delText.trim() !== 'quinn.dev' ? ' is-error' : ''),
+      confirmDelete: () => { this.setState({ modal: null, pending: true }); this.toast('success', 'Deletion scheduled for 20 Oct', 'We sent a confirmation to your email. Sign in before then to cancel.'); },
+      closeModal: () => this.setState({ modal: null }), scrimClose: e => { if (e.target === e.currentTarget) this.setState({ modal: null }); },
+      toasts: s.toasts.map(t => ({ ...t, cls: `sp-toast sp-toast--${t.tone}`, close: () => this.setState(st => ({ toasts: st.toasts.filter(x => x.id !== t.id) })) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

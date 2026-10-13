@@ -1,0 +1,33 @@
+/* Command palette (Ctrl/Cmd+K) + its trigger. Items reuse .sp-option. */
+.sp-cmdk-trigger {
+  position: relative; display: inline-flex; align-items: center; gap: 10px; height: var(--sp-control-h); width: min(320px, 100%); padding: 0 8px 0 12px;
+  border: 1px solid var(--sp-line); border-radius: var(--sp-radius-control); background: var(--sp-surface); color: var(--sp-muted);
+  font: 400 14px/20px var(--sp-font-sans); cursor: pointer; text-align: left;
+  transition: border-color var(--sp-dur-fast) var(--sp-ease-out), background-color var(--sp-dur-fast) var(--sp-ease-out), box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-cmdk-trigger > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sp-cmdk-trigger:hover, .sp-cmdk-trigger.is-hover { border-color: var(--sp-line-strong); color: var(--sp-text); }
+.sp-cmdk-trigger:focus-visible, .sp-cmdk-trigger.is-focus { outline: none; box-shadow: var(--sp-ring); }
+.sp-cmdk-trigger .sp-kbd-group { display: flex; gap: 4px; }
+
+.sp-cmdk-scrim { position: fixed; inset: 0; z-index: var(--sp-z-palette); display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; background: var(--sp-scrim); animation: sp-fade var(--sp-dur-base) var(--sp-ease-out); }
+.sp-cmdk {
+  display: flex; flex-direction: column; width: min(640px, 100%); max-height: min(520px, 100%); overflow: hidden;
+  background: var(--sp-surface); border: 1px solid var(--sp-line); border-radius: var(--sp-radius-card); box-shadow: var(--sp-shadow-overlay); color: var(--sp-text);
+  animation: sp-pop var(--sp-dur-base) var(--sp-ease-out);
+}
+.sp-cmdk__search { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 16px; border-bottom: 1px solid var(--sp-line); flex: none; color: var(--sp-muted); }
+.sp-cmdk__search:focus-within { box-shadow: inset 0 -2px 0 var(--sp-focus-edge); }
+.sp-cmdk__search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; padding: 0; background: transparent; color: var(--sp-text); font: 400 16px/24px var(--sp-font-sans); box-shadow: none !important; }
+.sp-cmdk__search input::placeholder { color: var(--sp-muted); opacity: 1; }
+.sp-cmdk__list { flex: 1; min-height: 0; overflow: auto; padding: 6px; display: grid; gap: 2px; align-content: start; }
+.sp-cmdk__list .sp-option { min-height: 44px; }
+.sp-cmdk__icon { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: var(--sp-radius-chip); background: var(--sp-raised); color: var(--sp-muted); }
+.sp-option[data-active="true"] .sp-cmdk__icon { background: var(--sp-brand); color: var(--sp-on-brand); }
+.sp-cmdk__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 16px; border-top: 1px solid var(--sp-line); background: var(--sp-subtle); font: 400 12px/16px var(--sp-font-sans); color: var(--sp-muted); flex: none; }
+.sp-cmdk__foot span { display: inline-flex; align-items: center; gap: 6px; }
+@container (max-width: 640px) {
+  .sp-cmdk-scrim { padding: 12px; }
+  .sp-cmdk { max-height: 100%; }
+  .sp-cmdk__foot { display: none; }
+}

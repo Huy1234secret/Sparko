@@ -1,0 +1,39 @@
+/* Card, stat tile, module card. */
+.sp-card { min-width: 0; background: var(--sp-surface); border: 1px solid var(--sp-line); border-radius: var(--sp-radius-card); box-shadow: var(--sp-shadow-card); color: var(--sp-text); }
+.sp-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 60px; padding: 12px 12px 12px 20px; border-bottom: 1px solid var(--sp-line); }
+.sp-card__titles { display: grid; gap: 2px; min-width: 0; }
+.sp-card__title { margin: 0; display: flex; align-items: center; gap: 8px; font: var(--sp-text-h3); letter-spacing: -0.006em; }
+.sp-card__sub { margin: 0; font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); }
+.sp-card__body { padding: 20px; display: grid; gap: 16px; }
+.sp-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--sp-line); background: var(--sp-subtle); border-radius: 0 0 var(--sp-radius-card) var(--sp-radius-card); }
+.sp-card--flush .sp-card__body { padding: 0; }
+
+a.sp-card, button.sp-card, .sp-card--interactive {
+  display: block; width: 100%; text-align: left; font: inherit; color: inherit; text-decoration: none; cursor: pointer;
+  transition: border-color var(--sp-dur-fast) var(--sp-ease-out), background-color var(--sp-dur-fast) var(--sp-ease-out), box-shadow var(--sp-dur-fast) var(--sp-ease-out), transform var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-card--interactive:hover, .sp-card--interactive.is-hover { border-color: var(--sp-line-strong); }
+.sp-card--interactive:active, .sp-card--interactive.is-active { transform: translateY(1px); background: var(--sp-subtle); }
+.sp-card--interactive:focus-visible, .sp-card--interactive.is-focus { outline: none; box-shadow: var(--sp-ring); }
+.sp-card--interactive[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+
+/* Module card */
+.sp-module { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: start; padding: 16px 16px 16px 16px; }
+.sp-module__icon { grid-row: span 2; display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--sp-radius-control); background: var(--sp-raised); color: var(--sp-text); }
+.sp-module__name { font: 600 14px/20px var(--sp-font-sans); display: flex; align-items: center; gap: 8px; padding-top: 2px; }
+.sp-module__desc { grid-column: 2; font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); text-wrap: pretty; }
+.sp-module__toggle { grid-column: 3; grid-row: 1 / span 2; margin-top: -10px; }
+
+/* Stat tile */
+.sp-stat { display: grid; gap: 6px; align-content: start; min-width: 0; padding: 16px 20px 18px; background: var(--sp-surface); border: 1px solid var(--sp-line); border-radius: var(--sp-radius-card); box-shadow: var(--sp-shadow-card); }
+.sp-stat__label { display: flex; align-items: center; gap: 8px; font: 500 13px/18px var(--sp-font-sans); color: var(--sp-muted); }
+.sp-stat__value { font: var(--sp-text-stat); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--sp-text); }
+.sp-stat__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); }
+.sp-delta { display: inline-flex; align-items: center; gap: 2px; height: 20px; padding: 0 6px; border-radius: var(--sp-radius-xs); font: 600 12px/16px var(--sp-font-sans); font-variant-numeric: tabular-nums; }
+.sp-delta .sp-i { width: 14px; height: 14px; }
+.sp-delta--up { background: var(--sp-success-soft); color: var(--sp-success); }
+.sp-delta--down { background: var(--sp-danger-soft); color: var(--sp-danger); }
+.sp-delta--flat { background: var(--sp-raised); color: var(--sp-muted); }
+.sp-stat.is-error .sp-stat__value { color: var(--sp-muted); }
+.sp-stat-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+@container (max-width: 640px) { .sp-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .sp-stat { padding: 14px 16px; } .sp-stat__value { font-size: 24px; line-height: 30px; } }

@@ -1,0 +1,16 @@
+/* Sparko — motion + layering. Every transition/animation is <= 200ms and disabled under prefers-reduced-motion (see base.css). */
+:root {
+  --sp-dur-instant: 80ms;
+  --sp-dur-fast: 120ms;   /* hover, press, colour changes */
+  --sp-dur-base: 160ms;   /* popovers, toasts, switch thumb */
+  --sp-dur-slow: 200ms;   /* modals, drawers, sheets — the ceiling */
+  --sp-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sp-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --sp-z-sticky: 30;
+  --sp-z-savebar: 40;
+  --sp-z-popover: 50;
+  --sp-z-toast: 60;
+  --sp-z-overlay: 70;
+  --sp-z-palette: 80;
+}

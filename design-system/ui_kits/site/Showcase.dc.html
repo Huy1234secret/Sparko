@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sparko public site — showcase</title>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&amp;display=swap">
+<style>body{margin:0;background:#0B0B0A}a{color:#FACC15}a:hover{color:#FAFAF5}</style>
+</helmet>
+<div style="padding:48px;display:grid;gap:48px;font-family:Inter,system-ui,sans-serif;color:#FAFAF5;width:max-content">
+  <header style="display:grid;gap:6px;max-width:900px">
+    <h1 style="margin:0;font:600 24px/32px Inter;letter-spacing:-0.018em">Area 2 · Public site</h1>
+    <p style="margin:0;font:400 14px/22px Inter;color:#AAA99D;text-wrap:pretty">Each frame is the live Site.dc.html. The hero preview tours four modules (pause button top right of it); the feature page has a working Message Studio demo; pricing switches between the three billing periods; commands are searchable and expand.</p>
+  </header>
+  <sc-for list="{{ rows }}" as="row" hint-placeholder-count="5">
+    <section style="display:grid;gap:16px">
+      <h2 style="margin:0;font:600 12px/16px Inter;letter-spacing:0.06em;text-transform:uppercase;color:#AAA99D">{{ row.label }}</h2>
+      <div style="display:flex;gap:32px;align-items:flex-start">
+        <div style="display:grid;gap:8px"><span style="font:500 12px/16px ui-monospace,Menlo,monospace;color:#AAA99D">1440 · {{ row.dTheme }}</span><iframe title="{{ row.dTitle }}" src="{{ row.dSrc }}" loading="lazy" style="width:1440px;height:1000px;border:1px solid #30302A;border-radius:14px;background:#111110;display:block"></iframe></div>
+        <div style="display:grid;gap:8px"><span style="font:500 12px/16px ui-monospace,Menlo,monospace;color:#AAA99D">390 · {{ row.mTheme }}</span><iframe title="{{ row.mTitle }}" src="{{ row.mSrc }}" loading="lazy" style="width:390px;height:1000px;border:1px solid #30302A;border-radius:28px;background:#111110;display:block"></iframe></div>
+      </div>
+    </section>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const u = (t, p, id) => `Site.dc.html?theme=${t}&page=${p}${id ? '&id=' + id : ''}`;
+    const r = (label, p, id, dT, mT) => ({ label, dTheme: dT, mTheme: mT, dTitle: `${label} desktop ${dT}`, mTitle: `${label} mobile ${mT}`, dSrc: u(dT, p, id), mSrc: u(mT, p, id) });
+    return { rows: [r('Home', 'home', '', 'dark', 'light'), r('Home', 'home', '', 'light', 'dark'), r('Features catalogue', 'features', '', 'dark', 'light'), r('Feature page · Message Studio', 'feature', 'studio', 'light', 'dark'), r('Pricing', 'pricing', '', 'dark', 'light'), r('Commands', 'commands', '', 'light', 'dark')] };
+  }
+}
+</script>
+</body>
+</html>

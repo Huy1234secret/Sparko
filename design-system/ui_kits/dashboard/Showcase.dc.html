@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sparko Dashboard — showcase</title>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&amp;display=swap">
+<style>body{margin:0;background:#0B0B0A}a{color:#FACC15}a:hover{color:#FAFAF5}</style>
+</helmet>
+<div style="padding:48px;display:grid;gap:40px;font-family:Inter,system-ui,sans-serif;color:#FAFAF5;width:max-content">
+  <header style="display:grid;gap:6px">
+    <h1 style="margin:0;font:600 24px/32px Inter;letter-spacing:-0.018em">Sparko dashboard UI kit</h1>
+    <p style="margin:0;font:400 14px/22px Inter;color:#AAA99D">The same interactive Dashboard.dc.html at 1440 and 390 px, in dark and light. Each frame is live: click around, open the command palette (Ctrl/⌘ K), edit the welcome message.</p>
+  </header>
+  <sc-for list="{{ rows }}" as="row" hint-placeholder-count="2">
+    <section style="display:grid;gap:16px">
+      <h2 style="margin:0;font:600 12px/16px Inter;letter-spacing:0.06em;text-transform:uppercase;color:#AAA99D">{{ row.label }}</h2>
+      <div style="display:flex;gap:32px;align-items:flex-start">
+        <div style="display:grid;gap:8px"><span style="font:500 12px/16px ui-monospace,Menlo,monospace;color:#AAA99D">1440 × 900 · {{ row.page }}</span><iframe title="{{ row.deskTitle }}" src="{{ row.deskSrc }}" style="width:1440px;height:900px;border:1px solid #30302A;border-radius:14px;background:#111110;display:block"></iframe></div>
+        <div style="display:grid;gap:8px"><span style="font:500 12px/16px ui-monospace,Menlo,monospace;color:#AAA99D">390 × 844 · {{ row.mpage }}</span><iframe title="{{ row.mobTitle }}" src="{{ row.mobSrc }}" style="width:390px;height:844px;border:1px solid #30302A;border-radius:28px;background:#111110;display:block"></iframe></div>
+      </div>
+    </section>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const mk = (theme, label, page, mpage) => ({ label, page, mpage, deskSrc: `Dashboard.dc.html?theme=${theme}&page=${page}`, mobSrc: `Dashboard.dc.html?theme=${theme}&page=${mpage}`, deskTitle: `${label} desktop`, mobTitle: `${label} mobile` });
+    return { rows: [mk('dark', 'Dark', 'overview', 'moderation'), mk('light', 'Light', 'welcome', 'welcome')] };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sparko Dashboard</title>
+<link rel="stylesheet" href="../../sparko.bundle.css">
+<script src="../../assets/icons/sp-icon.js"></script>
+<style>html,body{height:100%;margin:0}body{overflow:hidden;background:#111110}sp-icon{display:inline-block;width:18px;height:18px}</style>
+</helmet>
+<div data-theme="{{ theme }}" class="sp-cq" style="height:100vh;display:flex;flex-direction:column;background:var(--sp-canvas);color:var(--sp-text)">
+  <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-paused sp-paused--bar" role="alert">
+      <sp-icon class="sp-i sp-i--lg sp-paused__icon" name="circle-pause"></sp-icon>
+      <div class="sp-paused__title">Sparko is paused on Sparko HQ <span class="sp-paused__ref">Ref PA-20931</span></div>
+      <div class="sp-paused__body">Sparko staff paused all modules on 12 Oct 2026 after a Terms of Service report. Commands, automations and logs won’t run until the review is finished.</div>
+      <div class="sp-paused__actions"><button class="sp-btn sp-btn--secondary sp-btn--sm">View details</button><button class="sp-btn sp-btn--ghost sp-btn--sm">Contact support</button></div>
+    </div>
+  </sc-if>
+  <div class="sp-app" style="flex:1;min-height:0">
+    <nav class="{{ sidebarClass }}" aria-label="Main">
+      <div class="sp-sidebar__brand" style="justify-content:space-between">Sparko<sc-if value="{{ navOpen }}" hint-placeholder-val="{{ false }}"><button class="sp-btn sp-btn--ghost sp-btn--icon" aria-label="Close menu" onClick="{{ closeNav }}"><sp-icon class="sp-i" name="x"></sp-icon></button></sc-if></div>
+      <button class="sp-server-switch"><span class="sp-server sp-server--tint sp-server--md" style="--h:85">SH</span><span>Sparko HQ<small>12,408 members</small></span><sp-icon class="sp-i sp-i--sm" name="chevrons-up-down"></sp-icon></button>
+      <div class="sp-sidebar__section">Server</div>
+      <sc-for list="{{ nav }}" as="item" hint-placeholder-count="6">
+        <button class="sp-nav-item" aria-current="{{ item.current }}" onClick="{{ item.go }}"><sp-icon class="sp-i" name="{{ item.icon }}"></sp-icon><span>{{ item.label }}</span><sc-if value="{{ item.count }}"><span class="sp-count">{{ item.count }}</span></sc-if></button>
+      </sc-for>
+      <div class="sp-sidebar__foot">
+        <div class="sp-plus sp-plus--compact sp-sparks">
+          <div class="sp-plus__text"><div class="sp-plus__title"><sp-icon class="sp-i sp-i--sm" name="crown"></sp-icon>Sparko Plus</div><div class="sp-plus__desc">Custom bot profile, unlimited auto-roles and 90-day logs.</div></div>
+          <div class="sp-plus__actions"><button class="sp-btn sp-btn--primary sp-btn--sm" onClick="{{ upgrade }}">Upgrade</button></div>
+        </div>
+      </div>
+    </nav>
+    <sc-if value="{{ navOpen }}" hint-placeholder-val="{{ false }}"><div class="sp-nav-scrim" onClick="{{ closeNav }}"></div></sc-if>
+    <main class="sp-main">
+      <header class="sp-topbar">
+        <button class="sp-btn sp-btn--ghost sp-btn--icon sp-topbar__menu" aria-label="Open menu" onClick="{{ openNav }}"><sp-icon class="sp-i" name="menu"></sp-icon></button>
+        <div class="sp-topbar__start">
+          <nav aria-label="Breadcrumb"><ol class="sp-crumbs"><li class="sp-topbar__desktop-only"><a class="sp-crumb" href="#" onClick="{{ goOverview }}">Sparko HQ</a><sp-icon class="sp-i" name="chevron-right"></sp-icon></li><li><span class="sp-crumb" aria-current="page">{{ pageLabel }}</span></li></ol></nav>
+        </div>
+        <div class="sp-topbar__end">
+          <button class="sp-cmdk-trigger sp-topbar__desktop-only" onClick="{{ openCmdk }}"><sp-icon class="sp-i sp-i--sm" name="search"></sp-icon><span>Search or jump to…</span><span class="sp-kbd-group"><span class="sp-kbd">{{ modKey }}</span><span class="sp-kbd">K</span></span></button>
+          <button class="sp-btn sp-btn--ghost sp-btn--icon sp-topbar__mobile-only" aria-label="Search" onClick="{{ openCmdk }}"><sp-icon class="sp-i" name="search"></sp-icon></button>
+          <span class="sp-tip sp-tip--end sp-tip--below"><button class="sp-btn sp-btn--ghost sp-btn--icon" aria-label="{{ themeLabel }}" onClick="{{ toggleTheme }}"><sp-icon class="sp-i" name="{{ themeIcon }}"></sp-icon></button><span class="sp-tooltip" role="tooltip">{{ themeLabel }}</span></span>
+          <div class="sp-menu-anchor" data-popover="account">
+            <button class="sp-avatar sp-avatar--2 sp-avatar--sm" aria-label="Account" aria-haspopup="menu" aria-expanded="{{ acctOpen }}" onClick="{{ toggleAcct }}">Q</button>
+            <sc-if value="{{ acctOpen }}" hint-placeholder-val="{{ false }}">
+              <div class="sp-popover sp-menu" role="menu">
+                <div style="display:grid;padding:8px 10px 10px"><b style="font-weight:600">Quinn</b><span class="sp-user__id">quinn.dev · 1029384756102938</span></div>
+                <hr class="sp-sep">
+                <button class="sp-option" role="menuitem" onClick="{{ toggleTheme }}"><sp-icon class="sp-i" name="{{ themeIcon }}"></sp-icon><span class="sp-option__label">{{ themeLabel }}</span></button>
+                <button class="sp-option" role="menuitem" onClick="{{ upgrade }}"><sp-icon class="sp-i" name="crown"></sp-icon><span class="sp-option__label">Billing &amp; Plus</span></button>
+                <button class="sp-option" role="menuitem" onClick="{{ closeAcct }}"><sp-icon class="sp-i" name="life-buoy"></sp-icon><span class="sp-option__label">Support</span></button>
+                <hr class="sp-sep">
+                <button class="sp-option sp-option--danger" role="menuitem" onClick="{{ closeAcct }}"><sp-icon class="sp-i" name="log-out"></sp-icon><span class="sp-option__label">Log out</span></button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </header>
+
+      <div class="sp-content">
+        <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+          <header class="sp-page-head">
+            <div class="sp-page-head__text">
+              <div class="sp-page-head__eyebrow">Overview</div>
+              <h1 class="sp-page-head__title">Sparko HQ <span class="{{ statusPillClass }}"><span class="sp-dot"></span>{{ statusPillLabel }}</span></h1>
+              <p class="sp-page-head__desc">What Sparko did in your server this week, and the modules it’s running.</p>
+            </div>
+            <div class="sp-page-head__actions"><button class="sp-btn sp-btn--secondary" onClick="{{ openCmdk }}"><sp-icon class="sp-i" name="command"></sp-icon>Quick actions</button><button class="sp-btn sp-btn--primary" onClick="{{ goWelcome }}"><sp-icon class="sp-i" name="user-plus"></sp-icon>Set up welcome</button></div>
+          </header>
+          <sc-if value="{{ showPlus }}" hint-placeholder-val="{{ true }}">
+            <div class="sp-plus sp-sparks">
+              <span class="sp-plus__mark"><sp-icon class="sp-i sp-i--lg" name="crown"></sp-icon></span>
+              <div class="sp-plus__text"><div class="sp-plus__title">Get more from Sparko with Plus</div><div class="sp-plus__desc">Custom bot name and avatar, unlimited auto-roles and 90-day log history. From $4.99 a month per server.</div></div>
+              <div class="sp-plus__actions"><button class="sp-btn sp-btn--primary sp-btn--sm" onClick="{{ upgrade }}">Upgrade to Plus</button><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="Dismiss" onClick="{{ hidePlus }}"><sp-icon class="sp-i sp-i--sm" name="x"></sp-icon></button></div>
+            </div>
+          </sc-if>
+          <div class="sp-stat-grid">
+            <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+              <div class="sp-stat"><div class="sp-stat__label"><sp-icon class="sp-i sp-i--sm" name="{{ s.icon }}"></sp-icon>{{ s.label }}</div><div class="sp-stat__value">{{ s.value }}</div><div class="sp-stat__meta"><span class="{{ s.deltaClass }}"><sp-icon class="sp-i" name="{{ s.deltaIcon }}"></sp-icon>{{ s.delta }}</span>{{ s.meta }}</div></div>
+            </sc-for>
+          </div>
+          <div class="sp-split">
+            <section class="sp-stack" aria-labelledby="mods-h">
+              <h2 id="mods-h" style="font:var(--sp-text-h3)">Modules</h2>
+              <div class="sp-stack" style="gap:12px">
+                <sc-for list="{{ modules }}" as="m" hint-placeholder-count="5">
+                  <div class="sp-card sp-module">
+                    <span class="sp-module__icon"><sp-icon class="sp-i" name="{{ m.icon }}"></sp-icon></span>
+                    <span class="sp-module__name">{{ m.name }}<sc-if value="{{ m.plus }}"><span class="sp-badge sp-badge--sm sp-badge--plus">Plus</span></sc-if></span>
+                    <label class="sp-switch sp-module__toggle"><input class="sp-choice-input" type="checkbox" role="switch" aria-label="{{ m.name }}" checked="{{ m.on }}" disabled="{{ m.locked }}" onChange="{{ m.toggle }}"><span class="sp-switch__track"><span class="sp-switch__thumb"></span></span></label>
+                    <span class="sp-module__desc">{{ m.desc }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+            <section class="sp-card" aria-labelledby="rc-h">
+              <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="rc-h">Recent cases</h2><p class="sp-card__sub">Last 24 hours</p></div><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ goModeration }}">View all<sp-icon class="sp-i sp-i--sm" name="chevron-right"></sp-icon></button></div>
+              <div style="display:grid;padding:6px">
+                <sc-for list="{{ recent }}" as="r" hint-placeholder-count="4">
+                  <button class="sp-option" style="min-height:60px;gap:12px" onClick="{{ r.open }}">
+                    <span class="{{ r.avClass }}">{{ r.initial }}</span>
+                    <span style="display:grid;flex:1;min-width:0"><span class="sp-user__name">{{ r.user }}</span><span class="sp-hint" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.reason }}</span></span>
+                    <span class="{{ r.badgeClass }}">{{ r.label }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </section>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isModeration }}" hint-placeholder-val="{{ false }}">
+          <header class="sp-page-head">
+            <div class="sp-page-head__text"><div class="sp-page-head__eyebrow">Modules</div><h1 class="sp-page-head__title">Moderation</h1><p class="sp-page-head__desc">Every ban, timeout, warn and kick — by your moderators or AutoMod — with the reason behind it.</p></div>
+            <div class="sp-page-head__actions"><button class="sp-btn sp-btn--danger" onClick="{{ openBan }}"><sp-icon class="sp-i" name="ban"></sp-icon>Ban member</button></div>
+          </header>
+          <div class="sp-tabs" role="tablist">
+            <sc-for list="{{ modTabs }}" as="tb" hint-placeholder-count="3">
+              <button class="sp-tab" role="tab" aria-selected="{{ tb.sel }}" onClick="{{ tb.pick }}">{{ tb.label }}<sc-if value="{{ tb.count }}"><span class="sp-count">{{ tb.count }}</span></sc-if></button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ isCasesTab }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+              <div class="sp-input" style="flex:1 1 240px;max-width:380px"><sp-icon class="sp-i" name="search"></sp-icon><input aria-label="Search cases" placeholder="Search by member, ID or case #" value="{{ q }}" onChange="{{ setQ }}"></div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5"><button class="sp-chip sp-chip--toggle" aria-pressed="{{ f.on }}" onClick="{{ f.pick }}">{{ f.label }}</button></sc-for>
+              </div>
+            </div>
+            <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+              <div class="sp-table-wrap">
+                <table class="sp-table">
+                  <thead><tr><th scope="col" aria-sort="descending"><button class="sp-sort">Member · case<sp-icon class="sp-i" name="arrow-down"></sp-icon></button></th><th scope="col">Action</th><th scope="col">Reason</th><th scope="col">Moderator</th><th scope="col">Date</th><th scope="col"><span class="sp-sr-only">Open</span></th></tr></thead>
+                  <tbody>
+                    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                      <tr aria-selected="{{ r.selected }}" onClick="{{ r.open }}" style="cursor:pointer">
+                        <td data-label="Member" data-primary="true"><div class="sp-user"><span class="{{ r.avClass }}">{{ r.initial }}</span><div class="sp-user__text"><span class="sp-user__name">{{ r.user }}</span><span class="sp-user__id">#{{ r.id }} · {{ r.uid }}</span></div></div></td>
+                        <td data-label="Action"><span class="{{ r.badgeClass }}">{{ r.label }}</span></td>
+                        <td data-label="Reason"><div class="sp-table__reason">{{ r.reason }}</div></td>
+                        <td data-label="Moderator">{{ r.mod }}</td>
+                        <td data-label="Date" class="sp-table__muted sp-tnum">{{ r.date }}</td>
+                        <td data-actions="true"><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="{{ r.openLabel }}" onClick="{{ r.open }}"><sp-icon class="sp-i" name="chevron-right"></sp-icon></button></td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+                <div class="sp-table-foot"><span>{{ rowsSummary }}</span><div class="sp-table-foot__pager"><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" disabled="{{ true }}" aria-label="Previous page"><sp-icon class="sp-i" name="chevron-left"></sp-icon></button><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" disabled="{{ true }}" aria-label="Next page"><sp-icon class="sp-i" name="chevron-right"></sp-icon></button></div></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ noRows }}" hint-placeholder-val="{{ false }}">
+              <div class="sp-card"><div class="sp-empty"><div class="sp-empty__art"><sp-icon class="sp-i" name="search"></sp-icon></div><div class="sp-empty__title">No cases match</div><p class="sp-empty__desc">Try a member name, user ID or case number, or clear the filters.</p><div class="sp-empty__actions"><button class="sp-btn sp-btn--secondary" onClick="{{ clearFilters }}">Clear filters</button></div></div></div>
+            </sc-if>
+          </sc-if>
+          <sc-if value="{{ isAutomodTab }}" hint-placeholder-val="{{ false }}">
+            <div class="sp-card"><div class="sp-empty sp-sparks"><div class="sp-empty__art"><sp-icon class="sp-i" name="shield"></sp-icon></div><div class="sp-empty__title">No AutoMod rules yet</div><p class="sp-empty__desc">Rules catch spam, invite links and banned words before your moderators have to.</p><div class="sp-empty__actions"><button class="sp-btn sp-btn--primary">Create a rule</button><button class="sp-btn sp-btn--ghost">Use recommended rules</button></div></div></div>
+          </sc-if>
+          <sc-if value="{{ isSettingsTab }}" hint-placeholder-val="{{ false }}">
+            <div class="sp-notice sp-notice--warning" role="status"><sp-icon class="sp-i sp-notice__icon" name="triangle-alert"></sp-icon><div class="sp-notice__title">Sparko’s role is below Moderator</div><div class="sp-notice__body">It can’t time out or ban moderators until you move it higher in Server Settings → Roles.</div><div class="sp-notice__actions"><button class="sp-link-btn">How to fix</button><button class="sp-link-btn">Check again</button></div></div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ isWelcome }}" hint-placeholder-val="{{ false }}">
+          <header class="sp-page-head">
+            <div class="sp-page-head__text"><div class="sp-page-head__eyebrow">Modules</div><h1 class="sp-page-head__title">Welcome messages<span class="{{ welcomePillClass }}"><span class="sp-dot"></span>{{ welcomePillLabel }}</span></h1><p class="sp-page-head__desc">Greet new members with a message or embed the moment they join.</p></div>
+            <div class="sp-page-head__actions"><button class="{{ testBtnClass }}" aria-busy="{{ testing }}" onClick="{{ sendTest }}"><sc-if value="{{ testing }}"><span class="sp-spinner"></span></sc-if><sc-if value="{{ notTesting }}"><sp-icon class="sp-i" name="message-square-text"></sp-icon></sc-if>{{ testLabel }}</button></div>
+          </header>
+          <div class="sp-split">
+            <div class="sp-stack">
+              <section class="sp-card">
+                <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title">Delivery</h2><p class="sp-card__sub">Where and how Sparko greets people</p></div>
+                  <label class="sp-switch"><input class="sp-choice-input" type="checkbox" role="switch" aria-label="Enable welcome messages" checked="{{ form.enabled }}" onChange="{{ toggleEnabled }}"><span class="sp-switch__track"><span class="sp-switch__thumb"></span></span></label>
+                </div>
+                <div class="sp-card__body">
+                  <fieldset class="sp-radio-cards" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"><legend class="sp-label" style="margin-bottom:8px">Send to</legend>
+                    <sc-for list="{{ deliveries }}" as="d" hint-placeholder-count="3">
+                      <label class="sp-radio-card"><input class="sp-choice-input" type="radio" name="delivery" checked="{{ d.checked }}" onChange="{{ d.pick }}"><span class="sp-check__box"></span><span class="sp-radio-card__title">{{ d.title }}</span><span class="sp-radio-card__desc">{{ d.desc }}</span></label>
+                    </sc-for>
+                  </fieldset>
+                  <div class="sp-combo" data-popover="channel">
+                    <span class="sp-label" id="ch-label">Welcome channel</span>
+                    <button class="sp-input" aria-labelledby="ch-label" aria-haspopup="listbox" aria-expanded="{{ chOpen }}" disabled="{{ channelDisabled }}" onClick="{{ toggleCh }}"><span class="sp-input__value"><sp-icon class="sp-i sp-channel-glyph" name="hash"></sp-icon>{{ form.channel }}</span><sp-icon class="sp-i sp-input__chev" name="chevron-down"></sp-icon></button>
+                    <sc-if value="{{ chOpen }}" hint-placeholder-val="{{ false }}">
+                      <div class="sp-popover" role="listbox" aria-labelledby="ch-label">
+                        <div class="sp-popover__search"><sp-icon class="sp-i sp-i--sm" name="search"></sp-icon><input autoFocus="{{ true }}" aria-label="Search channels" placeholder="Search channels" value="{{ chQuery }}" onChange="{{ setChQuery }}" onKeyDown="{{ chKey }}"></div>
+                        <div class="sp-popover__list">
+                          <sc-for list="{{ chList }}" as="c">
+                            <sc-if value="{{ c.isGroup }}"><div class="sp-option-group">{{ c.name }}</div></sc-if>
+                            <sc-if value="{{ c.isItem }}"><button class="sp-option" role="option" tabindex="-1" aria-selected="{{ c.sel }}" data-active="{{ c.active }}" aria-disabled="{{ c.dis }}" onClick="{{ c.pick }}" onMouseEnter="{{ c.hover }}"><sp-icon class="sp-i" name="{{ c.icon }}"></sp-icon><span class="sp-option__label">{{ c.name }}</span><sc-if value="{{ c.dis }}"><span class="sp-option__meta"><sp-icon class="sp-i sp-i--sm" name="lock"></sp-icon>No access</span></sc-if><sc-if value="{{ c.sel }}"><span class="sp-option__check"><sp-icon class="sp-i" name="check"></sp-icon></span></sc-if></button></sc-if>
+                          </sc-for>
+                          <sc-if value="{{ chEmpty }}"><div class="sp-popover__empty">No channels match “{{ chQuery }}”.</div></sc-if>
+                        </div>
+                        <div class="sp-popover__foot">Channels Sparko can’t post in are disabled.</div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </section>
+              <section class="sp-card">
+                <div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title">Message</h2><p class="sp-card__sub">Use {user}, {server} and #channel</p></div></div>
+                <div class="sp-card__body">
+                  <div class="sp-field">
+                    <label class="sp-label" for="w-msg">Message text</label>
+                    <div class="{{ msgBoxClass }}"><textarea id="w-msg" rows="3" aria-invalid="{{ msgInvalid }}" value="{{ form.message }}" onChange="{{ setMessage }}"></textarea></div>
+                    <sc-if value="{{ msgInvalid }}"><p class="sp-field-error"><sp-icon class="sp-i" name="circle-alert"></sp-icon>Write a message or turn the module off.</p></sc-if>
+                    <sc-if value="{{ msgValid }}"><div class="sp-field__row"><p class="sp-hint">Markdown supported</p><p class="sp-hint sp-tnum">{{ msgCount }} / 2000</p></div></sc-if>
+                  </div>
+                  <div class="sp-field"><label class="sp-label" for="w-title">Embed title <span class="sp-label__opt">(optional)</span></label><div class="sp-input"><input id="w-title" value="{{ form.title }}" onChange="{{ setTitle }}" placeholder="Read this first"></div></div>
+                  <div class="sp-field"><span class="sp-label" id="col-l">Embed colour</span>
+                    <div class="sp-seg" role="radiogroup" aria-labelledby="col-l" style="flex-wrap:wrap;align-self:start">
+                      <sc-for list="{{ colors }}" as="col" hint-placeholder-count="4"><button class="sp-seg__item" role="radio" aria-checked="{{ col.sel }}" onClick="{{ col.pick }}"><span class="sp-dot" style="color:{{ col.hex }}"></span>{{ col.name }}</button></sc-for>
+                    </div>
+                  </div>
+                  <div class="sp-combo" data-popover="roles">
+                    <span class="sp-label" id="role-l">Give these roles on join</span>
+                    <div class="sp-input sp-input--chips" role="combobox" tabindex="0" aria-labelledby="role-l" aria-haspopup="listbox" aria-expanded="{{ roleOpen }}" onClick="{{ toggleRole }}" onKeyDown="{{ roleTrigKey }}" style="cursor:pointer">
+                      <sc-for list="{{ roleChips }}" as="rc"><span class="sp-chip"><span class="sp-role-dot" style="--role:{{ rc.color }}"></span>{{ rc.name }}<button class="sp-chip__remove" aria-label="{{ rc.removeLabel }}" onClick="{{ rc.remove }}"><sp-icon class="sp-i" name="x"></sp-icon></button></span></sc-for>
+                      <sc-if value="{{ noRoles }}"><span class="sp-input__placeholder" style="padding-left:6px">Add roles</span></sc-if>
+                      <sp-icon class="sp-i sp-input__chev" name="chevron-down"></sp-icon>
+                    </div>
+                    <sc-if value="{{ roleOpen }}" hint-placeholder-val="{{ false }}">
+                      <div class="sp-popover" role="listbox" aria-multiselectable="true" aria-labelledby="role-l">
+                        <div class="sp-popover__search"><sp-icon class="sp-i sp-i--sm" name="search"></sp-icon><input autoFocus="{{ true }}" aria-label="Search roles" placeholder="Search roles" value="{{ roleQuery }}" onChange="{{ setRoleQuery }}" onKeyDown="{{ roleKey }}"></div>
+                        <div class="sp-popover__list">
+                          <sc-for list="{{ roleList }}" as="ro"><button class="sp-option" role="option" tabindex="-1" aria-selected="{{ ro.sel }}" data-active="{{ ro.active }}" aria-disabled="{{ ro.dis }}" onClick="{{ ro.pick }}" onMouseEnter="{{ ro.hover }}"><span class="sp-role-dot" style="--role:{{ ro.color }}"></span><span class="sp-option__label">{{ ro.name }}</span><sc-if value="{{ ro.note }}"><span class="sp-option__meta">{{ ro.note }}</span></sc-if><sc-if value="{{ ro.sel }}"><span class="sp-option__check"><sp-icon class="sp-i" name="check"></sp-icon></span></sc-if></button></sc-for>
+                          <sc-if value="{{ roleEmpty }}"><div class="sp-popover__empty">No roles match “{{ roleQuery }}”.</div></sc-if>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <section class="sp-stack" style="position:sticky;top:88px" aria-labelledby="pv-h">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><h2 id="pv-h" style="font:var(--sp-text-h3)">Preview</h2><span class="sp-hint">{{ previewWhere }}</span></div>
+              <div class="dc-preview-frame">
+                <div class="dc-chat">
+                  <div class="dc-msg">
+                    <div class="dc-avatar">S</div>
+                    <div class="dc-head"><span class="dc-name">Sparko</span><span class="dc-tag"><sp-icon class="sp-i" name="check"></sp-icon>App</span><span class="dc-time">Today at 4:20 PM</span></div>
+                    <div class="dc-content">Welcome, <span class="dc-mention">@mira.k</span>!</div>
+                    <div class="dc-embed" style="--dc-color:{{ form.color }}">
+                      <div class="dc-embed__main">
+                        <div class="dc-embed__author"><span class="dc-embed__author-icon">SH</span>Sparko HQ</div>
+                        <sc-if value="{{ form.title }}"><div class="dc-embed__title">{{ form.title }}</div></sc-if>
+                        <div class="dc-embed__desc"><sc-for list="{{ msgParts }}" as="p"><sc-if value="{{ p.m }}"><span class="dc-mention">{{ p.t }}</span></sc-if><sc-if value="{{ p.plain }}"><span>{{ p.t }}</span></sc-if></sc-for></div>
+                        <div class="dc-fields"><div class="dc-field dc-field--inline"><div class="dc-field__name">Members</div><div class="dc-field__value">12,409</div></div><div class="dc-field dc-field--inline"><div class="dc-field__name">Joined</div><div class="dc-field__value">Just now</div></div><div class="dc-field dc-field--inline"><div class="dc-field__name">Rules</div><div class="dc-field__value"><span class="dc-mention">#rules</span></div></div></div>
+                      </div>
+                      <div class="dc-embed__footer"><span class="dc-embed__footer-icon"></span>Sparko · Welcome<span class="dc-sep">•</span>Today at 4:20 PM</div>
+                    </div>
+                    <div class="dc-components"><div class="dc-row"><button class="dc-btn dc-btn--primary">Get roles</button><button class="dc-btn">Server guide</button><button class="dc-btn">Website<sp-icon class="sp-i" name="external-link"></sp-icon></button></div><button class="dc-select"><span>Choose your pronouns</span><sp-icon class="sp-i sp-i--lg" name="chevron-down"></sp-icon></button></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isGeneric }}" hint-placeholder-val="{{ false }}">
+          <header class="sp-page-head"><div class="sp-page-head__text"><div class="sp-page-head__eyebrow">Modules</div><h1 class="sp-page-head__title">{{ pageLabel }}</h1><p class="sp-page-head__desc">{{ genericDesc }}</p></div></header>
+          <sc-if value="{{ genLoading }}" hint-placeholder-val="{{ false }}">
+            <div class="sp-card" aria-busy="true"><div class="sp-card__body" style="gap:18px"><sc-for list="{{ skelRows }}" as="sk"><div style="display:flex;align-items:center;gap:12px"><span class="sp-skel sp-skel--circle" style="width:32px;height:32px"></span><div class="sp-skel-stack" style="flex:1"><span class="sp-skel" style="width:{{ sk.w }}"></span><span class="sp-skel" style="width:{{ sk.w2 }};height:10px"></span></div></div></sc-for></div></div>
+          </sc-if>
+          <sc-if value="{{ genError }}" hint-placeholder-val="{{ false }}">
+            <div class="sp-card"><div class="sp-empty sp-empty--error" role="alert"><div class="sp-empty__art"><sp-icon class="sp-i" name="cloud-off"></sp-icon></div><div class="sp-empty__title">Couldn’t load the audit log</div><p class="sp-empty__desc">Discord didn’t respond in time. This usually clears up within a minute.</p><span class="sp-empty__code">Error 504 · req_8f2c1a</span><div class="sp-empty__actions"><button class="sp-btn sp-btn--secondary" onClick="{{ retry }}"><sp-icon class="sp-i" name="refresh-cw"></sp-icon>Try again</button></div></div></div>
+          </sc-if>
+          <sc-if value="{{ genEmpty }}" hint-placeholder-val="{{ false }}">
+            <div class="sp-card"><div class="sp-empty sp-sparks"><div class="sp-empty__art"><sp-icon class="sp-i" name="{{ genericIcon }}"></sp-icon></div><div class="sp-empty__title">{{ genericEmptyTitle }}</div><p class="sp-empty__desc">{{ genericEmptyDesc }}</p><div class="sp-empty__actions"><button class="sp-btn sp-btn--primary">{{ genericCta }}</button></div></div></div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{ showSavebar }}" hint-placeholder-val="{{ false }}">
+          <div class="{{ savebarClass }}" role="region" aria-label="Unsaved changes">
+            <div class="sp-savebar__msg"><sp-icon class="sp-i" name="{{ savebarIcon }}"></sp-icon><span>{{ savebarTitle }}<sc-if value="{{ savebarSub }}"><small>{{ savebarSub }}</small></sc-if></span></div>
+            <div class="sp-savebar__actions"><button class="sp-btn sp-btn--ghost" disabled="{{ saving }}" onClick="{{ resetForm }}">Reset</button><button class="sp-btn sp-btn--primary" aria-busy="{{ saving }}" onClick="{{ save }}"><sc-if value="{{ saving }}"><span class="sp-spinner"></span></sc-if>{{ saveLabel }}</button></div>
+          </div>
+        </sc-if>
+      </div>
+    </main>
+  </div>
+
+  <div class="sp-toast-region" aria-live="polite">
+    <sc-for list="{{ toasts }}" as="t">
+      <div class="{{ t.cls }}" role="status"><sp-icon class="sp-i sp-toast__icon" name="{{ t.icon }}"></sp-icon><div class="sp-toast__title">{{ t.title }}</div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm sp-toast__close" aria-label="Dismiss" onClick="{{ t.close }}"><sp-icon class="sp-i sp-i--sm" name="x"></sp-icon></button><div class="sp-toast__body">{{ t.body }}</div></div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ banOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-scrim" onMouseDown="{{ scrimCloseBan }}">
+      <div class="sp-modal" role="dialog" aria-modal="true" aria-labelledby="ban-t">
+        <span class="sp-sheet-grip"></span>
+        <div class="sp-modal__head"><span class="sp-modal__icon"><sp-icon class="sp-i" name="ban"></sp-icon></span><div class="sp-modal__titles"><h2 class="sp-modal__title" id="ban-t">Ban a member</h2><p class="sp-modal__desc">They’ll be removed from Sparko HQ and can’t rejoin until unbanned.</p></div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="Close" onClick="{{ closeBan }}"><sp-icon class="sp-i" name="x"></sp-icon></button></div>
+        <div class="sp-modal__body">
+          <sc-if value="{{ ban.failed }}"><div class="sp-notice sp-notice--danger" role="alert"><sp-icon class="sp-i sp-notice__icon" name="circle-x"></sp-icon><div class="sp-notice__title">Ban failed</div><div class="sp-notice__body">Sparko’s role is below Admin. Move Sparko higher, then try again.</div></div></sc-if>
+          <div class="sp-field"><label class="sp-label" for="ban-u">Member</label><div class="{{ banUserClass }}"><sp-icon class="sp-i" name="at-sign"></sp-icon><input id="ban-u" autoFocus="{{ true }}" placeholder="Username or user ID" aria-invalid="{{ banUserInvalid }}" value="{{ ban.user }}" onChange="{{ setBanUser }}"></div><sc-if value="{{ banUserInvalid }}"><p class="sp-field-error"><sp-icon class="sp-i" name="circle-alert"></sp-icon>Enter a username or user ID.</p></sc-if><sc-if value="{{ banUserOk }}"><p class="sp-hint">Tip: type “admin” to see the error state.</p></sc-if></div>
+          <div class="sp-field"><label class="sp-label" for="ban-h">Delete message history</label><div class="sp-input sp-input--select"><select id="ban-h" value="{{ ban.history }}" onChange="{{ setBanHistory }}"><option>Don’t delete</option><option>Last 24 hours</option><option>Last 7 days</option></select></div></div>
+          <div class="sp-field"><label class="sp-label" for="ban-r">Reason <span class="sp-label__opt">(optional)</span></label><div class="sp-input sp-input--multiline"><textarea id="ban-r" rows="2" value="{{ ban.reason }}" onChange="{{ setBanReason }}" placeholder="Shown in the audit log"></textarea></div></div>
+          <label class="sp-check" style="padding:0;align-items:center"><input class="sp-choice-input" type="checkbox" checked="{{ ban.dm }}" onChange="{{ toggleBanDm }}"><span class="sp-check__box"><sp-icon class="sp-i" name="check"></sp-icon></span>DM the reason to the member</label>
+        </div>
+        <div class="sp-modal__foot"><button class="sp-btn sp-btn--secondary" disabled="{{ ban.loading }}" onClick="{{ closeBan }}">Cancel</button><button class="sp-btn sp-btn--danger" aria-busy="{{ ban.loading }}" onClick="{{ submitBan }}"><sc-if value="{{ ban.loading }}"><span class="sp-spinner"></span></sc-if>{{ banLabel }}</button></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-scrim sp-scrim--drawer" onMouseDown="{{ scrimCloseDrawer }}">
+      <aside class="sp-drawer" role="dialog" aria-modal="true" aria-labelledby="dr-t">
+        <div class="sp-drawer__head"><h2 class="sp-drawer__title" id="dr-t">Case #{{ cs.id }}</h2><span class="{{ cs.badgeClass }}">{{ cs.label }}</span><button class="sp-btn sp-btn--ghost sp-btn--icon" aria-label="Close" autoFocus="{{ true }}" onClick="{{ closeDrawer }}"><sp-icon class="sp-i" name="x"></sp-icon></button></div>
+        <div class="sp-drawer__body">
+          <div class="sp-user"><span class="{{ cs.avClassLg }}">{{ cs.initial }}</span><div class="sp-user__text"><span class="sp-user__name">{{ cs.user }}</span><span class="sp-user__id">{{ cs.uid }}</span></div><span class="sp-tip sp-tip--end" style="margin-left:auto"><button class="sp-btn sp-btn--ghost sp-btn--icon" aria-label="Copy user ID" onClick="{{ copyId }}"><sp-icon class="sp-i" name="copy"></sp-icon></button><span class="sp-tooltip" role="tooltip">Copy user ID</span></span></div>
+          <sc-if value="{{ cs.revoked }}"><div class="sp-notice sp-notice--success sp-notice--compact" role="status"><sp-icon class="sp-i sp-notice__icon" name="circle-check"></sp-icon><div class="sp-notice__title">Revoked</div></div></sc-if>
+          <dl class="sp-dl"><dt>Reason</dt><dd>{{ cs.reason }}</dd><dt>Moderator</dt><dd>{{ cs.mod }}</dd><dt>Created</dt><dd>{{ cs.date }}</dd><dt>Status</dt><dd>{{ cs.status }}</dd></dl>
+          <div class="sp-field"><label class="sp-label" for="dr-n">Internal note <span class="sp-label__opt">(optional)</span></label><div class="sp-input sp-input--multiline"><textarea id="dr-n" rows="3" placeholder="Only moderators can see this"></textarea></div></div>
+        </div>
+        <div class="sp-drawer__foot"><button class="sp-btn sp-btn--ghost" disabled="{{ cs.revoked }}" onClick="{{ revoke }}"><sp-icon class="sp-i" name="rotate-ccw"></sp-icon>Revoke</button><button class="sp-btn sp-btn--primary" onClick="{{ saveNote }}">Save note</button></div>
+      </aside>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ cmdkOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-cmdk-scrim" onMouseDown="{{ scrimCloseCmdk }}">
+      <div class="sp-cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="sp-cmdk__search"><sp-icon class="sp-i sp-i--lg" name="search"></sp-icon><input autoFocus="{{ true }}" role="combobox" aria-expanded="true" aria-controls="cmdk-list" aria-label="Search pages, settings and actions" placeholder="Search pages, settings and actions" value="{{ cq }}" onChange="{{ setCq }}" onKeyDown="{{ cmdKey }}"><button class="sp-kbd" style="cursor:pointer" onClick="{{ closeCmdk }}" aria-label="Close">esc</button></div>
+        <div class="sp-cmdk__list" id="cmdk-list" role="listbox">
+          <sc-for list="{{ cmdList }}" as="c">
+            <sc-if value="{{ c.isGroup }}"><div class="sp-option-group">{{ c.label }}</div></sc-if>
+            <sc-if value="{{ c.isItem }}"><button class="sp-option" role="option" tabindex="-1" data-active="{{ c.active }}" onClick="{{ c.run }}" onMouseEnter="{{ c.hover }}"><span class="sp-cmdk__icon"><sp-icon class="sp-i sp-i--sm" name="{{ c.icon }}"></sp-icon></span><span class="sp-option__label">{{ c.label }}</span><span class="sp-option__meta">{{ c.meta }}</span></button></sc-if>
+          </sc-for>
+          <sc-if value="{{ cmdEmpty }}"><div class="sp-popover__empty" style="padding:28px">No results for “{{ cq }}”.</div></sc-if>
+        </div>
+        <div class="sp-cmdk__foot"><span><span class="sp-kbd">↑</span><span class="sp-kbd">↓</span>Navigate</span><span><span class="sp-kbd">↵</span>Open</span><span><span class="sp-kbd">esc</span>Close</span></div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;},&quot;startPage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;moderation&quot;,&quot;welcome&quot;,&quot;logs&quot;],&quot;default&quot;:&quot;overview&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;paused&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const CH=[{g:'Information'},{n:'welcome',i:'hash'},{n:'rules',i:'hash',dis:1},{n:'announcements',i:'megaphone'},{g:'Community'},{n:'general',i:'hash'},{n:'introductions',i:'hash'},{n:'art-share',i:'hash'},{g:'Voice'},{n:'Lounge',i:'volume-2',dis:1}];
+const ROLES=[{n:'Admin',c:'#E74C3C',note:'Above Sparko',dis:1},{n:'Moderator',c:'#3498DB'},{n:'Event host',c:'#9B59B6'},{n:'Member',c:'#2ECC71'},{n:'Artist',c:'#E67E22'},{n:'Muted',c:'#95A5A6'},{n:'Sparko',c:'#FACC15',note:'Managed',dis:1}];
+const TYPES={ban:['Ban','danger'],timeout:['Timeout · 1h','warning'],warn:['Warn','info'],kick:['Kick','']};
+const CASES0=[
+ {id:1042,user:'mira.k',av:1,uid:'284719305512345601',type:'ban',reason:'Spam links in #general',mod:'Theo',date:'12 Oct, 14:02'},
+ {id:1041,user:'quietfox',av:3,uid:'391827465019283746',type:'timeout',reason:'Repeated caps after a warning',mod:'AutoMod',date:'12 Oct, 13:47'},
+ {id:1040,user:'duncan_r',av:2,uid:'118273645509182736',type:'warn',reason:'Off-topic in #support',mod:'Ayo',date:'11 Oct, 22:15'},
+ {id:1039,user:'pixelpaws',av:4,uid:'402918273645018273',type:'kick',reason:'Alt account of a banned user',mod:'Theo',date:'11 Oct, 19:30'},
+ {id:1038,user:'lumen',av:5,uid:'223344556677889900',type:'warn',reason:'Unmarked spoilers in #anime',mod:'AutoMod',date:'11 Oct, 16:05'},
+ {id:1037,user:'brightside',av:6,uid:'556677889900112233',type:'timeout',reason:'Mass mentions',mod:'AutoMod',date:'10 Oct, 23:51'}];
+const NAV=[{id:'overview',l:'Overview',i:'layout-dashboard'},{id:'moderation',l:'Moderation',i:'gavel',count:3},{id:'welcome',l:'Welcome',i:'user-plus'},{id:'roles',l:'Auto-roles',i:'users'},{id:'tickets',l:'Tickets',i:'ticket'},{id:'logs',l:'Logs',i:'scroll-text'},{id:'settings',l:'Settings',i:'settings'}];
+const GEN={roles:{d:'Give members roles automatically when they join or react.',i:'users',t:'No auto-role rules',e:'Add a rule to hand out roles on join, after a delay, or when someone reacts.',c:'Add a rule'},tickets:{d:'Private support threads between members and your staff.',i:'ticket',t:'No ticket panels yet',e:'Post a panel in any channel and members can open a private ticket with one click.',c:'Create a panel'},logs:{d:'A record of joins, leaves, edits, deletes and moderator actions.',i:'scroll-text',err:1},settings:{d:'Prefix, language, timezone and who can use the dashboard.',i:'settings',t:'Nothing to configure yet',e:'Server-wide settings will appear here once a module needs them.',c:'Browse modules'}};
+const COLORS=[{n:'Yellow',h:'#FACC15'},{n:'Blurple',h:'#5865F2'},{n:'Green',h:'#57F287'},{n:'Red',h:'#ED4245'}];
+const FORM0={enabled:true,channel:'welcome',delivery:'channel',message:'Hey {user}, welcome to {server}! Grab your roles in #roles and say hi in #general.',title:'Read this first',color:'#FACC15',roles:['Member']};
+const MODS0=[{k:'mod',name:'Moderation',icon:'gavel',desc:'Cases, timeouts and bans with reasons',on:true},{k:'automod',name:'AutoMod',icon:'shield',desc:'Filters spam, invites and banned words',on:true},{k:'welcome',name:'Welcome',icon:'user-plus',desc:'Greets new members in #welcome',on:true},{k:'level',name:'Leveling',icon:'award',desc:'XP and rank roles for active members',on:false},{k:'music',name:'Music',icon:'music',desc:'Play from YouTube and Spotify in voice',on:false,plus:true}];
+
+class Component extends DCLogic {
+  state = (() => {
+    let qp = {}; try { qp = Object.fromEntries(new URLSearchParams(window.location.search)); } catch (e) {}
+    return {
+      theme: qp.theme || this.props.theme || 'dark', page: qp.page || this.props.startPage || 'overview',
+      navOpen: false, acctOpen: false, showPlus: true, modules: MODS0, cases: CASES0,
+      tab: 'cases', q: '', filter: 'all',
+      form: { ...FORM0, roles: [...FORM0.roles] }, saved: { ...FORM0, roles: [...FORM0.roles] }, saving: false, saveErr: false, testing: false,
+      chOpen: false, chQuery: '', chActive: 0, roleOpen: false, roleQuery: '', roleActive: 0,
+      toasts: [], banOpen: false, ban: null, drawerId: null, cmdkOpen: false, cq: '', cActive: 0,
+      gen: 'loading'
+    };
+  })();
+  _tid = 0;
+  componentDidMount() {
+    this._key = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.setState(s => ({ cmdkOpen: !s.cmdkOpen, cq: '', cActive: -1 })); }
+      else if (e.key === 'Escape') { this.setState({ cmdkOpen: false, chOpen: false, roleOpen: false, acctOpen: false, navOpen: false, drawerId: null, banOpen: this.state.ban && this.state.ban.loading ? true : false }); }
+    };
+    this._down = (e) => {
+      const p = e.target.closest && e.target.closest('[data-popover]'); const k = p && p.getAttribute('data-popover');
+      const u = {}; if (k !== 'channel' && this.state.chOpen) u.chOpen = false; if (k !== 'roles' && this.state.roleOpen) u.roleOpen = false; if (k !== 'account' && this.state.acctOpen) u.acctOpen = false;
+      if (Object.keys(u).length) this.setState(u);
+    };
+    document.addEventListener('keydown', this._key); document.addEventListener('mousedown', this._down);
+    if (GEN[this.state.page]) this.loadGen();
+  }
+  componentWillUnmount() { document.removeEventListener('keydown', this._key); document.removeEventListener('mousedown', this._down); clearTimeout(this._gt); }
+  componentDidUpdate(pp) { if (pp.theme !== this.props.theme && this.props.theme) this.setState({ theme: this.props.theme }); }
+  toast(tone, title, body) {
+    const id = ++this._tid; const icon = { success: 'circle-check', danger: 'circle-x', info: 'info' }[tone];
+    this.setState(s => ({ toasts: [...s.toasts.slice(-2), { id, tone, icon, title, body }] }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), tone === 'danger' ? 8000 : 5000);
+  }
+  go(page) { this.setState({ page, navOpen: false, cmdkOpen: false, acctOpen: false }); if (GEN[page]) this.loadGen(); const m = document.querySelector('.sp-main'); if (m) m.scrollTop = 0; }
+  loadGen() { clearTimeout(this._gt); this.setState({ gen: 'loading' }); this._gt = setTimeout(() => this.setState({ gen: GEN[this.state.page] && GEN[this.state.page].err ? 'error' : 'empty' }), 900); }
+  openBan = () => this.setState({ banOpen: true, cmdkOpen: false, ban: { user: '', history: 'Last 24 hours', reason: '', dm: true, loading: false, failed: false, touched: false } });
+  setBan(p) { this.setState(s => ({ ban: { ...s.ban, ...p } })); }
+  submitBan = () => {
+    const b = this.state.ban; if (!b.user.trim()) return this.setBan({ touched: true });
+    this.setBan({ loading: true, failed: false });
+    setTimeout(() => {
+      if (/admin/i.test(b.user)) return this.setBan({ loading: false, failed: true });
+      const id = Math.max(...this.state.cases.map(c => c.id)) + 1;
+      this.setState(s => ({ banOpen: false, cases: [{ id, user: b.user.trim(), av: (id % 6) + 1, uid: String(Math.floor(1e17 + Math.random() * 9e17)), type: 'ban', reason: b.reason.trim() || 'No reason given', mod: 'Quinn', date: 'Just now' }, ...s.cases] }));
+      this.toast('success', `${b.user.trim()} was banned`, `Case #${id} added to the log.`);
+    }, 800);
+  };
+  save = () => {
+    const f = this.state.form; if (f.enabled && !f.message.trim()) return this.setState({ saveErr: true });
+    this.setState({ saving: true, saveErr: false });
+    setTimeout(() => { this.setState(s => ({ saving: false, saved: { ...s.form, roles: [...s.form.roles] } })); this.toast('success', 'Settings saved', `Welcome messages are ${f.enabled ? 'live in #' + f.channel : 'off'}.`); }, 700);
+  };
+  setForm(p) { this.setState(s => ({ form: { ...s.form, ...p }, saveErr: false })); }
+  chItems() { const q = this.state.chQuery.toLowerCase(); const out = []; let g = null; CH.forEach(c => { if (c.g) { g = c; return; } if (q && !c.n.toLowerCase().includes(q)) return; if (g) { out.push(g); g = null; } out.push(c); }); return out; }
+  roleItems() { const q = this.state.roleQuery.toLowerCase(); return ROLES.filter(r => !q || r.n.toLowerCase().includes(q)); }
+  pickChannel(c) { if (c.dis) return; this.setForm({ channel: c.n }); this.setState({ chOpen: false, chQuery: '' }); }
+  toggleRoleName(r) { if (r.dis) return; this.setState(s => { const has = s.form.roles.includes(r.n); return { form: { ...s.form, roles: has ? s.form.roles.filter(x => x !== r.n) : [...s.form.roles, r.n] } }; }); }
+  listKey(e, items, activeKey, onPick, closeKey) {
+    const sel = items.map((x, i) => [x, i]).filter(([x]) => !x.g && !x.dis); if (!sel.length) return;
+    const cur = sel.findIndex(([, i]) => i === this.state[activeKey]);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = e.key === 'ArrowDown' ? (cur + 1) % sel.length : (cur - 1 + sel.length) % sel.length; this.setState({ [activeKey]: sel[n][1] }); }
+    else if (e.key === 'Enter') { e.preventDefault(); const it = items[this.state[activeKey]] || sel[0][0]; onPick(it); }
+    else if (e.key === 'Escape') { e.stopPropagation(); this.setState({ [closeKey]: false }); }
+  }
+  cmds() {
+    const s = this.state; const dark = s.theme === 'dark';
+    const all = [{ g: 'Pages' }, ...NAV.map(n => ({ l: n.l, i: n.i, meta: 'Page', run: () => this.go(n.id) })), { g: 'Actions' },
+      { l: 'Ban a member…', i: 'ban', meta: '', run: this.openBan },
+      { l: dark ? 'Switch to light theme' : 'Switch to dark theme', i: dark ? 'sun' : 'moon', meta: '', run: () => this.setState({ theme: dark ? 'light' : 'dark', cmdkOpen: false }) },
+      { l: 'Send a test welcome message', i: 'message-square-text', meta: '', run: () => { this.setState({ cmdkOpen: false }); this.toast('info', 'Test message sent', 'Check #' + this.state.form.channel + ' in Discord.'); } },
+      { l: 'Upgrade to Plus', i: 'crown', meta: '', run: () => { this.setState({ cmdkOpen: false }); this.toast('info', 'Checkout would open here', 'Plus is $4.99 a month per server.'); } }];
+    const q = s.cq.toLowerCase(); const out = []; let g = null;
+    all.forEach(c => { if (c.g) { g = c; return; } if (q && !c.l.toLowerCase().includes(q)) return; if (g) { out.push(g); g = null; } out.push(c); });
+    return out;
+  }
+  renderVals() {
+    const s = this.state; const dark = s.theme === 'dark';
+    const paused = this.props.paused ?? false;
+    const av = (n, size = 'sm') => `sp-avatar sp-avatar--${n} sp-avatar--${size}`;
+    const badge = t => 'sp-badge' + (TYPES[t][1] ? ' sp-badge--' + TYPES[t][1] : '');
+    const caseView = c => ({ ...c, initial: c.user[0].toUpperCase(), avClass: av(c.av), avClassLg: av(c.av, 'lg'), badgeClass: c.revoked ? 'sp-badge' : badge(c.type), label: c.revoked ? 'Revoked' : TYPES[c.type][0], open: (e) => { e && e.stopPropagation(); this.setState({ drawerId: c.id, page: 'moderation' }); }, openLabel: `Open case ${c.id}`, selected: s.drawerId === c.id, status: c.revoked ? 'Revoked by Quinn' : c.type === 'ban' ? 'Active · permanent' : c.type === 'timeout' ? 'Expired' : 'Logged' });
+    const fmap = { all: null, ban: 'ban', timeout: 'timeout', warn: 'warn', kick: 'kick' };
+    const q = s.q.trim().toLowerCase();
+    const rows = s.cases.filter(c => (!fmap[s.filter] || c.type === fmap[s.filter]) && (!q || (c.user + ' ' + c.uid + ' ' + c.id + ' ' + c.reason).toLowerCase().includes(q))).map(caseView);
+    const dirty = JSON.stringify(s.form) !== JSON.stringify(s.saved);
+    const msgInvalid = s.saveErr && !s.form.message.trim();
+    const parts = s.form.message.split(/(\{user\}|\{server\}|#[a-z0-9-]+)/gi).filter(Boolean).map(t => t === '{user}' ? { t: '@mira.k', m: true } : t === '{server}' ? { t: 'Sparko HQ', plain: true } : t[0] === '#' ? { t, m: true } : { t, plain: true });
+    const chItems = this.chItems(); const roleItems = this.roleItems(); const cmdItems = this.cmds();
+    const cs = s.drawerId != null ? caseView(s.cases.find(c => c.id === s.drawerId) || s.cases[0]) : {};
+    const g = GEN[s.page];
+    const ban = s.ban || {};
+    const welcomeOn = s.saved.enabled;
+    return {
+      theme: s.theme, paused, modKey: /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl',
+      sidebarClass: 'sp-sidebar' + (s.navOpen ? ' is-open' : ''), navOpen: s.navOpen,
+      openNav: () => this.setState({ navOpen: true }), closeNav: () => this.setState({ navOpen: false }),
+      nav: NAV.map(n => ({ label: n.l, icon: n.i, count: n.count, current: s.page === n.id ? 'page' : undefined, go: () => this.go(n.id) })),
+      pageLabel: (NAV.find(n => n.id === s.page) || NAV[0]).l,
+      goOverview: (e) => { e.preventDefault(); this.go('overview'); }, goWelcome: () => this.go('welcome'), goModeration: () => this.go('moderation'),
+      themeIcon: dark ? 'sun' : 'moon', themeLabel: dark ? 'Switch to light theme' : 'Switch to dark theme',
+      toggleTheme: () => this.setState({ theme: dark ? 'light' : 'dark', acctOpen: false }),
+      acctOpen: s.acctOpen, toggleAcct: () => this.setState({ acctOpen: !s.acctOpen }), closeAcct: () => this.setState({ acctOpen: false }),
+      upgrade: () => { this.setState({ acctOpen: false }); this.toast('info', 'Checkout would open here', 'Plus is $4.99 a month per server.'); },
+      openCmdk: () => this.setState({ cmdkOpen: true, cq: '', cActive: 1 }),
+      isOverview: s.page === 'overview', isModeration: s.page === 'moderation', isWelcome: s.page === 'welcome', isGeneric: !!g,
+      statusPillClass: 'sp-badge sp-pill ' + (paused ? 'sp-badge--danger' : 'sp-badge--success'), statusPillLabel: paused ? 'Paused by staff' : 'Online',
+      showPlus: s.showPlus, hidePlus: () => this.setState({ showPlus: false }),
+      stats: [['Members', 'users', '12,408', '4.2%', 'up', 'vs last week'], ['Commands run', 'terminal', '38.1k', '2.1%', 'down', 'vs last week'], ['Open tickets', 'ticket', '7', '0', 'flat', '2 waiting over 1h'], ['AutoMod actions', 'shield', '126', '18%', 'up', 'last 7 days']].map(([label, icon, value, delta, dir, meta]) => ({ label, icon, value, delta, meta, deltaClass: 'sp-delta sp-delta--' + dir, deltaIcon: dir === 'up' ? 'trending-up' : dir === 'down' ? 'trending-down' : 'minus' })),
+      modules: s.modules.map(m => ({ ...m, locked: !!m.plus || paused, toggle: () => { this.setState(st => ({ modules: st.modules.map(x => x.k === m.k ? { ...x, on: !x.on } : x) })); this.toast('success', `${m.name} turned ${m.on ? 'off' : 'on'}`, m.on ? 'Sparko stopped running it right away.' : 'Sparko is running it now.'); } })),
+      recent: s.cases.slice(0, 4).map(caseView),
+      openBan: this.openBan,
+      modTabs: [['cases', 'Cases', s.cases.length], ['automod', 'AutoMod'], ['settings', 'Settings']].map(([k, label, count]) => ({ label, count, sel: s.tab === k, pick: () => this.setState({ tab: k }) })),
+      isCasesTab: s.tab === 'cases', isAutomodTab: s.tab === 'automod', isSettingsTab: s.tab === 'settings',
+      q: s.q, setQ: e => this.setState({ q: e.target.value }),
+      filters: [['all', 'All'], ['ban', 'Bans'], ['timeout', 'Timeouts'], ['warn', 'Warns'], ['kick', 'Kicks']].map(([k, label]) => ({ label, on: s.filter === k, pick: () => this.setState({ filter: k }) })),
+      rows, hasRows: rows.length > 0, noRows: rows.length === 0, rowsSummary: `${rows.length} of ${s.cases.length} cases`,
+      clearFilters: () => this.setState({ q: '', filter: 'all' }),
+      form: s.form, welcomePillClass: 'sp-badge sp-pill ' + (welcomeOn ? 'sp-badge--success' : 'sp-pill--muted'), welcomePillLabel: welcomeOn ? 'Live' : 'Off',
+      testing: s.testing, notTesting: !s.testing, testLabel: s.testing ? 'Sending…' : 'Send test', testBtnClass: 'sp-btn sp-btn--secondary' + (s.testing ? ' is-loading' : ''),
+      sendTest: () => { this.setState({ testing: true }); setTimeout(() => { this.setState({ testing: false }); this.toast('info', 'Test message sent', `Posted to #${s.form.channel}. Only you were mentioned.`); }, 900); },
+      toggleEnabled: () => this.setForm({ enabled: !s.form.enabled }),
+      deliveries: [['channel', 'Channel', 'Post in a channel'], ['dm', 'Direct message', 'Send privately'], ['both', 'Both', 'Channel and DM']].map(([k, title, desc]) => ({ title, desc, checked: s.form.delivery === k, pick: () => this.setForm({ delivery: k }) })),
+      channelDisabled: s.form.delivery === 'dm',
+      chOpen: s.chOpen, toggleCh: () => this.setState({ chOpen: !s.chOpen, chQuery: '', chActive: CH.findIndex(c => c.n === s.form.channel), roleOpen: false }),
+      chQuery: s.chQuery, setChQuery: e => this.setState({ chQuery: e.target.value, chActive: -1 }),
+      chKey: e => this.listKey(e, chItems, 'chActive', c => this.pickChannel(c), 'chOpen'),
+      chList: chItems.map((c, i) => c.g ? { isGroup: true, name: c.g } : { isItem: true, name: c.n, icon: c.i, dis: !!c.dis, sel: s.form.channel === c.n, active: i === s.chActive, pick: () => this.pickChannel(c), hover: () => this.setState({ chActive: i }) }),
+      chEmpty: chItems.length === 0,
+      msgBoxClass: 'sp-input sp-input--multiline' + (msgInvalid ? ' is-error' : ''), msgInvalid, msgValid: !msgInvalid, msgCount: s.form.message.length,
+      setMessage: e => this.setForm({ message: e.target.value }), setTitle: e => this.setForm({ title: e.target.value }),
+      colors: COLORS.map(c => ({ name: c.n, hex: c.h, sel: s.form.color === c.h, pick: () => this.setForm({ color: c.h }) })),
+      roleOpen: s.roleOpen, toggleRole: () => this.setState({ roleOpen: !s.roleOpen, roleQuery: '', roleActive: -1, chOpen: false }),
+      roleTrigKey: e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown')) { e.preventDefault(); this.setState({ roleOpen: true, roleQuery: '', roleActive: -1 }); } },
+      roleChips: s.form.roles.map(n => { const r = ROLES.find(x => x.n === n) || {}; return { name: n, color: r.c, removeLabel: `Remove ${n}`, remove: e => { e.stopPropagation(); this.setForm({ roles: s.form.roles.filter(x => x !== n) }); } }; }),
+      noRoles: s.form.roles.length === 0,
+      roleQuery: s.roleQuery, setRoleQuery: e => this.setState({ roleQuery: e.target.value, roleActive: -1 }),
+      roleKey: e => this.listKey(e, roleItems, 'roleActive', r => this.toggleRoleName(r), 'roleOpen'),
+      roleList: roleItems.map((r, i) => ({ name: r.n, color: r.c, note: r.note, dis: !!r.dis, sel: s.form.roles.includes(r.n), active: i === s.roleActive, pick: () => this.toggleRoleName(r), hover: () => this.setState({ roleActive: i }) })),
+      roleEmpty: roleItems.length === 0,
+      msgParts: parts, previewWhere: s.form.delivery === 'dm' ? 'As a direct message' : `In #${s.form.channel}`,
+      genericDesc: g ? g.d : '', genericIcon: g ? g.i : 'inbox', genericEmptyTitle: g ? g.t : '', genericEmptyDesc: g ? g.e : '', genericCta: g ? g.c : '',
+      genLoading: s.gen === 'loading', genError: s.gen === 'error', genEmpty: s.gen === 'empty', retry: () => this.loadGen(),
+      skelRows: [['70%', '45%'], ['55%', '30%'], ['80%', '50%'], ['45%', '25%']].map(([w, w2]) => ({ w, w2 })),
+      showSavebar: s.page === 'welcome' && (dirty || s.saving), saving: s.saving,
+      savebarClass: 'sp-savebar' + (s.saveErr ? ' is-error' : ''), savebarIcon: s.saveErr ? 'circle-alert' : 'triangle-alert',
+      savebarTitle: s.saving ? 'Saving your changes…' : s.saveErr ? 'Couldn’t save' : 'You have unsaved changes', savebarSub: s.saveErr ? 'Fix the highlighted field, then try again.' : '',
+      saveLabel: s.saving ? 'Saving…' : s.saveErr ? 'Try again' : 'Save changes', save: this.save,
+      resetForm: () => this.setState(st => ({ form: { ...st.saved, roles: [...st.saved.roles] }, saveErr: false })),
+      toasts: s.toasts.map(t => ({ ...t, cls: 'sp-toast sp-toast--' + t.tone, close: () => this.setState(st => ({ toasts: st.toasts.filter(x => x.id !== t.id) })) })),
+      banOpen: s.banOpen, ban, closeBan: () => !ban.loading && this.setState({ banOpen: false }), scrimCloseBan: e => { if (e.target === e.currentTarget && !ban.loading) this.setState({ banOpen: false }); },
+      banUserInvalid: !!ban.touched && !(ban.user || '').trim(), banUserOk: !(ban.touched && !(ban.user || '').trim()),
+      banUserClass: 'sp-input' + (ban.touched && !(ban.user || '').trim() ? ' is-error' : ''),
+      setBanUser: e => this.setBan({ user: e.target.value, failed: false }), setBanHistory: e => this.setBan({ history: e.target.value }), setBanReason: e => this.setBan({ reason: e.target.value }), toggleBanDm: () => this.setBan({ dm: !ban.dm }),
+      submitBan: this.submitBan, banLabel: ban.loading ? 'Banning…' : ban.failed ? 'Try again' : 'Ban member',
+      drawerOpen: s.drawerId != null, cs, closeDrawer: () => this.setState({ drawerId: null }), scrimCloseDrawer: e => { if (e.target === e.currentTarget) this.setState({ drawerId: null }); },
+      copyId: () => { try { navigator.clipboard.writeText(cs.uid); } catch (e) {} this.toast('success', 'User ID copied', cs.uid); },
+      revoke: () => { this.setState(st => ({ cases: st.cases.map(c => c.id === cs.id ? { ...c, revoked: true } : c) })); this.toast('success', `Case #${cs.id} revoked`, `${cs.user} can rejoin Sparko HQ.`); },
+      saveNote: () => { this.setState({ drawerId: null }); this.toast('success', 'Note saved', `Added to case #${cs.id}.`); },
+      cmdkOpen: s.cmdkOpen, closeCmdk: () => this.setState({ cmdkOpen: false }), scrimCloseCmdk: e => { if (e.target === e.currentTarget) this.setState({ cmdkOpen: false }); },
+      cq: s.cq, setCq: e => this.setState({ cq: e.target.value, cActive: -1 }),
+      cmdKey: e => this.listKey(e, cmdItems, 'cActive', c => c.run(), 'cmdkOpen'),
+      cmdList: cmdItems.map((c, i) => c.g ? { isGroup: true, label: c.g } : { isItem: true, label: c.l, icon: c.i, meta: c.meta, active: i === s.cActive || (s.cActive === -1 && i === 1), run: c.run, hover: () => this.setState({ cActive: i }) }),
+      cmdEmpty: cmdItems.length === 0
+    };
+  }
+}
+</script>
+</body>
+</html>

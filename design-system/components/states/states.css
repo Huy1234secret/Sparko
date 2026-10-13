@@ -1,0 +1,19 @@
+/* Empty state, error state with retry, loading skeletons (static — no shimmer). */
+.sp-empty { display: grid; justify-items: center; gap: 8px; padding: 48px 24px; text-align: center; color: var(--sp-text); }
+.sp-empty__art { position: relative; display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 8px; border-radius: var(--sp-radius-card); background: var(--sp-raised); border: 1px solid var(--sp-line); color: var(--sp-muted); }
+.sp-empty__art .sp-i { width: 24px; height: 24px; }
+.sp-empty__title { font: 600 16px/24px var(--sp-font-sans); }
+.sp-empty__desc { max-width: 44ch; font: var(--sp-text-body); color: var(--sp-muted); text-wrap: pretty; }
+.sp-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+.sp-empty__code { font: 400 12px/16px var(--sp-font-mono); color: var(--sp-muted); }
+.sp-empty--error .sp-empty__art { background: var(--sp-danger-soft); border-color: var(--sp-danger-line); color: var(--sp-danger); }
+.sp-empty--compact { padding: 24px 16px; }
+
+.sp-skel { display: block; height: 12px; border-radius: var(--sp-radius-xs); background: var(--sp-skeleton); }
+.sp-skel--title { height: 20px; width: 40%; }
+.sp-skel--text { height: 12px; }
+.sp-skel--stat { height: 28px; width: 50%; }
+.sp-skel--circle { width: 40px; height: 40px; border-radius: 50%; flex: none; }
+.sp-skel--btn { height: 44px; width: 120px; border-radius: var(--sp-radius-control); }
+.sp-skel--block { height: 120px; border-radius: var(--sp-radius-card); }
+.sp-skel-stack { display: grid; gap: 10px; }

@@ -1,0 +1,31 @@
+/* Specimen-card scaffolding only (not shipped via styles.css). */
+body.spec { margin: 0; background: var(--sp-canvas); }
+.spec-stack { display: grid; }
+.spec-pane { display: grid; gap: 16px; padding: 24px 28px 28px; background: var(--sp-canvas); color: var(--sp-text); font: var(--sp-text-body); align-content: start; }
+.spec-cols { display: grid; grid-template-columns: 1fr 1fr; }
+.spec-theme { display: flex; align-items: center; gap: 8px; font: 600 12px/16px var(--sp-font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--sp-muted); }
+.spec-theme::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--sp-text); }
+[data-theme="dark"] .spec-theme::before { background: var(--sp-text); }
+.spec-split { display: grid; grid-template-columns: 1180px 390px; gap: 32px; align-items: start; }
+.spec-col { display: grid; gap: 24px; align-content: start; min-width: 0; }
+.spec-col-h { font: 500 12px/16px var(--sp-font-mono); color: var(--sp-muted); }
+.spec-frame { container-type: inline-size; position: relative; overflow: hidden; background: var(--sp-canvas); border: 1px solid var(--sp-line); border-radius: 14px; }
+.spec-390 { width: 390px; }
+.spec-mobile { padding: 16px; display: grid; gap: 16px; align-content: start; }
+.spec-sec { display: grid; gap: 12px; min-width: 0; }
+.spec-sec-h { font: 600 13px/18px var(--sp-font-sans); color: var(--sp-text); }
+.spec-matrix { display: grid; gap: 14px 16px; align-items: center; justify-items: start; }
+.spec-h { font: 500 12px/16px var(--sp-font-sans); color: var(--sp-muted); }
+.spec-cells { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.spec-cells--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.spec-cells--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.spec-cells--7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.spec-cell { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.spec-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.spec-note { font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); }
+.spec-static { position: static !important; animation: none !important; }
+.spec-bg { position: absolute; inset: 0; padding: 28px; display: grid; gap: 16px; align-content: start; }
+.spec-sw { display: grid; gap: 6px; min-width: 0; }
+.spec-sw__chip { height: 56px; border-radius: 10px; border: 1px solid var(--sp-line); }
+.spec-sw b { font: 600 13px/18px var(--sp-font-sans); }
+.spec-sw code { font: 400 12px/16px var(--sp-font-mono); color: var(--sp-muted); }

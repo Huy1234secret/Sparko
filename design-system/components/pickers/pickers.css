@@ -1,0 +1,44 @@
+/* Popover surface + listbox options. Shared by combobox, channel/role pickers, popover menu, command palette. */
+.sp-combo { position: relative; display: grid; gap: 6px; min-width: 0; }
+.sp-popover {
+  z-index: var(--sp-z-popover); display: flex; flex-direction: column; min-width: 240px; max-height: 360px; padding: 6px;
+  background: var(--sp-surface); border: 1px solid var(--sp-line); border-radius: var(--sp-radius-card);
+  box-shadow: var(--sp-shadow-overlay); color: var(--sp-text);
+  animation: sp-pop var(--sp-dur-base) var(--sp-ease-out);
+}
+.sp-combo > .sp-popover { position: absolute; top: calc(100% + 6px); left: 0; right: 0; }
+.sp-popover__search {
+  display: flex; align-items: center; gap: 8px; height: 44px; margin: -6px -6px 6px; padding: 0 14px; flex: none;
+  border-bottom: 1px solid var(--sp-line); color: var(--sp-muted); border-radius: var(--sp-radius-card) var(--sp-radius-card) 0 0;
+}
+.sp-popover__search:focus-within { box-shadow: inset 0 -2px 0 var(--sp-focus-edge); }
+.sp-popover__search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; padding: 0; background: transparent; color: var(--sp-text); font: 400 14px/20px var(--sp-font-sans); box-shadow: none !important; }
+.sp-popover__search input::placeholder { color: var(--sp-muted); opacity: 1; }
+.sp-popover__list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; overflow: auto; min-height: 0; }
+.sp-popover__empty { padding: 20px 12px; text-align: center; font: 400 13px/18px var(--sp-font-sans); color: var(--sp-muted); }
+.sp-popover__foot { margin: 6px -6px -6px; padding: 10px 14px; border-top: 1px solid var(--sp-line); font: 400 12px/16px var(--sp-font-sans); color: var(--sp-muted); }
+.sp-sep { height: 1px; margin: 6px -6px; border: 0; background: var(--sp-line); flex: none; }
+
+.sp-option-group { padding: 10px 10px 4px; font: 600 12px/16px var(--sp-font-sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--sp-muted); }
+.sp-option {
+  position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--sp-tap); padding: 0 10px;
+  border: 0; border-radius: var(--sp-radius-chip); background: transparent; color: var(--sp-text);
+  font: 400 14px/20px var(--sp-font-sans); text-align: left; text-decoration: none; cursor: pointer;
+  transition: background-color var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-option > .sp-i { color: var(--sp-muted); }
+.sp-option:hover, .sp-option.is-hover { background: var(--sp-raised); color: var(--sp-text); }
+.sp-option[data-active="true"], .sp-option:focus-visible, .sp-option.is-focus { outline: none; background: var(--sp-raised); box-shadow: inset 0 0 0 1px var(--sp-focus-edge); }
+.sp-option:active, .sp-option.is-active { background: var(--sp-raised-hover); }
+.sp-option[aria-selected="true"] { font-weight: 500; }
+.sp-option[aria-disabled="true"], .sp-option:disabled { opacity: 0.45; cursor: not-allowed; background: transparent; }
+.sp-option__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-option__meta { margin-left: auto; color: var(--sp-muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.sp-option__check { margin-left: auto; color: var(--sp-brand-text); }
+.sp-option--danger, .sp-option--danger > .sp-i { color: var(--sp-danger); }
+.sp-option--danger:hover { color: var(--sp-danger); background: var(--sp-danger-soft); }
+.sp-option mark { background: none; color: var(--sp-brand-text); font-weight: 600; }
+
+/* Discord-specific option glyphs */
+.sp-channel-glyph { color: var(--sp-muted); }
+.sp-role-dot { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--role, #99AAB5); box-shadow: 0 0 0 1px rgb(0 0 0 / 0.12) inset; }

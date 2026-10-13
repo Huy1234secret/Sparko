@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Sparko Console · Staff only</title>
+<link rel="stylesheet" href="../../sparko.bundle.css">
+<script src="../../assets/icons/sp-icon.js"></script>
+<style>html,body{margin:0}body{background:#111110}sp-icon{display:inline-block;width:18px;height:18px}a{color:var(--sp-brand-text)}a:hover{color:var(--sp-text)}</style>
+</helmet>
+<div data-theme="{{ theme }}" class="sp-cq" style="min-height:100vh;display:flex;flex-direction:column;background:var(--sp-canvas);color:var(--sp-text)">
+  <header style="position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;min-height:56px;padding:0 20px;background:var(--sp-surface);border-bottom:1px solid var(--sp-line)">
+    <span style="font:700 18px/1 var(--sp-font-sans);letter-spacing:-0.03em">Sparko</span>
+    <span class="sp-badge sp-badge--sm sp-badge--danger"><sp-icon class="sp-i" name="lock"></sp-icon>Console · staff only</span>
+    <span style="flex:1"></span>
+    <sc-if value="{{ unlocked }}"><span class="sp-hint" aria-live="polite">{{ sessionText }}</span></sc-if>
+    <button class="sp-btn sp-btn--ghost sp-btn--icon" aria-label="{{ themeLabel }}" onClick="{{ toggleTheme }}"><sp-icon class="sp-i" name="{{ themeIcon }}"></sp-icon></button>
+    <span class="sp-avatar sp-avatar--5 sp-avatar--sm" aria-label="Signed in as mira, Trust & Safety">M</span>
+  </header>
+
+  <sc-if value="{{ locked }}" hint-placeholder-val="{{ false }}">
+    <main style="flex:1;display:grid;place-items:center;padding:32px 20px">
+      <section class="sp-card" aria-labelledby="ra-h" style="width:100%;max-width:440px"><div class="sp-card__body" style="gap:18px;padding:28px">
+        <span class="sp-row__icon" style="width:48px;height:48px;background:var(--sp-raised);color:var(--sp-text)"><sp-icon class="sp-i" name="key-round"></sp-icon></span>
+        <div style="display:grid;gap:6px"><h1 id="ra-h" style="margin:0;font:var(--sp-text-h2)">Confirm it’s you</h1><p class="sp-hint" style="margin:0">The console can pause servers and change plans, so Sparko asks for your security key every 12 hours.</p></div>
+        <sc-if value="{{ keyFailed }}"><div class="sp-notice sp-notice--danger sp-notice--compact" role="alert"><sp-icon class="sp-i sp-notice__icon" name="circle-x"></sp-icon><div class="sp-notice__title">The key didn’t respond. Touch it when it blinks, then try again.</div></div></sc-if>
+        <button class="sp-btn sp-btn--primary sp-btn--lg" aria-busy="{{ verifying }}" disabled="{{ verifying }}" onClick="{{ unlock }}"><sc-if value="{{ verifying }}"><span class="sp-spinner"></span></sc-if><sc-if value="{{ notVerifying }}"><sp-icon class="sp-i" name="key-round"></sp-icon></sc-if>{{ unlockLabel }}</button>
+        <p class="sp-hint" style="margin:0">Lost your key? Ask another admin in #staff-security. Every sign-in is logged.</p>
+      </div></section>
+    </main>
+  </sc-if>
+
+  <sc-if value="{{ unlocked }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;display:flex;flex-wrap:wrap;align-items:stretch;min-height:0">
+      <nav aria-label="Console" style="flex:1 1 200px;max-width:100%;padding:16px 12px;border-right:1px solid var(--sp-line);border-bottom:1px solid var(--sp-line);display:flex;flex-wrap:wrap;gap:4px;align-content:start;box-sizing:border-box;flex-basis:220px">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5"><button class="sp-option" aria-current="{{ n.cur }}" onClick="{{ n.go }}" style="{{ n.style }}"><sp-icon class="sp-i" name="{{ n.icon }}"></sp-icon><span class="sp-option__label">{{ n.label }}</span><sc-if value="{{ n.count }}"><span class="sp-count">{{ n.count }}</span></sc-if></button></sc-for>
+      </nav>
+      <main style="flex:999 1 480px;padding:28px 24px 72px;display:grid;gap:24px;align-content:start;min-width:0;max-width:1120px;box-sizing:border-box">
+
+        <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between"><div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Overview</span><h1 class="sp-page-head__title">{{ healthTitle }}</h1></div><button class="sp-btn sp-btn--secondary" aria-haspopup="dialog" onClick="{{ openStatus }}"><sp-icon class="sp-i" name="send"></sp-icon>Post a status update</button></div>
+          <div class="sp-stat-grid"><sc-for list="{{ stats }}" as="st" hint-placeholder-count="4"><div class="sp-stat"><span class="sp-stat__label">{{ st.label }}</span><span class="sp-stat__value">{{ st.value }}</span><span class="sp-stat__meta" style="{{ st.metaStyle }}">{{ st.meta }}</span></div></sc-for></div>
+          <section class="sp-card" aria-labelledby="sh-h" style="padding:0;overflow:hidden"><div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="sh-h">Shards</h2><p class="sp-card__sub">Each square is one shard, about 2,600 servers.</p></div></div><div class="sp-card__body"><div role="list" aria-label="Shard health" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(28px,1fr));gap:6px"><sc-for list="{{ shards }}" as="sd" hint-placeholder-count="48"><span role="listitem" title="{{ sd.tip }}" aria-label="{{ sd.tip }}" style="{{ sd.style }}">{{ sd.n }}</span></sc-for></div><p class="sp-hint" style="display:flex;flex-wrap:wrap;gap:12px"><span style="display:inline-flex;gap:6px;align-items:center"><span aria-hidden="true" style="width:10px;height:10px;border-radius:3px;background:var(--sp-success)"></span>Healthy</span><span style="display:inline-flex;gap:6px;align-items:center"><span aria-hidden="true" style="width:10px;height:10px;border-radius:3px;background:var(--sp-warning)"></span>Slow</span><span style="display:inline-flex;gap:6px;align-items:center"><span aria-hidden="true" style="width:10px;height:10px;border-radius:3px;background:var(--sp-danger)"></span>Reconnecting</span></p></div></section>
+          <section class="sp-card" aria-labelledby="in-h" style="padding:0;overflow:hidden"><div class="sp-card__head"><div class="sp-card__titles"><h2 class="sp-card__title" id="in-h">Status updates</h2><p class="sp-card__sub">Shown on status.sparko.gg and in every dashboard while open.</p></div></div><sc-for list="{{ incidents }}" as="i" hint-placeholder-count="2"><div style="display:grid;gap:4px;padding:14px 20px;border-top:1px solid var(--sp-line)"><span style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><b style="font:600 14px/20px var(--sp-font-sans)">{{ i.title }}</b><span class="{{ i.badge }}">{{ i.stateLabel }}</span></span><span class="sp-hint">{{ i.meta }}</span><sc-if value="{{ i.open }}"><button class="sp-btn sp-btn--ghost sp-btn--sm" style="justify-self:start" onClick="{{ i.resolve }}">Mark resolved</button></sc-if></div></sc-for></section>
+        </sc-if>
+
+        <sc-if value="{{ isServers }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Servers</span><h1 class="sp-page-head__title">Find a server</h1></div>
+          <div class="sp-input" style="max-width:480px"><sp-icon class="sp-i" name="search"></sp-icon><input aria-label="Server name or ID" placeholder="Server name or ID" value="{{ q }}" onChange="{{ setQ }}"></div>
+          <div class="sp-split sp-split--lead">
+            <div class="sp-card" style="padding:0;overflow:hidden;align-self:start" role="listbox" aria-label="Results">
+              <sc-for list="{{ results }}" as="r" hint-placeholder-count="4"><button role="option" aria-selected="{{ r.sel }}" onClick="{{ r.pick }}" style="{{ r.style }}"><span class="sp-server sp-server--tint" style="--h:{{ r.hue }};--size:36px;border-radius:10px;font-size:13px;flex:none">{{ r.ini }}</span><span style="display:grid;gap:2px;min-width:0;flex:1"><b style="font:600 14px/20px var(--sp-font-sans)">{{ r.name }}</b><span class="sp-hint" style="font-family:var(--sp-font-mono)">{{ r.id }}</span></span><span class="{{ r.badge }}">{{ r.badgeText }}</span></button></sc-for>
+              <sc-if value="{{ noResults }}"><div class="sp-empty sp-empty--compact"><div class="sp-empty__art"><sp-icon class="sp-i" name="search"></sp-icon></div><div class="sp-empty__title">No server matches</div><p class="sp-empty__desc">Search by name, or paste the full server ID.</p></div></sc-if>
+            </div>
+            <sc-if value="{{ hasSel }}">
+              <section class="sp-stack" aria-labelledby="sv-h">
+                <div class="sp-card"><div class="sp-card__body" style="gap:14px">
+                  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><span class="sp-server sp-server--tint" style="--h:{{ sv.hue }};--size:44px;border-radius:12px;font-size:15px">{{ sv.ini }}</span><span style="display:grid;gap:2px;flex:1;min-width:0"><h2 id="sv-h" style="margin:0;font:var(--sp-text-h3)">{{ sv.name }}</h2><span class="sp-hint" style="font-family:var(--sp-font-mono)">{{ sv.id }}</span></span><span class="{{ sv.badge }}">{{ sv.badgeText }}</span></div>
+                  <sc-if value="{{ sv.paused }}"><div class="sp-notice sp-notice--danger" role="status"><sp-icon class="sp-i sp-notice__icon" name="pause"></sp-icon><div class="sp-notice__title">Paused by {{ sv.pausedBy }} · {{ sv.pausedWhen }}</div><div class="sp-notice__body">{{ sv.pauseReason }}<br>The owner sees: “{{ sv.ownerMsg }}”</div></div></sc-if>
+                  <dl class="sp-dl"><dt>Owner</dt><dd>{{ sv.owner }}</dd><dt>Members</dt><dd class="sp-tnum">{{ sv.members }}</dd><dt>Plan</dt><dd>{{ sv.planText }}</dd><dt>Modules on</dt><dd>{{ sv.mods }}</dd><dt>Reports</dt><dd>{{ sv.reports }}</dd></dl>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-if value="{{ sv.notPaused }}"><button class="sp-btn sp-btn--danger" aria-haspopup="dialog" onClick="{{ openPause }}"><sp-icon class="sp-i" name="pause"></sp-icon>Pause server…</button></sc-if><sc-if value="{{ sv.paused }}"><button class="sp-btn sp-btn--primary" aria-haspopup="dialog" onClick="{{ openUnpause }}"><sp-icon class="sp-i" name="play"></sp-icon>Unpause…</button></sc-if><button class="sp-btn sp-btn--secondary" aria-haspopup="dialog" onClick="{{ openComp }}"><sp-icon class="sp-i" name="crown"></sp-icon>Give Plus…</button><button class="sp-btn sp-btn--ghost" onClick="{{ viewAs }}"><sp-icon class="sp-i" name="eye"></sp-icon>View dashboard (read-only)</button></div>
+                </div></div>
+                <section class="sp-card" aria-labelledby="er-h" style="padding:0;overflow:hidden"><div class="sp-card__head"><div class="sp-card__titles"><h3 class="sp-card__title" id="er-h">Recent errors</h3></div></div><sc-for list="{{ sv.errors }}" as="e"><div style="display:grid;gap:2px;padding:12px 20px;border-top:1px solid var(--sp-line)"><span style="font:500 13px/18px var(--sp-font-mono);overflow-wrap:anywhere">{{ e.code }}</span><span class="sp-hint">{{ e.text }}</span></div></sc-for><sc-if value="{{ sv.noErrors }}"><p class="sp-hint" style="padding:12px 20px 16px;margin:0;border-top:1px solid var(--sp-line)">No errors in the last 7 days.</p></sc-if></section>
+              </section>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isReports }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Abuse reports</span><h1 class="sp-page-head__title">{{ reportsTitle }}</h1><p class="sp-page-head__desc">Reports about servers using Sparko against Discord’s or Sparko’s rules.</p></div>
+          <sc-for list="{{ reports }}" as="r" hint-placeholder-count="3">
+            <article class="sp-card" aria-label="{{ r.title }}"><div class="sp-card__body" style="gap:10px">
+              <div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between"><h2 style="margin:0;font:600 15px/22px var(--sp-font-sans)">{{ r.title }}</h2><span class="{{ r.badge }}">{{ r.sev }}</span></div>
+              <p class="sp-hint" style="margin:0">{{ r.meta }}</p>
+              <p style="margin:0;font:400 14px/22px var(--sp-font-sans);text-wrap:pretty">{{ r.body }}</p>
+              <sc-if value="{{ r.done }}"><p style="margin:0;display:flex;gap:6px;align-items:center;font:500 13px/18px var(--sp-font-sans);color:var(--sp-success)"><sp-icon class="sp-i sp-i--sm" name="circle-check"></sp-icon>{{ r.done }}</p></sc-if>
+              <sc-if value="{{ r.open }}"><div style="display:flex;flex-wrap:wrap;gap:8px"><button class="sp-btn sp-btn--secondary sp-btn--sm" onClick="{{ r.openServer }}">Open {{ r.server }}</button><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ r.escalate }}">Send to Discord Trust & Safety</button><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ r.dismiss }}">No action needed</button></div></sc-if>
+            </div></article>
+          </sc-for>
+        </sc-if>
+
+        <sc-if value="{{ isFlags }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Feature flags</span><h1 class="sp-page-head__title">Rollouts</h1><p class="sp-page-head__desc">Changes reach servers within a minute. Each one asks for a reason and goes in the staff log.</p></div>
+          <div class="sp-card" style="padding:0;overflow:hidden">
+            <sc-for list="{{ flags }}" as="f" hint-placeholder-count="4">
+              <div style="display:grid;gap:10px;padding:16px 20px;border-top:1px solid var(--sp-line)">
+                <div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><span style="display:grid;gap:2px;flex:1 1 240px"><b style="font:600 14px/20px var(--sp-font-mono)">{{ f.key }}</b><span class="sp-hint">{{ f.desc }}</span></span><span class="{{ f.badge }}">{{ f.stateText }}</span></div>
+                <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><label class="sp-label" for="{{ f.inputId }}" style="margin:0;min-width:84px">Servers</label><input id="{{ f.inputId }}" type="range" min="0" max="100" step="5" value="{{ f.draft }}" onChange="{{ f.setDraft }}" aria-valuetext="{{ f.draftText }}" style="flex:1 1 200px;accent-color:var(--sp-brand-text);min-height:44px"><b class="sp-tnum" style="width:48px;text-align:right">{{ f.draftText }}</b><sc-if value="{{ f.changed }}"><button class="sp-btn sp-btn--primary sp-btn--sm" aria-haspopup="dialog" onClick="{{ f.apply }}">Apply…</button><button class="sp-btn sp-btn--ghost sp-btn--sm" onClick="{{ f.reset }}">Reset</button></sc-if><sc-if value="{{ f.canKill }}"><button class="sp-btn sp-btn--ghost sp-btn--sm" style="color:var(--sp-danger)" aria-haspopup="dialog" onClick="{{ f.kill }}"><sp-icon class="sp-i sp-i--sm" name="power"></sp-icon>Turn off everywhere</button></sc-if></div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isLog }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;gap:4px"><span class="sp-page-head__eyebrow">Staff log</span><h1 class="sp-page-head__title">What staff did</h1><p class="sp-page-head__desc">Nobody can edit or delete these entries, including admins.</p></div>
+          <div class="sp-card" style="padding:0;overflow:hidden"><sc-for list="{{ log }}" as="l" hint-placeholder-count="5"><div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-start;padding:14px 20px;border-top:1px solid var(--sp-line)"><span class="{{ l.av }}">{{ l.initial }}</span><span style="display:grid;gap:2px;flex:1 1 280px;min-width:0"><span style="font:400 14px/20px var(--sp-font-sans);text-wrap:pretty"><b>{{ l.who }}</b> {{ l.action }}</span><span class="sp-hint">Reason: {{ l.reason }}</span></span><span class="sp-hint sp-tnum">{{ l.when }}</span></div></sc-for></div>
+        </sc-if>
+      </main>
+    </div>
+  </sc-if>
+
+  <div class="sp-toast-region" aria-live="polite"><sc-for list="{{ toasts }}" as="t"><div class="{{ t.cls }}" role="status"><sp-icon class="sp-i sp-toast__icon" name="{{ t.icon }}"></sp-icon><div class="sp-toast__title">{{ t.title }}</div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm sp-toast__close" aria-label="Dismiss" onClick="{{ t.close }}"><sp-icon class="sp-i sp-i--sm" name="x"></sp-icon></button><div class="sp-toast__body">{{ t.body }}</div></div></sc-for></div>
+
+  <sc-if value="{{ actOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="sp-scrim" onMouseDown="{{ scrimClose }}"><div class="sp-modal sp-modal--lg" role="dialog" aria-modal="true" aria-labelledby="ac-t">
+      <span class="sp-sheet-grip"></span>
+      <div class="sp-modal__head"><span class="sp-modal__icon" style="{{ act.iconStyle }}"><sp-icon class="sp-i" name="{{ act.icon }}"></sp-icon></span><div class="sp-modal__titles"><h2 class="sp-modal__title" id="ac-t">{{ act.title }}</h2><p class="sp-modal__desc">{{ act.desc }}</p></div><button class="sp-btn sp-btn--ghost sp-btn--icon sp-btn--sm" aria-label="Close" onClick="{{ closeModal }}"><sp-icon class="sp-i" name="x"></sp-icon></button></div>
+      <div class="sp-modal__body" style="display:grid;gap:16px">
+        <sc-if value="{{ act.hasCategory }}"><div class="sp-field"><label class="sp-label" for="ac-cat">{{ act.catLabel }}</label><div class="sp-input sp-input--select"><select id="ac-cat" value="{{ ax.cat }}" onChange="{{ setCat }}"><sc-for list="{{ act.cats }}" as="c"><option value="{{ c }}">{{ c }}</option></sc-for></select></div></div></sc-if>
+        <sc-if value="{{ act.hasMsg }}"><div class="sp-field"><label class="sp-label" for="ac-msg">What the owner sees</label><div class="sp-input sp-input--multiline"><textarea id="ac-msg" rows="3" maxLength="400" value="{{ ax.msg }}" onChange="{{ setMsg }}"></textarea></div><p class="sp-hint">Sent by DM and shown at the top of their dashboard. Keep it plain and say how to appeal.</p></div></sc-if>
+        <div class="sp-field"><label class="sp-label" for="ac-r">Reason for the staff log</label><div class="{{ reasonBox }}"><textarea id="ac-r" rows="2" maxLength="300" placeholder="Ticket or report number, and what you checked" value="{{ ax.reason }}" onChange="{{ setReason }}" aria-invalid="{{ reasonBad }}"></textarea></div><sc-if value="{{ reasonBad }}"><p class="sp-field-error"><sp-icon class="sp-i" name="circle-alert"></sp-icon>Write at least a few words, so the next person knows why.</p></sc-if></div>
+      </div>
+      <div class="sp-modal__foot"><button class="sp-btn sp-btn--ghost" disabled="{{ actBusy }}" onClick="{{ closeModal }}">Cancel</button><button class="{{ act.btnCls }}" aria-busy="{{ actBusy }}" onClick="{{ confirmAct }}"><sc-if value="{{ actBusy }}"><span class="sp-spinner"></span></sc-if>{{ act.btn }}</button></div>
+    </div></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;},&quot;startPage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;servers&quot;,&quot;reports&quot;,&quot;flags&quot;,&quot;log&quot;],&quot;default&quot;:&quot;overview&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;demoState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;reauth&quot;,&quot;keyFail&quot;,&quot;incident&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const SRV = [
+  { id: '1029384756102938475', name: 'Pixel Plaza', hue: 85, owner: 'quinn.dev', members: '8,214', plan: 'Free', mods: 18, reports: 0, errors: [{ code: 'MISSING_PERMISSIONS · Manage Roles', text: 'Automatic roles and Verification, 41 times today' }] },
+  { id: '1100223344556677889', name: 'Cozy Corner Café', hue: 30, owner: 'quinn.dev', members: '1,920', plan: 'Plus · yearly', mods: 11, reports: 0, errors: [] },
+  { id: '0987123456098712345', name: 'Study Hall 24/7', hue: 150, owner: 'nightlark', members: '12,880', plan: 'Plus · monthly', mods: 9, reports: 7, paused: { by: 'mira', when: '11 Oct, 14:20', reason: 'Scheduled messages and DMs used to send crypto links to 4,000+ members. Reports R-311 to R-317.', msg: 'Sparko is paused in Study Hall 24/7 while we look into reports of spam DMs. Reply to this message to talk to us.' }, errors: [{ code: 'RATE_LIMITED · /channels/…/messages', text: 'Scheduled messages, 2,140 times on 11 Oct, before the pause' }] },
+  { id: '1212343456567878909', name: 'Lucky Spin Rewards', hue: 330, owner: 'fastcash22', members: '640', plan: 'Free', mods: 4, reports: 3, errors: [] }
+];
+const REPORTS0 = [{ id: 'R-322', title: 'Server runs a paid lottery with Sparko’s economy', server: 'Lucky Spin Rewards', sid: '1212343456567878909', sev: 'High', meta: 'From 3 members · today, 09:12', body: 'Members say they must pay real money through an outside site to get lottery tickets, and winners are paid in gift cards. Sparko currency must have no real-world value.' }, { id: 'R-318', title: 'Welcome message contains a phishing link', server: 'Pixel Plaza', sid: '1029384756102938475', sev: 'Low', meta: 'From 1 member · yesterday', body: 'Says the welcome DM links to a fake Discord login. The current welcome message has no links, so this may be an older version or a different bot.' }];
+const FLAGS0 = [{ key: 'workflow-builder-v2', desc: 'New visual workflow builder with test runs', pct: 25 }, { key: 'ai-drafts', desc: 'AI drafts for messages and ticket summaries', pct: 5 }, { key: 'paypal-six-month', desc: 'Six-month billing period at checkout', pct: 100 }, { key: 'rss-fast-poll', desc: 'Two-minute RSS checks for Plus servers', pct: 0 }];
+const LOG0 = [{ who: 'mira', av: 5, action: 'paused Study Hall 24/7', reason: 'R-311 to R-317, confirmed spam DMs from scheduled messages', when: '11 Oct, 14:20' }, { who: 'devon', av: 3, action: 'set workflow-builder-v2 to 25% of servers', reason: 'Error rate under 0.2% at 10% for 48 hours', when: '10 Oct, 11:05' }, { who: 'mira', av: 5, action: 'gave Night Owls Gaming Plus for 1 month', reason: 'Billing bug double-charged them in September, ticket S-8812', when: '8 Oct, 16:40' }, { who: 'sana', av: 4, action: 'viewed Cozy Corner Café’s dashboard (read-only)', reason: 'Owner asked for help in support ticket S-8790', when: '7 Oct, 10:12' }];
+const PAUSE_CATS = ['Spam or scam', 'Paid gambling or real-money economy', 'Harassment or raids', 'Discord asked us to', 'Other'];
+const COMP_CATS = ['1 month', '3 months', '1 year'];
+class Component extends DCLogic {
+  state = (() => { let qp = {}; try { qp = Object.fromEntries(new URLSearchParams(window.location.search)); } catch (e) {} const demo = qp.state || this.props.demoState || 'none';
+    return { theme: qp.theme || this.props.theme || 'dark', page: qp.page || this.props.startPage || 'overview', demo, locked: demo === 'reauth' || demo === 'keyFail', keyFail: false, keyFailNext: demo === 'keyFail', verifying: false, mins: 714,
+      srv: SRV, q: '', sel: '0987123456098712345', reports: REPORTS0, flags: FLAGS0.map(f => ({ ...f, draft: f.pct })), log: LOG0,
+      incidents: [{ id: 1, title: 'Slow replies for servers in Europe', open: demo === 'incident', meta: demo === 'incident' ? 'Investigating · started 18:02 · shards 12, 13 and 31' : 'Resolved · 9 Oct, 21:40 · lasted 26 minutes' }, { id: 2, title: 'PayPal checkout failing for some cards', open: false, meta: 'Resolved · 2 Oct, 11:15 · lasted 1 hour' }],
+      modal: null, ax: null, busy: false, toasts: [] }; })();
+  _id = 0;
+  componentDidMount() { this._key = e => { if (e.key === 'Escape' && !this.state.busy) this.setState({ modal: null }); }; document.addEventListener('keydown', this._key); }
+  componentWillUnmount() { document.removeEventListener('keydown', this._key); (this._t || []).forEach(clearTimeout); }
+  later(fn, ms) { (this._t = this._t || []).push(setTimeout(fn, ms)); }
+  toast(tone, title, body) { const id = ++this._id; const icon = { success: 'circle-check', danger: 'circle-x', info: 'info' }[tone]; this.setState(s => ({ toasts: [...s.toasts.slice(-2), { id, tone, icon, title, body }] })); this.later(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 5000); }
+  logIt(action, reason) { this.setState(s => ({ log: [{ who: 'mira', av: 5, action, reason, when: 'Just now' }, ...s.log] })); }
+  open(kind, extra) { this.setState({ modal: kind, ax: { cat: kind === 'comp' ? COMP_CATS[0] : PAUSE_CATS[0], msg: '', reason: '', tried: false, ...extra } }); }
+  renderVals() {
+    const s = this.state; const dark = s.theme === 'dark'; const ini = n => n.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const q = s.q.trim().toLowerCase(); const res = s.srv.filter(x => !q || x.name.toLowerCase().includes(q) || x.id.includes(q));
+    const sv0 = s.srv.find(x => x.id === s.sel); const openReports = s.reports.filter(r => !r.done);
+    const ax = s.ax || { cat: '', msg: '', reason: '', tried: false }; const reasonBad = ax.tried && ax.reason.trim().length < 8;
+    const fl = s.modal === 'flag' || s.modal === 'kill' ? s.flags.find(f => f.key === ax.key) : null;
+    const ACT = {
+      pause: { title: `Pause Sparko in ${sv0 ? sv0.name : ''}?`, desc: 'Sparko stops posting, moderating and running workflows there. Settings are kept, and the owner can still sign in to read them.', icon: 'pause', iconStyle: { background: 'var(--sp-danger-soft)', color: 'var(--sp-danger)' }, hasCategory: true, catLabel: 'Why', cats: PAUSE_CATS, hasMsg: true, btn: 'Pause server', btnCls: 'sp-btn sp-btn--danger' },
+      unpause: { title: `Unpause ${sv0 ? sv0.name : ''}?`, desc: 'Every module that was on starts again right away. Scheduled messages that were missed are skipped, not sent late.', icon: 'play', iconStyle: {}, hasCategory: false, hasMsg: false, btn: 'Unpause', btnCls: 'sp-btn sp-btn--primary' },
+      comp: { title: `Give ${sv0 ? sv0.name : ''} Plus for free?`, desc: 'For refunds and apologies. It doesn’t touch their PayPal, and it ends by itself.', icon: 'crown', iconStyle: {}, hasCategory: true, catLabel: 'For how long', cats: COMP_CATS, hasMsg: false, btn: 'Give Plus', btnCls: 'sp-btn sp-btn--primary' },
+      flag: { title: fl ? `Set ${fl.key} to ${fl.draft}%?` : '', desc: fl ? `From ${fl.pct}% of servers. About ${Math.round(Math.abs(fl.draft - fl.pct) * 1250).toLocaleString('en-US')} servers change.` : '', icon: 'toggle-left', iconStyle: {}, hasCategory: false, hasMsg: false, btn: 'Apply', btnCls: 'sp-btn sp-btn--primary' },
+      kill: { title: fl ? `Turn off ${fl.key} everywhere?` : '', desc: 'Use this when something is broken. Servers fall back to the old behaviour within a minute.', icon: 'power', iconStyle: { background: 'var(--sp-danger-soft)', color: 'var(--sp-danger)' }, hasCategory: false, hasMsg: false, btn: 'Turn off', btnCls: 'sp-btn sp-btn--danger' },
+      status: { title: 'Post a status update', desc: 'It shows on status.sparko.gg and as a banner in every dashboard.', icon: 'send', iconStyle: {}, hasCategory: true, catLabel: 'What’s affected', cats: ['Slow replies in Europe', 'Slow replies everywhere', 'Dashboard won’t load', 'PayPal checkout'], hasMsg: false, btn: 'Post update', btnCls: 'sp-btn sp-btn--primary' }
+    };
+    const act = ACT[s.modal] || ACT.status;
+    return {
+      theme: s.theme, themeIcon: dark ? 'sun' : 'moon', themeLabel: dark ? 'Switch to light theme' : 'Switch to dark theme', toggleTheme: () => this.setState({ theme: dark ? 'light' : 'dark' }),
+      locked: s.locked, unlocked: !s.locked, keyFailed: s.keyFail, verifying: s.verifying, notVerifying: !s.verifying, unlockLabel: s.verifying ? 'Touch your key…' : 'Use security key',
+      unlock: () => { this.setState({ verifying: true, keyFail: false }); this.later(() => { if (this.state.keyFailNext) return this.setState({ verifying: false, keyFail: true, keyFailNext: false }); this.setState({ verifying: false, locked: false }); this.logIt('signed in to the console', 'Security key'); }, 1200); },
+      sessionText: `Session ends in ${Math.floor(s.mins / 60)} h ${s.mins % 60} min`,
+      nav: [['overview', 'Overview', 'activity', null], ['servers', 'Servers', 'server', null], ['reports', 'Abuse reports', 'flag', openReports.length || null], ['flags', 'Feature flags', 'toggle-left', null], ['log', 'Staff log', 'scroll-text', null]].map(([k, label, icon, count]) => ({ label, icon, count, cur: s.page === k ? 'page' : undefined, style: { width: 'auto', flex: '1 1 180px', background: s.page === k ? 'var(--sp-raised)' : undefined, fontWeight: s.page === k ? 600 : 400 }, go: () => this.setState({ page: k }) })),
+      isOverview: s.page === 'overview', isServers: s.page === 'servers', isReports: s.page === 'reports', isFlags: s.page === 'flags', isLog: s.page === 'log',
+      healthTitle: s.incidents.some(i => i.open) ? 'Some servers are slow right now' : 'Everything is running normally',
+      stats: [['Servers', '124,806', '+1,214 this week', { color: 'var(--sp-success)' }], ['Shards online', s.incidents.some(i => i.open) ? '45 of 48' : '48 of 48', s.incidents.some(i => i.open) ? '3 reconnecting' : 'All healthy', { color: s.incidents.some(i => i.open) ? 'var(--sp-warning)' : 'var(--sp-success)' }], ['Reply time', s.incidents.some(i => i.open) ? '840 ms' : '61 ms', 'Median, last 5 minutes', {}], ['Command errors', '0.4%', 'Last hour', {}]].map(([label, value, meta, metaStyle]) => ({ label, value, meta, metaStyle })),
+      shards: Array.from({ length: 48 }, (_, i) => { const bad = s.incidents.some(x => x.open) && [12, 13, 31].includes(i); const slow = i === 7; const c = bad ? 'var(--sp-danger)' : slow ? 'var(--sp-warning)' : 'var(--sp-success)'; return { n: i, tip: `Shard ${i}: ${bad ? 'reconnecting' : slow ? 'slow, 410 ms' : 'healthy'}`, style: { display: 'grid', placeItems: 'center', aspectRatio: '1', borderRadius: '6px', background: c, color: '#1C1A17', font: '600 10px/1 var(--sp-font-mono)' } }; }),
+      incidents: s.incidents.map(i => ({ ...i, badge: 'sp-badge sp-badge--sm ' + (i.open ? 'sp-badge--warning' : 'sp-pill sp-pill--muted'), stateLabel: i.open ? 'Open' : 'Resolved', resolve: () => { this.setState(st => ({ incidents: st.incidents.map(x => x.id === i.id ? { ...x, open: false, meta: 'Resolved just now' } : x) })); this.logIt(`resolved “${i.title}”`, 'Shards reconnected, reply times normal'); this.toast('success', 'Marked resolved', 'The banner is gone from dashboards.'); } })),
+      openStatus: () => this.open('status'),
+      q: s.q, setQ: e => this.setState({ q: e.target.value }), noResults: !res.length,
+      results: res.map(x => ({ ...x, ini: ini(x.name), sel: x.id === s.sel, badge: 'sp-badge sp-badge--sm ' + (x.paused ? 'sp-badge--danger' : x.reports ? 'sp-badge--warning' : 'sp-pill sp-pill--muted'), badgeText: x.paused ? 'Paused' : x.reports ? `${x.reports} reports` : x.plan.split(' ')[0], pick: () => this.setState({ sel: x.id }), style: { display: 'flex', gap: '12px', alignItems: 'center', width: '100%', padding: '12px 16px', border: 0, borderTop: '1px solid var(--sp-line)', background: x.id === s.sel ? 'var(--sp-raised)' : 'transparent', color: 'var(--sp-text)', font: 'inherit', textAlign: 'left', cursor: 'pointer', minHeight: '56px' } })),
+      hasSel: !!sv0, sv: sv0 ? { ...sv0, ini: ini(sv0.name), paused: !!sv0.paused, notPaused: !sv0.paused, pausedBy: sv0.paused ? sv0.paused.by : '', pausedWhen: sv0.paused ? sv0.paused.when : '', pauseReason: sv0.paused ? sv0.paused.reason : '', ownerMsg: sv0.paused ? sv0.paused.msg : '', planText: sv0.comp ? `${sv0.plan} · free Plus for ${sv0.comp}` : sv0.plan, mods: `${sv0.mods} modules`, reports: sv0.reports ? `${sv0.reports} open` : 'None', badge: 'sp-badge ' + (sv0.paused ? 'sp-badge--danger' : 'sp-badge--success'), badgeText: sv0.paused ? 'Paused' : 'Running', noErrors: !sv0.errors.length } : {},
+      openPause: () => this.open('pause', { msg: `Sparko is paused in ${sv0.name} while we look into a report. Reply to this message to talk to us.` }), openUnpause: () => this.open('unpause'), openComp: () => this.open('comp'),
+      viewAs: () => { this.logIt(`viewed ${sv0.name}’s dashboard (read-only)`, 'Opened from the console'); this.toast('info', `${sv0.name}’s dashboard would open read-only`, 'This visit is in the staff log, and the owner can see it in their audit log.'); },
+      reportsTitle: openReports.length ? `${openReports.length} waiting` : 'All caught up',
+      reports: s.reports.map(r => ({ ...r, open: !r.done, done: r.done || '', badge: 'sp-badge sp-badge--sm ' + (r.sev === 'High' ? 'sp-badge--danger' : 'sp-pill sp-pill--muted'), openServer: () => this.setState({ page: 'servers', sel: r.sid, q: '' }),
+        escalate: () => { this.setState(st => ({ reports: st.reports.map(x => x.id === r.id ? { ...x, done: 'Sent to Discord Trust & Safety by you.' } : x) })); this.logIt(`sent ${r.id} to Discord Trust & Safety`, r.title); this.toast('success', `${r.id} sent to Discord`, 'You’ll get their reply by email.'); },
+        dismiss: () => { this.setState(st => ({ reports: st.reports.map(x => x.id === r.id ? { ...x, done: 'Closed by you: no action needed.' } : x) })); this.logIt(`closed ${r.id} with no action`, r.title); this.toast('info', `${r.id} closed`, 'The reporters get an email that it was reviewed.'); } })),
+      flags: s.flags.map((f, i) => ({ ...f, inputId: 'fl-' + i, draftText: f.draft + '%', changed: f.draft !== f.pct, canKill: f.pct > 0 && f.draft === f.pct, badge: 'sp-badge sp-badge--sm ' + (f.pct === 100 ? 'sp-badge--success' : f.pct === 0 ? 'sp-pill sp-pill--muted' : 'sp-badge--info'), stateText: f.pct === 100 ? 'Everyone' : f.pct === 0 ? 'Off' : `${f.pct}% of servers`,
+        setDraft: e => { const v = +e.target.value; this.setState(st => ({ flags: st.flags.map((x, j) => j === i ? { ...x, draft: v } : x) })); }, reset: () => this.setState(st => ({ flags: st.flags.map((x, j) => j === i ? { ...x, draft: x.pct } : x) })), apply: () => this.open('flag', { key: f.key }), kill: () => this.open('kill', { key: f.key }) })),
+      log: s.log.map(l => ({ ...l, av: `sp-avatar sp-avatar--${l.av} sp-avatar--sm`, initial: l.who[0].toUpperCase() })),
+      actOpen: !!s.modal, act, ax, actBusy: s.busy, reasonBad, reasonBox: 'sp-input sp-input--multiline' + (reasonBad ? ' is-error' : ''),
+      setCat: e => { const v = e.target.value; this.setState(st => ({ ax: { ...st.ax, cat: v } })); }, setMsg: e => { const v = e.target.value; this.setState(st => ({ ax: { ...st.ax, msg: v } })); }, setReason: e => { const v = e.target.value; this.setState(st => ({ ax: { ...st.ax, reason: v } })); },
+      confirmAct: () => { if (ax.reason.trim().length < 8) return this.setState(st => ({ ax: { ...st.ax, tried: true } })); const kind = s.modal; this.setState({ busy: true }); this.later(() => { const r = ax.reason.trim(); const st0 = this.state; this.setState({ busy: false, modal: null });
+        if (kind === 'pause') { this.setState({ srv: st0.srv.map(x => x.id === sv0.id ? { ...x, paused: { by: 'mira', when: 'Just now', reason: `${ax.cat}. ${r}`, msg: ax.msg } } : x) }); this.logIt(`paused ${sv0.name}`, r); this.toast('success', `${sv0.name} is paused`, 'The owner got your message by DM.'); }
+        else if (kind === 'unpause') { this.setState({ srv: st0.srv.map(x => x.id === sv0.id ? { ...x, paused: null } : x) }); this.logIt(`unpaused ${sv0.name}`, r); this.toast('success', `${sv0.name} is running again`, 'The owner got a DM saying Sparko is back.'); }
+        else if (kind === 'comp') { this.setState({ srv: st0.srv.map(x => x.id === sv0.id ? { ...x, comp: ax.cat } : x) }); this.logIt(`gave ${sv0.name} Plus for ${ax.cat}`, r); this.toast('success', `${sv0.name} has Plus for ${ax.cat}`, 'It ends by itself. Their PayPal isn’t touched.'); }
+        else if (kind === 'flag' || kind === 'kill') { const to = kind === 'kill' ? 0 : fl.draft; this.setState({ flags: st0.flags.map(x => x.key === fl.key ? { ...x, pct: to, draft: to } : x) }); this.logIt(kind === 'kill' ? `turned off ${fl.key} everywhere` : `set ${fl.key} to ${to}% of servers`, r); this.toast('success', kind === 'kill' ? `${fl.key} is off` : `${fl.key} is at ${to}%`, 'Servers pick this up within a minute.'); }
+        else { this.setState({ incidents: [{ id: Date.now(), title: ax.cat, open: true, meta: 'Investigating · posted just now by mira' }, ...st0.incidents] }); this.logIt(`posted the status update “${ax.cat}”`, r); this.toast('success', 'Status update posted', 'Dashboards show the banner now.'); } }, 900); },
+      closeModal: () => this.setState({ modal: null }), scrimClose: e => { if (e.target === e.currentTarget && !s.busy) this.setState({ modal: null }); },
+      toasts: s.toasts.map(t => ({ ...t, cls: `sp-toast sp-toast--${t.tone}`, close: () => this.setState(st => ({ toasts: st.toasts.filter(x => x.id !== t.id) })) }))
+    };
+  }
+}
+</script>
+</body>
+</html>
