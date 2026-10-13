@@ -5,7 +5,13 @@
 export type Plan = 'free' | 'plus';
 
 export type Session = {
-  user: { id: string; name: string; avatarColor: 1 | 2 | 3 | 4 | 5 | 6 };
+  user: {
+    id: string;
+    name: string;
+    avatarColor: 1 | 2 | 3 | 4 | 5 | 6;
+    /** The Discord avatar, when signed in for real. */
+    avatarUrl?: string;
+  };
 };
 
 export type Server = {
@@ -13,6 +19,8 @@ export type Server = {
   name: string;
   /** Tint for the server's initials when it has no icon. */
   hue: number;
+  /** The server's Discord icon, when it has one. */
+  icon?: string;
   members: number;
   plan: Plan;
   /** Sparko is in the server. Servers without it can only be added. */
@@ -102,7 +110,9 @@ export type ApplyResult =
   | { status: 'error'; message: string };
 
 export interface PanelApi {
-  getSession(): Promise<Session>;
+  /** Null when signed out. */
+  getSession(): Promise<Session | null>;
+  signOut(): Promise<void>;
   listServers(): Promise<Server[]>;
   getOverview(serverId: string): Promise<Overview>;
   skipStep(serverId: string, stepId: string, skipped: boolean): Promise<void>;

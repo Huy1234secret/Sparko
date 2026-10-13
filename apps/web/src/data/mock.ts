@@ -35,7 +35,7 @@ const session: Session = {
   user: { id: '200000000000000001', name: 'quinn.dev', avatarColor: 2 },
 };
 
-const servers: Server[] = [
+const sampleServers: Server[] = [
   {
     id: '900000000000000001',
     name: 'Pixel Plaza',
@@ -90,6 +90,7 @@ const servers: Server[] = [
     installed: false,
   },
 ];
+let servers = sampleServers;
 
 const firstServerOn: Record<string, boolean> = {
   workflows: true,
@@ -353,8 +354,17 @@ function health(s: ServerState): Overview['health'] {
   };
 }
 
+/**
+ * Signed in for real, the list is the person's own servers, and module
+ * pages show sample settings for them.
+ */
+export function adoptServers(list: Server[]) {
+  servers = copy(list);
+}
+
 const coreApi = {
-  getSession: () => wait(copy(session)),
+  getSession: () => wait<Session | null>(copy(session)),
+  signOut: () => wait(undefined),
   listServers: () => wait(copy(servers)),
   async getOverview(serverId) {
     const server = serverById(serverId);
@@ -523,6 +533,7 @@ const coreApi = {
 /** Resets the sample data; for tests. */
 export function resetMock() {
   state.clear();
+  servers = sampleServers;
   resetSupport();
 }
 

@@ -4,7 +4,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { mockApi } from './mock';
+import { adoptServers, mockApi } from './mock';
+import { backend, withBackend } from './live';
 import type {
   ModuleState,
   PanelApi,
@@ -16,9 +17,11 @@ import type {
 
 export * from './types';
 
-/** Sample data until the backend is reconnected; swap this for the HTTP client. */
-export const api: PanelApi = mockApi;
-export const usingSampleData = true;
+/** Real sign-in and servers where the backend runs; sample data for the rest. */
+export const api: PanelApi = withBackend(mockApi, adoptServers);
+export { backend, inviteUrl, signInUrl } from './live';
+export const useBackend = () =>
+  useQuery({ queryKey: ['backend'], queryFn: backend, staleTime: Infinity });
 
 export const createQueryClient = () =>
   new QueryClient({
@@ -42,6 +45,13 @@ export const keys = {
 
 export const useSession = () =>
   useQuery({ queryKey: keys.session, queryFn: () => api.getSession() });
+export function useSignOut() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.signOut(),
+    onSettled: () => client.clear(),
+  });
+}
 export const useServers = () =>
   useQuery({ queryKey: keys.servers, queryFn: () => api.listServers() });
 export const useOverview = (serverId: string) =>

@@ -1,7 +1,15 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, EmptyState, Icon, Notice, useToast } from '../ui';
-import { useServers, useSession, type Server } from '../data';
+import {
+  backend,
+  inviteUrl,
+  signInUrl,
+  useBackend,
+  useServers,
+  useSession,
+  type Server,
+} from '../data';
 import { useTheme } from '../state/theme';
 import { DashboardFrame } from './ServerLayout';
 import { AccountMenu, ThemeButton } from './Topbar';
@@ -13,13 +21,24 @@ export function SignInPage() {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
+  const status = useBackend().data;
+  const session = useSession();
   const signedOut = params.has('signedOut');
-  const cancelled = params.get('error') === 'access_denied';
-  const signIn = () => {
+  const error = params.get('error');
+  const cancelled = error === 'access_denied';
+  const live = !!status?.live;
+  const notReady = live && !status.signIn;
+  const signIn = async () => {
     setBusy(true);
-    // Until the backend is reconnected, sign-in goes straight to the sample servers.
-    setTimeout(() => navigate('/dashboard'), 600);
+    // With the real backend, Discord asks the person; without it, sign-in
+    // goes straight to the sample servers.
+    const found = await backend();
+    if (!found.live) setTimeout(() => navigate('/dashboard'), 600);
+    else if (found.signIn) window.location.assign(signInUrl);
+    else setBusy(false);
   };
+  if (live && session.data && !signedOut)
+    return <Navigate to="/dashboard" replace />;
   return (
     <main className="sp-signin sp-sparks" id="main">
       <div className="sp-signin__inner">
@@ -51,6 +70,19 @@ export function SignInPage() {
               Nothing was shared. Sign in again whenever you’re ready.
             </Notice>
           )}
+          {(error === 'expired' || error === 'failed') && (
+            <Notice tone="warning" title="That sign-in didn’t finish">
+              {error === 'expired'
+                ? 'It took too long or was opened in another tab. Try again.'
+                : 'Discord didn’t answer properly. Try again in a moment.'}
+            </Notice>
+          )}
+          {(notReady || error === 'not_configured') && (
+            <Notice tone="info" title="Discord sign-in isn’t switched on yet">
+              The server needs its Discord app ID and secret. Until then you
+              can’t sign in here.
+            </Notice>
+          )}
           {signedOut && (
             <Notice tone="info" title="You’re signed out">
               Your settings are safe. Sign in again to keep going.
@@ -63,7 +95,8 @@ export function SignInPage() {
             icon="log-in"
             loading={busy}
             loadingLabel="Opening Discord…"
-            onClick={signIn}
+            disabled={notReady}
+            onClick={() => void signIn()}
           >
             Continue with Discord
           </Button>
@@ -151,11 +184,15 @@ export function ServerPickerPage() {
   );
   const withSparko = list.filter((s) => s.installed);
   const without = list.filter((s) => !s.installed);
-  const addBot = () =>
-    toast({
-      title: 'Discord would open here',
-      body: 'You’d pick a server and approve only the permissions Sparko needs.',
-    });
+  const live = useBackend().data?.live;
+  const addBot = (server: Server) =>
+    live
+      ? window.location.assign(inviteUrl(server.id))
+      : toast({
+          title: 'Discord would open here',
+          body: 'You’d pick a server and approve only the permissions Sparko needs.',
+        });
+  if (session === null) return <Navigate to="/signin" replace />;
   return (
     <DashboardFrame>
       <div className="sp-app">
@@ -251,7 +288,11 @@ export function ServerPickerPage() {
                     </h2>
                     <div className="sp-server-grid">
                       {withSparko.map((s) => (
-                        <ServerCard key={s.id} server={s} onAdd={addBot} />
+                        <ServerCard
+                          key={s.id}
+                          server={s}
+                          onAdd={() => addBot(s)}
+                        />
                       ))}
                     </div>
                   </section>
@@ -264,7 +305,11 @@ export function ServerPickerPage() {
                     </h2>
                     <div className="sp-server-grid">
                       {without.map((s) => (
-                        <ServerCard key={s.id} server={s} onAdd={addBot} />
+                        <ServerCard
+                          key={s.id}
+                          server={s}
+                          onAdd={() => addBot(s)}
+                        />
                       ))}
                     </div>
                   </section>

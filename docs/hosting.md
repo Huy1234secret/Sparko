@@ -9,7 +9,8 @@ The server runs two pm2 processes from `ecosystem.config.cjs`:
 
 Both read settings from `/opt/sparko/shared/.env.production` (set `SPARKO_ENV_FILE` to use another file):
 
-- `DISCORD_BOT_TOKEN`: the bot's token (required for `sparko-bot`).
+- `DISCORD_BOT_TOKEN`: the bot's token (required for `sparko-bot`; the website also uses it to see which servers have Sparko).
+- `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`: the Discord app's OAuth2 ID and secret, for signing in to the dashboard. Without them the sign-in page says sign-in isn't switched on.
 - `PUBLIC_APP_URL`: the dashboard address, shown in `/ping` replies.
 - `WEB_PORT` / `WEB_HOST`: where the website listens (default `8080` on `127.0.0.1`).
 
@@ -62,6 +63,27 @@ From now on, log in as `deploy` instead of `root`:
 ```powershell
 ssh -i $HOME\.ssh\sparko-deploy deploy@NEW_IP
 ```
+
+## Turning on Discord sign-in
+
+The dashboard signs people in with Discord. On a server set up before sign-in existed, add it once:
+
+1. On discord.com/developers open your app → **OAuth2**.
+   - Copy the **Client ID**.
+   - Press **Reset Secret** and copy the secret.
+   - Under **Redirects** add `https://panel.coin-sprite.com/api/v1/auth/discord/callback` and press **Save Changes**.
+2. On the server, as `deploy`, run `nano /opt/sparko/shared/.env.production` and add two lines with your values:
+
+   ```
+   DISCORD_CLIENT_ID=your client id
+   DISCORD_CLIENT_SECRET=your secret
+   ```
+
+   Save with Ctrl+O, Enter, then Ctrl+X.
+
+3. Run `bash /opt/sparko/app/infra/update.sh`.
+
+Signing in shows your real Discord name, avatar and the servers you can manage, and which of them have Sparko. Module settings are still sample data. Sign-ins are kept in memory, so restarting the website signs everyone out.
 
 ## Everyday commands
 

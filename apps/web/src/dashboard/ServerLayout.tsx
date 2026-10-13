@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
+import {
+  Link,
+  Navigate,
+  Outlet,
+  useLocation,
+  useParams,
+} from 'react-router-dom';
 import { EmptyState, Icon } from '../ui';
+import { useBackend, useSession } from '../data';
 import { moduleById } from '../content/modules';
 import { CommandPalette } from './CommandPalette';
 import { Sidebar } from './Sidebar';
@@ -9,11 +16,14 @@ import { useActiveModuleId, useCurrentServer } from './shared';
 
 /** Full-height frame for every dashboard page, with the sample-data notice. */
 export function DashboardFrame({ children }: { children: React.ReactNode }) {
+  const live = useBackend().data?.live;
   return (
     <div className="sp-dash">
       <p className="sp-preview-bar" role="note">
         <Icon name="info" size="sm" />
-        Preview with sample data. Nothing here is sent to Discord yet.
+        {live
+          ? 'Your account and servers are real. Module settings are still sample data and aren’t sent to Discord yet.'
+          : 'Preview with sample data. Nothing here is sent to Discord yet.'}
       </p>
       {children}
     </div>
@@ -24,6 +34,7 @@ export function ServerLayout() {
   const { ticketNumber } = useParams();
   const moduleId = useActiveModuleId();
   const { serverId, server, servers } = useCurrentServer();
+  const session = useSession();
   const [navPath, setNavPath] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const { pathname } = useLocation();
@@ -44,6 +55,7 @@ export function ServerLayout() {
     document.querySelector('.sp-main')?.scrollTo?.(0, 0);
   }, [pathname]);
 
+  if (session.data === null) return <Navigate to="/signin" replace />;
   if (servers.isPending)
     return (
       <DashboardFrame>

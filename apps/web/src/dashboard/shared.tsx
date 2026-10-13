@@ -26,7 +26,7 @@ export function ServerMark({
   size,
   className,
 }: {
-  server: Pick<Server, 'name' | 'hue'>;
+  server: Pick<Server, 'name' | 'hue' | 'icon'>;
   size?: number;
   className?: string;
 }) {
@@ -48,7 +48,7 @@ export function ServerMark({
       style={style}
       aria-hidden="true"
     >
-      {initials(server.name)}
+      {server.icon ? <img src={server.icon} alt="" /> : initials(server.name)}
     </span>
   );
 }
