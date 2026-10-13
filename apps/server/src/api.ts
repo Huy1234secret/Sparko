@@ -23,10 +23,13 @@ import {
   skippedSteps,
   writeModule,
   type Db,
+  Plain,
   type GuildView,
+  type Rest,
 } from '@sparko/core';
 import type { createAuth, DiscordGuild } from './auth.ts';
 import { BadRequest, json, readJson } from './http.ts';
+import { ticketRoutes } from './tickets-api.ts';
 
 type Auth = ReturnType<typeof createAuth>;
 type Views = {
@@ -57,6 +60,7 @@ export function createApi({
   db,
   auth,
   views,
+  discord,
   publicUrl,
   now = Date.now,
   applyWaitMs = 15_000,
@@ -64,6 +68,8 @@ export function createApi({
   db: Db;
   auth: Auth;
   views: Views | undefined;
+  /** Discord's REST API with the bot token, when it's set. */
+  discord?: Rest | undefined;
   publicUrl: string;
   now?: () => number;
   applyWaitMs?: number;
@@ -228,6 +234,13 @@ export function createApi({
       config: v.config,
     }));
 
+  const tickets = ticketRoutes({
+    db,
+    rest: discord,
+    view: (id) => view(id),
+    now,
+  });
+
   /** Waits for the bot to apply the latest change, up to applyWaitMs. */
   async function applied(guildId: string, mod: string) {
     const until = now() + applyWaitMs;
@@ -314,6 +327,16 @@ export function createApi({
       json(res, 200, {
         ok: !!v?.channels.find((c) => c.id === channelId)?.canPost,
       });
+    } else if (rest.startsWith('/tickets')) {
+      const handled = await tickets({
+        req,
+        res,
+        method,
+        path: rest,
+        guildId,
+        user,
+      });
+      if (!handled) json(res, 404, { error: 'not_found' });
     } else if (method === 'GET' && rest === '/welcome') {
       const v = await view(guildId);
       const channels = (v?.channels ?? []).map(
@@ -427,7 +450,9 @@ export function createApi({
     try {
       return await route(req, res, url);
     } catch (e) {
-      if (e instanceof BadRequest)
+      if (e instanceof Plain)
+        json(res, 409, { error: 'discord', message: e.message });
+      else if (e instanceof BadRequest)
         json(res, 400, { error: 'bad_request', message: e.message });
       else throw e;
       return true;

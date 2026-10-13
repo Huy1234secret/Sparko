@@ -200,7 +200,8 @@ export type TicketsState = {
   on: boolean;
   panel: TicketPanel;
   channels: Channel[];
-  roles: string[];
+  /** Roles that can be staff; the panel stores their ids. */
+  roles: { id: string; name: string }[];
   staff: { name: string; color: AvatarColor }[];
   versions: Version<TicketPanel>[];
 };
@@ -253,7 +254,7 @@ export interface PanelApi {
   closeTicket(
     serverId: string,
     number: number,
-    close: { reason: string; detail: string },
+    close: { reason: string; detail: string; dm?: boolean },
   ): Promise<void>;
   reopenTicket(serverId: string, number: number): Promise<void>;
   getTickets(serverId: string): Promise<TicketsState>;

@@ -21,6 +21,8 @@ import {
   useTicketActions,
   useTicketList,
   useTicketsConfig,
+  useBackend,
+  ticketTranscriptUrl,
   type Person,
   type TicketDetail,
   type TicketMessage,
@@ -64,7 +66,7 @@ function CloseModal({
       onClose={() => !busy && onClose()}
       icon="circle-check"
       title={`Close ticket #${ticket.number}?`}
-      description="The thread is locked and the transcript is saved to #ticket-logs. You can reopen it later."
+      description="The thread is locked so nobody can write in it. You can reopen it later."
       footer={
         <>
           <Button variant="ghost" disabled={busy} onClick={onClose}>
@@ -128,8 +130,8 @@ function CloseModal({
         <Switch
           checked={dm}
           onChange={setDm}
-          label={`Send ${ticket.member} the transcript by DM`}
-          description="Includes your reason. Staff notes are left out."
+          label={`Tell ${ticket.member} by DM`}
+          description="They get your reason. Staff notes are never shared."
         />
       </div>
     </Modal>
@@ -459,6 +461,7 @@ export function TicketPage() {
   const actions = useTicketActions(serverId, number);
   const session = useSession().data;
   const [closeOpen, setCloseOpen] = useState(false);
+  const live = !!useBackend().data?.live;
   const toast = useToast();
   const log = useRef<HTMLDivElement>(null);
   useDashboardTitle(`Ticket #${ticketNumber}`, server?.name);
@@ -655,18 +658,21 @@ export function TicketPage() {
                   Closed by {t.closedBy === 'You' ? 'you' : t.closedBy} ·{' '}
                   {t.closeReason ?? 'Solved'}.
                 </b>{' '}
-                The thread is locked and the transcript is saved in
-                #ticket-logs.
+                The thread is locked. You can download the transcript any time.
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 icon="download"
                 onClick={() =>
-                  toast({
-                    title: `Transcript #${t.number} would download`,
-                    body: 'An HTML file with every message and attachment. Staff notes are included for staff copies only.',
-                  })
+                  live
+                    ? window.location.assign(
+                        ticketTranscriptUrl(server.id, t.number),
+                      )
+                    : toast({
+                        title: `Transcript #${t.number} would download`,
+                        body: 'An HTML file with every message. Staff notes are included for staff copies only.',
+                      })
                 }
               >
                 Transcript
@@ -704,7 +710,7 @@ export function TicketPage() {
                 <dt>Handled by</dt>
                 <dd>{t.assignee ?? 'Nobody yet'}</dd>
                 <dt>Transcript</dt>
-                <dd>Saved to #ticket-logs on close</dd>
+                <dd>Download it here once closed</dd>
               </dl>
             </div>
           </section>
@@ -717,17 +723,20 @@ export function TicketPage() {
         busy={actions.close.isPending}
         onClose={() => setCloseOpen(false)}
         onConfirm={({ dm, ...close }) =>
-          actions.close.mutate(close, {
-            onSuccess: () => {
-              setCloseOpen(false);
-              toast({
-                tone: 'success',
-                title: `Ticket #${t.number} closed`,
-                body: `Transcript saved to #ticket-logs.${dm ? ` ${t.member} got a copy by DM.` : ''}`,
-              });
+          actions.close.mutate(
+            { ...close, dm },
+            {
+              onSuccess: () => {
+                setCloseOpen(false);
+                toast({
+                  tone: 'success',
+                  title: `Ticket #${t.number} closed`,
+                  body: `The thread is locked.${dm ? ` ${t.member} got the reason by DM.` : ''}`,
+                });
+              },
+              onError: fail,
             },
-            onError: fail,
-          })
+          )
         }
       />
     </>

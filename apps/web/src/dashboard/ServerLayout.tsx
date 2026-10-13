@@ -22,7 +22,7 @@ export function DashboardFrame({ children }: { children: React.ReactNode }) {
       <p className="sp-preview-bar" role="note">
         <Icon name="info" size="sm" />
         {live
-          ? 'Turning modules on and off is saved for real. Welcome works in Discord now; other modules start working as they’re rebuilt. Tickets and Message Studio still show sample settings.'
+          ? 'Turning modules on and off is saved for real. Welcome and Tickets work in Discord now; other modules start working as they’re rebuilt. Message Studio still shows sample settings.'
           : 'Preview with sample data. Nothing here is sent to Discord yet.'}
       </p>
       {children}

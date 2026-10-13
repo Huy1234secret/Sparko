@@ -19,7 +19,7 @@ export * from './types';
 
 /** Real sign-in and servers where the backend runs; sample data for the rest. */
 export const api: PanelApi = withBackend(mockApi, adoptServers);
-export { backend, inviteUrl, signInUrl } from './live';
+export { backend, inviteUrl, signInUrl, ticketTranscriptUrl } from './live';
 export const useBackend = () =>
   useQuery({ queryKey: ['backend'], queryFn: backend, staleTime: Infinity });
 
@@ -161,7 +161,7 @@ export function useTicketActions(serverId: string, number: number) {
       ...options,
     }),
     close: useMutation({
-      mutationFn: (c: { reason: string; detail: string }) =>
+      mutationFn: (c: { reason: string; detail: string; dm?: boolean }) =>
         api.closeTicket(serverId, number, c),
       ...options,
     }),

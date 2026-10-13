@@ -597,7 +597,10 @@ export function createSupportMock(h: Helpers) {
           on: s.ticketsOn,
           panel: s.panel,
           channels: h.channels(serverId),
-          roles: ['Admin', 'Moderator', 'Helper', 'Event team'],
+          roles: ['Admin', 'Moderator', 'Helper', 'Event team'].map((r) => ({
+            id: r,
+            name: r,
+          })),
           staff: [
             { name: 'You', color: 2 },
             { name: 'Rhea', color: 5 },

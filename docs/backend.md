@@ -38,3 +38,12 @@ Modules without their own settings page yet can be switched on and off; what the
 - After a save the bot checks it can post in the chosen channel and explains what's missing if not. "Check again" re-queues the change (`POST …/modules/welcome/apply`).
 - When someone joins, the bot sends the message with `{user}`, `{server}` and `{member_count}` filled in. Only the new member can be pinged. With "Welcome people who rejoin" off, people who joined before aren't greeted again.
 - Discord only tells bots about new members with the **Server Members Intent** on (Developer Portal → your app → Bot → Privileged Gateway Intents). Without it the bot still runs, and saving Welcome says what to turn on.
+
+## Tickets
+
+- Saving Tickets (`PUT /api/v1/servers/:id/tickets`) checks the panel (channel, title, 1–5 buttons, staff role ids, auto-close) and queues a job; the bot posts the panel with its buttons, edits it in place on later saves, posts it again if someone deleted it, and removes it when Tickets is turned off.
+- Pressing a button opens a private thread (`ticket-N`), adds the member, and posts the opener with the button's question, pinging the staff roles if that's on. With "one open ticket per member", a second press points to the open one.
+- Messages typed in the thread are kept in the inbox (the member's first message becomes the ticket's subject). Staff can also reply from the dashboard (posted by Sparko as "**Name:** text"); staff notes stay in Sparko.
+- Assigning, priority, closing (locks and archives the thread, optionally tells the member by DM), reopening and the HTML transcript all work from the dashboard. Tickets whose member stopped replying are warned two hours before the auto-close time and then closed.
+- Staff with Discord's Manage Threads permission see every ticket thread; with "ping these roles" on, the roles are also mentioned (and added) in each new ticket.
+- Ticket messages typed in Discord need the **Message Content Intent** (Developer Portal → Bot). Without it the inbox shows that Discord didn't share the text.

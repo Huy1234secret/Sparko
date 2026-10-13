@@ -30,9 +30,8 @@ const handle = createHandler(root);
 const publicUrl = process.env.PUBLIC_APP_URL ?? `http://localhost:${port}`;
 const db = openDb(defaultDbPath(join(import.meta.dirname, '../../..')));
 const botToken = process.env.DISCORD_BOT_TOKEN;
-const views = botToken
-  ? guildViews(discordRest({ token: botToken }))
-  : undefined;
+const discord = botToken ? discordRest({ token: botToken }) : undefined;
+const views = discord ? guildViews(discord) : undefined;
 const auth = createAuth({
   db,
   clientId: process.env.DISCORD_CLIENT_ID,
@@ -40,7 +39,7 @@ const auth = createAuth({
   botToken,
   publicUrl,
 });
-const api = createApi({ db, auth, views, publicUrl });
+const api = createApi({ db, auth, views, discord, publicUrl });
 // Expired sign-ins are cleared once an hour.
 setInterval(() => pruneSessions(db, Date.now()), 3_600_000).unref();
 if (!auth.configured)

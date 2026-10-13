@@ -6,9 +6,11 @@ import {
   listVersions,
   openDb,
   Perm,
+  createTicket,
   setStatus,
   upsertGuild,
   type GuildView,
+  type Rest,
 } from '@sparko/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApi } from './api.ts';
@@ -41,7 +43,10 @@ const view = (): GuildView => ({
       canThread: false,
     },
   ],
-  roles: [],
+  roles: [
+    { id: '301', name: 'Moderator', color: 0, managed: false },
+    { id: '302', name: 'Sparko', color: 0, managed: true },
+  ],
 });
 /** Signed in as Quinn, who manages server 9001 only. */
 const auth = {
@@ -56,6 +61,24 @@ const auth = {
           }
         : { status: 403 as const },
 };
+
+/** A pretend Discord REST API that records calls. */
+const discordCalls: { method: string; path: string; body?: unknown }[] = [];
+const fakeDiscord = (() => {
+  const run = async (method: string, path: string, body?: unknown) => {
+    discordCalls.push({ method, path, body });
+    if (path.includes('/members/'))
+      return { joined_at: new Date().toISOString(), roles: [] } as never;
+    return { id: '4242' } as never;
+  };
+  return {
+    get: (p: string) => run('GET', p),
+    post: (p: string, b: unknown) => run('POST', p, b),
+    patch: (p: string, b: unknown) => run('PATCH', p, b),
+    put: (p: string, b: unknown) => run('PUT', p, b),
+    delete: (p: string) => run('DELETE', p),
+  } as unknown as Rest;
+})();
 
 let server: Server;
 let base: string;
@@ -75,6 +98,7 @@ beforeAll(async () => {
     db,
     auth: auth as never,
     views: { get: async () => view(), refresh: async () => view() },
+    discord: fakeDiscord,
     publicUrl: site,
     applyWaitMs: 400,
   });
@@ -242,5 +266,107 @@ describe('server API', () => {
     expect(again.kind).toBe('welcome');
     finishJob(db, again.id, null, Date.now());
     expect(await body(await retry)).toEqual({ status: 'live' });
+  });
+
+  it('runs the ticket inbox: panel, list, reply, notes, assign, close, transcript', async () => {
+    const state = await body<{
+      panel: { roles: string[]; topics: unknown[] };
+      roles: { id: string; name: string }[];
+    }>(await call('/9001/tickets'));
+    // Bot roles can't be staff roles.
+    expect(state.roles).toEqual([{ id: '301', name: 'Moderator' }]);
+    expect(
+      (
+        await call('/9001/tickets', {
+          method: 'PUT',
+          body: JSON.stringify({ on: true, panel: state.panel }),
+        })
+      ).status,
+    ).toBe(400);
+    const panel = { ...state.panel, roles: ['301'] };
+    expect(
+      (
+        await call('/9001/tickets', {
+          method: 'PUT',
+          body: JSON.stringify({ on: true, panel }),
+        })
+      ).status,
+    ).toBe(204);
+
+    createTicket(
+      db,
+      {
+        guildId: '9001',
+        threadId: '7001',
+        memberId: '123456789012345678',
+        memberName: 'tomoko',
+        category: 'Get help',
+      },
+      Date.now() - 90 * 60_000,
+    );
+    const list = await body<
+      { number: number; status: string; waitingMinutes: number }[]
+    >(await call('/9001/tickets/list'));
+    expect(list[0]).toMatchObject({ number: 1, status: 'new' });
+    expect(list[0]!.waitingMinutes).toBeGreaterThanOrEqual(89);
+
+    discordCalls.length = 0;
+    await call('/9001/tickets/1/messages', {
+      method: 'POST',
+      body: JSON.stringify({ text: 'On it!', note: false }),
+    });
+    expect(discordCalls[0]).toMatchObject({
+      method: 'POST',
+      path: '/channels/7001/messages',
+      body: { content: '**Quinn:** On it!' },
+    });
+    await call('/9001/tickets/1/messages', {
+      method: 'POST',
+      body: JSON.stringify({ text: 'Probably the verify role.', note: true }),
+    });
+    // Notes stay in Sparko.
+    expect(discordCalls).toHaveLength(1);
+
+    const detail = await body<{
+      status: string;
+      assignee: string;
+      messages: { kind: string; text: string }[];
+      people: { person: { name: string } }[];
+    }>(await call('/9001/tickets/1'));
+    expect(detail).toMatchObject({ status: 'waiting', assignee: 'You' });
+    expect(detail.messages.map((x) => x.kind)).toEqual(['message', 'note']);
+    expect(detail.people[0]?.person.name).toBe('tomoko');
+
+    await call('/9001/tickets/1', {
+      method: 'PATCH',
+      body: JSON.stringify({ priority: 'urgent', assignee: null }),
+    });
+    expect(
+      await body<{ priority: string; assignee: null }>(
+        await call('/9001/tickets/1'),
+      ),
+    ).toMatchObject({ priority: 'urgent', assignee: null });
+
+    await call('/9001/tickets/1/close', {
+      method: 'POST',
+      body: JSON.stringify({ reason: 'Solved', detail: '', dm: false }),
+    });
+    expect(discordCalls.at(-1)).toMatchObject({
+      method: 'PATCH',
+      path: '/channels/7001',
+      body: { archived: true, locked: true },
+    });
+    expect(
+      await body<{ status: string; closedBy: string }>(
+        await call('/9001/tickets/1'),
+      ),
+    ).toMatchObject({ status: 'closed', closedBy: 'You' });
+
+    const transcript = await call('/9001/tickets/1/transcript');
+    expect(transcript.headers.get('content-disposition')).toContain(
+      'ticket-1.html',
+    );
+    expect(await transcript.text()).toContain('Probably the verify role.');
+    expect((await call('/9001/tickets/99')).status).toBe(404);
   });
 });
