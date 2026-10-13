@@ -131,3 +131,16 @@ a.sp-btn {
   margin-top: auto;
   padding-top: 8px;
 }
+
+/* Card demos stay inside their card: long badges wrap instead of overflowing. */
+.sw-card__demo {
+  min-width: 0;
+}
+.sw-card__demo .sp-badge {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  padding-block: 3px;
+  white-space: normal;
+  line-height: 16px;
+}

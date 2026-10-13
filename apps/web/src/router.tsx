@@ -1,4 +1,8 @@
-import { createBrowserRouter, type RouteObject } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  useRouteError,
+  type RouteObject,
+} from 'react-router-dom';
 import { SiteLayout } from './site/SiteLayout';
 import { HomePage } from './site/HomePage';
 
@@ -13,7 +17,30 @@ const info = (name: keyof typeof import('./site/InfoPages')) =>
 const dashboard = (name: keyof typeof import('./dashboard')) =>
   page(async () => ({ default: (await import('./dashboard'))[name] }));
 
-export const routes: RouteObject[] = [
+/** Shown instead of a blank or broken page if something crashes. */
+function CrashPage() {
+  console.error(useRouteError());
+  return (
+    <main className="sp-crash" role="alert">
+      <h1>Something went wrong on this page</h1>
+      <p>Reloading usually fixes it. If it keeps happening, let us know.</p>
+      <p>
+        <button
+          type="button"
+          className="sp-btn sp-btn--primary"
+          onClick={() => window.location.reload()}
+        >
+          Reload
+        </button>{' '}
+        <a className="sp-btn sp-btn--ghost" href="/">
+          Go to the home page
+        </a>
+      </p>
+    </main>
+  );
+}
+
+const pages: RouteObject[] = [
   { path: 'signin', lazy: dashboard('SignInPage') },
   { path: 'dashboard', lazy: dashboard('ServerPickerPage') },
   {
@@ -61,5 +88,8 @@ export const routes: RouteObject[] = [
       { path: '*', lazy: info('NotFoundPage') },
     ],
   },
+];
+export const routes: RouteObject[] = [
+  { errorElement: <CrashPage />, children: pages },
 ];
 export const createRouter = () => createBrowserRouter(routes);

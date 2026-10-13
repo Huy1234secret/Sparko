@@ -47,7 +47,9 @@ export function SiteLayout() {
   const menu = menuPath === pathname;
   const setMenu = (open: boolean) => setMenuPath(open ? pathname : null);
 
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   useEffect(() => {
     if (!menu) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuPath(null);
