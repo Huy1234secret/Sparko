@@ -125,3 +125,132 @@ export interface PanelApi {
   /** Re-reads Sparko's permissions in a channel after the owner fixes them. */
   checkChannel(serverId: string, channelId: string): Promise<boolean>;
 }
+
+export type TicketStatus = 'new' | 'claimed' | 'waiting' | 'closed';
+export type TicketPriority = 'urgent' | 'high' | 'normal' | 'low';
+export type AvatarColor = 1 | 2 | 3 | 4 | 5 | 6;
+export type Ticket = {
+  number: number;
+  topic: string;
+  member: string;
+  category: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  /** Staff member handling it; "You" is the signed-in user. */
+  assignee: string | null;
+  /** When the last message was sent, as shown to staff. */
+  lastAt: string;
+  lastBy: 'member' | 'staff';
+  /** Minutes a member has been waiting for staff, when they are. */
+  waitingMinutes: number;
+  openedAt: string;
+  closedBy?: string;
+  closeReason?: string;
+};
+export type TicketMessage = {
+  id: string;
+  kind: 'opener' | 'message' | 'note';
+  author: string;
+  authorColor: AvatarColor;
+  staff: boolean;
+  text: string;
+  at: string;
+  file?: string;
+};
+export type Person = {
+  name: string;
+  color: AvatarColor;
+  joined: string;
+  account: string;
+  roles: string;
+  newAccount?: boolean;
+};
+export type TicketDetail = Ticket & {
+  messages: TicketMessage[];
+  people: { heading: string; person: Person }[];
+};
+export type ButtonStyle = 'primary' | 'secondary' | 'success' | 'danger';
+export type TicketPanel = {
+  channel: string;
+  title: string;
+  description: string;
+  color: string;
+  topics: { id: string; label: string; style: ButtonStyle; question: string }[];
+  roles: string[];
+  ping: boolean;
+  onePerMember: boolean;
+  autoClose: 'never' | '24h' | '48h' | '7d';
+};
+export type TicketsState = {
+  on: boolean;
+  panel: TicketPanel;
+  channels: Channel[];
+  roles: string[];
+  staff: { name: string; color: AvatarColor }[];
+  versions: Version<TicketPanel>[];
+};
+
+export type StudioMessage = {
+  name: string;
+  channel: string;
+  content: string;
+  useEmbed: boolean;
+  embed: {
+    author: string;
+    title: string;
+    description: string;
+    color: string;
+    image: string;
+    footer: string;
+    thumbnail: boolean;
+    timestamp: boolean;
+    fields: { id: string; name: string; value: string; inline: boolean }[];
+  };
+  buttons: { id: string; label: string; url: string }[];
+};
+export type StudioTemplate = {
+  id: string;
+  name: string;
+  meta: string;
+  message: StudioMessage;
+};
+export type StudioState = {
+  message: StudioMessage;
+  channels: Channel[];
+  templates: StudioTemplate[];
+  templateLimit: number;
+  versions: Version<StudioMessage>[];
+};
+
+export interface PanelApi {
+  listTickets(serverId: string): Promise<Ticket[]>;
+  getTicket(serverId: string, number: number): Promise<TicketDetail>;
+  sendTicketMessage(
+    serverId: string,
+    number: number,
+    message: { text: string; note: boolean },
+  ): Promise<void>;
+  updateTicket(
+    serverId: string,
+    number: number,
+    change: { priority?: TicketPriority; assignee?: string | null },
+  ): Promise<void>;
+  closeTicket(
+    serverId: string,
+    number: number,
+    close: { reason: string; detail: string },
+  ): Promise<void>;
+  reopenTicket(serverId: string, number: number): Promise<void>;
+  getTickets(serverId: string): Promise<TicketsState>;
+  saveTickets(
+    serverId: string,
+    change: { on: boolean; panel: TicketPanel },
+  ): Promise<void>;
+  getStudio(serverId: string): Promise<StudioState>;
+  publishStudio(serverId: string, message: StudioMessage): Promise<void>;
+  saveTemplate(
+    serverId: string,
+    template: { name: string; message: StudioMessage },
+  ): Promise<void>;
+  deleteTemplate(serverId: string, id: string): Promise<void>;
+}

@@ -21,6 +21,7 @@ export const routes: RouteObject[] = [
     lazy: dashboard('ServerLayout'),
     children: [
       { index: true, lazy: dashboard('OverviewPage') },
+      { path: 'tickets/:ticketNumber', lazy: dashboard('TicketPage') },
       { path: ':moduleId', lazy: dashboard('ModulePage') },
     ],
   },

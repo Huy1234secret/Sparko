@@ -1,0 +1,677 @@
+import type {
+  AvatarColor,
+  Channel,
+  PanelApi,
+  Person,
+  Server,
+  Session,
+  StudioMessage,
+  StudioState,
+  Ticket,
+  TicketDetail,
+  TicketMessage,
+  TicketPanel,
+  TicketsState,
+} from './types';
+
+type Helpers = {
+  wait: <T>(value: T, slow?: boolean) => Promise<T>;
+  copy: <T>(value: T) => T;
+  server: (id: string) => Server;
+  channels: (serverId: string) => Channel[];
+  you: () => Session['user'];
+};
+
+type SupportApi = Pick<
+  PanelApi,
+  | 'listTickets'
+  | 'getTicket'
+  | 'sendTicketMessage'
+  | 'updateTicket'
+  | 'closeTicket'
+  | 'reopenTicket'
+  | 'getTickets'
+  | 'saveTickets'
+  | 'getStudio'
+  | 'publishStudio'
+  | 'saveTemplate'
+  | 'deleteTemplate'
+>;
+
+const people: Record<string, Partial<Person>> = {
+  tomoko: {
+    color: 4,
+    joined: 'Today',
+    account: '3 years old',
+    roles: 'None yet',
+  },
+  'nadia.r': {
+    color: 5,
+    joined: '2 days ago',
+    account: '1 year old',
+    roles: 'Member',
+  },
+  kestrel: {
+    color: 1,
+    joined: '6 days ago',
+    account: '9 days old',
+    roles: 'Member',
+    newAccount: true,
+  },
+  mossy_bun: { color: 6 },
+  'quiet.fox': { color: 3 },
+  pebble: { color: 5 },
+  'jun.k': { color: 2 },
+  arlo: { color: 4 },
+  'sunny.d': { color: 6 },
+  bramble: { color: 1 },
+};
+const staffColors: Record<string, AvatarColor> = { You: 2, Rhea: 5, Ayo: 3 };
+const person = (name: string): Person => ({
+  name,
+  color: 3,
+  joined: '8 months ago',
+  account: '4 years old',
+  roles: 'Member, Regular',
+  ...people[name],
+});
+
+type Seed = Omit<Ticket, 'waitingMinutes'> & {
+  waitingMinutes?: number;
+  first: string;
+  file?: string;
+  about?: string;
+  reply?: [string, string, string];
+};
+const seeds: Seed[] = [
+  {
+    number: 214,
+    topic: 'Can’t see #events after verifying',
+    member: 'tomoko',
+    category: 'Access',
+    status: 'new',
+    priority: 'normal',
+    assignee: null,
+    lastAt: '12 min ago',
+    lastBy: 'member',
+    waitingMinutes: 12,
+    openedAt: 'Today at 18:31',
+    first:
+      'hi! I clicked verify in #rules about an hour ago but #events is still hidden for me. Other channels work fine.',
+  },
+  {
+    number: 213,
+    topic: 'Someone is DMing scam links',
+    member: 'nadia.r',
+    category: 'Report',
+    status: 'new',
+    priority: 'urgent',
+    assignee: null,
+    lastAt: '1 h 8 min ago',
+    lastBy: 'member',
+    waitingMinutes: 68,
+    openedAt: 'Today at 17:35',
+    about: 'kestrel',
+    file: 'dm-screenshot.png',
+    first:
+      'kestrel has been DMing new members a “free Nitro” link. I got one ten minutes after joining. Screenshot attached.',
+  },
+  {
+    number: 212,
+    topic: 'Art jam entry didn’t post',
+    member: 'mossy_bun',
+    category: 'Events',
+    status: 'claimed',
+    priority: 'normal',
+    assignee: 'You',
+    lastAt: '34 min ago',
+    lastBy: 'member',
+    waitingMinutes: 34,
+    openedAt: 'Today at 16:50',
+    first:
+      'I submitted my piece with /jam submit but it never showed up in #art-share.',
+  },
+  {
+    number: 211,
+    topic: 'Appeal: timeout on Saturday',
+    member: 'quiet.fox',
+    category: 'Appeal',
+    status: 'waiting',
+    priority: 'normal',
+    assignee: 'Rhea',
+    lastAt: '2 h ago',
+    lastBy: 'staff',
+    openedAt: 'Today at 14:02',
+    first:
+      'I got timed out for spam but I was only posting links to my art. Can someone look?',
+    reply: [
+      'Rhea',
+      'Thanks! I’m checking the AutoMod log for Saturday now.',
+      'Today at 16:40',
+    ],
+  },
+  {
+    number: 210,
+    topic: 'How do I get the Artist role?',
+    member: 'pebble',
+    category: 'Roles',
+    status: 'waiting',
+    priority: 'low',
+    assignee: 'You',
+    lastAt: '5 h ago',
+    lastBy: 'staff',
+    openedAt: 'Today at 12:10',
+    first: 'I saw people with a purple Artist role. How do I get it?',
+    reply: [
+      'You',
+      'Share three pieces in #art-share and an Artist can vouch for you. The role usually comes within a day.',
+      'Today at 13:05',
+    ],
+  },
+  {
+    number: 209,
+    topic: 'Level reset after I rejoined',
+    member: 'jun.k',
+    category: 'Levels',
+    status: 'claimed',
+    priority: 'normal',
+    assignee: 'Ayo',
+    lastAt: '50 min ago',
+    lastBy: 'staff',
+    openedAt: 'Today at 15:20',
+    first: 'I left by accident and came back, and now I’m level 1 again.',
+    reply: [
+      'Ayo',
+      'Levels are kept for 30 days after someone leaves, so we can restore yours. Give me a few minutes.',
+      'Today at 17:52',
+    ],
+  },
+  {
+    number: 208,
+    topic: 'Voice channel keeps kicking me',
+    member: 'arlo',
+    category: 'Other',
+    status: 'new',
+    priority: 'high',
+    assignee: null,
+    lastAt: '1 h 21 min ago',
+    lastBy: 'member',
+    waitingMinutes: 81,
+    openedAt: 'Today at 17:22',
+    first:
+      'Every time I join Chill VC I get disconnected after about a minute.',
+  },
+  {
+    number: 207,
+    topic: 'Partnership request',
+    member: 'sunny.d',
+    category: 'Other',
+    status: 'closed',
+    priority: 'low',
+    assignee: 'Rhea',
+    closedBy: 'Rhea',
+    closeReason: 'Not a support issue',
+    lastAt: 'Yesterday',
+    lastBy: 'staff',
+    openedAt: 'Yesterday at 20:14',
+    first:
+      'Hi, I run a small art server and wanted to ask about a partnership.',
+    reply: [
+      'Rhea',
+      'Thanks for asking! We’re not taking partners right now, but we’ll post in #announcements when we do.',
+      'Yesterday at 21:02',
+    ],
+  },
+  {
+    number: 206,
+    topic: 'Lost my colour role',
+    member: 'bramble',
+    category: 'Roles',
+    status: 'closed',
+    priority: 'low',
+    assignee: 'You',
+    closedBy: 'You',
+    closeReason: 'Solved',
+    lastAt: '2 days ago',
+    lastBy: 'staff',
+    openedAt: '11 Oct at 10:30',
+    first: 'My colour role disappeared after the update.',
+    reply: [
+      'You',
+      'Fixed. The colour menu had reset. It’s back now.',
+      '11 Oct at 10:44',
+    ],
+  },
+];
+
+const panelDefault = (channelId: string): TicketPanel => ({
+  channel: channelId,
+  title: 'Need a hand?',
+  description:
+    'Press a button below and a private thread opens with our staff. Only you and the team can see it.',
+  color: '#FACC15',
+  topics: [
+    {
+      id: 'tp1',
+      label: 'Access & roles',
+      style: 'primary',
+      question: 'Which channel or role is missing for you?',
+    },
+    {
+      id: 'tp2',
+      label: 'Report a member',
+      style: 'danger',
+      question: 'Who is it, and what happened? Screenshots help a lot.',
+    },
+    {
+      id: 'tp3',
+      label: 'Something else',
+      style: 'secondary',
+      question: 'What can we help with?',
+    },
+  ],
+  roles: ['Moderator', 'Helper'],
+  ping: true,
+  onePerMember: true,
+  autoClose: '48h',
+});
+
+const studioDefault = (server: Server, channelId: string): StudioMessage => ({
+  name: 'Spring art jam announcement',
+  channel: channelId,
+  content: '@Artists the spring jam starts Saturday!',
+  useEmbed: true,
+  embed: {
+    author: `${server.name} events`,
+    title: 'Spring Art Jam',
+    description:
+      'Draw anything with the theme **bloom** and post it in #art-share before Sunday 22:00. Everyone who enters gets 500 XP.',
+    color: '#FACC15',
+    image: 'https://pixelplaza.gg/img/jam-banner.png',
+    footer: 'Hosted by the event team',
+    thumbnail: true,
+    timestamp: true,
+    fields: [
+      { id: 'f1', name: 'Theme', value: 'Bloom', inline: true },
+      { id: 'f2', name: 'Deadline', value: 'Sunday 22:00', inline: true },
+      {
+        id: 'f3',
+        name: 'Prize',
+        value: 'Artist role + 2,000 XP',
+        inline: true,
+      },
+    ],
+  },
+  buttons: [{ id: 'b1', label: 'Jam rules', url: 'https://pixelplaza.gg/jam' }],
+});
+const simple = (
+  base: StudioMessage,
+  name: string,
+  title: string,
+  description: string,
+  color: string,
+): StudioMessage => ({
+  ...base,
+  name,
+  content: '',
+  embed: {
+    ...base.embed,
+    author: '',
+    title,
+    description,
+    color,
+    image: '',
+    fields: [],
+  },
+  buttons: [],
+});
+
+type SupportState = {
+  tickets: (Seed & { messages: TicketMessage[]; waitingMinutes: number })[];
+  ticketsOn: boolean;
+  panel: TicketPanel;
+  panelVersions: TicketsState['versions'];
+  studio: StudioState;
+};
+
+export function createSupportMock(h: Helpers) {
+  const state = new Map<string, SupportState>();
+  let nextId = 1;
+  const id = (prefix: string) => `${prefix}${nextId++}`;
+
+  function of(serverId: string): SupportState {
+    const server = h.server(serverId);
+    let s = state.get(serverId);
+    if (s) return s;
+    const channels = h.channels(serverId);
+    const byName = (name: string) =>
+      channels.find((c) => c.name === name)?.id ?? channels[0]!.id;
+    const first = serverId === '900000000000000001';
+    const tickets = (first ? seeds : seeds.slice(0, 3)).map((seed) => {
+      const messages: TicketMessage[] = [
+        {
+          id: id('m'),
+          kind: 'opener',
+          author: 'Sparko',
+          authorColor: 1,
+          staff: true,
+          text: `thanks, a staff member will be with you soon. Only you and staff can see this thread.`,
+          at: seed.openedAt,
+        },
+        {
+          id: id('m'),
+          kind: 'message',
+          author: seed.member,
+          authorColor: person(seed.member).color,
+          staff: false,
+          text: seed.first,
+          at: seed.openedAt,
+          ...(seed.file ? { file: seed.file } : {}),
+        },
+      ];
+      if (seed.reply)
+        messages.push({
+          id: id('m'),
+          kind: 'message',
+          author: seed.reply[0] === 'You' ? h.you().name : seed.reply[0],
+          authorColor: staffColors[seed.reply[0]] ?? 3,
+          staff: true,
+          text: seed.reply[1],
+          at: seed.reply[2],
+        });
+      return { ...seed, waitingMinutes: seed.waitingMinutes ?? 0, messages };
+    });
+    const base = studioDefault(server, byName('announcements'));
+    const panel = panelDefault(byName('support'));
+    s = {
+      tickets,
+      ticketsOn: true,
+      panel,
+      panelVersions: [
+        {
+          id: id('v'),
+          title: 'Added the “Report a member” button',
+          who: 'Rhea',
+          whoColor: 5,
+          when: 'Yesterday, 18:20',
+          config: panel,
+        },
+        {
+          id: id('v'),
+          title: 'First version',
+          who: 'You',
+          whoColor: 2,
+          when: '28 Sep, 12:30',
+          config: {
+            ...panel,
+            topics: panel.topics.filter((t) => t.id !== 'tp2'),
+          },
+        },
+      ],
+      studio: {
+        message: base,
+        channels,
+        templates: [
+          {
+            id: id('t'),
+            name: base.name,
+            meta: 'Edited today by you',
+            message: base,
+          },
+          {
+            id: id('t'),
+            name: 'Weekly recap',
+            meta: 'Edited 2 days ago by Ayo',
+            message: simple(
+              base,
+              'Weekly recap',
+              `This week in ${server.name}`,
+              '**3** new artists joined, the jam got **41** entries, and #art-share hit 2,000 posts.',
+              '#5865F2',
+            ),
+          },
+          {
+            id: id('t'),
+            name: 'Server rules',
+            meta: 'Edited 9 Oct by Rhea',
+            message: simple(
+              base,
+              'Server rules',
+              'House rules',
+              'Be kind. No NSFW. Credit other artists. Ask before you DM someone.',
+              '#ED4245',
+            ),
+          },
+          {
+            id: id('t'),
+            name: 'Maintenance notice',
+            meta: 'Edited 28 Sep by you',
+            message: simple(
+              base,
+              'Maintenance notice',
+              'Quick maintenance',
+              'Sparko is restarting at 03:00 UTC. Levels and tickets pause for about five minutes.',
+              '#57F287',
+            ),
+          },
+        ],
+        templateLimit: server.plan === 'plus' ? 100 : 10,
+        versions: [
+          {
+            id: id('v'),
+            title: 'Moved the deadline to Sunday 22:00',
+            who: 'You',
+            whoColor: 2,
+            when: 'Today, 10:15',
+            config: base,
+          },
+          {
+            id: id('v'),
+            title: 'Added the prize field',
+            who: 'Ayo',
+            whoColor: 3,
+            when: 'Yesterday, 19:40',
+            config: {
+              ...base,
+              embed: {
+                ...base.embed,
+                description:
+                  'Draw anything with the theme **bloom** and post it in #art-share before Saturday 22:00.',
+                fields: base.embed.fields.slice(0, 2),
+              },
+            },
+          },
+          {
+            id: id('v'),
+            title: 'First version',
+            who: 'Rhea',
+            whoColor: 5,
+            when: '12 Oct, 14:02',
+            config: {
+              ...base,
+              content: '',
+              embed: {
+                ...base.embed,
+                image: '',
+                fields: [],
+                description: 'Spring jam this weekend. Theme coming soon!',
+              },
+              buttons: [],
+            },
+          },
+        ],
+      },
+    };
+    state.set(serverId, s);
+    return s;
+  }
+  const ticketOf = (serverId: string, number: number) => {
+    const t = of(serverId).tickets.find((x) => x.number === number);
+    if (!t) throw new Error('Ticket not found');
+    return t;
+  };
+  const summary = ({
+    first: _f,
+    file: _x,
+    about: _a,
+    reply: _r,
+    messages: _m,
+    ...t
+  }: SupportState['tickets'][number]): Ticket => t;
+  const guardPaused = (serverId: string) => {
+    if (h.server(serverId).paused)
+      throw new Error('This server is paused by Sparko staff.');
+  };
+
+  const api: SupportApi = {
+    listTickets: (serverId) =>
+      h.wait(h.copy(of(serverId).tickets.map(summary))),
+    async getTicket(serverId, number) {
+      const t = ticketOf(serverId, number);
+      const detail: TicketDetail = {
+        ...summary(t),
+        messages: t.messages,
+        people: [
+          { heading: 'Opened by', person: person(t.member) },
+          ...(t.about
+            ? [{ heading: 'Reported member', person: person(t.about) }]
+            : []),
+        ],
+      };
+      return h.wait(h.copy(detail));
+    },
+    async sendTicketMessage(serverId, number, { text, note }) {
+      guardPaused(serverId);
+      const t = ticketOf(serverId, number);
+      if (t.status === 'closed') throw new Error('This ticket is closed.');
+      t.messages.push({
+        id: id('m'),
+        kind: note ? 'note' : 'message',
+        author: h.you().name,
+        authorColor: h.you().avatarColor,
+        staff: true,
+        text,
+        at: 'Just now',
+      });
+      if (!note) {
+        t.lastAt = 'Just now';
+        t.lastBy = 'staff';
+        t.waitingMinutes = 0;
+        t.status = 'waiting';
+        if (!t.assignee) t.assignee = 'You';
+      }
+      return h.wait(undefined);
+    },
+    async updateTicket(serverId, number, change) {
+      guardPaused(serverId);
+      const t = ticketOf(serverId, number);
+      if (change.priority) t.priority = change.priority;
+      if (change.assignee !== undefined) {
+        t.assignee = change.assignee;
+        if (t.status === 'new' && change.assignee) t.status = 'claimed';
+        if (!change.assignee && t.status === 'claimed') t.status = 'new';
+      }
+      return h.wait(undefined);
+    },
+    async closeTicket(serverId, number, { reason, detail }) {
+      guardPaused(serverId);
+      const t = ticketOf(serverId, number);
+      t.status = 'closed';
+      t.closedBy = 'You';
+      t.closeReason = detail ? `${reason}: ${detail}` : reason;
+      t.waitingMinutes = 0;
+      return h.wait(undefined);
+    },
+    async reopenTicket(serverId, number) {
+      guardPaused(serverId);
+      const t = ticketOf(serverId, number);
+      t.status = t.assignee ? 'claimed' : 'new';
+      delete t.closedBy;
+      delete t.closeReason;
+      return h.wait(undefined);
+    },
+    async getTickets(serverId) {
+      const s = of(serverId);
+      return h.wait(
+        h.copy<TicketsState>({
+          on: s.ticketsOn,
+          panel: s.panel,
+          channels: h.channels(serverId),
+          roles: ['Admin', 'Moderator', 'Helper', 'Event team'],
+          staff: [
+            { name: 'You', color: 2 },
+            { name: 'Rhea', color: 5 },
+            { name: 'Ayo', color: 3 },
+          ],
+          versions: s.panelVersions,
+        }),
+      );
+    },
+    async saveTickets(serverId, change) {
+      guardPaused(serverId);
+      const s = of(serverId);
+      s.ticketsOn = change.on;
+      s.panel = h.copy(change.panel);
+      s.panelVersions.unshift({
+        id: id('v'),
+        title: change.on ? 'Updated the ticket panel' : 'Turned Tickets off',
+        who: 'You',
+        whoColor: h.you().avatarColor,
+        when: 'Just now',
+        config: h.copy(change.panel),
+      });
+      return h.wait(undefined);
+    },
+    async getStudio(serverId) {
+      const s = of(serverId);
+      return h.wait(h.copy({ ...s.studio, channels: h.channels(serverId) }));
+    },
+    async publishStudio(serverId, message) {
+      guardPaused(serverId);
+      const s = of(serverId);
+      s.studio.message = h.copy(message);
+      s.studio.versions.unshift({
+        id: id('v'),
+        title: 'Published changes',
+        who: 'You',
+        whoColor: h.you().avatarColor,
+        when: 'Just now',
+        config: h.copy(message),
+      });
+      return h.wait(undefined);
+    },
+    async saveTemplate(serverId, { name, message }) {
+      const s = of(serverId);
+      if (s.studio.templates.length >= s.studio.templateLimit)
+        throw new Error('You’ve used every template on this plan.');
+      s.studio.templates.unshift({
+        id: id('t'),
+        name,
+        meta: 'Saved just now by you',
+        message: h.copy(message),
+      });
+      return h.wait(undefined);
+    },
+    async deleteTemplate(serverId, templateId) {
+      const s = of(serverId);
+      s.studio.templates = s.studio.templates.filter(
+        (t) => t.id !== templateId,
+      );
+      return h.wait(undefined);
+    },
+  };
+
+  return {
+    api,
+    reset: () => state.clear(),
+    /** The channel a module posts in, for the apply check. */
+    postingChannel: (serverId: string, moduleId: string) => {
+      if (moduleId === 'tickets') {
+        const s = of(serverId);
+        return s.ticketsOn ? s.panel.channel : undefined;
+      }
+      if (moduleId === 'studio') return of(serverId).studio.message.channel;
+      return undefined;
+    },
+  };
+}

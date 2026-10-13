@@ -57,6 +57,11 @@ export function useServerId() {
   const { serverId = '' } = useParams();
   return serverId;
 }
+/** The module whose page is open; a single ticket belongs to Tickets. */
+export function useActiveModuleId() {
+  const { moduleId, ticketNumber } = useParams();
+  return moduleId ?? (ticketNumber ? 'tickets' : undefined);
+}
 /** The server in the address, once the server list has loaded. */
 export function useCurrentServer() {
   const serverId = useServerId();

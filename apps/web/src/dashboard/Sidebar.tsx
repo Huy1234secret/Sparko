@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Badge, Button, Icon, useToast } from '../ui';
 import { groups, modules } from '../content/modules';
 import { useOverview, useServers, type Server } from '../data';
@@ -9,6 +9,7 @@ import {
   moduleHealth,
   planName,
   ServerMark,
+  useActiveModuleId,
 } from './shared';
 
 /** Picks another server; also links to all servers and to adding Sparko. */
@@ -174,7 +175,7 @@ export function Sidebar({
   open: boolean;
   onClose: () => void;
 }) {
-  const { moduleId } = useParams();
+  const moduleId = useActiveModuleId();
   const overview = useOverview(server.id).data;
   const [query, setQuery] = useState('');
   const [closed, setClosed] = useState<Set<string>>(() => new Set());
