@@ -1,0 +1,10 @@
+{
+  "name": "@sparko/server",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node --disable-warning=ExperimentalWarning src/main.ts"
+  }
+}

@@ -14,7 +14,8 @@
     "format:check": "prettier --check apps docs *.json *.yaml .github",
     "format": "prettier --write apps docs *.json *.yaml .github",
     "build": "pnpm -r build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "start": "pm2 start ecosystem.config.cjs"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
