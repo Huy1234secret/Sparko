@@ -1,0 +1,37 @@
+/* The Sparko design system (design-system/ at the repository root), minus its
+   Google Fonts import: Inter is served from this site instead. */
+@import '@fontsource-variable/inter';
+@import '../../../design-system/tokens/colors.css';
+@import '../../../design-system/tokens/typography.css';
+@import '../../../design-system/tokens/spacing.css';
+@import '../../../design-system/tokens/effects.css';
+@import '../../../design-system/tokens/base.css';
+@import '../../../design-system/assets/icons/icons.css';
+@import '../../../design-system/components/actions/actions.css';
+@import '../../../design-system/components/inputs/inputs.css';
+@import '../../../design-system/components/pickers/pickers.css';
+@import '../../../design-system/components/choice/choice.css';
+@import '../../../design-system/components/navigation/navigation.css';
+@import '../../../design-system/components/command/command.css';
+@import '../../../design-system/components/status/status.css';
+@import '../../../design-system/components/notices/notices.css';
+@import '../../../design-system/components/toasts/toasts.css';
+@import '../../../design-system/components/states/states.css';
+@import '../../../design-system/components/overlays/overlays.css';
+@import '../../../design-system/components/cards/cards.css';
+@import '../../../design-system/components/table/table.css';
+@import '../../../design-system/components/identity/identity.css';
+@import '../../../design-system/components/pricing/pricing.css';
+@import '../../../design-system/components/discord/discord.css';
+@import '../../../design-system/components/shell/shell.css';
+@import '../../../design-system/components/panel/panel.css';
+@import '../../../design-system/components/site/site.css';
+
+:root {
+  --sp-font-sans:
+    'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', sans-serif;
+}
+html {
+  scroll-padding-top: 88px;
+}

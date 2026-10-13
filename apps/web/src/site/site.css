@@ -1,0 +1,133 @@
+/* Small additions to the design system's site styles (components/site). */
+a.sp-btn {
+  text-decoration: none;
+}
+.sw-stage__tabs {
+  flex-wrap: wrap;
+}
+.sw-demo-dc {
+  font: 400 13px/18px var(--sp-font-discord);
+  color: var(--sp-dc-text);
+  background: var(--sp-dc-bg);
+  padding: 8px 10px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.sw-status-demo {
+  gap: 8px;
+  font: 500 13px/18px var(--sp-font-sans);
+}
+.sw-status-demo span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--sp-success);
+}
+.sw-feature-art {
+  min-height: 320px;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  background: var(--sp-brand-soft);
+  border-color: var(--sp-brand-line);
+}
+.sw-swatches {
+  flex-wrap: wrap;
+  align-self: start;
+}
+.dc-msg--first {
+  margin-top: 0;
+}
+
+/* Docs and legal text */
+.sw-docs {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 900px) {
+  .sw-docs {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .sw-docs__toc {
+    position: sticky;
+    top: 96px;
+    align-self: start;
+  }
+}
+.sw-docs__toc ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-docs__toc a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--sp-radius-sm, 8px);
+  color: var(--sp-muted);
+  text-decoration: none;
+}
+.sw-docs__toc a:hover {
+  background: var(--sp-raised);
+  color: var(--sp-text);
+}
+.sw-prose {
+  display: grid;
+  gap: 32px;
+  max-width: 72ch;
+  color: var(--sp-text);
+  font: 400 16px/26px var(--sp-font-sans);
+}
+.sw-prose section {
+  display: grid;
+  gap: 12px;
+}
+.sw-prose h2 {
+  font: 600 20px/28px var(--sp-font-sans);
+  letter-spacing: -0.01em;
+}
+.sw-prose h3 {
+  margin-top: 8px;
+  font: 600 16px/24px var(--sp-font-sans);
+}
+.sw-prose ul,
+.sw-prose ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+}
+.sw-prose ul {
+  list-style: disc;
+}
+.sw-prose li::marker {
+  color: var(--sp-muted);
+}
+.sw-docs__groups {
+  list-style: none !important;
+  padding-left: 0 !important;
+}
+.sw-docs__groups li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px 10px;
+  align-items: baseline;
+}
+.sw-docs__groups .sw-body {
+  font-size: 14px;
+}
+.sw-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+}
+.sw-card__action {
+  margin-top: auto;
+  padding-top: 8px;
+}
