@@ -406,6 +406,8 @@ describe('server API', () => {
         thumbnail: '',
         gallery: [],
         order: ['text', 'components', 'gallery'],
+        above: [],
+        below: [],
       },
     };
     const bad = await call('/9001/studio', {

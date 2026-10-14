@@ -901,6 +901,17 @@ describe('Components V2 in the editor', () => {
     expect(json().indexOf('"type": 12')).toBeLessThan(
       json().indexOf('Summer Jam'),
     );
+    // …and out of the container, below it.
+    for (let i = 0; i < 4; i++) {
+      screen.getByRole('button', { name: /Move the gallery/ }).focus();
+      await userEvent.keyboard('{ArrowDown}');
+    }
+    expect(document.querySelector('.sp-v2-part--gallery')).toHaveClass(
+      'is-outside',
+    );
+    expect(json().indexOf('"type": 17')).toBeLessThan(
+      json().indexOf('"type": 12'),
+    );
     await userEvent.click(
       screen.getByRole('button', { name: 'Remove image 1' }),
     );

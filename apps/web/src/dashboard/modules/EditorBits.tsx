@@ -400,16 +400,69 @@ export function UrlPopover({
   );
 }
 
+const SETTLE = { duration: 220, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' };
+const still = () =>
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+type KeyOf = (el: HTMLElement) => unknown;
+const keyOfItem: KeyOf = (el) => el.dataset.key ?? el;
+
+/** Where each item is on screen, by its key (or itself when it has none). */
+export function measure(els: HTMLElement[], keyOf = keyOfItem) {
+  return new Map<unknown, DOMRect>(
+    els.map((el) => [keyOf(el), el.getBoundingClientRect()]),
+  );
+}
+
+/**
+ * After a list changes order, slides each item from where it was to where
+ * it now is. `before` is from {@link measure}, taken just before the change.
+ * Call it straight after the change has been drawn (`now`), or let it wait
+ * for the next frame.
+ */
+export function slideFrom(
+  els: () => HTMLElement[],
+  before: Map<unknown, DOMRect>,
+  { keyOf = keyOfItem, now = false }: { keyOf?: KeyOf; now?: boolean } = {},
+) {
+  if (still()) return;
+  const run = () => {
+    for (const el of els()) {
+      const was = before.get(keyOf(el));
+      if (!was) continue;
+      const at = el.getBoundingClientRect();
+      const dx = was.left - at.left;
+      const dy = was.top - at.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      el.animate?.(
+        [
+          { transform: `translate(${dx}px, ${dy}px)` },
+          { transform: 'translate(0, 0)' },
+        ],
+        SETTLE,
+      );
+    }
+  };
+  if (now) run();
+  else requestAnimationFrame(run);
+}
+
 /**
  * Drag to reorder, for any list: drag an item's handle, or focus it and
- * use the arrow keys. `grid` is for items that wrap across rows.
+ * use the arrow keys. While dragging, the item follows the pointer and the
+ * others slide aside to show where it will land; let go and it settles
+ * into its place. `grid` is for items that wrap across rows.
  */
 export function useReorder({
   onMove,
   mode = 'list',
+  fit = false,
 }: {
   onMove: (from: number, to: number) => void;
   mode?: 'list' | 'grid';
+  /** Grid items take the size of the place they slide into (a gallery's). */
+  fit?: boolean;
 }) {
   // The list element, kept in state so nothing reads a ref while rendering.
   const [listEl, list] = useState<HTMLElement | null>(null);
@@ -419,33 +472,99 @@ export function useReorder({
     Array.from(
       listEl?.querySelectorAll<HTMLElement>(`[data-reorder="${group}"]`) ?? [],
     );
-  const overAt = (x: number, y: number) => {
-    const all = items();
-    const at = all.findIndex((el) => {
-      const r = el.getBoundingClientRect();
-      return mode === 'list'
-        ? y < r.top + r.height / 2
-        : y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+
+  /** Moves an item, sliding everything to its new place. */
+  const commit = (els: HTMLElement[], from: number, to: number) => {
+    const before = measure(els);
+    for (const el of els) {
+      el.style.transition = 'none';
+      el.style.transform = '';
+      el.style.transformOrigin = '';
+      el.style.zIndex = '';
+    }
+    setDrag(null);
+    if (to !== from) onMove(from, to);
+    slideFrom(items, before);
+    requestAnimationFrame(() => {
+      for (const el of els) el.style.transition = '';
     });
-    return at < 0 ? all.length : at;
   };
+
   const start = (from: number) => (e: React.PointerEvent<HTMLElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    const els = items();
+    const dragged = els[from];
+    if (!dragged) return;
+    // Where everything starts; the places to drop are worked out from these.
+    const slots = els.map((el) => el.getBoundingClientRect());
+    const fixed = els.map((el) => el.dataset.fixed === 'true');
+    const gap =
+      slots.length > 1 ? Math.max(0, slots[1]!.top - slots[0]!.bottom) : 0;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
     let over = from;
     setDrag({ from, over });
+    dragged.style.zIndex = '5';
+    dragged.style.transition = 'none';
+    for (const [i, el] of els.entries())
+      if (i !== from)
+        el.style.transition = `transform ${SETTLE.duration}ms ${SETTLE.easing}`;
+
+    const overAt = (x: number, y: number) => {
+      const at = slots.findIndex((r) =>
+        mode === 'list'
+          ? y < r.top + r.height / 2
+          : y < r.top || (y <= r.bottom && x < r.left + r.width / 2),
+      );
+      return at < 0 ? slots.length : at;
+    };
+    // Slides the other items to where they'd be with the dragged one moved.
+    const preview = (to: number) => {
+      const order = moveItem(
+        els.map((_, i) => i),
+        from,
+        to,
+      );
+      let top = slots[0]!.top;
+      order.forEach((k, j) => {
+        const own = slots[k]!;
+        const target =
+          mode === 'list'
+            ? { left: own.left, top }
+            : { left: slots[j]!.left, top: slots[j]!.top };
+        top += own.height + gap;
+        if (k === from || fixed[k]) return;
+        const dx = target.left - own.left;
+        const dy = target.top - own.top;
+        const size =
+          fit && mode === 'grid'
+            ? ` scale(${slots[j]!.width / own.width}, ${slots[j]!.height / own.height})`
+            : '';
+        els[k]!.style.transformOrigin = size ? '0 0' : '';
+        els[k]!.style.transform =
+          Math.abs(dx) < 1 && Math.abs(dy) < 1 && !size
+            ? ''
+            : `translate(${dx}px, ${dy}px)${size}`;
+      });
+    };
+
     const move = (ev: PointerEvent) => {
-      over = overAt(ev.clientX, ev.clientY);
+      const dx = ev.clientX - x0;
+      const dy = ev.clientY - y0;
+      dragged.style.transform = `translate(${mode === 'list' ? 0 : dx}px, ${dy}px)`;
+      const next = overAt(ev.clientX, ev.clientY);
+      if (next === over) return;
+      over = next;
       setDrag({ from, over });
+      preview(over > from ? over - 1 : over);
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      setDrag(null);
-      const to = over > from ? over - 1 : over;
-      if (to !== from) onMove(from, to);
+      commit(els, from, over > from ? over - 1 : over);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -458,18 +577,20 @@ export function useReorder({
       if (!back && !ahead) return;
       e.preventDefault();
       const to = from + (back ? -1 : 1);
-      if (to >= 0 && to < count) onMove(from, to);
+      if (to >= 0 && to < count) commit(items(), from, to);
     };
-  const dropClass = (i: number, count: number) => {
-    if (!drag) return null;
-    if (drag.from === i) return 'is-dragged';
-    if (drag.over === drag.from || drag.over === drag.from + 1) return null;
-    if (drag.over === i) return 'is-drop-before';
-    if (drag.over === count && i === count - 1) return 'is-drop-after';
-    return null;
-  };
-  /** Props for each item and its handle. */
-  const item = (i: number) => ({ 'data-reorder': group, 'data-index': i });
+  const dropClass = (i: number, _count?: number) =>
+    drag?.from === i ? 'is-dragged' : null;
+  /**
+   * Props for each item. A key lets an item that moves to another row still
+   * slide into place; `fixed` items mark places to drop but never move.
+   */
+  const item = (i: number, key?: string, fixed?: boolean) => ({
+    'data-reorder': group,
+    'data-index': i,
+    ...(key ? { 'data-key': key } : {}),
+    ...(fixed ? { 'data-fixed': 'true' } : {}),
+  });
   return { list, start, keys, dropClass, item, dragging: drag !== null };
 }
 

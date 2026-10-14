@@ -194,7 +194,13 @@ function ActionCard({
   const [fading, setFading] = useState(false);
   const title =
     action.type === 'send' ? 'Send message template' : 'Give or take role';
-  const templateItems: ComboItem[] = data.templates.map((t) => ({
+  // Templates are listed folder by folder, loose ones first.
+  const folderOf = (t: { folderId: string | null }) =>
+    t.folderId ? folderLabel(data.folders, t.folderId) : '';
+  const templates = [...data.templates].sort((a, b) =>
+    folderOf(a).localeCompare(folderOf(b)),
+  );
+  const templateItems: ComboItem[] = templates.map((t) => ({
     value: t.id,
     label: t.name,
     group: folderLabel(data.folders, t.folderId),
@@ -221,7 +227,7 @@ function ActionCard({
   }));
   return (
     <li
-      {...reorder.item(index)}
+      {...reorder.item(index, action.id)}
       className={cx(
         'sp-action',
         reorder.dropClass(index, count),
@@ -668,7 +674,7 @@ function MenuSettings({
             {menu.options.map((o, i) => (
               <li
                 key={o.id}
-                {...reorder.item(i)}
+                {...reorder.item(i, o.id)}
                 className={cx(
                   'sp-action sp-option',
                   reorder.dropClass(i, menu.options.length),
@@ -777,7 +783,7 @@ function ComponentItem({
   );
   return (
     <div
-      {...reorder.item(index)}
+      {...reorder.item(index, component.id)}
       className={cx(
         'sp-comp',
         c.type === 'menu' ? 'sp-comp--menu' : 'sp-comp--button',

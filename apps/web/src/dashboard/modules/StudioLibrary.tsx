@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import {
   AnimatedButton,
   Badge,
@@ -25,6 +31,7 @@ import {
   type StudioState,
   type StudioTemplate,
 } from '../../data';
+import { measure, slideFrom } from './EditorBits';
 import editAnim from '../../../../../design-system/assets/icons/animated-icons/edit-button-hover.json?url';
 import cloneAnim from '../../../../../design-system/assets/icons/animated-icons/clone-button-hover.json?url';
 import removeAnim from '../../../../../design-system/assets/icons/animated-icons/remove-button-hover.json?url';
@@ -140,6 +147,21 @@ export function StudioLibrary({
   if (folderGone) setFolderId(null);
 
   const items = itemsIn(studio, folderId);
+  // After a move, the cards slide to their new places; the one dropped
+  // glides from where it was let go.
+  const cards = () =>
+    Array.from(
+      list.current?.querySelectorAll<HTMLElement>('[data-lib-key]') ?? [],
+    );
+  const cardKey = (el: HTMLElement) => el.dataset.libKey;
+  const slide = useRef<Map<unknown, DOMRect> | null>(null);
+  const order = items.map(keyOf).join();
+  useLayoutEffect(() => {
+    const before = slide.current;
+    if (!before) return;
+    slide.current = null;
+    slideFrom(cards, before, { keyOf: cardKey, now: true });
+  }, [order]);
   const path = folderPath(studio, folderId);
   const fullTemplates = studio.templates.length >= studio.templateLimit;
   const fullFolders = studio.folders.length >= studio.folderLimit;
@@ -198,6 +220,14 @@ export function StudioLibrary({
     }
     if (t.type === 'into')
       setAdded((a) => ({ ...a, [t.key]: (a[t.key] ?? 0) + 1 }));
+    else {
+      const before = measure(cards(), cardKey);
+      const ghostBox = document
+        .querySelector('.sp-lib-ghost')
+        ?.getBoundingClientRect();
+      if (ghostBox) before.set(key, ghostBox);
+      slide.current = before;
+    }
     setAnnounce(`Moved. ${describe(t)}`);
     actions.move.mutate(move, { onError: failed('Couldn’t move that') });
   };

@@ -1,7 +1,14 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { cx } from '../../ui';
 import type { StudioEmbed, StudioMessage } from '../../data';
-import { CloseButton, EditText, MaskIcon, UrlPopover } from './EditorBits';
+import {
+  CloseButton,
+  EditText,
+  MaskIcon,
+  UrlPopover,
+  moveItem,
+  useReorder,
+} from './EditorBits';
 import { newId } from './parts';
 import { ColourPicker } from './ColourPicker';
 import { ComponentsArea } from './ComponentsEditor';
@@ -190,24 +197,20 @@ function EmbedBlock({
   index,
   count,
   serverId,
-  dropClass,
+  reorder,
   openPop,
   onChange,
   onRemove,
-  onMove,
-  onDragStart,
 }: {
   embed: StudioEmbed;
   index: number;
   count: number;
   serverId: string;
-  dropClass: string | null;
+  reorder: Omit<ReturnType<typeof useReorder>, 'list'>;
   /** A popover to show when the embed first appears. */
   openPop: Pop | null;
   onChange: (patch: Partial<StudioEmbed>) => void;
   onRemove: () => void;
-  onMove: (by: number) => void;
-  onDragStart: (e: React.PointerEvent<HTMLButtonElement>) => void;
 }) {
   const [pop, setPop] = useState<Pop | null>(openPop);
   const fields = embed.fields;
@@ -248,8 +251,8 @@ function EmbedBlock({
 
   return (
     <div
-      className={cx('sp-embed-wrap', dropClass)}
-      data-embed-index={index}
+      {...reorder.item(index, embed.id)}
+      className={cx('sp-embed-wrap', reorder.dropClass(index))}
       style={{ '--dc-color': embed.color } as CSSProperties}
     >
       <div className="sp-embed-gutter">
@@ -267,16 +270,8 @@ function EmbedBlock({
           className="sp-embed-drag"
           aria-label={`Move ${label}. Drag it, or use the arrow keys.`}
           disabled={count < 2}
-          onPointerDown={onDragStart}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowUp' && index > 0) {
-              e.preventDefault();
-              onMove(-1);
-            } else if (e.key === 'ArrowDown' && index < count - 1) {
-              e.preventDefault();
-              onMove(1);
-            }
-          }}
+          onPointerDown={reorder.start(index)}
+          onKeyDown={reorder.keys(index, count)}
         >
           <MaskIcon src={dragIcon} size={16} />
         </button>
@@ -460,60 +455,14 @@ export function EmbedCanvas({
   focus: { id: string; pop?: Pop } | null;
 }) {
   const embeds = message.embeds;
-  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
-  const list = useRef<HTMLDivElement>(null);
 
   const editEmbed = (id: string, patch: Partial<StudioEmbed>) =>
     onChange({
       embeds: embeds.map((e) => (e.id === id ? { ...e, ...patch } : e)),
     });
-  const moveEmbed = (from: number, to: number) => {
-    if (from === to) return;
-    const next = [...embeds];
-    const [e] = next.splice(from, 1);
-    next.splice(to, 0, e!);
-    onChange({ embeds: next });
-  };
-  const startDrag =
-    (from: number) => (e: React.PointerEvent<HTMLButtonElement>) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      let over = from;
-      setDrag({ from, over });
-      const move = (ev: PointerEvent) => {
-        const blocks = Array.from(
-          list.current?.querySelectorAll<HTMLElement>('[data-embed-index]') ??
-            [],
-        );
-        // The place is the first embed whose middle is below the pointer.
-        const at = blocks.findIndex((b) => {
-          const r = b.getBoundingClientRect();
-          return ev.clientY < r.top + r.height / 2;
-        });
-        over = at < 0 ? blocks.length : at;
-        setDrag({ from, over });
-      };
-      const up = () => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        window.removeEventListener('pointercancel', up);
-        setDrag(null);
-        moveEmbed(from, over > from ? over - 1 : over);
-      };
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-      window.addEventListener('pointercancel', up);
-    };
-  const dropClass = (i: number) => {
-    if (!drag || drag.over === drag.from || drag.over === drag.from + 1)
-      return drag?.from === i ? 'is-dragged' : null;
-    if (drag.from === i) return 'is-dragged';
-    if (drag.over === i) return 'is-drop-before';
-    if (drag.over === embeds.length && i === embeds.length - 1)
-      return 'is-drop-after';
-    return null;
-  };
+  const { list, ...reorder } = useReorder({
+    onMove: (from, to) => onChange({ embeds: moveItem(embeds, from, to) }),
+  });
 
   return (
     <div className="dc-chat sp-canvas">
@@ -544,14 +493,12 @@ export function EmbedCanvas({
               index={i}
               count={embeds.length}
               serverId={serverId}
-              dropClass={dropClass(i)}
+              reorder={reorder}
               openPop={focus?.id === e.id ? (focus.pop ?? null) : null}
               onChange={(patch) => editEmbed(e.id, patch)}
               onRemove={() =>
                 onChange({ embeds: embeds.filter((x) => x.id !== e.id) })
               }
-              onMove={(by) => moveEmbed(i, i + by)}
-              onDragStart={startDrag(i)}
             />
           ))}
         </div>
