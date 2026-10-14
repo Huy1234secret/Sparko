@@ -38,12 +38,18 @@ const loadGroups = () =>
     })),
   ));
 
-// The emoji files the button picks from, one per visit.
-const faces = import.meta.glob<string>(
-  '../../../../../design-system/assets/icons/animated-icons/emoji-button/emoji_*_hover.json',
+// The faces the button picks from, one per visit: each has an animation
+// for appearing (_reveal) and one for hover (_hover).
+const faceFiles = import.meta.glob<string>(
+  '../../../../../design-system/assets/icons/animated-icons/emoji-button/emoji_*_{reveal,hover}.json',
   { query: '?url', import: 'default', eager: true },
 );
-const faceList = Object.values(faces);
+const faceList = Object.entries(faceFiles)
+  .filter(([path]) => path.endsWith('_hover.json'))
+  .map(([path, hover]) => ({
+    hover,
+    reveal: faceFiles[path.replace('_hover.json', '_reveal.json')] ?? hover,
+  }));
 
 /** The round button that opens the picker; its face is picked at random. */
 export function EmojiButton({
@@ -54,10 +60,11 @@ export function EmojiButton({
   onPick: (text: string) => void;
 }) {
   const [face] = useState(
-    () => faceList[Math.floor(Math.random() * faceList.length)] ?? '',
+    () => faceList[Math.floor(Math.random() * faceList.length)],
   );
-  // It plays once when it appears, then each time the pointer comes over it.
-  const [play, setPlay] = useState(1);
+  // It plays its reveal when it appears, then its hover each time the
+  // pointer comes over it.
+  const [play, setPlay] = useState({ src: face?.reveal ?? '', key: 1 });
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), wrap);
@@ -69,10 +76,14 @@ export function EmojiButton({
         aria-label="Add an emoji"
         aria-expanded={open}
         aria-haspopup="dialog"
-        onPointerEnter={() => setPlay((n) => n + 1)}
+        onPointerEnter={() =>
+          setPlay((p) => ({ src: face?.hover ?? '', key: p.key + 1 }))
+        }
         onClick={() => setOpen((o) => !o)}
       >
-        {face && <LottieIcon src={face} size={24} playKey={play} original />}
+        {play.src && (
+          <LottieIcon src={play.src} size={24} playKey={play.key} original />
+        )}
       </button>
       {open && (
         <EmojiPicker
