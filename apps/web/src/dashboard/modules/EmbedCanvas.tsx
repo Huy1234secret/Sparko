@@ -1,15 +1,10 @@
 import { useRef, useState, type CSSProperties } from 'react';
-import { Button, Input, cx } from '../../ui';
+import { cx } from '../../ui';
 import type { StudioEmbed, StudioMessage } from '../../data';
-import {
-  CloseButton,
-  EditText,
-  MaskIcon,
-  UrlPopover,
-  useDismiss,
-} from './EditorBits';
+import { CloseButton, EditText, MaskIcon, UrlPopover } from './EditorBits';
 import { newId } from './parts';
 import { ColourPicker } from './ColourPicker';
+import { ComponentsArea } from './ComponentsEditor';
 import addImage from '../../../../../design-system/assets/icons/add-image-button.png';
 import colourWheel from '../../../../../design-system/assets/icons/color-picker.png';
 import dragIcon from '../../../../../design-system/assets/icons/drag.png';
@@ -18,7 +13,6 @@ import upIcon from '../../../../../design-system/assets/icons/arrow-up-icon.svg'
 import downIcon from '../../../../../design-system/assets/icons/arrow-down-icon.svg';
 
 type Field = StudioEmbed['fields'][number];
-type LinkButton = StudioMessage['buttons'][number];
 type Pop =
   | 'colour'
   | 'image'
@@ -29,7 +23,6 @@ type Pop =
 
 export const MAX_EMBEDS = 10;
 export const MAX_FIELDS = 25;
-export const MAX_BUTTONS = 25;
 
 export const newEmbed = (): StudioEmbed => ({
   id: newId(),
@@ -450,74 +443,6 @@ function EmbedBlock({
   );
 }
 
-/** A link button under the message; clicking it opens its label and link. */
-function LinkButtonChip({
-  button,
-  onChange,
-  onRemove,
-  startOpen,
-}: {
-  button: LinkButton;
-  onChange: (patch: Partial<LinkButton>) => void;
-  onRemove: () => void;
-  startOpen: boolean;
-}) {
-  const [open, setOpen] = useState(startOpen);
-  const wrap = useRef<HTMLDivElement>(null);
-  useDismiss(open, () => setOpen(false), wrap);
-  const bad = !/^https:\/\/\S+$/.test(button.url);
-  return (
-    <div ref={wrap} className="sp-pop-anchor">
-      <button
-        type="button"
-        className={cx('dc-btn sp-link-chip', bad && 'is-bad')}
-        aria-label={`Edit button ${button.label || 'without a label'}`}
-        onClick={() => setOpen((o) => !o)}
-      >
-        {button.label || 'Button'}
-        <MaskIcon src={linkIcon} size={14} />
-      </button>
-      {open && (
-        <div className="sp-url-pop" role="dialog" aria-label="Link button">
-          <CloseButton
-            label="Close"
-            className="sp-url-pop__x"
-            onClick={() => setOpen(false)}
-          />
-          <Input
-            label="Label"
-            value={button.label}
-            maxLength={80}
-            autoFocus
-            onChange={(e) => onChange({ label: e.target.value })}
-          />
-          <Input
-            label="Link"
-            value={button.url}
-            placeholder="https://"
-            error={bad ? 'Use a link that starts with https://.' : undefined}
-            onChange={(e) => onChange({ url: e.target.value.trim() })}
-          />
-          <div className="sp-url-pop__actions">
-            <span className="sp-url-pop__end">
-              <Button size="sm" variant="ghost" onClick={onRemove}>
-                Remove
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => setOpen(false)}
-              >
-                Done
-              </Button>
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /**
  * The classic message, edited in place: the text, each embed with its
  * pictures, fields and colour, and link buttons underneath.
@@ -630,31 +555,11 @@ export function EmbedCanvas({
             />
           ))}
         </div>
-        {message.buttons.length > 0 && (
-          <div className="dc-components">
-            <div className="dc-row">
-              {message.buttons.map((b) => (
-                <LinkButtonChip
-                  key={b.id}
-                  button={b}
-                  startOpen={focus?.id === b.id}
-                  onChange={(patch) =>
-                    onChange({
-                      buttons: message.buttons.map((x) =>
-                        x.id === b.id ? { ...x, ...patch } : x,
-                      ),
-                    })
-                  }
-                  onRemove={() =>
-                    onChange({
-                      buttons: message.buttons.filter((x) => x.id !== b.id),
-                    })
-                  }
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        <ComponentsArea
+          components={message.components}
+          onChange={(components) => onChange({ components })}
+          focusId={focus?.id ?? null}
+        />
       </div>
     </div>
   );

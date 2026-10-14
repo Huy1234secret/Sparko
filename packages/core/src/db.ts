@@ -155,6 +155,14 @@ const migrations = [
   ALTER TABLE templates ADD COLUMN folder_id INTEGER;
   ALTER TABLE templates ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
   UPDATE templates SET position = -id;`,
+  // 6: Studio messages Sparko posted, so their buttons and menus can work.
+  `CREATE TABLE studio_posts (
+    message_id TEXT PRIMARY KEY,
+    guild_id TEXT NOT NULL,
+    json TEXT NOT NULL,
+    posted_at INTEGER NOT NULL
+  );
+  CREATE INDEX studio_posts_by_guild ON studio_posts (guild_id);`,
 ];
 
 export function openDb(path: string): Db {

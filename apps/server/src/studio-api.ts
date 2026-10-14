@@ -17,7 +17,9 @@ import {
   listVersions,
   moveLibraryItem,
   renameFolder,
+  planProblem,
   savedLine,
+  sendLimit,
   setPosted,
   updateTemplate,
   normaliseStudio,
@@ -73,14 +75,17 @@ export function studioRoutes({
     if (typeof value === 'string' && /^\d{1,12}$/.test(value)) return value;
     throw new BadRequest('That folder isn’t valid.');
   };
-  const messageOf = (value: unknown) => {
+  const messageOf = (value: unknown, guildId: string) => {
     if (
       !value ||
       typeof value !== 'object' ||
       studioProblem({ ...value, name: 'x' }) === 'The message is missing.'
     )
       throw new BadRequest('The message is missing.');
-    return normaliseStudio(value as StudioMessage);
+    const m = normaliseStudio(value as StudioMessage);
+    const tooMany = planProblem(m, getGuild(db, guildId)?.plan);
+    if (tooMany) throw new BadRequest(tooMany);
+    return m;
   };
 
   return async function handle({
@@ -110,6 +115,15 @@ export function studioRoutes({
             ),
         ),
         channels,
+        // Roles "Give or take role" can pick; Discord manages bot roles itself.
+        roles: (v?.roles ?? [])
+          .filter((r) => !r.managed)
+          .map(({ id, name, color }) => ({
+            id,
+            name,
+            color: color ? `#${color.toString(16).padStart(6, '0')}` : null,
+          })),
+        sendLimit: sendLimit(getGuild(db, guildId)?.plan),
         ...(() => {
           const { templates, folders } = listLibrary<StudioMessage>(
             db,
@@ -183,6 +197,8 @@ export function studioRoutes({
       const problem = studioProblem(message);
       if (problem) throw new BadRequest(problem);
       const m = normaliseStudio(message as StudioMessage);
+      const tooMany = planProblem(m, getGuild(db, guildId)?.plan);
+      if (tooMany) throw new BadRequest(tooMany);
       const at = now();
       writeModule(db, guildId, 'studio', { on: true, config: m }, at);
       setPosted(db, guildId, `studio:${m.layout}`, null);
@@ -245,7 +261,7 @@ export function studioRoutes({
         folderId?: unknown;
       }>(req);
       const name = nameOf(body?.name, 'template');
-      const message = messageOf(body?.message);
+      const message = messageOf(body?.message, guildId);
       const folderId = folderOf(body?.folderId);
       if (
         countLibrary(db, guildId, 'studio').templates >=
@@ -329,7 +345,7 @@ export function studioRoutes({
             : { name: nameOf(body.name, 'template') }),
           ...(body?.message === undefined
             ? {}
-            : { message: messageOf(body.message) }),
+            : { message: messageOf(body.message, guildId) }),
           who: user.name,
         },
         now(),

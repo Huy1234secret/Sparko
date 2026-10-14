@@ -241,8 +241,44 @@ export type StudioMessage = {
   content: string;
   /** Up to 10 embeds, shown in this order. */
   embeds: StudioEmbed[];
-  buttons: { id: string; label: string; url: string }[];
+  /** Buttons and menus under the message, in order. */
+  components: StudioComponent[];
 };
+export type StudioAction =
+  | {
+      id: string;
+      type: 'send';
+      templates: string[];
+      dm: boolean;
+      ephemeral: boolean;
+    }
+  | { id: string; type: 'role'; mode: 'give' | 'take'; roles: string[] };
+export type ButtonColour = 'blurple' | 'grey' | 'green' | 'red';
+export type StudioButton = {
+  id: string;
+  type: 'button';
+  label: string;
+  emoji: string;
+  colour: ButtonColour;
+  link: boolean;
+  url: string;
+  actions: StudioAction[];
+};
+export type MenuOption = {
+  id: string;
+  label: string;
+  emoji: string;
+  description: string;
+  actions: StudioAction[];
+};
+export type StudioMenu = {
+  id: string;
+  type: 'menu';
+  placeholder: string;
+  multiple: boolean;
+  options: MenuOption[];
+};
+export type StudioComponent = StudioButton | StudioMenu;
 export type StudioEmbed = {
   id: string;
   author: string;
@@ -295,6 +331,10 @@ export type StudioState = {
   channels: Channel[];
   templates: StudioTemplate[];
   folders: StudioFolder[];
+  /** Roles a button can give or take; Discord's own bot roles are left out. */
+  roles: { id: string; name: string; color: string | null }[];
+  /** How many templates one "Send message" action can send on this plan. */
+  sendLimit: number;
   templateLimit: number;
   folderLimit: number;
   versions: Version<StudioMessage>[];

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addTemplate,
+  componentRows,
+  DiscordError,
+  handleStudioInteraction,
+  planProblem,
+  rememberPost,
+  type StudioButton,
+  type StudioComponent,
+  type StudioMenu,
   embedDefault,
   getPosted,
   normaliseStudio,
@@ -70,7 +79,18 @@ describe('Message Studio messages', () => {
         { ...embedDefault('e2') },
         { ...embedDefault('e3'), image: 'https://cdn/big.png' },
       ],
-      buttons: [{ id: 'x', label: 'Go', url: 'https://example.com' }],
+      components: [
+        {
+          id: 'x',
+          type: 'button',
+          label: 'Go',
+          emoji: '',
+          colour: 'grey',
+          link: true,
+          url: 'https://example.com',
+          actions: [],
+        },
+      ],
     };
     expect(studioProblem(m)).toBeNull();
     const body = studioPayload(m, { now: 0 });
@@ -197,5 +217,277 @@ describe('Message Studio messages', () => {
       `PATCH /channels/100/messages/${first.messageId}`,
       'POST /channels/100/messages',
     ]);
+  });
+});
+
+const button = (
+  id: string,
+  over: Partial<StudioButton> = {},
+): StudioButton => ({
+  id,
+  type: 'button',
+  label: id,
+  emoji: '',
+  colour: 'blurple',
+  link: false,
+  url: '',
+  actions: [{ id: `a-${id}`, type: 'role', mode: 'give', roles: ['900'] }],
+  ...over,
+});
+const menu: StudioMenu = {
+  id: 'pick',
+  type: 'menu',
+  placeholder: 'Choose your roles',
+  multiple: true,
+  options: [
+    {
+      id: 'o1',
+      label: 'Artist',
+      emoji: '<:brush:77>',
+      description: 'Draws things',
+      actions: [{ id: 'r1', type: 'role', mode: 'give', roles: ['901'] }],
+    },
+    {
+      id: 'o2',
+      label: 'Rules',
+      emoji: '📜',
+      description: '',
+      actions: [
+        {
+          id: 's1',
+          type: 'send',
+          templates: ['5'],
+          dm: false,
+          ephemeral: true,
+        },
+      ],
+    },
+  ],
+};
+
+describe('buttons and menus', () => {
+  it('lays out buttons five to a row with each menu on its own', () => {
+    const m: StudioMessage = {
+      ...base,
+      components: [
+        ...['a', 'b', 'c', 'd', 'e', 'f'].map((id) => button(id)),
+        menu,
+        button('g', { link: true, url: 'https://x.example', colour: 'red' }),
+      ],
+    };
+    expect(studioProblem(m)).toBeNull();
+    expect(componentRows(m.components).map((r) => r.length)).toEqual([
+      5, 1, 1, 1,
+    ]);
+    const body = studioPayload(m, { now: 0 }) as {
+      components: { components: Record<string, unknown>[] }[];
+    };
+    expect(body.components[0]!.components[0]).toEqual({
+      type: 2,
+      style: 1,
+      label: 'a',
+      custom_id: 'sp:b:a',
+    });
+    // Link buttons are always grey in Discord, whatever colour was picked.
+    expect(body.components[3]!.components[0]).toMatchObject({
+      style: 5,
+      url: 'https://x.example',
+    });
+    expect(body.components[2]!.components[0]).toMatchObject({
+      type: 3,
+      custom_id: 'sp:m:pick',
+      max_values: 2,
+      options: [
+        {
+          label: 'Artist',
+          value: 'o1',
+          emoji: { id: '77', name: 'brush', animated: false },
+        },
+        { label: 'Rules', value: 'o2', emoji: { name: '📜' } },
+      ],
+    });
+  });
+
+  it('refuses buttons and menus Discord or the bot can’t use', () => {
+    const with_ = (components: StudioComponent[]) =>
+      studioProblem({ ...base, components });
+    expect(with_([button('a', { actions: [] })])).toMatch(/something to do/);
+    expect(with_([button('a', { label: '', emoji: '' })])).toMatch(
+      /text or an emoji/,
+    );
+    expect(with_([button('a', { link: true, url: 'http://x' })])).toMatch(
+      /https/,
+    );
+    expect(with_([{ ...menu, options: [] }])).toMatch(/1 to 25/);
+    expect(with_(Array.from({ length: 6 }, () => menu))).toMatch(/5 rows/);
+    expect(
+      planProblem(
+        {
+          ...base,
+          components: [
+            button('a', {
+              actions: [
+                {
+                  id: 's',
+                  type: 'send',
+                  templates: ['1', '2'],
+                  dm: false,
+                  ephemeral: false,
+                },
+              ],
+            }),
+          ],
+        },
+        'free',
+      ),
+    ).toMatch(/up to 1 template/);
+  });
+
+  it('reads old link buttons as link buttons', () => {
+    const old = {
+      ...base,
+      components: undefined,
+      buttons: [{ id: 'l', label: 'Rules', url: 'https://x.example' }],
+    } as unknown as StudioMessage;
+    expect(normaliseStudio(old).components).toEqual([
+      button('l', {
+        label: 'Rules',
+        colour: 'grey',
+        link: true,
+        url: 'https://x.example',
+        actions: [],
+      }),
+    ]);
+  });
+});
+
+describe('using buttons and menus in Discord', () => {
+  const setup = () => {
+    const db = openDb(':memory:');
+    const calls: { method: string; path: string; body?: unknown }[] = [];
+    let next = 0;
+    const fail = new Map<string, DiscordError>();
+    const run = async (method: string, path: string, body?: unknown) => {
+      calls.push({ method, path, body });
+      const err = fail.get(`${method} ${path}`);
+      if (err) throw err;
+      return { id: `m${++next}` } as never;
+    };
+    const rest = {
+      get: (p: string) => run('GET', p),
+      post: (p: string, b: unknown) => run('POST', p, b),
+      patch: (p: string, b: unknown) => run('PATCH', p, b),
+      put: (p: string, b: unknown) => run('PUT', p, b),
+      delete: (p: string) => run('DELETE', p),
+    } as unknown as Rest;
+    const rules = addTemplate(
+      db,
+      {
+        guildId: 'g',
+        moduleId: 'studio',
+        name: 'Rules',
+        who: 'Quinn',
+        message: { ...base, content: 'Be kind.' },
+      },
+      1,
+    );
+    const msg: StudioMessage = {
+      ...base,
+      components: [
+        button('roles', {
+          actions: [
+            { id: 'r', type: 'role', mode: 'give', roles: ['900', '901'] },
+            {
+              id: 's',
+              type: 'send',
+              templates: [rules],
+              dm: true,
+              ephemeral: false,
+            },
+          ],
+        }),
+        {
+          ...menu,
+          options: menu.options.map((o) =>
+            o.id === 'o2'
+              ? {
+                  ...o,
+                  actions: [
+                    {
+                      id: 's1',
+                      type: 'send' as const,
+                      templates: [rules],
+                      dm: false,
+                      ephemeral: true,
+                    },
+                  ],
+                }
+              : o,
+          ),
+        },
+      ],
+    };
+    rememberPost(db, 'g', 'posted', msg, 1);
+    const i = {
+      id: 'i1',
+      token: 'tok',
+      applicationId: 'app',
+      guildId: 'g',
+      channelId: 'c',
+      userId: 'u',
+      messageId: 'posted',
+      customId: 'sp:b:roles',
+      values: [],
+    };
+    return { db, rest, calls, fail, i };
+  };
+
+  it('runs a button’s actions from top to bottom', async () => {
+    const { db, rest, calls, i } = setup();
+    await handleStudioInteraction(rest, db, i, 1);
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      'POST /interactions/i1/tok/callback',
+      'PUT /guilds/g/members/u/roles/900',
+      'PUT /guilds/g/members/u/roles/901',
+      'POST /users/@me/channels',
+      // The DM channel is the fourth id the pretend API handed out.
+      'POST /channels/m4/messages',
+    ]);
+    // Nothing is shown, so the click is just acknowledged.
+    expect(calls[0]!.body).toEqual({ type: 6 });
+    expect(calls[4]!.body).toMatchObject({ content: 'Be kind.' });
+  });
+
+  it('answers a menu pick privately and says what didn’t work', async () => {
+    const { db, rest, calls, fail, i } = setup();
+    fail.set(
+      'PUT /guilds/g/members/u/roles/901',
+      new DiscordError(403, 50013, 'Missing Permissions'),
+    );
+    await handleStudioInteraction(
+      rest,
+      db,
+      { ...i, customId: 'sp:m:pick', values: ['o2', 'o1'] },
+      1,
+    );
+    expect(calls[0]!.body).toEqual({ type: 5, data: { flags: 64 } });
+    // The template fills the private reply, then the problem follows it.
+    expect(calls[1]).toMatchObject({
+      method: 'PATCH',
+      path: '/webhooks/app/tok/messages/@original',
+      body: { content: 'Be kind.' },
+    });
+    expect(calls.at(-1)).toMatchObject({
+      method: 'POST',
+      path: '/webhooks/app/tok',
+      body: { flags: 64, content: expect.stringMatching(/Manage Roles/) },
+    });
+  });
+
+  it('says so when the message isn’t one it knows', async () => {
+    const { db, rest, calls, i } = setup();
+    await handleStudioInteraction(rest, db, { ...i, messageId: 'gone' }, 1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.body).toMatchObject({ type: 4, data: { flags: 64 } });
   });
 });

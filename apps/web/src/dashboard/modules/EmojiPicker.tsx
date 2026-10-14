@@ -6,7 +6,9 @@ import {
   Segmented,
   Spinner,
   cx,
+  preloadAnimations,
   rememberEmojis,
+  renderDiscordText,
 } from '../../ui';
 import { useServerEmojis, type ServerEmoji } from '../../data';
 import { useDismiss } from './EditorBits';
@@ -37,12 +39,18 @@ const loadGroups = () =>
     })),
   ));
 
-// The emoji files the button picks from, one per visit.
-const faces = import.meta.glob<string>(
-  '../../../../../design-system/assets/icons/animated-icons/emoji-button/emoji_*_hover.json',
+// The faces the button picks from, one per visit: each has an animation
+// for appearing (_reveal) and one for hover (_hover).
+const faceFiles = import.meta.glob<string>(
+  '../../../../../design-system/assets/icons/animated-icons/emoji-button/emoji_*_{reveal,hover}.json',
   { query: '?url', import: 'default', eager: true },
 );
-const faceList = Object.values(faces);
+const faceList = Object.entries(faceFiles)
+  .filter(([path]) => path.endsWith('_hover.json'))
+  .map(([path, hover]) => ({
+    hover,
+    reveal: faceFiles[path.replace('_hover.json', '_reveal.json')] ?? hover,
+  }));
 
 /** The round button that opens the picker; its face is picked at random. */
 export function EmojiButton({
@@ -53,13 +61,18 @@ export function EmojiButton({
   onPick: (text: string) => void;
 }) {
   const [face] = useState(
-    () => faceList[Math.floor(Math.random() * faceList.length)] ?? '',
+    () => faceList[Math.floor(Math.random() * faceList.length)],
   );
-  // It plays once when it appears, then each time the pointer comes over it.
-  const [play, setPlay] = useState(1);
+  // It plays its reveal when it appears, then its hover each time the
+  // pointer comes over it.
+  const [play, setPlay] = useState({ src: face?.reveal ?? '', key: 1 });
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), wrap);
+  // The hover animation is fetched now, so the first hover plays at once.
+  useEffect(() => {
+    if (face) preloadAnimations([face.hover], true);
+  }, [face]);
   return (
     <div ref={wrap} className="sp-pop-anchor">
       <button
@@ -68,10 +81,14 @@ export function EmojiButton({
         aria-label="Add an emoji"
         aria-expanded={open}
         aria-haspopup="dialog"
-        onPointerEnter={() => setPlay((n) => n + 1)}
+        onPointerEnter={() =>
+          setPlay((p) => ({ src: face?.hover ?? '', key: p.key + 1 }))
+        }
         onClick={() => setOpen((o) => !o)}
       >
-        {face && <LottieIcon src={face} size={24} playKey={play} original />}
+        {play.src && (
+          <LottieIcon src={play.src} size={24} playKey={play.key} original />
+        )}
       </button>
       {open && (
         <EmojiPicker
@@ -89,9 +106,11 @@ export function EmojiButton({
 function EmojiPicker({
   serverId,
   onPick,
+  className,
 }: {
   serverId: string;
   onPick: (text: string) => void;
+  className?: string;
 }) {
   const [tab, setTab] = useState<'emoji' | 'server'>('emoji');
   const [query, setQuery] = useState('');
@@ -131,7 +150,11 @@ function EmojiPicker({
     `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`;
 
   return (
-    <div className="sp-emoji-pop" role="dialog" aria-label="Emoji">
+    <div
+      className={cx('sp-emoji-pop', className)}
+      role="dialog"
+      aria-label="Emoji"
+    >
       <Segmented
         label="Emoji set"
         value={tab}
@@ -241,6 +264,62 @@ function EmojiPicker({
       <p className="sp-emoji-pop__name" aria-live="polite">
         {hover || 'Pick an emoji'}
       </p>
+    </div>
+  );
+}
+
+/**
+ * The round emoji box in button and menu settings: empty until an emoji is
+ * picked, which then shows inside it.
+ */
+export function EmojiField({
+  serverId,
+  value,
+  onChange,
+  label,
+}: {
+  serverId: string;
+  value: string;
+  onChange: (emoji: string) => void;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useDismiss(open, () => setOpen(false), wrap);
+  return (
+    <div ref={wrap} className="sp-pop-anchor sp-emoji-field">
+      <button
+        type="button"
+        className={cx('sp-emoji-circle', !!value && 'is-set')}
+        aria-label={
+          value ? `${label}: change the emoji` : `${label}: add an emoji`
+        }
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {value && renderDiscordText(value)}
+      </button>
+      {value && (
+        <button
+          type="button"
+          className="sp-emoji-circle__clear"
+          aria-label={`${label}: remove the emoji`}
+          onClick={() => onChange('')}
+        >
+          ×
+        </button>
+      )}
+      {open && (
+        <EmojiPicker
+          serverId={serverId}
+          className="sp-emoji-pop--start"
+          onPick={(text) => {
+            onChange(text);
+            setOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
