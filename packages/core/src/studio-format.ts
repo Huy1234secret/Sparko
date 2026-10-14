@@ -393,47 +393,86 @@ const str = (v: unknown, max: number) =>
   typeof v === 'string' && v.length <= max;
 const id = (v: unknown) => typeof v === 'string' && /^[\w-]{1,40}$/.test(v);
 
+/** A problem with a message, and where in the editor it is. */
+export type StudioIssue = {
+  problem: string;
+  /**
+   * Where to look: "name", "channel", "text", "accent", "thumbnail",
+   * "gallery", "image:<id>", "embed:<id>", "message", or a button or menu
+   * as "component:<id>", with "/label", "/url", "/actions", "/action:<id>",
+   * "/options" or "/option:<id>" (and its "/action:<id>") after it.
+   */
+  at: string;
+};
+const issue = (problem: string, at = 'message'): StudioIssue => ({
+  problem,
+  at,
+});
+
 /** Checks a message from the dashboard. Returns a problem, or null. */
 export function studioProblem(input: unknown): string | null {
+  return studioIssue(input)?.problem ?? null;
+}
+
+/** Checks a message, saying where the first problem is. */
+export function studioIssue(input: unknown): StudioIssue | null {
   const m = input as Partial<StudioMessage> | null;
-  if (!m || typeof m !== 'object') return 'The message is missing.';
-  if (!str(m.name, 80)) return 'The name must be 80 characters or fewer.';
-  if (!/^\d{1,25}$/.test(m.channel ?? '')) return 'Pick a channel to post in.';
+  if (!m || typeof m !== 'object') return issue('The message is missing.');
+  if (!str(m.name, 80))
+    return issue('The name must be 80 characters or fewer.', 'name');
+  if (!/^\d{1,25}$/.test(m.channel ?? ''))
+    return issue('Pick a channel to post in.', 'channel');
   if (m.layout === 'v2') {
     const v = m.v2;
     if (!v || typeof v !== 'object' || typeof v.text !== 'string')
-      return 'The layout is missing.';
-    if (!hex(v.accent)) return 'Use a colour like #FACC15.';
+      return issue('The layout is missing.');
+    if (!hex(v.accent)) return issue('Use a colour like #FACC15.', 'accent');
     if (v.text.length > 4000)
-      return 'Discord allows 4,000 characters of text in a message like this.';
+      return issue(
+        'Discord allows 4,000 characters of text in a message like this.',
+        'text',
+      );
     if (v.thumbnail && !https(v.thumbnail))
-      return 'The thumbnail link must start with https://.';
+      return issue('The thumbnail link must start with https://.', 'thumbnail');
     if (!Array.isArray(v.gallery) || v.gallery.length > 10)
-      return 'A gallery holds up to 10 images.';
+      return issue('A gallery holds up to 10 images.', 'gallery');
     for (const img of v.gallery)
       if (!id(img?.id) || !https(img.url) || !str(img.description, 1024))
-        return 'Gallery images need a link that starts with https://.';
+        return issue(
+          'Gallery images need a link that starts with https://.',
+          `image:${img?.id}`,
+        );
     if (
       !v2Sections(v.text).some((t) => t.trim()) &&
       !v.gallery.length &&
       !(m.components ?? []).length
     )
-      return 'Add some text, an image or a button. Discord won’t send an empty message.';
+      return issue(
+        'Add some text, an image or a button. Discord won’t send an empty message.',
+        'text',
+      );
     return componentsProblem(m.components);
   }
   if (!str(m.content, 2000))
-    return 'The text must be 2,000 characters or fewer.';
+    return issue('The text must be 2,000 characters or fewer.', 'text');
   if (!Array.isArray(m.embeds) || m.embeds.length > 10)
-    return 'Use up to 10 embeds.';
+    return issue('Use up to 10 embeds.', 'message');
   let size = 0;
   for (const e of m.embeds as StudioEmbed[]) {
     if (!e || typeof e !== 'object' || !id(e.id))
-      return 'An embed is damaged. Remove it and add it again.';
+      return issue(
+        'An embed is damaged. Remove it and add it again.',
+        'message',
+      );
     if (!str(e.author, 256) || !str(e.title, 256) || !str(e.footer, 2048))
-      return 'The author, title or footer is too long.';
+      return issue('The author, title or footer is too long.', `embed:${e.id}`);
     if (!str(e.description, 4096))
-      return 'The description must be 4,096 characters or fewer.';
-    if (!hex(e.color)) return 'Use a colour like #FACC15.';
+      return issue(
+        'The description must be 4,096 characters or fewer.',
+        `embed:${e.id}`,
+      );
+    if (!hex(e.color))
+      return issue('Use a colour like #FACC15.', `embed:${e.id}`);
     for (const url of [
       e.image,
       e.thumbnail,
@@ -442,9 +481,12 @@ export function studioProblem(input: unknown): string | null {
       e.footerIcon,
     ])
       if (typeof url !== 'string' || (url && !https(url)))
-        return 'Links and pictures must start with https://.';
+        return issue(
+          'Links and pictures must start with https://.',
+          `embed:${e.id}`,
+        );
     if (!Array.isArray(e.fields) || e.fields.length > 25)
-      return 'Use up to 25 fields in an embed.';
+      return issue('Use up to 25 fields in an embed.', `embed:${e.id}`);
     for (const f of e.fields)
       if (
         !id(f?.id) ||
@@ -452,7 +494,10 @@ export function studioProblem(input: unknown): string | null {
         !str(f.value, 1024) ||
         typeof f.inline !== 'boolean'
       )
-        return 'A field is too long. Names hold 256 characters and values 1,024.';
+        return issue(
+          'A field is too long. Names hold 256 characters and values 1,024.',
+          `embed:${e.id}`,
+        );
     size +=
       e.author.length +
       e.title.length +
@@ -461,12 +506,18 @@ export function studioProblem(input: unknown): string | null {
       e.fields.reduce((n, f) => n + f.name.length + f.value.length, 0);
   }
   if (size > 6000)
-    return 'Discord rejects embeds with more than 6,000 characters between them.';
+    return issue(
+      'Discord rejects embeds with more than 6,000 characters between them.',
+      'message',
+    );
   if (
     !m.content?.trim() &&
     !(m.embeds as StudioEmbed[]).some((e) => !embedIsEmpty(e))
   )
-    return 'Add some text or an embed. Discord won’t send an empty message.';
+    return issue(
+      'Add some text or an embed. Discord won’t send an empty message.',
+      'text',
+    );
   return componentsProblem(m.components);
 }
 
@@ -482,11 +533,16 @@ export function componentRows(list: StudioComponent[]) {
   return rows;
 }
 
-function actionsProblem(list: unknown): string | null {
+function actionsProblem(list: unknown, at: string): StudioIssue | null {
   if (!Array.isArray(list) || list.length > 10)
-    return 'Use up to 10 actions on a button or option.';
+    return issue(
+      'Use up to 10 actions on a button or option.',
+      `${at}/actions`,
+    );
   for (const a of list as StudioAction[]) {
-    if (!id(a?.id)) return 'An action is damaged. Remove it and add it again.';
+    const here = `${at}/action:${a?.id}`;
+    if (!id(a?.id))
+      return issue('An action is damaged. Remove it and add it again.', at);
     if (a.type === 'send') {
       if (
         !Array.isArray(a.templates) ||
@@ -494,9 +550,9 @@ function actionsProblem(list: unknown): string | null {
         a.templates.length > 10 ||
         !a.templates.every((t) => /^\d{1,12}$/.test(t))
       )
-        return 'Pick the templates a “Send message” action sends.';
+        return issue('Pick the templates a “Send message” action sends.', here);
       if (typeof a.dm !== 'boolean' || typeof a.ephemeral !== 'boolean')
-        return 'An action is damaged. Remove it and add it again.';
+        return issue('An action is damaged. Remove it and add it again.', here);
     } else if (a.type === 'role') {
       if (
         !['give', 'take'].includes(a.mode) ||
@@ -505,8 +561,12 @@ function actionsProblem(list: unknown): string | null {
         a.roles.length > 25 ||
         !a.roles.every((r) => /^\d{1,25}$/.test(r))
       )
-        return 'Pick the roles a “Give or take role” action changes.';
-    } else return 'An action is damaged. Remove it and add it again.';
+        return issue(
+          'Pick the roles a “Give or take role” action changes.',
+          here,
+        );
+    } else
+      return issue('An action is damaged. Remove it and add it again.', here);
   }
   return null;
 }
@@ -516,50 +576,70 @@ const emojiOk = (e: unknown) =>
   e.length <= 64 &&
   (!e || /^<a?:\w{1,32}:\d{1,25}>$/.test(e) || !/[<>:\s]/.test(e));
 
-function componentsProblem(list: unknown): string | null {
-  if (!Array.isArray(list)) return 'The buttons are damaged.';
+function componentsProblem(list: unknown): StudioIssue | null {
+  if (!Array.isArray(list)) return issue('The buttons are damaged.');
   if (componentRows(list as StudioComponent[]).length > 5)
-    return 'Discord shows up to 5 rows of buttons and menus. A menu takes a row of its own.';
+    return issue(
+      'Discord shows up to 5 rows of buttons and menus. A menu takes a row of its own.',
+    );
   for (const c of list as StudioComponent[]) {
-    if (!id(c?.id)) return 'A button is damaged. Remove it and add it again.';
+    const at = `component:${c?.id}`;
+    if (!id(c?.id))
+      return issue('A button is damaged. Remove it and add it again.');
     if (c.type === 'button') {
       if (!str(c.label, 80) || !emojiOk(c.emoji))
-        return 'Button text holds up to 80 characters.';
+        return issue('Button text holds up to 80 characters.', `${at}/label`);
       if (!c.label.trim() && !c.emoji)
-        return 'Every button needs some text or an emoji.';
+        return issue(
+          'Every button needs some text or an emoji.',
+          `${at}/label`,
+        );
       if (!['blurple', 'grey', 'green', 'red'].includes(c.colour))
-        return 'A button is damaged. Remove it and add it again.';
+        return issue('A button is damaged. Remove it and add it again.', at);
       if (c.link) {
         if (!https(c.url))
-          return 'Link buttons need a link that starts with https://.';
+          return issue(
+            'Link buttons need a link that starts with https://.',
+            `${at}/url`,
+          );
       } else {
-        const p = actionsProblem(c.actions);
+        const p = actionsProblem(c.actions, at);
         if (p) return p;
         if (!c.actions.length)
-          return 'Give every action button something to do, or make it a link.';
+          return issue(
+            'Give every action button something to do, or make it a link.',
+            `${at}/actions`,
+          );
       }
     } else if (c.type === 'menu') {
       if (!str(c.placeholder, 150))
-        return 'Menu placeholders hold up to 150 characters.';
+        return issue('Menu placeholders hold up to 150 characters.', at);
       if (typeof c.multiple !== 'boolean')
-        return 'A menu is damaged. Remove it and add it again.';
+        return issue('A menu is damaged. Remove it and add it again.', at);
       if (
         !Array.isArray(c.options) ||
         !c.options.length ||
         c.options.length > 25
       )
-        return 'A menu holds 1 to 25 options.';
+        return issue('A menu holds 1 to 25 options.', `${at}/options`);
       for (const o of c.options) {
+        const here = `${at}/option:${o?.id}`;
         if (!id(o?.id) || !emojiOk(o.emoji))
-          return 'A menu option is damaged. Remove it and add it again.';
+          return issue(
+            'A menu option is damaged. Remove it and add it again.',
+            here,
+          );
         if (!str(o.label, 100) || !o.label.trim())
-          return 'Every menu option needs a title of up to 100 characters.';
+          return issue(
+            'Every menu option needs a title of up to 100 characters.',
+            here,
+          );
         if (!str(o.description, 100))
-          return 'Option descriptions hold up to 100 characters.';
-        const p = actionsProblem(o.actions);
+          return issue('Option descriptions hold up to 100 characters.', here);
+        const p = actionsProblem(o.actions, here);
         if (p) return p;
       }
-    } else return 'A button is damaged. Remove it and add it again.';
+    } else return issue('A button is damaged. Remove it and add it again.');
   }
   return null;
 }
@@ -567,6 +647,31 @@ function componentsProblem(list: unknown): string | null {
 /** The most templates one "Send message" action can send on a plan. */
 export const sendLimit = (plan: 'free' | 'plus' | undefined) =>
   plan === 'plus' ? 10 : 1;
+/** Checks the parts of a message that depend on the server's plan, saying where. */
+export function planIssue(
+  m: StudioMessage,
+  plan: 'free' | 'plus' | undefined,
+): StudioIssue | null {
+  const max = sendLimit(plan);
+  for (const c of m.components) {
+    const owners =
+      c.type === 'button'
+        ? [{ at: `component:${c.id}`, actions: c.actions }]
+        : c.options.map((o) => ({
+            at: `component:${c.id}/option:${o.id}`,
+            actions: o.actions,
+          }));
+    for (const { at, actions } of owners)
+      for (const a of actions)
+        if (a.type === 'send' && a.templates.length > max)
+          return issue(
+            `A “Send message” action sends up to ${max} template${max === 1 ? '' : 's'} on this plan.`,
+            `${at}/action:${a.id}`,
+          );
+  }
+  return null;
+}
+
 /** Checks the parts of a message that depend on the server's plan. */
 export function planProblem(
   m: StudioMessage,
@@ -689,12 +794,13 @@ export const IS_COMPONENTS_V2 = 1 << 15;
 /** The message body for Discord's create/edit message endpoints. */
 export function studioPayload(
   input: StudioMessage,
-  ctx: { now: number } & StudioVars,
+  /** `raw` leaves {variables} as written, for showing and editing the JSON. */
+  ctx: { now: number; raw?: boolean } & StudioVars,
 ) {
   const m = normaliseStudio(input);
   // Mentions in Studio messages are shown but never ping anyone by surprise.
   const allowed_mentions = { parse: [] as string[] };
-  const fill = (text: string) => fillVariables(text, ctx);
+  const fill = (text: string) => (ctx.raw ? text : fillVariables(text, ctx));
   if (m.layout === 'v2') {
     const v = m.v2;
     const byId = new Map(m.components.map((c) => [c.id, c]));

@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -643,9 +644,53 @@ describe('Message Studio', () => {
     ).toHaveAttribute('alt', ':pixel_heart:');
   }, 20_000);
 
+  it('edits the message as JSON, and points at problems on saving', async () => {
+    await openEditor();
+    const code = document.querySelector<HTMLTextAreaElement>('.sp-code__text')!;
+    // JSON that doesn't read turns the box red and names the line.
+    fireEvent.change(code, {
+      target: { value: '{\n  "content": "Hello there",\n  oops\n}' },
+    });
+    expect(document.querySelector('.sp-code')).toHaveClass('is-error');
+    expect(document.querySelector('#studio-json-error')).toHaveTextContent(
+      'Line 3 isn’t valid JSON',
+    );
+    expect(
+      document.querySelector('.sp-code__gutter .is-bad'),
+    ).toHaveTextContent('3');
+    // JSON that reads changes the message.
+    fireEvent.change(code, {
+      target: {
+        value: JSON.stringify({
+          content: 'Hello there',
+          components: [
+            {
+              type: 1,
+              components: [{ type: 2, style: 1, label: 'Go', custom_id: 'x' }],
+            },
+          ],
+        }),
+      },
+    });
+    expect(document.querySelector('.sp-code')).not.toHaveClass('is-error');
+    expect(document.querySelector('.dc-content')).toHaveTextContent(
+      'Hello there',
+    );
+    // The new button does nothing yet, so saving opens it and points there.
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Save template' })[0]!,
+    );
+    expect(await screen.findByText('Can’t save yet')).toBeInTheDocument();
+    expect(screen.getByText('Button settings')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('.is-flagged')).toHaveClass('sp-actions'),
+    );
+  });
+
   it('sets up buttons with actions, link buttons and menus', async () => {
     await openEditor();
-    const json = () => document.querySelector('.sp-json')!.textContent ?? '';
+    const json = () =>
+      (document.querySelector('.sp-code__text') as HTMLTextAreaElement).value;
 
     // An action button: its colour, text and a "Send message" action.
     await userEvent.click(
@@ -863,7 +908,8 @@ describe('Message Studio', () => {
 describe('Components V2 in the editor', () => {
   it('builds a container with text, a gallery and variables', async () => {
     await openEditor();
-    const json = () => document.querySelector('.sp-json')!.textContent ?? '';
+    const json = () =>
+      (document.querySelector('.sp-code__text') as HTMLTextAreaElement).value;
     await userEvent.click(screen.getByRole('radio', { name: 'V2 components' }));
 
     // The text is edited where it's shown; {separator} draws a line.
@@ -872,9 +918,7 @@ describe('Components V2 in the editor', () => {
     await userEvent.clear(text);
     await userEvent.type(text, '## Summer Jam{{separator}See you there ');
     // A variable goes where the caret was.
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Add a variable' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Variables' }));
     await userEvent.click(screen.getByRole('menuitem', { name: /\{user\}/ }));
     expect(document.querySelector('.dc-h2')).toHaveTextContent('Summer Jam');
     expect(document.querySelector('.dc-separator')).toBeInTheDocument();

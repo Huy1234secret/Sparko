@@ -3,9 +3,9 @@ import { LottieIcon, cx } from '../../ui';
 import { useDismiss } from './EditorBits';
 import plusAnim from '../../../../../design-system/assets/icons/animated-icons/plus-menu-button-select.json?url';
 
-/** The plus icon turns into a cross over the first half, and back over the rest. */
-const HALF = 60;
-const END = 120;
+/** The plus turns into a cross over frames 0–35, and back over 85–120. */
+const OPEN = [0, 35] as const;
+const CLOSE = [85, 120] as const;
 
 export type PlusItem = {
   label: string;
@@ -51,8 +51,8 @@ export function PlusMenu({
           solid
           startAt={0}
           playKey={turn}
-          from={open ? 0 : HALF}
-          to={open ? HALF : END}
+          from={open ? OPEN[0] : CLOSE[0]}
+          to={open ? OPEN[1] : CLOSE[1]}
         />
       </button>
       {open && (

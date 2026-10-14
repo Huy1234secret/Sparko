@@ -1638,22 +1638,6 @@
 .sp-post-row:has(.sp-field-error) {
   align-items: center;
 }
-.sp-json {
-  max-height: 320px;
-  margin: 0;
-  padding: 12px;
-  overflow: auto;
-  border: 1px solid var(--sp-line-strong);
-  border-radius: var(--sp-radius-control);
-  background: var(--sp-subtle);
-  color: var(--sp-text);
-  font: 400 12px/18px var(--sp-font-mono);
-  white-space: pre;
-}
-.sp-json:focus-visible {
-  outline: none;
-  box-shadow: var(--sp-ring);
-}
 .sp-info-tip {
   display: inline-grid;
   vertical-align: -3px;
@@ -2299,8 +2283,11 @@ body:has(> .sp-settings-scrim) > #root {
 
 /* Variables */
 .sp-vars-btn {
-  font: 700 13px/1 var(--sp-font-mono);
-  letter-spacing: -0.04em;
+  display: inline-flex;
+  gap: 6px;
+  width: auto;
+  padding: 0 8px 0 10px;
+  font: 600 13px/1 var(--sp-font-sans);
 }
 .sp-vars-pop {
   position: absolute;
@@ -2535,4 +2522,107 @@ body:has(> .sp-settings-scrim) > #root {
   .sp-combo-option--role:not([data-active='true']):not([aria-selected='true']) {
   color: var(--sp-text);
   text-shadow: none;
+}
+
+/* The Discord JSON editor: line numbers, and a red line where it's wrong */
+.sp-json-head {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.sp-json-head__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.sp-code {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  height: 320px;
+  overflow: hidden;
+  border: 1px solid var(--sp-line-strong);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-subtle);
+  font: 400 12px/18px var(--sp-font-mono);
+  transition:
+    border-color var(--sp-dur-fast) var(--sp-ease-out),
+    box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-code:focus-within {
+  border-color: var(--sp-focus-edge);
+  box-shadow: 0 0 0 3px var(--sp-focus);
+}
+.sp-code.is-error,
+.sp-code.is-error:focus-within {
+  border-color: var(--sp-danger);
+  box-shadow: 0 0 0 3px var(--sp-danger-soft);
+}
+.sp-code__gutter {
+  display: grid;
+  align-content: start;
+  min-width: 36px;
+  padding: 12px 8px 12px 10px;
+  border-right: 1px solid var(--sp-line);
+  color: var(--sp-muted);
+  text-align: right;
+  user-select: none;
+  will-change: transform;
+}
+.sp-code__gutter .is-bad {
+  color: var(--sp-danger);
+  font-weight: 700;
+}
+.sp-code__main {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+.sp-code__bad {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 18px;
+  background: var(--sp-danger-soft);
+  box-shadow: inset 3px 0 0 var(--sp-danger);
+  pointer-events: none;
+}
+.sp-code__text {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 12px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--sp-text);
+  font: inherit;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+
+/* A problem found on saving: its part of the editor flashes red. */
+@keyframes sp-flag {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--sp-danger),
+      0 0 0 6px var(--sp-danger-soft);
+  }
+}
+.is-flagged {
+  border-radius: var(--sp-radius-control);
+  animation: sp-flag 0.7s var(--sp-ease-out) 3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-flagged {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--sp-danger);
+  }
 }

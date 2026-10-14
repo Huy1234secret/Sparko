@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { Button, Segmented } from '../../ui';
+import { Button, Segmented, useKeepOnScreen } from '../../ui';
 import { CloseButton, useDismiss } from './EditorBits';
 
 /**
@@ -143,6 +143,7 @@ export function ColourPicker({
     hexOk(value) ? value.toUpperCase() : '#FACC15',
   );
   useDismiss(true, onClose, box);
+  useKeepOnScreen(box);
   const set = (next: Hsv) => {
     setHsv(next);
     const hex = hsvToHex(next);

@@ -10,9 +10,11 @@ import {
 } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
 import {
+  planIssue,
   planProblem,
-  studioPayload,
+  studioIssue,
   studioProblem,
+  type StudioIssue,
   useCheckChannel,
   useStudio,
   useStudioActions,
@@ -32,6 +34,7 @@ import {
 } from './frame';
 import { ContainerCanvas, MAX_GALLERY, newImage } from './ContainerCanvas';
 import { VariablesButton, variablesAnimations } from './VariablesButton';
+import { JsonPanel, jsonAnimations } from './JsonPanel';
 import { StudioLibrary } from './StudioLibrary';
 import { ChannelPicker, VersionHistory } from './parts';
 import { EmbedCanvas, MAX_EMBEDS, newEmbed } from './EmbedCanvas';
@@ -41,7 +44,14 @@ import {
   newMenu,
   roomFor,
 } from './ComponentsEditor';
-import { InfoTip, InsertProvider, useInsertTarget } from './EditorBits';
+import {
+  InfoTip,
+  InsertProvider,
+  IssueProvider,
+  flashIssue,
+  useInsertTarget,
+  type ShownIssue,
+} from './EditorBits';
 import { EmojiButton } from './EmojiPicker';
 import { PlusMenu, type PlusItem } from './PlusMenu';
 import { preloadAnimations, preloadCombobox } from '../../ui';
@@ -135,7 +145,6 @@ function StudioEditor({
     id: string;
     pop?: 'image';
   } | null>(null);
-  const [copied, setCopied] = useState(false);
   const paused = !!server.paused;
   const v2 = message.layout === 'v2';
   const channel = channels.find((c) => c.id === message.channel);
@@ -144,7 +153,6 @@ function StudioEditor({
     studioProblem(forChecks(message)) ??
     planProblem(message, server.plan === 'plus' ? 'plus' : 'free');
   const size = embedSize(message);
-  const json = JSON.stringify(studioPayload(message, { now: 0 }), null, 2);
 
   const addButton = () => {
     const button = newButton();
@@ -288,7 +296,11 @@ function StudioEditor({
               }
             />
           </div>
-          <fieldset className="sp-fieldset" disabled={paused}>
+          <fieldset
+            className="sp-fieldset"
+            disabled={paused}
+            data-issue="message"
+          >
             <legend className="sp-sr-only">Message</legend>
             {v2 ? (
               <ContainerCanvas
@@ -362,6 +374,7 @@ function StudioEditor({
             </div>
             <div className="sp-card__body">
               <Input
+                data-issue="name"
                 label={
                   <>
                     Template name{' '}
@@ -373,13 +386,15 @@ function StudioEditor({
                 onChange={(e) => onChange({ name: e.target.value })}
               />
               <div className="sp-post-row">
-                <ChannelPicker
-                  label="Post in"
-                  channels={channels}
-                  value={message.channel}
-                  onChange={(id) => onChange({ channel: id })}
-                  error={locked ? 'Sparko can’t post here yet.' : undefined}
-                />
+                <div data-issue="channel">
+                  <ChannelPicker
+                    label="Post in"
+                    channels={channels}
+                    value={message.channel}
+                    onChange={(id) => onChange({ channel: id })}
+                    error={locked ? 'Sparko can’t post here yet.' : undefined}
+                  />
+                </div>
                 <Button
                   variant="primary"
                   icon="send"
@@ -391,33 +406,10 @@ function StudioEditor({
                   Post test
                 </Button>
               </div>
-              <div className="sp-field">
-                <div className="sp-field__row">
-                  <span className="sp-label" id="studio-json">
-                    Discord JSON{' '}
-                    <InfoTip text="Exactly what Sparko sends to Discord for this message. You can copy it into other tools that read Discord message JSON." />
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon={copied ? 'check' : 'copy'}
-                    onClick={() => {
-                      void navigator.clipboard
-                        ?.writeText(json)
-                        .then(() => setCopied(true));
-                    }}
-                  >
-                    {copied ? 'Copied' : 'Copy'}
-                  </Button>
-                </div>
-                <pre
-                  className="sp-json"
-                  aria-labelledby="studio-json"
-                  tabIndex={0}
-                >
-                  {json}
-                </pre>
-              </div>
+              <JsonPanel
+                message={message}
+                onChange={(next) => onChange(next)}
+              />
             </div>
           </section>
         </div>
@@ -444,6 +436,21 @@ export function StudioModule({
   const [tried, setTried] = useState(false);
   const [fixOpen, setFixOpen] = useState(false);
   const toast = useToast();
+  // A problem found on saving or posting: the page goes to it and flashes
+  // it red, and a button or menu with the problem opens its settings.
+  const [issue, setIssue] = useState<ShownIssue | null>(null);
+  useEffect(() => {
+    if (!issue) return;
+    // Two frames: one for settings panels to open, one for them to draw.
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => flashIssue(issue.at));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [issue]);
 
   const template = studio.data?.templates.find((t) => t.id === editingId);
   // The template as saved; its name is the template's own.
@@ -454,6 +461,7 @@ export function StudioModule({
   useEffect(() => {
     preloadAnimations(Object.values(icons));
     preloadAnimations(variablesAnimations, true);
+    preloadAnimations(jsonAnimations);
     preloadCombobox();
   }, []);
 
@@ -501,8 +509,20 @@ export function StudioModule({
     setDraft({ ...message, ...patch });
     flow.clear();
   };
+  const blocked = (m: StudioMessage, doing: string) => {
+    const found: StudioIssue | null =
+      studioIssue(forChecks(m)) ??
+      planIssue(m, server.plan === 'plus' ? 'plus' : 'free');
+    if (!found) return false;
+    setTried(true);
+    setIssue((i) => ({ at: found.at, n: (i?.n ?? 0) + 1 }));
+    toast({ tone: 'danger', title: `Can’t ${doing} yet`, body: found.problem });
+    return true;
+  };
+
   const save = () => {
     if (!template || !message) return;
+    if (blocked(message, 'save')) return;
     const name = message.name.trim() || template.name;
     actions.updateTemplate.mutate(
       { id: template.id, name, message: { ...message, name } },
@@ -523,10 +543,7 @@ export function StudioModule({
   const post = async () => {
     if (!message) return;
     setTried(true);
-    const problem =
-      studioProblem(forChecks(message)) ??
-      planProblem(message, server.plan === 'plus' ? 'plus' : 'free');
-    if (problem) return;
+    if (blocked(message, 'post')) return;
     await flow.run(() => actions.postTest.mutateAsync(message));
   };
   const recheck = (after?: () => void) =>
@@ -565,38 +582,40 @@ export function StudioModule({
       {tab === 'settings' &&
         (template && message ? (
           <InsertProvider>
-            <StudioDataProvider
-              value={{
-                serverId: server.id,
-                templates: studio.data.templates,
-                folders: studio.data.folders,
-                roles: studio.data.roles,
-                sendLimit: studio.data.sendLimit,
-              }}
-            >
-              <p className="sp-edit-banner" role="status">
-                <Icon name="info" size="sm" />
-                <span>
-                  You’re editing <b>{template.name}</b>. Save your changes
-                  before you leave.
-                </span>
-              </p>
-              <StudioEditor
-                server={server}
-                message={message}
-                channels={channels}
-                saving={actions.updateTemplate.isPending}
-                dirty={dirty}
-                tried={tried}
-                phase={flow.phase}
-                onChange={edit}
-                onSave={save}
-                onPost={() => void post()}
-                onFix={() => setFixOpen(true)}
-                onCheck={() => recheck()}
-                checking={checkChannel.isPending}
-              />
-            </StudioDataProvider>
+            <IssueProvider value={issue}>
+              <StudioDataProvider
+                value={{
+                  serverId: server.id,
+                  templates: studio.data.templates,
+                  folders: studio.data.folders,
+                  roles: studio.data.roles,
+                  sendLimit: studio.data.sendLimit,
+                }}
+              >
+                <p className="sp-edit-banner" role="status">
+                  <Icon name="info" size="sm" />
+                  <span>
+                    You’re editing <b>{template.name}</b>. Save your changes
+                    before you leave.
+                  </span>
+                </p>
+                <StudioEditor
+                  server={server}
+                  message={message}
+                  channels={channels}
+                  saving={actions.updateTemplate.isPending}
+                  dirty={dirty}
+                  tried={tried}
+                  phase={flow.phase}
+                  onChange={edit}
+                  onSave={save}
+                  onPost={() => void post()}
+                  onFix={() => setFixOpen(true)}
+                  onCheck={() => recheck()}
+                  checking={checkChannel.isPending}
+                />
+              </StudioDataProvider>
+            </IssueProvider>
           </InsertProvider>
         ) : (
           <div className="sp-card">

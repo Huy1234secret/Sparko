@@ -12,4 +12,11 @@ export {
   v2Lines,
   studioPayload,
   studioProblem,
+  studioIssue,
+  planIssue,
+  type StudioIssue,
 } from '../../../../packages/core/src/studio-format.ts';
+export {
+  fromDiscord,
+  jsonErrorLine,
+} from '../../../../packages/core/src/studio-import.ts';

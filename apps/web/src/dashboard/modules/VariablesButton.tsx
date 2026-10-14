@@ -50,7 +50,6 @@ export function VariablesButton({
       <button
         type="button"
         className={cx('sp-plus-btn sp-vars-btn', open && 'is-open')}
-        aria-label="Add a variable"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => toggle(!open)}
@@ -61,6 +60,7 @@ export function VariablesButton({
           else setAnim('hover');
         }}
       >
+        <span>Variables</span>
         <LottieIcon
           src={
             anim === 'reveal'

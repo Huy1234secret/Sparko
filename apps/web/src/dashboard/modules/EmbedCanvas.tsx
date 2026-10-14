@@ -252,6 +252,7 @@ function EmbedBlock({
   return (
     <div
       {...reorder.item(index, embed.id)}
+      data-issue={`embed:${embed.id}`}
       className={cx('sp-embed-wrap', reorder.dropClass(index))}
       style={{ '--dc-color': embed.color } as CSSProperties}
     >
@@ -475,7 +476,7 @@ export function EmbedCanvas({
           <span className="dc-tag">App</span>
           <span className="dc-time">Today at 18:42</span>
         </div>
-        <div className="dc-content">
+        <div className="dc-content" data-issue="text">
           <EditText
             value={message.content}
             label="message content"
