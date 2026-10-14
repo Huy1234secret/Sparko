@@ -41,7 +41,7 @@ import {
   newMenu,
   roomFor,
 } from './ComponentsEditor';
-import { InsertProvider, useInsertTarget } from './EditorBits';
+import { InfoTip, InsertProvider, useInsertTarget } from './EditorBits';
 import { EmojiButton } from './EmojiPicker';
 import { PlusMenu, type PlusItem } from './PlusMenu';
 import { preloadAnimations } from '../../ui';
@@ -73,14 +73,6 @@ const forChecks = (m: StudioMessage): StudioMessage =>
   JSON.parse(
     JSON.stringify(m).replace(/"blob:[^"]*"/g, '"https://upload.invalid"'),
   ) as StudioMessage;
-
-function Info({ text }: { text: string }) {
-  return (
-    <span className="sp-info-tip" title={text} aria-label={text} role="img">
-      <Icon name="info" size="sm" />
-    </span>
-  );
-}
 
 /** The emoji button and the plus menu above the preview. */
 function PreviewTools({
@@ -349,7 +341,12 @@ function StudioEditor({
             </div>
             <div className="sp-card__body">
               <Input
-                label="Template name"
+                label={
+                  <>
+                    Template name{' '}
+                    <InfoTip text="Only staff see this name. It’s how the template shows in Templates and when a button sends it." />
+                  </>
+                }
                 maxLength={80}
                 value={message.name}
                 onChange={(e) => onChange({ name: e.target.value })}
@@ -377,7 +374,7 @@ function StudioEditor({
                 <div className="sp-field__row">
                   <span className="sp-label" id="studio-json">
                     Discord JSON{' '}
-                    <Info text="What Sparko sends to Discord for this message. Useful with other tools." />
+                    <InfoTip text="Exactly what Sparko sends to Discord for this message. You can copy it into other tools that read Discord message JSON." />
                   </span>
                   <Button
                     size="sm"

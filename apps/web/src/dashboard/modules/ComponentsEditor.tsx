@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import {
   createContext,
   useContext,
@@ -33,6 +34,7 @@ import {
 } from '../../data';
 import {
   CloseButton,
+  InfoTip,
   MaskIcon,
   moveItem,
   useDismiss,
@@ -106,14 +108,6 @@ export function roomFor(list: StudioComponent[], kind: 'button' | 'menu') {
   return (
     componentRows([...list, kind === 'button' ? newButton() : newMenu()])
       .length <= MAX_ROWS
-  );
-}
-
-function Info({ text }: { text: string }) {
-  return (
-    <span className="sp-info-tip" title={text} aria-label={text} role="img">
-      <Icon name="info" size="sm" />
-    </span>
   );
 }
 
@@ -239,7 +233,16 @@ function ActionCard({
         onKeyDown={reorder.keys(index, count)}
       />
       <div className="sp-action__body">
-        <span className="sp-action__title">{title}</span>
+        <span className="sp-action__title">
+          {title}{' '}
+          <InfoTip
+            text={
+              action.type === 'send'
+                ? `Sends these templates, one after another. ${data.sendLimit === 1 ? 'Free servers send 1 template per action; Plus sends up to 10.' : `Up to ${data.sendLimit} templates per action.`}`
+                : 'Gives the person who clicked these roles, or takes them away. Sparko’s own role must sit above them in Server Settings → Roles.'
+            }
+          />
+        </span>
         {action.type === 'send' ? (
           <>
             <Combobox
@@ -261,7 +264,7 @@ function ActionCard({
                 label={
                   <>
                     DM user{' '}
-                    <Info text="Sends it to the person who clicked, in their DMs, instead of in the channel." />
+                    <InfoTip text="Sends the templates to the person who clicked, in their DMs, instead of in this channel. If their DMs are closed, Sparko tells them privately." />
                   </>
                 }
                 checked={action.dm}
@@ -277,7 +280,7 @@ function ActionCard({
                 label={
                   <>
                     Send as ephemeral{' '}
-                    <Info text="Only the person who clicked sees it, and only until they reload." />
+                    <InfoTip text="Sends a reply only the person who clicked can see. It disappears when they reload Discord." />
                   </>
                 }
                 disabled={action.dm}
@@ -339,7 +342,7 @@ function ActionsEditor({
       <div className="sp-actions__head">
         <span className="sp-label">
           {title}{' '}
-          <Info text="What happens when someone uses it. Actions run from top to bottom." />
+          <InfoTip text="What happens when someone clicks. Actions run from top to bottom; drag the dots to change the order." />
         </span>
         <PlusMenu
           label="Add an action"
@@ -412,22 +415,30 @@ function Panel({
 }) {
   const box = useRef<HTMLDivElement>(null);
   useDismiss(true, onClose, box);
-  return (
-    <div
-      ref={box}
-      className="sp-settings-pop"
-      role="dialog"
-      aria-label={title}
-      onKeyDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <CloseButton label="Close" className="sp-url-pop__x" onClick={onClose} />
-      <div className="sp-settings-pop__head">
-        <h3 className="sp-settings-pop__title">{title}</h3>
-        <p className="sp-hint">{description}</p>
+  // Shown in the middle of the screen over a blurred page.
+  return createPortal(
+    <div className="sp-settings-scrim">
+      <div
+        ref={box}
+        className="sp-settings-pop"
+        role="dialog"
+        aria-label={title}
+        onKeyDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <CloseButton
+          label="Close"
+          className="sp-url-pop__x"
+          onClick={onClose}
+        />
+        <div className="sp-settings-pop__head">
+          <h3 className="sp-settings-pop__title">{title}</h3>
+          <p className="sp-hint">{description}</p>
+        </div>
+        {children}
       </div>
-      {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -458,7 +469,12 @@ function ButtonSettings({
           />
         </div>
         <Input
-          label="Button text"
+          label={
+            <>
+              Button text{' '}
+              <InfoTip text="Up to 80 characters. A button needs text, an emoji, or both." />
+            </>
+          }
           maxLength={80}
           value={button.label}
           autoFocus
@@ -576,7 +592,12 @@ function MenuSettings({
       onClose={onClose}
     >
       <Input
-        label="Placeholder text"
+        label={
+          <>
+            Placeholder text{' '}
+            <InfoTip text="The grey text shown in the menu before anyone picks an option." />
+          </>
+        }
         maxLength={150}
         value={menu.placeholder}
         autoFocus
@@ -586,7 +607,7 @@ function MenuSettings({
         label={
           <>
             Multiple choice{' '}
-            <Info text="People can pick more than one option at once." />
+            <InfoTip text="Lets people pick more than one option at once. Each picked option runs its own actions." />
           </>
         }
         checked={menu.multiple}
@@ -613,7 +634,10 @@ function MenuSettings({
       ) : (
         <div className="sp-options">
           <div className="sp-actions__head">
-            <span className="sp-label">Options</span>
+            <span className="sp-label">
+              Options{' '}
+              <InfoTip text="Up to 25 options. Drag the dots to reorder them, and use the gear to set what each one does." />
+            </span>
             <Button
               size="sm"
               disabled={menu.options.length >= 25}
