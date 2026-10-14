@@ -324,7 +324,13 @@ export type StudioState = {
   templates: StudioTemplate[];
   folders: StudioFolder[];
   /** Roles a button can give or take; Discord's own bot roles are left out. */
-  roles: { id: string; name: string; color: string | null }[];
+  roles: {
+    id: string;
+    name: string;
+    color: string | null;
+    /** The second colour of a gradient role. */
+    color2?: string | null;
+  }[];
   /** How many templates one "Send message" action can send on this plan. */
   sendLimit: number;
   templateLimit: number;

@@ -214,7 +214,10 @@ function ActionCard({
   const roleItems: ComboItem[] = data.roles.map((r) => ({
     value: r.id,
     label: r.name,
-    ...(r.color ? { color: r.color } : {}),
+    icon: 'at-sign',
+    // Roles without a colour show in Discord's grey.
+    color: r.color ?? '#99AAB5',
+    ...(r.color && r.color2 ? { color2: r.color2 } : {}),
   }));
   return (
     <li

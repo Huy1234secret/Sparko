@@ -43,6 +43,8 @@ type Call = {
   guildId: string;
   user: StoredUser;
 };
+/** A Discord colour number as #rrggbb; 0 means the role has no colour. */
+const hex = (n: number) => (n ? `#${n.toString(16).padStart(6, '0')}` : null);
 const colourOf = (id: string | null) =>
   (((id ? Number(id.slice(-4)) : 0) % 6) + 1) as 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -118,10 +120,11 @@ export function studioRoutes({
         // Roles "Give or take role" can pick; Discord manages bot roles itself.
         roles: (v?.roles ?? [])
           .filter((r) => !r.managed)
-          .map(({ id, name, color }) => ({
+          .map(({ id, name, color, color2 }) => ({
             id,
             name,
-            color: color ? `#${color.toString(16).padStart(6, '0')}` : null,
+            color: hex(color),
+            color2: color && color2 ? hex(color2) : null,
           })),
         sendLimit: sendLimit(getGuild(db, guildId)?.plan),
         ...(() => {

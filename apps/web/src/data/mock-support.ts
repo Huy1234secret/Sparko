@@ -553,7 +553,12 @@ export function createSupportMock(h: Helpers) {
         ],
         roles: [
           { id: '9201', name: 'Artist', color: '#EB459E' },
-          { id: '9202', name: 'Event pings', color: '#FACC15' },
+          {
+            id: '9202',
+            name: 'Event pings',
+            color: '#FACC15',
+            color2: '#ED4245',
+          },
           { id: '9203', name: 'Moderator', color: '#5865F2' },
           { id: '9204', name: 'Member', color: null },
         ],
