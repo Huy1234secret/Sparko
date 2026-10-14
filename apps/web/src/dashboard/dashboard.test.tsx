@@ -588,8 +588,20 @@ describe('Message Studio', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Colour of embed 1' }),
     );
-    await userEvent.click(screen.getByRole('button', { name: '#5865F2' }));
+    const picker = screen.getByRole('dialog', { name: 'Colour picker' });
+    const hex = within(picker).getByRole('textbox', { name: 'Hex colour' });
+    await userEvent.clear(hex);
+    await userEvent.type(hex, '5865f2');
     expect(screen.getByText(/"color": 5793266/)).toBeTruthy();
+    // The other formats show the same colour.
+    await userEvent.click(within(picker).getByRole('radio', { name: 'RGB' }));
+    expect(within(picker).getByRole('spinbutton', { name: 'Red' })).toHaveValue(
+      88,
+    );
+    await userEvent.click(
+      within(picker).getByRole('button', { name: 'Close the colour picker' }),
+    );
+    expect(screen.queryByRole('dialog', { name: 'Colour picker' })).toBeNull();
   }, 20_000);
 
   it('adds emoji where you were writing, from Unicode or the server', async () => {

@@ -3,13 +3,13 @@ import { Button, Input, cx } from '../../ui';
 import type { StudioEmbed, StudioMessage } from '../../data';
 import {
   CloseButton,
-  ColourPopover,
   EditText,
   MaskIcon,
   UrlPopover,
   useDismiss,
 } from './EditorBits';
 import { newId } from './parts';
+import { ColourPicker } from './ColourPicker';
 import addImage from '../../../../../design-system/assets/icons/add-image-button.png';
 import colourWheel from '../../../../../design-system/assets/icons/color-picker.png';
 import dragIcon from '../../../../../design-system/assets/icons/drag.png';
@@ -435,7 +435,7 @@ function EmbedBlock({
       </div>
 
       {pop === 'colour' && (
-        <ColourPopover
+        <ColourPicker
           value={embed.color}
           onChange={(color) => onChange({ color })}
           onClose={close}

@@ -9,8 +9,10 @@ import {
 } from 'react';
 import { Button, Input, LottieIcon, cx, renderDiscordText } from '../../ui';
 import { useStudioActions } from '../../data';
-import { embedColours } from './parts';
 import closeAnim from '../../../../../design-system/assets/icons/close-button-hover.json?url';
+import uploadReveal from '../../../../../design-system/assets/icons/animated-icons/upload-button-reveal.json?url';
+import uploadHover from '../../../../../design-system/assets/icons/animated-icons/upload-button-hover.json?url';
+import uploadSelect from '../../../../../design-system/assets/icons/animated-icons/upload-button-select.json?url';
 
 /**
  * Pieces shared by Message Studio's editor: text edited where it's shown,
@@ -189,6 +191,39 @@ export function CloseButton({
   );
 }
 
+/**
+ * The upload button: its icon plays in when it appears, again on hover,
+ * and its "select" animation when pressed.
+ */
+function UploadButton({
+  busy,
+  onClick,
+}: {
+  busy: boolean;
+  onClick: () => void;
+}) {
+  const [play, setPlay] = useState({ src: uploadReveal, key: 1 });
+  return (
+    <Button
+      size="sm"
+      loading={busy}
+      loadingLabel="Uploading…"
+      onPointerEnter={() =>
+        setPlay((p) => ({ src: uploadHover, key: p.key + 1 }))
+      }
+      onPointerDown={() =>
+        setPlay((p) => ({ src: uploadSelect, key: p.key + 1 }))
+      }
+      onClick={onClick}
+    >
+      {!busy && (
+        <LottieIcon src={play.src} size={20} playKey={play.key} solid />
+      )}
+      Upload
+    </Button>
+  );
+}
+
 /** Closes a popover on Escape or a press outside it. */
 export function useDismiss(
   open: boolean,
@@ -211,10 +246,11 @@ export function useDismiss(
       if (ref.current && !ref.current.contains(e.target as Node))
         close.current();
     };
-    document.addEventListener('keydown', key);
+    // Captured first, since popovers keep their keys from reaching the page.
+    document.addEventListener('keydown', key, true);
     document.addEventListener('pointerdown', press);
     return () => {
-      document.removeEventListener('keydown', key);
+      document.removeEventListener('keydown', key, true);
       document.removeEventListener('pointerdown', press);
     };
   }, [open, ref]);
@@ -316,15 +352,10 @@ export function UrlPopover({
                 });
               }}
             />
-            <Button
-              size="sm"
-              icon="upload"
-              loading={upload.isPending}
-              loadingLabel="Uploading…"
+            <UploadButton
+              busy={upload.isPending}
               onClick={() => file.current?.click()}
-            >
-              Upload
-            </Button>
+            />
             <span className="sp-hint">Max 5 MB</span>
           </>
         )}
@@ -345,83 +376,6 @@ export function UrlPopover({
             Done
           </Button>
         </span>
-      </div>
-    </div>
-  );
-}
-
-const hexOk = (v: string) => /^#[0-9a-f]{6}$/i.test(v);
-const swatches = [
-  ...embedColours.map(([, hex]) => hex),
-  '#FEE75C',
-  '#EB459E',
-  '#1ABC9C',
-  '#E67E22',
-  '#FFFFFF',
-  '#23272A',
-];
-
-/** Picks an embed's colour: swatches, a hex box and the system picker. */
-export function ColourPopover({
-  value,
-  onChange,
-  onClose,
-}: {
-  value: string;
-  onChange: (hex: string) => void;
-  onClose: () => void;
-}) {
-  const box = useRef<HTMLDivElement>(null);
-  const [text, setText] = useState(value);
-  useDismiss(true, onClose, box);
-  return (
-    <div
-      ref={box}
-      className="sp-colour-pop"
-      role="dialog"
-      aria-label="Embed colour"
-    >
-      <div className="sp-colour-pop__swatches">
-        {swatches.map((hex) => (
-          <button
-            key={hex}
-            type="button"
-            className={cx(
-              'sp-swatch',
-              hex.toLowerCase() === value.toLowerCase() && 'is-on',
-            )}
-            style={{ background: hex }}
-            aria-label={hex}
-            aria-pressed={hex.toLowerCase() === value.toLowerCase()}
-            onClick={() => {
-              onChange(hex);
-              setText(hex);
-            }}
-          />
-        ))}
-      </div>
-      <div className="sp-colour-pop__row">
-        <input
-          type="color"
-          className="sp-colour-pop__native"
-          aria-label="Any colour"
-          value={hexOk(value) ? value : '#FACC15'}
-          onChange={(e) => {
-            onChange(e.target.value.toUpperCase());
-            setText(e.target.value.toUpperCase());
-          }}
-        />
-        <Input
-          aria-label="Hex colour"
-          value={text}
-          maxLength={7}
-          error={hexOk(text) ? undefined : 'Use a hex colour like #FACC15.'}
-          onChange={(e) => {
-            const v = e.target.value.trim();
-            setText(v);
-            if (hexOk(v)) onChange(v.toUpperCase());
-          }}
-        />
       </div>
     </div>
   );
