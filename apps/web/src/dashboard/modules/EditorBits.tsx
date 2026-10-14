@@ -7,7 +7,14 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import { Button, Input, LottieIcon, cx, renderDiscordText } from '../../ui';
+import {
+  Button,
+  Icon,
+  Input,
+  LottieIcon,
+  cx,
+  renderDiscordText,
+} from '../../ui';
 import { useStudioActions } from '../../data';
 import closeAnim from '../../../../../design-system/assets/icons/close-button-hover.json?url';
 import uploadReveal from '../../../../../design-system/assets/icons/animated-icons/upload-button-reveal.json?url';
@@ -472,4 +479,19 @@ export function moveItem<T>(list: T[], from: number, to: number) {
   const [x] = next.splice(from, 1);
   next.splice(to, 0, x!);
   return next;
+}
+
+/**
+ * The little (i) beside a setting: hovering or focusing it shows what the
+ * setting does, straight away.
+ */
+export function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="sp-tip" tabIndex={0} role="img" aria-label={text}>
+      <Icon name="info" size="sm" />
+      <span className="sp-tip__bubble" aria-hidden="true">
+        {text}
+      </span>
+    </span>
+  );
 }

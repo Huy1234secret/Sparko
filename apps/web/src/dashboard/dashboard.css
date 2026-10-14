@@ -1967,15 +1967,31 @@
 }
 
 /* Settings panels for a button or a menu */
-.sp-settings-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
+/* Button and menu settings open in the middle of the screen. */
+.sp-settings-scrim {
+  position: fixed;
+  inset: 0;
   z-index: var(--sp-z-popover);
   display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+  background: rgb(6 6 5 / 0.45);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: sp-fade var(--sp-dur-base) var(--sp-ease-out);
+}
+@keyframes sp-fade {
+  from {
+    opacity: 0;
+  }
+}
+.sp-settings-pop {
+  position: relative;
+  display: grid;
   gap: 14px;
-  width: min(440px, calc(100vw - 48px));
-  padding: 16px;
+  width: min(480px, 100%);
+  padding: 20px;
   border: 1px solid var(--sp-line);
   border-radius: var(--sp-radius-card);
   background: var(--sp-surface);
@@ -2002,9 +2018,9 @@
   margin: 0;
 }
 .sp-settings-pop__sep {
-  width: calc(100% + 32px);
+  width: calc(100% + 40px);
   height: 1px;
-  margin: 0 -16px;
+  margin: 0 -20px;
   border: 0;
   background: var(--sp-line);
 }
@@ -2219,4 +2235,47 @@
   outline: none;
   background: var(--sp-raised);
   color: var(--sp-text);
+}
+
+/* Info tips: the (i) beside a setting, explained on hover or focus */
+.sp-tip {
+  position: relative;
+  display: inline-grid;
+  vertical-align: -3px;
+  color: var(--sp-muted);
+  cursor: help;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.sp-tip:hover,
+.sp-tip:focus-visible {
+  outline: none;
+  color: var(--sp-text);
+}
+.sp-tip__bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: calc(var(--sp-z-popover) + 1);
+  width: max-content;
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: var(--sp-radius-chip);
+  background: var(--sp-tooltip-bg);
+  box-shadow: var(--sp-shadow-overlay);
+  color: var(--sp-tooltip-text);
+  font: 400 12px/17px var(--sp-font-sans);
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity var(--sp-dur-fast) var(--sp-ease-out),
+    transform var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-tip:hover > .sp-tip__bubble,
+.sp-tip:focus-visible > .sp-tip__bubble {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
