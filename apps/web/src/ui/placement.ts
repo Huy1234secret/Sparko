@@ -1,8 +1,15 @@
 import { useLayoutEffect, type RefObject } from 'react';
 
+/** Popovers stay below the dashboard's top bar, which stays on screen. */
+const topLimit = () =>
+  Math.max(
+    0,
+    document.querySelector('.sp-topbar')?.getBoundingClientRect().bottom ?? 0,
+  );
+
 /** The part of the screen a popover can use: the window, less any scrolling box around it. */
 function visibleArea(from: HTMLElement) {
-  let top = 0;
+  let top = topLimit();
   let bottom = window.innerHeight;
   for (let el: HTMLElement | null = from; el; el = el.parentElement) {
     const style = getComputedStyle(el);
@@ -40,7 +47,7 @@ function place(
   const natural = p.offsetHeight;
   const parent = (p.offsetParent as HTMLElement | null) ?? document.body;
   const area = fixed
-    ? { top: 0, bottom: window.innerHeight }
+    ? { top: topLimit(), bottom: window.innerHeight }
     : visibleArea(parent);
   const below = area.bottom - box.bottom - gap - margin;
   const above = box.top - area.top - gap - margin;
@@ -109,4 +116,37 @@ export function usePlacement(
       window.removeEventListener('scroll', onScroll, true);
     };
   }, [open, anchor, pop, gap, margin, fixed]);
+}
+
+/**
+ * Nudges a popover that's already placed (below or beside what opened it)
+ * up, down or sideways just enough to stay on screen and below the top bar.
+ */
+export function useKeepOnScreen(
+  pop: RefObject<HTMLElement | null>,
+  margin = 8,
+) {
+  useLayoutEffect(() => {
+    const p = pop.current;
+    if (!p) return;
+    const fit = () => nudge(p, margin);
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [pop, margin]);
+}
+
+function nudge(p: HTMLElement, margin: number) {
+  p.style.translate = '';
+  const r = p.getBoundingClientRect();
+  const top = topLimit() + margin;
+  const bottom = window.innerHeight - margin;
+  let dy = 0;
+  if (r.bottom > bottom) dy = bottom - r.bottom;
+  if (r.top + dy < top) dy = top - r.top;
+  let dx = 0;
+  if (r.right > window.innerWidth - margin)
+    dx = window.innerWidth - margin - r.right;
+  if (r.left + dx < margin) dx = margin - r.left;
+  if (dx || dy) p.style.translate = `${dx}px ${dy}px`;
 }

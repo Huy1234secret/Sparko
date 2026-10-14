@@ -125,6 +125,7 @@ function Gallery({
         <div
           key={img.id}
           {...reorder.item(i, img.id)}
+          data-issue={`image:${img.id}`}
           className={cx(
             'sp-gallery__cell',
             reorder.dropClass(i, images.length),
@@ -224,7 +225,9 @@ function usePlaceDrag({
   const keyOf = (el: HTMLElement) =>
     el.dataset.key ?? `line:${el.dataset.line}`;
   const itemEl = (id: string) =>
-    root?.querySelector<HTMLElement>(`[data-key="${CSS.escape(id)}"]`) ?? null;
+    root?.querySelector<HTMLElement>(
+      `[data-key="${id.replace(/["\\]/g, '\\$&')}"]`,
+    ) ?? null;
 
   /** Puts an item in a place (before another, or at the end of it). */
   const commit = (id: string, t: Target) => {
@@ -521,6 +524,7 @@ export function ContainerCanvas({
           <div
             key="gallery"
             {...drags.item(i, 'gallery')}
+            data-issue="gallery"
             className={cx('sp-v2-gallery', drags.dropClass(i))}
           >
             <button
@@ -584,7 +588,7 @@ export function ContainerCanvas({
   };
   const thumbAt = stretches.find((s) => !besideAt(s.from))?.from ?? -2;
   const thumb = (
-    <div className="sp-embed__thumb sp-v2-text__thumb">
+    <div className="sp-embed__thumb sp-v2-text__thumb" data-issue="thumbnail">
       <button
         type="button"
         className={cx(
@@ -654,7 +658,7 @@ export function ContainerCanvas({
                 <img src={colourWheel} alt="" />
               </button>
             </div>
-            <div className="dc-embed sp-embed sp-v2">
+            <div className="dc-embed sp-embed sp-v2" data-issue="accent">
               <button
                 type="button"
                 className="sp-embed-bar"
@@ -662,7 +666,7 @@ export function ContainerCanvas({
                 tabIndex={-1}
                 onClick={() => setPop('colour')}
               />
-              <div className="sp-v2__body">
+              <div className="sp-v2__body" data-issue="text">
                 {slotView({ at: 'line', line: -1 })}
                 {stretches.map(({ from, to }) => {
                   const side = besideAt(from);

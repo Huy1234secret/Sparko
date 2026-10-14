@@ -37,6 +37,7 @@ import {
   MaskIcon,
   moveItem,
   useDismiss,
+  useIssue,
   useReorder,
 } from './EditorBits';
 import { EmojiField } from './EmojiPicker';
@@ -179,6 +180,7 @@ function ActionCard({
   action,
   index,
   count,
+  issueAt,
   onChange,
   onRemove,
   reorder,
@@ -186,6 +188,8 @@ function ActionCard({
   action: StudioAction;
   index: number;
   count: number;
+  /** Where its problems point: "<button or option>/action:<id>". */
+  issueAt: string;
   onChange: (a: StudioAction) => void;
   onRemove: () => void;
   reorder: Omit<ReturnType<typeof useReorder>, 'list'>;
@@ -228,6 +232,7 @@ function ActionCard({
   return (
     <li
       {...reorder.item(index, action.id)}
+      data-issue={issueAt}
       className={cx(
         'sp-action',
         reorder.dropClass(index, count),
@@ -335,10 +340,13 @@ function ActionCard({
 function ActionsEditor({
   actions,
   onChange,
+  issueAt,
   title = 'Add actions',
 }: {
   actions: StudioAction[];
   onChange: (actions: StudioAction[]) => void;
+  /** The button or option they belong to, for pointing at problems. */
+  issueAt: string;
   title?: ReactNode;
 }) {
   const { list: listRef, ...reorder } = useReorder({
@@ -346,7 +354,7 @@ function ActionsEditor({
   });
   const add = (a: StudioAction) => onChange([...actions, a]);
   return (
-    <div className="sp-actions">
+    <div className="sp-actions" data-issue={`${issueAt}/actions`}>
       <div className="sp-actions__head">
         <span className="sp-label">
           {title}{' '}
@@ -384,6 +392,7 @@ function ActionsEditor({
               action={a}
               index={i}
               count={actions.length}
+              issueAt={`${issueAt}/action:${a.id}`}
               reorder={reorder}
               onChange={(next) =>
                 onChange(actions.map((x) => (x.id === a.id ? next : x)))
@@ -476,18 +485,20 @@ function ButtonSettings({
             onChange={(emoji) => onChange({ ...button, emoji })}
           />
         </div>
-        <Input
-          label={
-            <>
-              Button text{' '}
-              <InfoTip text="Up to 80 characters. A button needs text, an emoji, or both." />
-            </>
-          }
-          maxLength={80}
-          value={button.label}
-          autoFocus
-          onChange={(e) => onChange({ ...button, label: e.target.value })}
-        />
+        <div data-issue={`component:${button.id}/label`}>
+          <Input
+            label={
+              <>
+                Button text{' '}
+                <InfoTip text="Up to 80 characters. A button needs text, an emoji, or both." />
+              </>
+            }
+            maxLength={80}
+            value={button.label}
+            autoFocus
+            onChange={(e) => onChange({ ...button, label: e.target.value })}
+          />
+        </div>
         <div
           className="sp-colour-squares"
           role="radiogroup"
@@ -527,6 +538,7 @@ function ButtonSettings({
       />
       {button.link ? (
         <Input
+          data-issue={`component:${button.id}/url`}
           label="URL"
           placeholder="https://"
           value={button.url}
@@ -541,6 +553,7 @@ function ButtonSettings({
       ) : (
         <ActionsEditor
           actions={button.actions}
+          issueAt={`component:${button.id}`}
           onChange={(actions) => onChange({ ...button, actions })}
         />
       )}
@@ -579,8 +592,15 @@ function MenuSettings({
   onClose: () => void;
 }) {
   const data = useStudioData();
-  // The option whose actions are shown, or null for the list of options.
-  const [optionId, setOptionId] = useState<string | null>(null);
+  const issue = useIssue();
+  // The option whose actions are shown, or null for the list of options;
+  // opened for a problem in one option's actions, it starts on those.
+  const [optionId, setOptionId] = useState<string | null>(
+    () =>
+      issue?.at.match(
+        new RegExp(`^component:${menu.id}/option:([\\w-]+)/action:`),
+      )?.[1] ?? null,
+  );
   const [addPlay, setAddPlay] = useState(0);
   const { list: listRef, ...reorder } = useReorder({
     onMove: (from, to) =>
@@ -636,11 +656,12 @@ function MenuSettings({
           </div>
           <ActionsEditor
             actions={opened.actions}
+            issueAt={`component:${menu.id}/option:${opened.id}`}
             onChange={(actions) => editOption(opened.id, { actions })}
           />
         </div>
       ) : (
-        <div className="sp-options">
+        <div className="sp-options" data-issue={`component:${menu.id}/options`}>
           <div className="sp-actions__head">
             <span className="sp-label">
               Options{' '}
@@ -675,6 +696,7 @@ function MenuSettings({
               <li
                 key={o.id}
                 {...reorder.item(i, o.id)}
+                data-issue={`component:${menu.id}/option:${o.id}`}
                 className={cx(
                   'sp-action sp-option',
                   reorder.dropClass(i, menu.options.length),
@@ -784,9 +806,22 @@ export function ComponentItem({
   onChange: (c: StudioComponent) => void;
   onRemove: () => void;
 }) {
-  const [open, setOpen] = useState(startOpen);
+  const [opened, setOpen] = useState(startOpen);
   const [fading, setFading] = useState(false);
   const c = component;
+  // A problem in its settings opens them, until they're closed again.
+  const issue = useIssue();
+  const [closedFor, setClosedFor] = useState(0);
+  const forced =
+    !!issue &&
+    issue.n !== closedFor &&
+    (issue.at === `component:${c.id}` ||
+      issue.at.startsWith(`component:${c.id}/`));
+  const open = opened || forced;
+  const close = () => {
+    setOpen(false);
+    setClosedFor(issue?.n ?? 0);
+  };
   const name = c.type === 'button' ? `button ${c.label || index + 1}` : 'menu';
   const handle = (
     <DragHandle
@@ -799,6 +834,7 @@ export function ComponentItem({
   return (
     <div
       {...reorder.item(index, component.id)}
+      data-issue={`component:${c.id}`}
       className={cx(
         'sp-comp',
         c.type === 'menu' ? 'sp-comp--menu' : 'sp-comp--button',
@@ -862,17 +898,9 @@ export function ComponentItem({
       />
       {open &&
         (c.type === 'button' ? (
-          <ButtonSettings
-            button={c}
-            onChange={onChange}
-            onClose={() => setOpen(false)}
-          />
+          <ButtonSettings button={c} onChange={onChange} onClose={close} />
         ) : (
-          <MenuSettings
-            menu={c}
-            onChange={onChange}
-            onClose={() => setOpen(false)}
-          />
+          <MenuSettings menu={c} onChange={onChange} onClose={close} />
         ))}
     </div>
   );

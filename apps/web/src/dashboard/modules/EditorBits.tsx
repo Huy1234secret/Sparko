@@ -14,6 +14,7 @@ import {
   LottieIcon,
   cx,
   renderDiscordText,
+  useKeepOnScreen,
 } from '../../ui';
 import { useStudioActions } from '../../data';
 import closeAnim from '../../../../../design-system/assets/icons/close-button-hover.json?url';
@@ -202,6 +203,46 @@ export function CloseButton({
  * The upload button: its icon plays in when it appears, again on hover,
  * and its "select" animation when pressed.
  */
+/**
+ * A button with an animated icon: it draws in when it appears, plays its
+ * hover when the pointer comes over it, and its press when pressed.
+ */
+export function AnimatedIconButton({
+  reveal,
+  hover,
+  select,
+  children,
+  loading,
+  onPointerEnter,
+  onPointerDown,
+  ...rest
+}: React.ComponentProps<typeof Button> & {
+  reveal: string;
+  hover: string;
+  select: string;
+}) {
+  const [play, setPlay] = useState({ src: reveal, key: 1 });
+  return (
+    <Button
+      {...rest}
+      loading={!!loading}
+      onPointerEnter={(e) => {
+        setPlay((p) => ({ src: hover, key: p.key + 1 }));
+        onPointerEnter?.(e);
+      }}
+      onPointerDown={(e) => {
+        setPlay((p) => ({ src: select, key: p.key + 1 }));
+        onPointerDown?.(e);
+      }}
+    >
+      {!loading && (
+        <LottieIcon src={play.src} size={20} playKey={play.key} solid />
+      )}
+      {children}
+    </Button>
+  );
+}
+
 function UploadButton({
   busy,
   onClick,
@@ -209,27 +250,27 @@ function UploadButton({
   busy: boolean;
   onClick: () => void;
 }) {
-  const [play, setPlay] = useState({ src: uploadReveal, key: 1 });
   return (
-    <Button
+    <AnimatedIconButton
       size="sm"
+      reveal={uploadReveal}
+      hover={uploadHover}
+      select={uploadSelect}
       loading={busy}
       loadingLabel="Uploading…"
-      onPointerEnter={() =>
-        setPlay((p) => ({ src: uploadHover, key: p.key + 1 }))
-      }
-      onPointerDown={() =>
-        setPlay((p) => ({ src: uploadSelect, key: p.key + 1 }))
-      }
       onClick={onClick}
     >
-      {!busy && (
-        <LottieIcon src={play.src} size={20} playKey={play.key} solid />
-      )}
       Upload
-    </Button>
+    </AnimatedIconButton>
   );
 }
+
+/** The upload button's animations, for others that upload. */
+export const uploadAnimations = {
+  reveal: uploadReveal,
+  hover: uploadHover,
+  select: uploadSelect,
+};
 
 /** Open popovers, newest last; Escape closes only the newest. */
 const openPopovers: object[] = [];
@@ -303,6 +344,7 @@ export function UrlPopover({
   const [error, setError] = useState('');
   const { upload } = useStudioActions(serverId);
   useDismiss(true, onClose, box);
+  useKeepOnScreen(box);
   const apply = () => {
     const url = text.trim();
     if (url && !okLink(url)) {
@@ -615,4 +657,55 @@ export function InfoTip({ text }: { text: string }) {
       </span>
     </span>
   );
+}
+
+/**
+ * A problem found when saving or posting, and how many times one has been
+ * shown, so the same problem shown again still moves the page there.
+ */
+export type ShownIssue = { at: string; n: number };
+const IssueContext = createContext<ShownIssue | null>(null);
+export const IssueProvider = IssueContext.Provider;
+/** The problem being shown, if any; settings panels open for theirs. */
+export const useIssue = () => useContext(IssueContext);
+
+/**
+ * Takes the person to a problem: scrolls the part of the editor it's in
+ * (marked with `data-issue`) into view, flashes a red outline round it and
+ * puts the caret there. Without that exact part, the nearest one holding
+ * it is used: "component:b1/action:a1" falls back to "component:b1".
+ */
+export function flashIssue(at: string) {
+  let key = at;
+  let el: HTMLElement | null = null;
+  for (;;) {
+    el = document.querySelector<HTMLElement>(
+      `[data-issue="${key.replace(/["\\]/g, '\\$&')}"]`,
+    );
+    const cut = key.lastIndexOf('/');
+    if (el || cut < 0) break;
+    key = key.slice(0, cut);
+  }
+  el ??= document.querySelector<HTMLElement>('[data-issue="message"]');
+  if (!el) return;
+  el.scrollIntoView?.({
+    block: 'center',
+    behavior: still() ? 'auto' : 'smooth',
+  });
+  el.classList.remove('is-flagged');
+  // Reading the size restarts the animation when it's shown again.
+  void el.offsetWidth;
+  el.classList.add('is-flagged');
+  const target = el;
+  target.addEventListener(
+    'animationend',
+    () => target.classList.remove('is-flagged'),
+    { once: true },
+  );
+  const field = el.matches('input, textarea, [role="combobox"]')
+    ? el
+    : el.querySelector<HTMLElement>(
+        'input:not([type="file"]), textarea, [role="combobox"], button.sp-input',
+      );
+  field?.focus({ preventScroll: true });
 }
