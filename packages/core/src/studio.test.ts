@@ -69,6 +69,8 @@ const v2: StudioMessage = {
       { id: 'i', url: 'https://img.example/1.png', description: 'One' },
     ],
     order: ['text', 'components', 'gallery'],
+    above: [],
+    below: [],
   },
   components: [
     {
@@ -183,6 +185,65 @@ describe('Message Studio messages', () => {
       { now: 0 },
     ) as unknown as typeof body;
     expect(moved.components[0]!.components[0]!.type).toBe(12);
+    // The buttons and the gallery can sit outside the container too.
+    const outside = studioPayload(
+      {
+        ...v2,
+        v2: {
+          ...v2.v2,
+          order: ['text'],
+          above: ['gallery'],
+          below: ['components'],
+        },
+      },
+      { now: 0 },
+    ) as unknown as typeof body;
+    expect(outside.components.map((c) => c.type)).toEqual([12, 17, 1]);
+    expect(outside.components[1]!.components.map((c) => c.type)).toEqual([
+      9, 14, 10,
+    ]);
+    // With nothing inside, there's no empty container.
+    const bare = studioPayload(
+      {
+        ...v2,
+        v2: {
+          ...v2.v2,
+          text: '',
+          order: ['text', 'gallery'],
+          below: ['components'],
+        },
+      },
+      { now: 0 },
+    ) as unknown as typeof body;
+    expect(bare.components.map((c) => c.type)).toEqual([17, 1]);
+    const empty = studioPayload(
+      {
+        ...v2,
+        v2: {
+          ...v2.v2,
+          text: '',
+          order: ['text'],
+          above: ['gallery', 'components'],
+        },
+      },
+      { now: 0 },
+    ) as unknown as typeof body;
+    expect(empty.components.map((c) => c.type)).toEqual([12, 1]);
+  });
+
+  it('keeps each V2 part in one place, with the text inside', () => {
+    const m = normaliseStudio({
+      ...v2,
+      v2: {
+        ...v2.v2,
+        order: ['gallery'],
+        above: ['text', 'components', 'gallery'],
+        below: ['components'],
+      },
+    });
+    expect(m.v2.above).toEqual(['components', 'gallery']);
+    expect(m.v2.below).toEqual([]);
+    expect(m.v2.order).toEqual(['text']);
   });
 
   it('reads Components V2 messages saved as blocks', () => {
@@ -195,6 +256,8 @@ describe('Message Studio messages', () => {
         { id: 'i', url: 'https://img.example/1.png', description: 'One' },
       ],
       order: ['text', 'components', 'gallery'],
+      above: [],
+      below: [],
     });
     expect(m.components).toMatchObject([
       { type: 'button', link: true, label: 'Rules' },

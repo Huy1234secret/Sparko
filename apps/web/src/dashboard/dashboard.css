@@ -1060,6 +1060,12 @@
   filter: grayscale(1);
   opacity: 0.7;
 }
+.sp-emoji-pop__groups button[aria-pressed='true'] {
+  background: var(--sp-raised);
+  box-shadow: inset 0 -2px 0 var(--sp-brand);
+  filter: none;
+  opacity: 1;
+}
 .sp-emoji-pop__groups button:hover,
 .sp-emoji-pop__groups button:focus-visible {
   outline: none;
@@ -1189,25 +1195,6 @@
 .sp-embed-wrap {
   position: relative;
   max-width: 516px;
-}
-.sp-embed-wrap.is-dragged {
-  opacity: 0.4;
-}
-.sp-embed-wrap.is-drop-before::before,
-.sp-embed-wrap.is-drop-after::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  left: 0;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--sp-dc-link);
-}
-.sp-embed-wrap.is-drop-before::before {
-  top: -6px;
-}
-.sp-embed-wrap.is-drop-after::after {
-  bottom: -6px;
 }
 .sp-embed-gutter {
   position: absolute;
@@ -1697,10 +1684,6 @@
 .sp-action > * {
   transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
 }
-.sp-comp.is-dragged,
-.sp-action.is-dragged {
-  opacity: 0.4;
-}
 .sp-comp__face {
   cursor: pointer;
 }
@@ -1737,46 +1720,6 @@
 .sp-handle:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--sp-dc-link);
-}
-.sp-comp--button.is-drop-before::before,
-.sp-comp--button.is-drop-after::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--sp-dc-link);
-}
-.sp-comp--button.is-drop-before::before {
-  left: -6px;
-}
-.sp-comp--button.is-drop-after::after {
-  right: -6px;
-}
-.sp-comp--menu.is-drop-before::before,
-.sp-comp--menu.is-drop-after::after,
-.sp-action.is-drop-before::before,
-.sp-action.is-drop-after::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  left: 0;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--sp-brand);
-}
-.sp-comp--menu.is-drop-before::before,
-.sp-action.is-drop-before::before {
-  top: -6px;
-}
-.sp-comp--menu.is-drop-after::after,
-.sp-action.is-drop-after::after {
-  bottom: -6px;
-}
-.sp-comp--menu.is-drop-before::before,
-.sp-comp--menu.is-drop-after::after {
-  background: var(--sp-dc-link);
 }
 
 /* The red trash: faint until its row is hovered, bright on its own hover */
@@ -1828,10 +1771,16 @@
   place-items: center;
   padding: 24px 16px;
   overflow-y: auto;
-  background: rgb(6 6 5 / 0.45);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
   animation: sp-fade var(--sp-dur-base) var(--sp-ease-out);
+}
+/* The page behind the panel is blurred with a filter on the page itself
+   rather than a backdrop filter on the scrim: the browser blurs it once,
+   instead of again on every frame something in the panel moves. */
+.sp-settings-scrim {
+  background: rgb(6 6 5 / 0.45);
+}
+body:has(> .sp-settings-scrim) > #root {
+  filter: blur(6px);
 }
 @keyframes sp-fade {
   from {
@@ -2003,11 +1952,16 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+/* Three or more actions scroll inside their list; the panel stops growing. */
 .sp-actions__list {
   display: grid;
   gap: 8px;
-  margin: 0;
-  padding: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Room for the drop line and focus rings at the edges. */
+  margin: -6px;
+  padding: 6px;
   list-style: none;
 }
 .sp-action {
@@ -2132,6 +2086,22 @@
   transform: translate(-50%, 0);
 }
 
+/* Anything being dragged lifts off the page and follows the pointer. */
+.sp-embed-wrap.is-dragged,
+.sp-comp.is-dragged,
+.sp-action.is-dragged,
+.sp-v2-part.is-dragged,
+.sp-gallery__cell.is-dragged {
+  position: relative;
+  z-index: 5;
+  cursor: grabbing;
+  filter: drop-shadow(0 10px 18px rgb(0 0 0 / 0.45));
+  will-change: transform;
+}
+.sp-action.is-dragged {
+  background: var(--sp-raised);
+}
+
 /* Message Studio: the Components V2 container */
 .sp-v2-wrap {
   max-width: none;
@@ -2156,48 +2126,75 @@
 }
 .sp-v2 {
   display: block;
-  padding: 12px 16px 16px 14px;
+  padding: 0 16px 0 14px;
+}
+/* The container's top and bottom edges: dropping above the top one (or
+   below the bottom one) moves a part out of the container. */
+.sp-v2__edge {
+  height: 12px;
+}
+.sp-v2__edge--bottom {
+  height: 16px;
 }
 .sp-v2__parts {
   display: grid;
   gap: 12px;
 }
+.sp-v2-message {
+  display: grid;
+  gap: 8px;
+  max-width: 516px;
+}
 .sp-v2-part {
   position: relative;
-  padding-left: 18px;
-  margin-left: -18px;
 }
+.sp-v2-part.is-outside > .sp-comps,
+.sp-v2-part.is-outside > .sp-gallery {
+  margin: 0;
+}
+/* Each part's handle is a small tab on its top edge, clear of the
+   handles on its pictures and buttons. */
 .sp-v2-part__handle {
   position: absolute;
-  top: 2px;
-  left: -2px;
+  top: -11px;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 7px;
+  background: var(--sp-dc-select, #2b2d31);
   color: var(--sp-dc-muted);
+  cursor: grab;
   opacity: 0;
-  transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
+  transform: translateX(-50%);
+  touch-action: none;
+  transition:
+    opacity var(--sp-dur-fast) var(--sp-ease-out),
+    color var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-v2-part__handle .sp-mask-icon,
+.sp-v2-part__handle > * {
+  transform: rotate(90deg);
+}
+.sp-v2-part__handle:hover {
+  color: var(--sp-dc-header);
+}
+.sp-v2-part__handle:disabled {
+  display: none;
+}
+.sp-v2-part__handle:focus-visible {
+  outline: none;
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--sp-dc-link);
 }
 .sp-v2-part:hover > .sp-v2-part__handle,
 .sp-v2-part:focus-within > .sp-v2-part__handle,
-.sp-v2__parts:has(.is-dragged) .sp-v2-part__handle {
+.sp-v2-part.is-dragged > .sp-v2-part__handle {
   opacity: 1;
-}
-.sp-v2-part.is-dragged {
-  opacity: 0.4;
-}
-.sp-v2-part.is-drop-before::before,
-.sp-v2-part.is-drop-after::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  left: 18px;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--sp-dc-link);
-}
-.sp-v2-part.is-drop-before::before {
-  top: -8px;
-}
-.sp-v2-part.is-drop-after::after {
-  bottom: -8px;
 }
 .sp-v2-text {
   display: grid;
@@ -2283,34 +2280,18 @@
 .sp-gallery__cell.is-fading > .sp-gallery__face {
   opacity: 0.25;
 }
-.sp-gallery__cell.is-dragged {
-  opacity: 0.4;
-}
-.sp-gallery__cell.is-drop-before::before,
-.sp-gallery__cell.is-drop-after::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 1;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--sp-dc-link);
-}
-.sp-gallery__cell.is-drop-before::before {
-  left: -4px;
-}
-.sp-gallery__cell.is-drop-after::after {
-  right: -4px;
-}
 .sp-gallery__handle {
   position: absolute;
   top: 4px;
   left: 4px;
-  border-radius: 4px;
-  background: rgb(0 0 0 / 0.55);
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgb(17 18 20 / 0.7);
   color: #fff;
   opacity: 0;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 .sp-gallery__trash {
   position: absolute;
@@ -2433,7 +2414,44 @@
 }
 
 .sp-combo > .sp-combo__pop {
+  top: calc(100% + 6px);
+  bottom: auto;
   max-width: 400px;
+}
+
+/* Menus wipe in from the edge nearest what opened them. */
+@keyframes sp-wipe-down {
+  from {
+    clip-path: inset(0 0 100% 0 round var(--sp-radius-card));
+  }
+  to {
+    clip-path: inset(0 0 0 0 round var(--sp-radius-card));
+  }
+}
+@keyframes sp-wipe-up {
+  from {
+    clip-path: inset(100% 0 0 0 round var(--sp-radius-card));
+  }
+  to {
+    clip-path: inset(0 0 0 0 round var(--sp-radius-card));
+  }
+}
+.sp-combo__pop,
+.sp-vars-pop,
+.sp-emoji-pop {
+  animation: sp-wipe-down 200ms var(--sp-ease-out) both;
+}
+.sp-combo__pop[data-side='top'],
+.sp-vars-pop[data-side='top'],
+.sp-emoji-pop[data-side='top'] {
+  animation-name: sp-wipe-up;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-combo__pop,
+  .sp-vars-pop,
+  .sp-emoji-pop {
+    animation: none;
+  }
 }
 .sp-combo__search-icon {
   color: var(--sp-muted);
@@ -2465,29 +2483,28 @@
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--sp-brand-edge);
 }
-.sp-combo-option[aria-selected='true'] {
-  padding-right: 0;
-}
 .sp-combo-option[aria-disabled='true'] {
   box-shadow: none;
 }
 .sp-combo-option__tick {
   display: grid;
   place-items: center;
-  align-self: stretch;
   flex: none;
-  width: 52px;
-  margin: 1px 1px 1px auto;
-  padding-left: 12px;
-  border-radius: 0 calc(var(--sp-radius-chip) - 1px)
-    calc(var(--sp-radius-chip) - 1px) 0;
-  background: linear-gradient(90deg, transparent, var(--sp-brand) 12px);
-  color: var(--sp-on-brand);
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  border-radius: 6px;
+  background: #fff;
+  color: #1c1917;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
   transition: opacity var(--sp-dur-base) var(--sp-ease-out);
 }
 .sp-combo-option__tick.is-leaving {
   opacity: 0;
   transition-delay: 0.45s;
+}
+.sp-option__meta + .sp-combo-option__tick {
+  margin-left: 0;
 }
 
 /* Role options sit on their colour at 25%, and full when hovered or picked;
@@ -2523,16 +2540,6 @@
 }
 .sp-combo-option--role .sp-option__meta {
   color: inherit;
-}
-.sp-combo-option--role .sp-combo-option__tick {
-  width: 28px;
-  height: 28px;
-  margin: auto 6px auto auto;
-  padding: 0;
-  align-self: center;
-  border-radius: 6px;
-  background: #fff;
-  color: #1c1917;
 }
 [data-theme='light']
   .sp-combo-option--role:not([data-active='true']):not([aria-selected='true']) {

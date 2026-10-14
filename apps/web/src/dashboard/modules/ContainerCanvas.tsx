@@ -25,7 +25,8 @@ import dragIcon from '../../../../../design-system/assets/icons/drag.png';
  * A Components V2 message, edited in place: one container with a colour
  * bar, its text (cut into sections by {separator}), a thumbnail, an image
  * gallery, and the message's buttons and menus. The parts can be dragged
- * into another order; the gallery starts at the bottom.
+ * into another order, and the gallery and the buttons can be dragged out
+ * of the container, above or below it; the gallery starts at the bottom.
  */
 
 export const MAX_GALLERY = 10;
@@ -108,6 +109,7 @@ function Gallery({
   const [fading, setFading] = useState<string | null>(null);
   const { list, ...reorder } = useReorder({
     mode: 'grid',
+    fit: true,
     onMove: (from, to) => onChange(moveItem(images, from, to)),
   });
   const cells = galleryCells(images.length);
@@ -116,7 +118,7 @@ function Gallery({
       {images.map((img, i) => (
         <div
           key={img.id}
-          {...reorder.item(i)}
+          {...reorder.item(i, img.id)}
           className={cx(
             'sp-gallery__cell',
             reorder.dropClass(i, images.length),
@@ -197,13 +199,35 @@ export function ContainerCanvas({
   const shows = (part: V2Part) =>
     part === 'text' ||
     (part === 'gallery' ? v.gallery.length > 0 : message.components.length > 0);
-  const visible = v.order.filter(shows);
-  // Moving the parts that show keeps hidden ones where they were.
+  // Everything that shows, top to bottom, with the container's top and
+  // bottom edges as places to drop: above the top edge is outside it.
+  type Token = V2Part | 'open' | 'close';
+  const seq: Token[] = [
+    ...v.above.filter(shows),
+    'open',
+    ...v.order.filter(shows),
+    'close',
+    ...v.below.filter(shows),
+  ];
   const { list, ...reorder } = useReorder({
     onMove: (from, to) => {
-      const moved = moveItem(visible, from, to);
-      let k = 0;
-      edit({ order: v.order.map((p) => (shows(p) ? moved[k++]! : p)) });
+      const moved = moveItem(seq, from, to);
+      const open = moved.indexOf('open');
+      const close = moved.indexOf('close');
+      const parts = (a: number, b: number) =>
+        moved
+          .slice(a, b)
+          .filter((t): t is V2Part => t !== 'open' && t !== 'close');
+      const inside = parts(open + 1, close);
+      // The text always stays in the container.
+      if (!inside.includes('text')) return;
+      // Parts that don't show stay where they were.
+      const hidden = (l: V2Part[]) => l.filter((p) => !shows(p));
+      edit({
+        above: [...parts(0, open), ...hidden(v.above)],
+        order: [...inside, ...hidden(v.order)],
+        below: [...parts(close + 1, moved.length), ...hidden(v.below)],
+      });
     },
   });
   const addPicture = () => {
@@ -274,6 +298,45 @@ export function ContainerCanvas({
     );
   };
 
+  const name = (part: V2Part) =>
+    part === 'components'
+      ? 'buttons and menus'
+      : part === 'gallery'
+        ? 'gallery'
+        : 'text';
+  const row = (part: V2Part, i: number, outside: boolean) => (
+    <div
+      key={part}
+      {...reorder.item(i, part)}
+      className={cx(
+        'sp-v2-part',
+        `sp-v2-part--${part}`,
+        outside && 'is-outside',
+        reorder.dropClass(i),
+      )}
+    >
+      <button
+        type="button"
+        className="sp-v2-part__handle"
+        aria-label={`Move the ${name(part)}${part === 'text' ? '' : ', inside or outside the container'}. Drag it, or use the arrow keys.`}
+        disabled={seq.length < 4}
+        onPointerDown={reorder.start(i)}
+        onKeyDown={reorder.keys(i, seq.length)}
+      >
+        <MaskIcon src={dragIcon} size={12} />
+      </button>
+      {partBody(part)}
+    </div>
+  );
+  let at = 0;
+  const rows = (parts: V2Part[], outside: boolean) =>
+    parts.filter(shows).map((part) => row(part, at++, outside));
+  const aboveRows = rows(v.above, true);
+  const openAt = at++;
+  const insideRows = rows(v.order, false);
+  const closeAt = at++;
+  const belowRows = rows(v.below, true);
+
   return (
     <div className="dc-chat sp-canvas">
       <div className="dc-msg">
@@ -285,77 +348,65 @@ export function ContainerCanvas({
           <span className="dc-tag">App</span>
           <span className="dc-time">Today at 18:42</span>
         </div>
-        <div
-          className="sp-embed-wrap sp-v2-wrap"
-          style={{ '--dc-color': v.accent } as CSSProperties}
-        >
-          <div className="sp-embed-gutter sp-v2-gutter">
-            <button
-              type="button"
-              className="sp-embed-tool sp-v2-add"
-              aria-label="Add an image to the gallery"
-              disabled={v.gallery.length >= MAX_GALLERY}
-              title={
-                v.gallery.length >= MAX_GALLERY
-                  ? 'A gallery holds up to 10 images'
-                  : undefined
-              }
-              onClick={addPicture}
-            >
-              <MaskIcon src={addImage} size={18} />
-            </button>
-            <button
-              type="button"
-              className="sp-embed-wheel"
-              aria-label="Colour of the container"
-              aria-expanded={pop === 'colour'}
-              onClick={() => setPop(pop === 'colour' ? null : 'colour')}
-            >
-              <img src={colourWheel} alt="" />
-            </button>
-          </div>
-          <div className="dc-embed sp-embed sp-v2">
-            <button
-              type="button"
-              className="sp-embed-bar"
-              aria-label="Change the colour of the container"
-              tabIndex={-1}
-              onClick={() => setPop('colour')}
-            />
-            <div ref={list} className="sp-v2__parts">
-              {visible.map((part, i) => (
-                <div
-                  key={part}
-                  {...reorder.item(i)}
-                  className={cx(
-                    'sp-v2-part',
-                    `sp-v2-part--${part}`,
-                    reorder.dropClass(i, visible.length),
-                  )}
-                >
-                  <button
-                    type="button"
-                    className="sp-handle sp-v2-part__handle"
-                    aria-label={`Move the ${part === 'components' ? 'buttons and menus' : part}. Drag it, or use the arrow keys.`}
-                    disabled={visible.length < 2}
-                    onPointerDown={reorder.start(i)}
-                    onKeyDown={reorder.keys(i, visible.length)}
-                  >
-                    <MaskIcon src={dragIcon} size={14} />
-                  </button>
-                  {partBody(part)}
-                </div>
-              ))}
+        <div ref={list} className="sp-v2-message">
+          {aboveRows}
+          <div
+            className="sp-embed-wrap sp-v2-wrap"
+            style={{ '--dc-color': v.accent } as CSSProperties}
+          >
+            <div className="sp-embed-gutter sp-v2-gutter">
+              <button
+                type="button"
+                className="sp-embed-tool sp-v2-add"
+                aria-label="Add an image to the gallery"
+                disabled={v.gallery.length >= MAX_GALLERY}
+                title={
+                  v.gallery.length >= MAX_GALLERY
+                    ? 'A gallery holds up to 10 images'
+                    : undefined
+                }
+                onClick={addPicture}
+              >
+                <MaskIcon src={addImage} size={18} />
+              </button>
+              <button
+                type="button"
+                className="sp-embed-wheel"
+                aria-label="Colour of the container"
+                aria-expanded={pop === 'colour'}
+                onClick={() => setPop(pop === 'colour' ? null : 'colour')}
+              >
+                <img src={colourWheel} alt="" />
+              </button>
             </div>
+            <div className="dc-embed sp-embed sp-v2">
+              <button
+                type="button"
+                className="sp-embed-bar"
+                aria-label="Change the colour of the container"
+                tabIndex={-1}
+                onClick={() => setPop('colour')}
+              />
+              <div
+                {...reorder.item(openAt, 'open', true)}
+                className="sp-v2__edge sp-v2__edge--top"
+              />
+              <div className="sp-v2__parts">{insideRows}</div>
+              <div
+                {...reorder.item(closeAt, 'close', true)}
+                className="sp-v2__edge sp-v2__edge--bottom"
+              />
+            </div>
+            {pop === 'colour' && (
+              <ColourPicker
+                value={v.accent}
+                title="Container colour"
+                onChange={(accent) => edit({ accent })}
+                onClose={() => setPop(null)}
+              />
+            )}
           </div>
-          {pop === 'colour' && (
-            <ColourPicker
-              value={v.accent}
-              title="Container colour"
-              onChange={(accent) => edit({ accent })}
-              onClose={() => setPop(null)}
-            />
-          )}
+          {belowRows}
         </div>
       </div>
     </div>

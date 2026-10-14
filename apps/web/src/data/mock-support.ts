@@ -380,6 +380,8 @@ const studioDefault = (server: Server, channelId: string): StudioMessage => ({
     thumbnail: '',
     gallery: [],
     order: ['text', 'components', 'gallery'],
+    above: [],
+    below: [],
   },
 });
 const simple = (

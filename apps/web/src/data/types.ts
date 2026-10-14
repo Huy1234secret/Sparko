@@ -208,7 +208,7 @@ export type TicketsState = {
 
 export type LinkButton = { id: string; label: string; url: string };
 export type GalleryImage = { id: string; url: string; description: string };
-/** The parts inside a Components V2 container, in the order they're shown. */
+/** The parts of a Components V2 message. */
 export type V2Part = 'text' | 'gallery' | 'components';
 /**
  * A Components V2 message: one container with a colour bar, its text
@@ -220,7 +220,11 @@ export type StudioV2 = {
   text: string;
   thumbnail: string;
   gallery: GalleryImage[];
+  /** The parts inside the container, in order. */
   order: V2Part[];
+  /** The gallery or buttons can sit above or below the container instead. */
+  above: V2Part[];
+  below: V2Part[];
 };
 
 export type StudioMessage = {

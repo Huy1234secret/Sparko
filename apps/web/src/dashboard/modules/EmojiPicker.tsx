@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   EmptyState,
   Input,
@@ -8,6 +8,7 @@ import {
   cx,
   preloadAnimations,
   rememberEmojis,
+  usePlacement,
   renderDiscordText,
 } from '../../ui';
 import { useServerEmojis, type ServerEmoji } from '../../data';
@@ -15,7 +16,8 @@ import { useDismiss } from './EditorBits';
 
 /**
  * An emoji picker like the ones in chat apps: every emoji Discord can show,
- * by group and searchable, and a tab with the server's own emojis.
+ * one group at a time (smileys first) and searchable across all of them,
+ * and a tab with the server's own emojis. Showing one group keeps it quick.
  */
 type Emoji = { emoji: string; name: string };
 type Group = { name: string; emojis: Emoji[] };
@@ -101,6 +103,7 @@ export function EmojiButton({
       {open && (
         <EmojiPicker
           serverId={serverId}
+          anchor={wrap}
           onPick={(text) => {
             onPick(text);
             setOpen(false);
@@ -113,18 +116,24 @@ export function EmojiButton({
 
 function EmojiPicker({
   serverId,
+  anchor,
   onPick,
   className,
 }: {
   serverId: string;
+  /** What opened it: the picker opens below it, or above if there's more room. */
+  anchor: RefObject<HTMLElement | null>;
   onPick: (text: string) => void;
   className?: string;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  usePlacement(true, anchor, box, { gap: 8 });
   const [tab, setTab] = useState<'emoji' | 'server'>('emoji');
   const [query, setQuery] = useState('');
   const [list, setList] = useState<Group[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [hover, setHover] = useState<string>('');
+  const [group, setGroup] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
   const server = useServerEmojis(serverId, tab === 'server');
   useEffect(() => {
@@ -141,15 +150,20 @@ function EmojiPicker({
   }, [server.data]);
 
   const q = query.trim().toLowerCase();
+  // A search looks through every group; otherwise one group shows.
   const shown = useMemo(
     () =>
-      (list ?? [])
-        .map((g) => ({
-          ...g,
-          emojis: q ? g.emojis.filter((e) => e.name.includes(q)) : g.emojis,
-        }))
-        .filter((g) => g.emojis.length),
-    [list, q],
+      q
+        ? (list ?? [])
+            .map((g) => ({
+              ...g,
+              emojis: g.emojis.filter((e) => e.name.includes(q)),
+            }))
+            .filter((g) => g.emojis.length)
+        : list?.[group]
+          ? [list[group]]
+          : [],
+    [list, q, group],
   );
   const serverShown = (server.data ?? []).filter((e) =>
     e.name.toLowerCase().includes(q),
@@ -159,6 +173,7 @@ function EmojiPicker({
 
   return (
     <div
+      ref={box}
       className={cx('sp-emoji-pop', className)}
       role="dialog"
       aria-label="Emoji"
@@ -192,11 +207,11 @@ function EmojiPicker({
               type="button"
               title={g.name}
               aria-label={g.name}
-              onClick={() =>
-                scroller.current
-                  ?.querySelector(`[data-group="${i}"]`)
-                  ?.scrollIntoView({ block: 'start' })
-              }
+              aria-pressed={group === i}
+              onClick={() => {
+                setGroup(i);
+                scroller.current?.scrollTo({ top: 0 });
+              }}
             >
               {g.emojis[0]?.emoji}
             </button>
@@ -215,11 +230,7 @@ function EmojiPicker({
             </div>
           ) : shown.length ? (
             shown.map((g) => (
-              <section
-                key={g.name}
-                data-group={list.findIndex((x) => x.name === g.name)}
-                aria-label={g.name}
-              >
+              <section key={g.name} aria-label={g.name}>
                 <h4 className="sp-emoji-pop__group">{g.name}</h4>
                 <div className="sp-emoji-grid">
                   {g.emojis.map((e) => (
@@ -332,6 +343,7 @@ export function EmojiField({
       {open && (
         <EmojiPicker
           serverId={serverId}
+          anchor={wrap}
           className="sp-emoji-pop--start"
           onPick={(text) => {
             onChange(text);

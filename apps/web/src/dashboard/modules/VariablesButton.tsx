@@ -1,7 +1,12 @@
 import { useRef, useState } from 'react';
-import { cx } from '../../ui';
+import { LottieIcon, cx, usePlacement } from '../../ui';
 import { studioVariables } from '../../data';
 import { useDismiss } from './EditorBits';
+import bookReveal from '../../../../../design-system/assets/icons/animated-icons/info-book-icon-reveal.json?url';
+import bookHover from '../../../../../design-system/assets/icons/animated-icons/info-book-icon-hover.json?url';
+import bookOpen from '../../../../../design-system/assets/icons/animated-icons/info-book-icon-open.json?url';
+
+export const variablesAnimations = [bookReveal, bookHover, bookOpen];
 
 /**
  * The { } button beside the live preview: a list of variables, written in
@@ -16,8 +21,18 @@ export function VariablesButton({
   onPick: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // The book draws in, flips its pages on hover, and opens while the list
+  // is showing (closing again when it goes).
+  const [anim, setAnim] = useState<'reveal' | 'hover' | 'open'>('reveal');
+  const [playKey, setPlayKey] = useState(1);
   const wrap = useRef<HTMLDivElement>(null);
-  useDismiss(open, () => setOpen(false), wrap);
+  const toggle = (next: boolean) => {
+    setOpen(next);
+    if (next) setAnim('open');
+  };
+  const pop = useRef<HTMLDivElement>(null);
+  useDismiss(open, () => toggle(false), wrap);
+  usePlacement(open, wrap, pop, { gap: 8 });
   const list = [
     ...studioVariables,
     ...(v2
@@ -38,12 +53,36 @@ export function VariablesButton({
         aria-label="Add a variable"
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => toggle(!open)}
+        onPointerEnter={() => {
+          if (open) return;
+          // A new file plays once it has loaded; the same one plays again.
+          if (anim === 'hover') setPlayKey((k) => k + 1);
+          else setAnim('hover');
+        }}
       >
-        {'{ }'}
+        <LottieIcon
+          src={
+            anim === 'reveal'
+              ? bookReveal
+              : anim === 'hover'
+                ? bookHover
+                : bookOpen
+          }
+          size={22}
+          original
+          playKey={anim === 'open' ? undefined : playKey}
+          open={anim === 'open' ? open : undefined}
+          startAt={0}
+        />
       </button>
       {open && (
-        <div className="sp-vars-pop" role="menu" aria-label="Variables">
+        <div
+          ref={pop}
+          className="sp-vars-pop"
+          role="menu"
+          aria-label="Variables"
+        >
           <p className="sp-vars-pop__note">
             Sparko fills these in when it sends the message. Click one to add it
             where you were writing.
@@ -57,7 +96,7 @@ export function VariablesButton({
               autoFocus={i === 0}
               onClick={() => {
                 onPick(`{${v.name}}`);
-                setOpen(false);
+                toggle(false);
               }}
             >
               <code>{`{${v.name}}`}</code>

@@ -97,19 +97,26 @@ type LegacyV2Block =
 
 /** A picture in a Components V2 image gallery. */
 export type GalleryImage = { id: string; url: string; description: string };
-/** The parts inside a Components V2 container, in the order they're shown. */
+/** The parts of a Components V2 message. */
 export type V2Part = 'text' | 'gallery' | 'components';
 /**
  * A Components V2 message: one container with a colour bar, its text
  * (split by {separator} into sections), a thumbnail beside the first
  * section, an image gallery, and the message's buttons and menus.
+ * The gallery and the buttons can also sit above or below the container;
+ * the text always stays inside. Each part is in exactly one of the lists.
  */
 export type StudioV2 = {
   accent: string;
   text: string;
   thumbnail: string;
   gallery: GalleryImage[];
+  /** The parts inside the container, in the order they're shown. */
   order: V2Part[];
+  /** Parts above the container. */
+  above: V2Part[];
+  /** Parts below the container. */
+  below: V2Part[];
 };
 export type StudioMessage = {
   name: string;
@@ -131,6 +138,8 @@ export const v2Default = (): StudioV2 => ({
   gallery: [],
   // The gallery sits at the bottom until it's moved.
   order: ['text', 'components', 'gallery'],
+  above: [],
+  below: [],
 });
 
 /** Reads a Components V2 message saved as separate blocks. */
@@ -236,17 +245,29 @@ const v2Of = (v: unknown): StudioV2 => {
   const x = (v ?? {}) as Partial<StudioV2> & { blocks?: LegacyV2Block[] };
   if (Array.isArray(x.blocks)) return fromBlocks(x).v2;
   const base = v2Default();
-  const order = Array.isArray(x.order)
-    ? x.order.filter((p): p is V2Part =>
-        ['text', 'gallery', 'components'].includes(p),
-      )
-    : base.order;
+  // Each part goes in one place; text is always inside, and anything
+  // missing goes back inside.
+  const seen = new Set<V2Part>();
+  const take = (list: unknown, outside: boolean) =>
+    (Array.isArray(list) ? list : []).filter((p): p is V2Part => {
+      const ok =
+        (p === 'gallery' || p === 'components' || (p === 'text' && !outside)) &&
+        !seen.has(p);
+      if (ok) seen.add(p);
+      return ok;
+    });
+  const above = take(x.above, true);
+  const below = take(x.below, true);
+  const inside = take(x.order ?? base.order, false);
+  const order = [...inside, ...base.order.filter((p) => !seen.has(p))];
   return {
     accent: typeof x.accent === 'string' ? x.accent : base.accent,
     text: typeof x.text === 'string' ? x.text : base.text,
     thumbnail: typeof x.thumbnail === 'string' ? x.thumbnail : '',
     gallery: Array.isArray(x.gallery) ? x.gallery : [],
-    order: order.length === 3 ? order : base.order,
+    order,
+    above,
+    below,
   };
 };
 
@@ -633,17 +654,22 @@ export function studioPayload(
           },
         ]
       : [];
-    const inside = v.order.flatMap((part) =>
+    const partOf = (part: V2Part) =>
       part === 'text'
         ? text
         : part === 'gallery'
           ? gallery
-          : componentsPayload(m.components, fill),
-    );
+          : componentsPayload(m.components, fill);
+    const inside = v.order.flatMap(partOf);
     return {
       flags: IS_COMPONENTS_V2,
+      // Rows of buttons and galleries can also sit outside the container.
       components: [
-        { type: 17, accent_color: colour(v.accent), components: inside },
+        ...v.above.flatMap(partOf),
+        ...(inside.length
+          ? [{ type: 17, accent_color: colour(v.accent), components: inside }]
+          : []),
+        ...v.below.flatMap(partOf),
       ],
       allowed_mentions,
     };

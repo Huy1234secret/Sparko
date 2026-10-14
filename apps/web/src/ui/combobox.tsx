@@ -10,14 +10,16 @@ import {
 } from 'react';
 import { cx, Icon } from './core';
 import { LottieIcon, preloadAnimations, reducedMotion } from './animated';
+import { usePlacement } from './placement';
 import searchReveal from '../../../../design-system/assets/icons/animated-icons/search-icon-reveal.json?url';
 import searchIdle from '../../../../design-system/assets/icons/animated-icons/search-icon-idle.json?url';
 import searchComplete from '../../../../design-system/assets/icons/animated-icons/search-icon-complete.json?url';
 import tickReveal from '../../../../design-system/assets/icons/animated-icons/tick-reveal.json?url';
 
-// Loaded the first time someone points at or tabs to a dropdown.
+// Loaded the first time someone points at or tabs to a dropdown, or
+// earlier by a page that's about to show some.
 let preloaded = false;
-const preload = () => {
+export const preloadCombobox = () => {
   if (preloaded) return;
   preloaded = true;
   preloadAnimations([searchReveal, searchIdle, searchComplete, tickReveal]);
@@ -167,11 +169,11 @@ export function Combobox(props: Props) {
     const onDown = (e: MouseEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false);
     };
-    // Inside a scrolling panel, the list scrolls itself into view.
-    pop.current?.scrollIntoView?.({ block: 'nearest' });
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
+
+  usePlacement(open, trigger, pop, { fixed: true });
 
   const selected = props.multiple ? props.value : [props.value];
   const isSelected = (value: string) => selected.includes(value);
@@ -183,27 +185,26 @@ export function Combobox(props: Props) {
     setOpen(false);
     trigger.current?.focus();
   };
+  // Picking keeps the list open (it closes on a click elsewhere or Esc), so
+  // the tick can be seen drawing in, and the old one drawing out.
   const pick = (item: ComboItem) => {
     if (item.disabled) return;
-    if (props.multiple) {
-      const was = isSelected(item.value);
+    const v = item.value;
+    const was = isSelected(v);
+    if (!props.multiple && was) return;
+    const gone = props.multiple ? (was ? [v] : []) : selected.filter(Boolean);
+    if (props.multiple)
       props.onChange(
-        was
-          ? props.value.filter((v) => v !== item.value)
-          : [...props.value, item.value],
+        was ? props.value.filter((x) => x !== v) : [...props.value, v],
       );
-      const v = item.value;
-      if (was) {
-        setLeaving((l) => [...l, v]);
-        setTimeout(() => setLeaving((l) => l.filter((x) => x !== v)), 900);
-      } else {
-        setPicked((p) => [...p, v]);
-        setLeaving((l) => l.filter((x) => x !== v));
-      }
-    } else {
-      props.onChange(item.value);
-      close();
-    }
+    else props.onChange(v);
+    if (!was) setPicked((p) => [...p, v]);
+    setLeaving((l) => [...l.filter((x) => x !== v), ...gone]);
+    if (gone.length)
+      setTimeout(
+        () => setLeaving((l) => l.filter((x) => !gone.includes(x))),
+        900,
+      );
   };
   const openList = () => {
     setQuery('');
@@ -242,8 +243,8 @@ export function Combobox(props: Props) {
     <div
       className="sp-combo"
       ref={root}
-      onPointerEnter={preload}
-      onFocus={preload}
+      onPointerEnter={preloadCombobox}
+      onFocus={preloadCombobox}
     >
       <span className="sp-label" id={`${id}-label`}>
         {label}

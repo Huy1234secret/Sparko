@@ -31,7 +31,7 @@ import {
   useSaveFlow,
 } from './frame';
 import { ContainerCanvas, MAX_GALLERY, newImage } from './ContainerCanvas';
-import { VariablesButton } from './VariablesButton';
+import { VariablesButton, variablesAnimations } from './VariablesButton';
 import { StudioLibrary } from './StudioLibrary';
 import { ChannelPicker, VersionHistory } from './parts';
 import { EmbedCanvas, MAX_EMBEDS, newEmbed } from './EmbedCanvas';
@@ -44,7 +44,7 @@ import {
 import { InfoTip, InsertProvider, useInsertTarget } from './EditorBits';
 import { EmojiButton } from './EmojiPicker';
 import { PlusMenu, type PlusItem } from './PlusMenu';
-import { preloadAnimations } from '../../ui';
+import { preloadAnimations, preloadCombobox } from '../../ui';
 
 // Every animated icon on this page, fetched ahead so none waits on first use.
 const icons = import.meta.glob<string>(
@@ -453,6 +453,8 @@ export function StudioModule({
 
   useEffect(() => {
     preloadAnimations(Object.values(icons));
+    preloadAnimations(variablesAnimations, true);
+    preloadCombobox();
   }, []);
 
   // Leaving the page with unsaved changes asks first.
