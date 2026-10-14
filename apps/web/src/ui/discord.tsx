@@ -174,12 +174,34 @@ export function DiscordPreview({ children }: { children: ReactNode }) {
 }
 
 /** Discord-style text: @mentions and #channels highlighted, **bold** made bold. */
+/** Pictures for server emojis the dashboard has loaded, by emoji id. */
+const emojiPictures = new Map<string, string>();
+export function rememberEmojis(list: { id: string; url: string }[]) {
+  for (const e of list) emojiPictures.set(e.id, e.url);
+}
+
 export function renderDiscordText(text: string): ReactNode[] {
   return text
-    .split(/(@everyone|@here|@[A-Za-z][\w.-]*|#[a-z0-9-]+|\*\*[^*]+\*\*)/g)
+    .split(
+      /(<a?:\w{1,32}:\d{1,25}>|@everyone|@here|@[A-Za-z][\w.-]*|#[a-z0-9-]+|\*\*[^*]+\*\*)/g,
+    )
     .filter(Boolean)
-    .map((part, i) =>
-      part.startsWith('@') || part.startsWith('#') ? (
+    .map((part, i) => {
+      const emoji = part.match(/^<(a?):(\w{1,32}):(\d{1,25})>$/);
+      if (emoji)
+        return (
+          <img
+            key={i}
+            className="dc-custom-emoji"
+            src={
+              emojiPictures.get(emoji[3]!) ??
+              `https://cdn.discordapp.com/emojis/${emoji[3]}.${emoji[1] ? 'gif' : 'webp'}?size=48`
+            }
+            alt={`:${emoji[2]}:`}
+            title={`:${emoji[2]}:`}
+          />
+        );
+      return part.startsWith('@') || part.startsWith('#') ? (
         <span key={i} className="dc-mention">
           {part}
         </span>
@@ -187,6 +209,6 @@ export function renderDiscordText(text: string): ReactNode[] {
         <b key={i}>{part.slice(2, -2)}</b>
       ) : (
         part
-      ),
-    );
+      );
+    });
 }

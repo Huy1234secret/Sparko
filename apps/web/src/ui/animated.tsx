@@ -7,7 +7,8 @@ import { Button, cx } from './core';
  * The files are drawn as a dark outline over a white fill; both are
  * recoloured here so an icon picks up the colours of whatever it sits in:
  * the outline takes the text colour and the fill takes --sp-anim-fill.
- * Icons drawn as a plain white shape use `solid`, which swaps the two.
+ * Icons drawn as a plain white shape use `solid`, which swaps the two, and
+ * `original` keeps the file's own colours.
  */
 type Lottie = typeof import('lottie-web/build/player/lottie_light').default;
 
@@ -51,8 +52,9 @@ function recolourAll(node: unknown) {
     Object.values(n).forEach(recolourAll);
   }
 }
-function loadFile(src: string) {
-  let file = files.get(src);
+function loadFile(src: string, keepColours: boolean) {
+  const key = `${keepColours ? 'own' : 'themed'}:${src}`;
+  let file = files.get(key);
   if (!file) {
     file = fetch(src)
       .then((res) => {
@@ -60,12 +62,12 @@ function loadFile(src: string) {
         return res.json() as Promise<unknown>;
       })
       .then((data) => {
-        recolourAll(data);
+        if (!keepColours) recolourAll(data);
         return data;
       });
     // A failed load can be tried again next time.
-    file.catch(() => files.delete(src));
-    files.set(src, file);
+    file.catch(() => files.delete(key));
+    files.set(key, file);
   }
   return file;
 }
@@ -80,12 +82,17 @@ export type LottieIconProps = {
   className?: string | undefined;
   /** Held animations: plays to the end while true and back while false. */
   open?: boolean | undefined;
-  /** Each change plays the animation once, from `from` to the end. */
+  /** Each change plays the animation once, from `from` to `to` (or the end). */
   playKey?: number | undefined;
   from?: number | undefined;
+  to?: number | undefined;
+  /** Shows this frame once the animation has loaded. */
+  startAt?: number | undefined;
   onDone?: (() => void) | undefined;
   /** For icons drawn as a white shape: that shape takes the text colour. */
   solid?: boolean | undefined;
+  /** Keeps the file's own colours instead of the dashboard's. */
+  original?: boolean | undefined;
 };
 
 export function LottieIcon({
@@ -95,21 +102,24 @@ export function LottieIcon({
   open,
   playKey,
   from = 0,
+  to,
+  startAt,
   onDone,
   solid,
+  original,
 }: LottieIconProps) {
   const box = useRef<HTMLSpanElement>(null);
   const [anim, setAnim] = useState<AnimationItem | null>(null);
   // Read when the animation loads or finishes, without reloading it.
-  const latest = useRef({ open, onDone });
+  const latest = useRef({ open, onDone, startAt });
   useEffect(() => {
-    latest.current = { open, onDone };
+    latest.current = { open, onDone, startAt };
   });
 
   useEffect(() => {
     let item: AnimationItem | undefined;
     let gone = false;
-    Promise.all([loadPlayer(), loadFile(src)])
+    Promise.all([loadPlayer(), loadFile(src, !!original)])
       .then(([lottie, data]) => {
         if (gone || !box.current) return;
         item = lottie.loadAnimation({
@@ -130,7 +140,7 @@ export function LottieIcon({
       gone = true;
       item?.destroy();
     };
-  }, [src]);
+  }, [src, original]);
 
   useEffect(() => {
     if (!anim || open === undefined) return;
@@ -145,21 +155,29 @@ export function LottieIcon({
   useEffect(() => {
     if (!anim || !playKey) return;
     if (reducedMotion()) {
+      // Jump to where the animation would have ended.
+      if (to !== undefined) anim.goToAndStop(Math.max(0, to - 1), true);
       latest.current.onDone?.();
       return;
     }
     anim.setDirection(1);
-    if (from > 0) anim.playSegments([from, anim.totalFrames], true);
+    if (from > 0 || to !== undefined)
+      anim.playSegments([from, to ?? anim.totalFrames], true);
     else {
       anim.resetSegments(true);
       anim.goToAndPlay(0, true);
     }
-  }, [anim, playKey, from]);
+  }, [anim, playKey, from, to]);
 
   return (
     <span
       ref={box}
-      className={cx('sp-lottie', solid && 'sp-lottie--solid', className)}
+      className={cx(
+        'sp-lottie',
+        solid && 'sp-lottie--solid',
+        original && 'sp-lottie--original',
+        className,
+      )}
       style={{ width: size, height: size }}
       aria-hidden="true"
     />

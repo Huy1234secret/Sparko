@@ -13,7 +13,11 @@ import {
   type Rest,
 } from '@sparko/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createApi } from './api.ts';
+import { createMedia } from './media.ts';
 
 const site = 'https://panel.example';
 const db = openDb(':memory:');
@@ -67,6 +71,8 @@ const discordCalls: { method: string; path: string; body?: unknown }[] = [];
 const fakeDiscord = (() => {
   const run = async (method: string, path: string, body?: unknown) => {
     discordCalls.push({ method, path, body });
+    if (path.endsWith('/emojis'))
+      return [{ id: '77', name: 'party', animated: true }] as never;
     if (path.includes('/members/'))
       return { joined_at: new Date().toISOString(), roles: [] } as never;
     return { id: '4242' } as never;
@@ -80,6 +86,10 @@ const fakeDiscord = (() => {
   } as unknown as Rest;
 })();
 
+const media = createMedia({
+  dir: mkdtempSync(join(tmpdir(), 'sparko-media-')),
+  publicUrl: site,
+});
 let server: Server;
 let base: string;
 beforeAll(async () => {
@@ -100,6 +110,7 @@ beforeAll(async () => {
     views: { get: async () => view(), refresh: async () => view() },
     discord: fakeDiscord,
     publicUrl: site,
+    media,
     applyWaitMs: 400,
   });
   server = createServer((req, res) => {
@@ -506,5 +517,51 @@ describe('server API', () => {
     lib = await body<Library>(await call('/9001/studio'));
     expect(lib.folders).toHaveLength(0);
     expect(lib.templates.map((t) => t.name)).toEqual(['Two']);
+  });
+
+  it('posts a test message, uploads pictures and lists server emojis', async () => {
+    const { message } = await body<{ message: object }>(
+      await call('/9001/studio'),
+    );
+    expect(
+      (
+        await call('/9001/studio/test', {
+          method: 'POST',
+          body: JSON.stringify(message),
+        })
+      ).status,
+    ).toBe(204);
+    expect(
+      listVersions(db, '9001', 'studio')[0]?.title.startsWith('Posted'),
+    ).toBe(true);
+
+    const png = Buffer.concat([
+      Buffer.from('89504e470d0a1a0a', 'hex'),
+      Buffer.alloc(32),
+    ]);
+    const up = await call('/9001/studio/uploads', {
+      method: 'POST',
+      body: png,
+      headers: { 'content-type': 'image/png' },
+    });
+    expect(up.status).toBe(200);
+    const { url } = await body<{ url: string }>(up);
+    expect(url).toMatch(
+      /^https:\/\/panel\.example\/media\/9001-[0-9a-f]{24}\.png$/,
+    );
+    const notPicture = await call('/9001/studio/uploads', {
+      method: 'POST',
+      body: 'hello',
+    });
+    expect(notPicture.status).toBe(400);
+
+    expect(await body(await call('/9001/studio/emojis'))).toEqual([
+      {
+        id: '77',
+        name: 'party',
+        animated: true,
+        url: 'https://cdn.discordapp.com/emojis/77.gif?size=48',
+      },
+    ]);
   });
 });

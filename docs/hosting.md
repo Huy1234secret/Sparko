@@ -14,6 +14,7 @@ Both read settings from `/opt/sparko/shared/.env.production` (set `SPARKO_ENV_FI
 - `PUBLIC_APP_URL`: the dashboard address, shown in `/ping` replies.
 - `WEB_PORT` / `WEB_HOST`: where the website listens (default `8080` on `127.0.0.1`).
 - `DATABASE_PATH`: the database file (default `.data/sparko.db` in the app folder). See `docs/backend.md`.
+- `MEDIA_DIR`: where pictures uploaded in Message Studio are kept (default: a `media` folder next to the database). Back it up with the database.
 
 If the website hasn't been built or the token is missing, that process stops with a message in `pm2 logs` instead of restarting over and over.
 

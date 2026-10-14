@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import {
   defaultDbPath,
   discordRest,
@@ -11,6 +11,7 @@ import {
 import { createApi } from './api.ts';
 import { createAuth } from './auth.ts';
 import { json } from './http.ts';
+import { createMedia } from './media.ts';
 import { createHandler } from './static.ts';
 
 // Exit code 78 means "fix the setup"; pm2 doesn't restart on it.
@@ -28,7 +29,13 @@ const port = Number(process.env.WEB_PORT ?? 8080);
 const host = process.env.WEB_HOST ?? '127.0.0.1';
 const handle = createHandler(root);
 const publicUrl = process.env.PUBLIC_APP_URL ?? `http://localhost:${port}`;
-const db = openDb(defaultDbPath(join(import.meta.dirname, '../../..')));
+const dbPath = defaultDbPath(join(import.meta.dirname, '../../..'));
+const db = openDb(dbPath);
+// Uploaded pictures sit next to the database unless MEDIA_DIR says otherwise.
+const media = createMedia({
+  dir: process.env.MEDIA_DIR ?? join(dirname(dbPath), 'media'),
+  publicUrl,
+});
 const botToken = process.env.DISCORD_BOT_TOKEN;
 const discord = botToken ? discordRest({ token: botToken }) : undefined;
 const views = discord ? guildViews(discord) : undefined;
@@ -39,7 +46,7 @@ const auth = createAuth({
   botToken,
   publicUrl,
 });
-const api = createApi({ db, auth, views, discord, publicUrl });
+const api = createApi({ db, auth, views, discord, publicUrl, media });
 // Expired sign-ins are cleared once an hour.
 setInterval(() => pruneSessions(db, Date.now()), 3_600_000).unref();
 if (!auth.configured)
@@ -50,6 +57,7 @@ const server = createServer((req, res) => {
   const respond = async () => {
     if (await auth.handle(req, res)) return;
     if (await api(req, res)) return;
+    if (await media.handle(req, res)) return;
     if (req.url?.startsWith('/api/'))
       return json(res, 404, { error: 'not_found' });
     await handle(req, res);
