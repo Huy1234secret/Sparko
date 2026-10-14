@@ -7,7 +7,8 @@ import { Button, cx } from './core';
  * The files are drawn as a dark outline over a white fill; both are
  * recoloured here so an icon picks up the colours of whatever it sits in:
  * the outline takes the text colour and the fill takes --sp-anim-fill.
- * Icons drawn as a plain white shape use `solid`, which swaps the two.
+ * Icons drawn as a plain white shape use `solid`, which swaps the two, and
+ * `original` keeps the file's own colours.
  */
 type Lottie = typeof import('lottie-web/build/player/lottie_light').default;
 
@@ -51,8 +52,9 @@ function recolourAll(node: unknown) {
     Object.values(n).forEach(recolourAll);
   }
 }
-function loadFile(src: string) {
-  let file = files.get(src);
+function loadFile(src: string, keepColours: boolean) {
+  const key = `${keepColours ? 'own' : 'themed'}:${src}`;
+  let file = files.get(key);
   if (!file) {
     file = fetch(src)
       .then((res) => {
@@ -60,12 +62,12 @@ function loadFile(src: string) {
         return res.json() as Promise<unknown>;
       })
       .then((data) => {
-        recolourAll(data);
+        if (!keepColours) recolourAll(data);
         return data;
       });
     // A failed load can be tried again next time.
-    file.catch(() => files.delete(src));
-    files.set(src, file);
+    file.catch(() => files.delete(key));
+    files.set(key, file);
   }
   return file;
 }
@@ -89,6 +91,8 @@ export type LottieIconProps = {
   onDone?: (() => void) | undefined;
   /** For icons drawn as a white shape: that shape takes the text colour. */
   solid?: boolean | undefined;
+  /** Keeps the file's own colours instead of the dashboard's. */
+  original?: boolean | undefined;
 };
 
 export function LottieIcon({
@@ -102,6 +106,7 @@ export function LottieIcon({
   startAt,
   onDone,
   solid,
+  original,
 }: LottieIconProps) {
   const box = useRef<HTMLSpanElement>(null);
   const [anim, setAnim] = useState<AnimationItem | null>(null);
@@ -114,7 +119,7 @@ export function LottieIcon({
   useEffect(() => {
     let item: AnimationItem | undefined;
     let gone = false;
-    Promise.all([loadPlayer(), loadFile(src)])
+    Promise.all([loadPlayer(), loadFile(src, !!original)])
       .then(([lottie, data]) => {
         if (gone || !box.current) return;
         item = lottie.loadAnimation({
@@ -135,7 +140,7 @@ export function LottieIcon({
       gone = true;
       item?.destroy();
     };
-  }, [src]);
+  }, [src, original]);
 
   useEffect(() => {
     if (!anim || open === undefined) return;
@@ -167,7 +172,12 @@ export function LottieIcon({
   return (
     <span
       ref={box}
-      className={cx('sp-lottie', solid && 'sp-lottie--solid', className)}
+      className={cx(
+        'sp-lottie',
+        solid && 'sp-lottie--solid',
+        original && 'sp-lottie--original',
+        className,
+      )}
       style={{ width: size, height: size }}
       aria-hidden="true"
     />

@@ -71,7 +71,7 @@ export function EmojiButton({
         onPointerEnter={() => setPlay((n) => n + 1)}
         onClick={() => setOpen((o) => !o)}
       >
-        {face && <LottieIcon src={face} size={24} playKey={play} />}
+        {face && <LottieIcon src={face} size={24} playKey={play} original />}
       </button>
       {open && (
         <EmojiPicker

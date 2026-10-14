@@ -727,34 +727,34 @@
 .sp-lottie svg {
   display: block;
 }
-.sp-lottie [fill='rgb(0,0,0)'] {
+.sp-lottie:not(.sp-lottie--original) [fill='rgb(0,0,0)'] {
   fill: currentColor;
 }
-.sp-lottie [stroke='rgb(0,0,0)'] {
+.sp-lottie:not(.sp-lottie--original) [stroke='rgb(0,0,0)'] {
   stroke: currentColor;
 }
-.sp-lottie [fill='rgb(255,255,255)'] {
+.sp-lottie:not(.sp-lottie--original) [fill='rgb(255,255,255)'] {
   fill: var(--sp-anim-fill, transparent);
 }
-.sp-lottie [stroke='rgb(255,255,255)'] {
+.sp-lottie:not(.sp-lottie--original) [stroke='rgb(255,255,255)'] {
   stroke: var(--sp-anim-fill, transparent);
 }
-.sp-lottie [fill='rgb(255,0,0)'] {
+.sp-lottie:not(.sp-lottie--original) [fill='rgb(255,0,0)'] {
   fill: var(--sp-brand);
 }
-.sp-lottie [stroke='rgb(255,0,0)'] {
+.sp-lottie:not(.sp-lottie--original) [stroke='rgb(255,0,0)'] {
   stroke: var(--sp-brand);
 }
-.sp-lottie--solid [fill='rgb(255,255,255)'] {
+.sp-lottie--solid:not(.sp-lottie--original) [fill='rgb(255,255,255)'] {
   fill: currentColor;
 }
-.sp-lottie--solid [stroke='rgb(255,255,255)'] {
+.sp-lottie--solid:not(.sp-lottie--original) [stroke='rgb(255,255,255)'] {
   stroke: currentColor;
 }
-.sp-lottie--solid [fill='rgb(0,0,0)'] {
+.sp-lottie--solid:not(.sp-lottie--original) [fill='rgb(0,0,0)'] {
   fill: var(--sp-anim-fill, transparent);
 }
-.sp-lottie--solid [stroke='rgb(0,0,0)'] {
+.sp-lottie--solid:not(.sp-lottie--original) [stroke='rgb(0,0,0)'] {
   stroke: var(--sp-anim-fill, transparent);
 }
 .sp-btn {
