@@ -4,6 +4,8 @@ export {
   componentRows,
   embedIsEmpty,
   planProblem,
+  studioVariables,
+  v2Sections,
   normaliseStudio,
   studioPayload,
   studioProblem,

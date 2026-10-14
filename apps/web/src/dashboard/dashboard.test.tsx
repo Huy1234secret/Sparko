@@ -861,36 +861,51 @@ describe('Message Studio', () => {
 });
 
 describe('Components V2 in the editor', () => {
-  it('builds a Components V2 message from blocks', async () => {
+  it('builds a container with text, a gallery and variables', async () => {
     await openEditor();
+    const json = () => document.querySelector('.sp-json')!.textContent ?? '';
     await userEvent.click(screen.getByRole('radio', { name: 'V2 components' }));
-    // Text is edited where it's shown.
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Edit text' })[0]!,
-    );
+
+    // The text is edited where it's shown; {separator} draws a line.
+    await userEvent.click(screen.getByRole('button', { name: 'Edit text' }));
     const text = screen.getByRole('textbox', { name: 'text' });
     await userEvent.clear(text);
-    await userEvent.type(text, '## Summer Jam');
-    await userEvent.tab();
-    expect(document.querySelector('.dc-h2')).toHaveTextContent('Summer Jam');
-
-    // An image block from the plus menu; its link goes in the side panel.
+    await userEvent.type(text, '## Summer Jam{{separator}See you there ');
+    // A variable goes where the caret was.
     await userEvent.click(
-      screen.getByRole('button', { name: 'Add to the message' }),
+      screen.getByRole('button', { name: 'Add a variable' }),
     );
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Add image' }));
-    expect(
-      screen.getByRole('textbox', { name: 'Image 1 link' }),
-    ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Post test' }));
-    expect(
-      screen.getAllByText('Image links must start with https://.').length,
-    ).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('menuitem', { name: /\{user\}/ }));
+    expect(document.querySelector('.dc-h2')).toHaveTextContent('Summer Jam');
+    expect(document.querySelector('.dc-separator')).toBeInTheDocument();
+    expect(document.querySelector('.dc-var')).toHaveTextContent('{user}');
+    expect(json()).toMatch(/"type": 14/);
+
+    // Pictures go in the gallery, which needs their links before posting.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add an image to the gallery' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add a link for image 1' }),
+    );
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'Image 1 link' }),
-      'img.example/a.png',
+      screen.getByRole('textbox', { name: 'Image 1 URL' }),
+      'https://img.example/a.png{Enter}',
     );
-  }, 20_000);
+    expect(json()).toMatch(/"type": 12/);
+    expect(json()).toMatch(/img\.example\/a\.png/);
+
+    // The gallery can move above the text.
+    screen.getByRole('button', { name: /Move the gallery/ }).focus();
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}');
+    expect(json().indexOf('"type": 12')).toBeLessThan(
+      json().indexOf('Summer Jam'),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove image 1' }),
+    );
+    expect(json()).not.toMatch(/"type": 12/);
+  }, 30_000);
 });
 
 describe('real sign-in', () => {

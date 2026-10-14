@@ -393,15 +393,18 @@ describe('server API', () => {
     const v2 = {
       ...studio.message,
       layout: 'v2',
+      components: [],
       v2: {
-        container: true,
         accent: '#FACC15',
-        blocks: [{ id: 'a', type: 'text', content: '## Hi' }],
+        text: '## Hi',
+        thumbnail: '',
+        gallery: [],
+        order: ['text', 'components', 'gallery'],
       },
     };
     const bad = await call('/9001/studio', {
       method: 'PUT',
-      body: JSON.stringify({ ...v2, v2: { ...v2.v2, blocks: [] } }),
+      body: JSON.stringify({ ...v2, v2: { ...v2.v2, text: '' } }),
     });
     expect(bad.status).toBe(400);
     expect(

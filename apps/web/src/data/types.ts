@@ -207,37 +207,29 @@ export type TicketsState = {
 };
 
 export type LinkButton = { id: string; label: string; url: string };
-/** One piece of a Components V2 message. */
-export type V2Block =
-  | { id: string; type: 'text'; content: string }
-  | {
-      id: string;
-      type: 'section';
-      content: string;
-      accessory:
-        | { type: 'thumbnail'; url: string }
-        | { type: 'button'; label: string; url: string };
-    }
-  | {
-      id: string;
-      type: 'gallery';
-      images: { id: string; url: string; description: string }[];
-    }
-  | {
-      id: string;
-      type: 'separator';
-      divider: boolean;
-      spacing: 'small' | 'large';
-    }
-  | { id: string; type: 'buttons'; buttons: LinkButton[] };
+export type GalleryImage = { id: string; url: string; description: string };
+/** The parts inside a Components V2 container, in the order they're shown. */
+export type V2Part = 'text' | 'gallery' | 'components';
+/**
+ * A Components V2 message: one container with a colour bar, its text
+ * (split by {separator}), a thumbnail, an image gallery, and the message's
+ * buttons and menus.
+ */
+export type StudioV2 = {
+  accent: string;
+  text: string;
+  thumbnail: string;
+  gallery: GalleryImage[];
+  order: V2Part[];
+};
 
 export type StudioMessage = {
   name: string;
   channel: string;
   /** "embed" is the classic message; "v2" uses Components V2 blocks. */
   layout: 'embed' | 'v2';
-  /** The Components V2 layout: blocks, optionally in a coloured container. */
-  v2: { container: boolean; accent: string; blocks: V2Block[] };
+  /** The Components V2 layout. */
+  v2: StudioV2;
   content: string;
   /** Up to 10 embeds, shown in this order. */
   embeds: StudioEmbed[];

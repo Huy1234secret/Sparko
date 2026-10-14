@@ -68,3 +68,5 @@
   .dc-field--inline { grid-column: span 6; }
 }
 .dc-custom-emoji { width: 1.375em; height: 1.375em; margin: 0 0.05em; object-fit: contain; vertical-align: -0.3em; }
+.dc-var { padding: 0 3px; border-radius: 3px; background: rgb(250 204 21 / 0.16); color: #fde68a; font-family: var(--sp-font-mono); font-size: 0.85em; }
+.dc-separator { height: 1px; margin: 8px 0; border: 0; background: rgb(255 255 255 / 0.1); }

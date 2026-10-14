@@ -375,27 +375,11 @@ const studioDefault = (server: Server, channelId: string): StudioMessage => ({
   ],
   layout: 'embed',
   v2: {
-    container: true,
     accent: '#FACC15',
-    blocks: [
-      {
-        id: 'v1',
-        type: 'text',
-        content: '## Spring Art Jam\nDraw anything with the theme **bloom**.',
-      },
-      { id: 'v2', type: 'separator', divider: true, spacing: 'small' },
-      {
-        id: 'v3',
-        type: 'section',
-        content:
-          '**Deadline:** Sunday 22:00\n**Prize:** Artist role + 2,000 XP',
-        accessory: {
-          type: 'button',
-          label: 'Jam rules',
-          url: 'https://pixelplaza.gg/jam',
-        },
-      },
-    ],
+    text: '## Spring Art Jam\nDraw anything with the theme **bloom**, {user}.{separator}**Deadline:** Sunday 22:00\n**Prize:** Artist role + 2,000 XP',
+    thumbnail: '',
+    gallery: [],
+    order: ['text', 'components', 'gallery'],
   },
 });
 const simple = (

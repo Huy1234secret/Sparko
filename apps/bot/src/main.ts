@@ -55,7 +55,18 @@ const handlers: Handlers = {
   welcome: async (job) =>
     checkWelcome(db, client.guilds.cache.get(job.guildId), membersIntent),
   tickets: (job) => tickets.applyPanel(job.guildId),
-  studio: (job) => publishStudio(rest, db, job.guildId),
+  studio: (job) => {
+    const by = job.payload as { userId?: string; userName?: string };
+    return publishStudio(
+      rest,
+      db,
+      job.guildId,
+      Date.now(),
+      by.userId && by.userName
+        ? { id: by.userId, name: by.userName }
+        : undefined,
+    );
+  },
 };
 
 const record = (guild: Guild, installed: boolean) =>
@@ -129,6 +140,10 @@ function wire(c: Client) {
         guildId: interaction.guildId,
         channelId: interaction.channelId,
         userId: interaction.user.id,
+        userName:
+          interaction.member && 'displayName' in interaction.member
+            ? interaction.member.displayName
+            : interaction.user.displayName,
         messageId: interaction.message.id,
         customId: interaction.customId,
         values: interaction.isStringSelectMenu() ? interaction.values : [],

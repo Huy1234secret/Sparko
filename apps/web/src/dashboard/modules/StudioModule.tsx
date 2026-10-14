@@ -6,7 +6,6 @@ import {
   Input,
   Notice,
   Segmented,
-  Switch,
   useToast,
 } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
@@ -31,9 +30,10 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
-import { BlockSettings, V2Canvas, newBlock, v2Issue } from './StudioCanvas';
+import { ContainerCanvas, MAX_GALLERY, newImage } from './ContainerCanvas';
+import { VariablesButton } from './VariablesButton';
 import { StudioLibrary } from './StudioLibrary';
-import { ChannelPicker, ColourChoice, VersionHistory } from './parts';
+import { ChannelPicker, VersionHistory } from './parts';
 import { EmbedCanvas, MAX_EMBEDS, newEmbed } from './EmbedCanvas';
 import {
   StudioDataProvider,
@@ -74,27 +74,29 @@ const forChecks = (m: StudioMessage): StudioMessage =>
     JSON.stringify(m).replace(/"blob:[^"]*"/g, '"https://upload.invalid"'),
   ) as StudioMessage;
 
-/** The emoji button and the plus menu above the preview. */
+/** The variables and emoji buttons and the plus menu above the preview. */
 function PreviewTools({
   serverId,
   items,
   onEmoji,
+  v2,
 }: {
   serverId: string;
   items: PlusItem[];
   onEmoji: (text: string) => void;
+  v2: boolean;
 }) {
   const target = useInsertTarget();
+  // Goes where the person was last writing, or at the end of the text.
+  const put = (text: string) => {
+    const insert = target.get();
+    if (insert) insert(text);
+    else onEmoji(text);
+  };
   return (
     <div className="sp-preview-tools">
-      <EmojiButton
-        serverId={serverId}
-        onPick={(text) => {
-          const insert = target.get();
-          if (insert) insert(text);
-          else onEmoji(text);
-        }}
-      />
+      <VariablesButton v2={v2} onPick={put} />
+      <EmojiButton serverId={serverId} onPick={put} />
       <PlusMenu items={items} />
     </div>
   );
@@ -133,44 +135,65 @@ function StudioEditor({
     id: string;
     pop?: 'image';
   } | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const paused = !!server.paused;
   const v2 = message.layout === 'v2';
   const channel = channels.find((c) => c.id === message.channel);
   const locked = !!channel && !channel.canPost;
-  const problem = v2
-    ? v2Issue(message.v2)
-    : (studioProblem(forChecks(message)) ??
-      planProblem(message, server.plan === 'plus' ? 'plus' : 'free'));
+  const problem =
+    studioProblem(forChecks(message)) ??
+    planProblem(message, server.plan === 'plus' ? 'plus' : 'free');
   const size = embedSize(message);
   const json = JSON.stringify(studioPayload(message, { now: 0 }), null, 2);
 
-  const addBlock = (type: Parameters<typeof newBlock>[0]) => {
-    const block = newBlock(type);
-    onChange({ v2: { ...message.v2, blocks: [...message.v2.blocks, block] } });
-    setSelected(block.id);
+  const addButton = () => {
+    const button = newButton();
+    onChange({ components: [...message.components, button] });
+    setFocus({ id: button.id });
   };
+  const addMenu = () => {
+    const menu = newMenu();
+    onChange({ components: [...message.components, menu] });
+    setFocus({ id: menu.id });
+  };
+  const rows = 'Discord shows up to 5 rows of buttons and menus.';
   const items: PlusItem[] = v2
     ? [
-        ...(message.v2.container
-          ? []
-          : [
-              {
-                label: 'Add container',
-                onSelect: () =>
-                  onChange({ v2: { ...message.v2, container: true } }),
+        {
+          label: 'Add image',
+          disabled: message.v2.gallery.length >= MAX_GALLERY,
+          note: 'A gallery holds up to 10 images.',
+          onSelect: () => {
+            const image = newImage();
+            onChange({
+              v2: { ...message.v2, gallery: [...message.v2.gallery, image] },
+            });
+            setFocus({ id: image.id });
+          },
+        },
+        {
+          label: 'Add button',
+          disabled: !roomFor(message.components, 'button'),
+          note: rows,
+          onSelect: addButton,
+        },
+        {
+          label: 'Add menu',
+          disabled: !roomFor(message.components, 'menu'),
+          note: rows,
+          onSelect: addMenu,
+        },
+        {
+          label: 'Add separator',
+          onSelect: () =>
+            onChange({
+              v2: {
+                ...message.v2,
+                text: `${message.v2.text}\n{separator}\n`.slice(0, 4000),
               },
-            ]),
-        { label: 'Add text', onSelect: () => addBlock('text') },
-        { label: 'Add button', onSelect: () => addBlock('buttons') },
-        { label: 'Add image', onSelect: () => addBlock('gallery') },
-        { label: 'Add separator', onSelect: () => addBlock('separator') },
-      ].map((item) => ({
-        ...item,
-        disabled: message.v2.blocks.length >= 30,
-        note: 'A message holds up to 30 blocks.',
-      }))
+            }),
+        },
+      ]
     : [
         {
           label: 'Add embed',
@@ -181,22 +204,14 @@ function StudioEditor({
         {
           label: 'Add button',
           disabled: !roomFor(message.components, 'button'),
-          note: 'Discord shows up to 5 rows of buttons and menus.',
-          onSelect: () => {
-            const button = newButton();
-            onChange({ components: [...message.components, button] });
-            setFocus({ id: button.id });
-          },
+          note: rows,
+          onSelect: addButton,
         },
         {
           label: 'Add menu',
           disabled: !roomFor(message.components, 'menu'),
-          note: 'Discord shows up to 5 rows of buttons and menus.',
-          onSelect: () => {
-            const menu = newMenu();
-            onChange({ components: [...message.components, menu] });
-            setFocus({ id: menu.id });
-          },
+          note: rows,
+          onSelect: addMenu,
         },
         {
           label: 'Add image',
@@ -244,7 +259,6 @@ function StudioEditor({
             className="sp-studio__type"
             value={message.layout}
             onChange={(layout) => {
-              setSelected(null);
               onChange({ layout });
             }}
             options={[
@@ -259,23 +273,30 @@ function StudioEditor({
             <PreviewTools
               serverId={server.id}
               items={items}
+              v2={v2}
               onEmoji={(text) =>
-                onChange({ content: (message.content + text).slice(0, 2000) })
+                v2
+                  ? onChange({
+                      v2: {
+                        ...message.v2,
+                        text: (message.v2.text + text).slice(0, 4000),
+                      },
+                    })
+                  : onChange({
+                      content: (message.content + text).slice(0, 2000),
+                    })
               }
             />
           </div>
           <fieldset className="sp-fieldset" disabled={paused}>
             <legend className="sp-sr-only">Message</legend>
             {v2 ? (
-              <div className="dc-chat">
-                <V2Canvas
-                  v2={message.v2}
-                  onChange={(next) => onChange({ v2: next })}
-                  selected={selected}
-                  onSelect={setSelected}
-                  disabled={paused}
-                />
-              </div>
+              <ContainerCanvas
+                message={message}
+                serverId={server.id}
+                onChange={onChange}
+                focusId={focus?.id ?? null}
+              />
             ) : (
               <EmbedCanvas
                 message={message}
@@ -399,54 +420,6 @@ function StudioEditor({
               </div>
             </div>
           </section>
-
-          {v2 && (
-            <section className="sp-card" aria-labelledby="studio-block">
-              <div className="sp-card__head">
-                <div className="sp-card__titles">
-                  <h2 className="sp-card__title" id="studio-block">
-                    Box and selected block
-                  </h2>
-                  <p className="sp-card__sub">
-                    {message.v2.blocks.length} of 30 blocks
-                  </p>
-                </div>
-                <Switch
-                  checked={message.v2.container}
-                  onChange={(container) =>
-                    onChange({ v2: { ...message.v2, container } })
-                  }
-                  description="Wrap in a box"
-                />
-              </div>
-              <div className="sp-card__body">
-                {message.v2.container && (
-                  <div className="sp-field">
-                    <span className="sp-label">Colour bar</span>
-                    <ColourChoice
-                      value={message.v2.accent}
-                      onChange={(accent) =>
-                        onChange({ v2: { ...message.v2, accent } })
-                      }
-                    />
-                  </div>
-                )}
-                <BlockSettings
-                  block={message.v2.blocks.find((b) => b.id === selected)}
-                  onChange={(block) =>
-                    onChange({
-                      v2: {
-                        ...message.v2,
-                        blocks: message.v2.blocks.map((b) =>
-                          b.id === block.id ? block : b,
-                        ),
-                      },
-                    })
-                  }
-                />
-              </div>
-            </section>
-          )}
         </div>
       </div>
     </div>
@@ -549,10 +522,8 @@ export function StudioModule({
     if (!message) return;
     setTried(true);
     const problem =
-      message.layout === 'v2'
-        ? v2Issue(message.v2)
-        : (studioProblem(forChecks(message)) ??
-          planProblem(message, server.plan === 'plus' ? 'plus' : 'free'));
+      studioProblem(forChecks(message)) ??
+      planProblem(message, server.plan === 'plus' ? 'plus' : 'free');
     if (problem) return;
     await flow.run(() => actions.postTest.mutateAsync(message));
   };

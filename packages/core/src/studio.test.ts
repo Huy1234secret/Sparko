@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addTemplate,
+  fillVariables,
   componentRows,
   DiscordError,
   handleStudioInteraction,
@@ -25,9 +26,11 @@ import {
 } from './index.ts';
 
 const base = studioDefault('100');
-const v2: StudioMessage = {
+/** A Components V2 message saved as blocks, before the container editor. */
+const blocksV2 = {
   ...base,
   layout: 'v2',
+  components: undefined,
   v2: {
     container: true,
     accent: '#5865F2',
@@ -54,6 +57,31 @@ const v2: StudioMessage = {
       },
     ],
   },
+} as unknown as StudioMessage;
+const v2: StudioMessage = {
+  ...base,
+  layout: 'v2',
+  v2: {
+    accent: '#5865F2',
+    text: '## Hello {user}{separator}Prize',
+    thumbnail: 'https://img.example/p.png',
+    gallery: [
+      { id: 'i', url: 'https://img.example/1.png', description: 'One' },
+    ],
+    order: ['text', 'components', 'gallery'],
+  },
+  components: [
+    {
+      id: 'x',
+      type: 'button',
+      label: 'Rules',
+      emoji: '',
+      colour: 'grey',
+      link: true,
+      url: 'https://example.com',
+      actions: [],
+    },
+  ],
 };
 
 describe('Message Studio messages', () => {
@@ -127,21 +155,64 @@ describe('Message Studio messages', () => {
 
   it('builds a Components V2 message inside a container', () => {
     expect(studioProblem(v2)).toBeNull();
-    const body = studioPayload(v2, { now: 0 }) as unknown as {
+    const body = studioPayload(v2, {
+      now: 0,
+      user: { id: '42', name: 'Quinn' },
+    }) as unknown as {
       flags: number;
       components: {
         type: number;
         accent_color: number;
-        components: { type: number }[];
+        components: { type: number; components?: { content: string }[] }[];
       }[];
     };
     expect(body.flags).toBe(IS_COMPONENTS_V2);
     expect(body.components[0]!.type).toBe(17);
     expect(body.components[0]!.accent_color).toBe(0x5865f2);
+    // Text with the thumbnail, a separator, more text, buttons, the gallery.
     expect(body.components[0]!.components.map((c) => c.type)).toEqual([
-      10, 14, 9, 12, 1,
+      9, 14, 10, 1, 12,
     ]);
+    expect(body.components[0]!.components[0]!.components![0]!.content).toBe(
+      '## Hello <@42>',
+    );
     expect('content' in body).toBe(false);
+    // The gallery can be moved, say to the top.
+    const moved = studioPayload(
+      { ...v2, v2: { ...v2.v2, order: ['gallery', 'text', 'components'] } },
+      { now: 0 },
+    ) as unknown as typeof body;
+    expect(moved.components[0]!.components[0]!.type).toBe(12);
+  });
+
+  it('reads Components V2 messages saved as blocks', () => {
+    const m = normaliseStudio(blocksV2);
+    expect(m.v2).toEqual({
+      accent: '#5865F2',
+      text: '## Hello\n{separator}\nPrize',
+      thumbnail: 'https://img.example/p.png',
+      gallery: [
+        { id: 'i', url: 'https://img.example/1.png', description: 'One' },
+      ],
+      order: ['text', 'components', 'gallery'],
+    });
+    expect(m.components).toMatchObject([
+      { type: 'button', link: true, label: 'Rules' },
+    ]);
+    expect(studioProblem(m)).toBeNull();
+  });
+
+  it('fills in variables, and leaves ones it can’t fill', () => {
+    expect(
+      fillVariables('{user.name} of {server} ({server.members}) {unknown}', {
+        now: 86_400_000,
+        user: { id: '1', name: 'Quinn' },
+        server: { name: 'Pixel Plaza', members: 8214 },
+      }),
+    ).toBe('Quinn of Pixel Plaza (8,214) {unknown}');
+    expect(fillVariables('{user} on {date}', { now: 86_400_000 })).toBe(
+      '{user} on <t:86400:D>',
+    );
   });
 
   it('refuses messages Discord would reject', () => {
@@ -177,18 +248,26 @@ describe('Message Studio messages', () => {
       id: 'e1',
     });
     expect('embed' in m).toBe(false);
-    expect(studioProblem({ ...v2, v2: { ...v2.v2, blocks: [] } })).toMatch(
-      /at least one/,
-    );
+    expect(
+      studioProblem({
+        ...v2,
+        components: [],
+        v2: { ...v2.v2, text: ' ', gallery: [] },
+      }),
+    ).toMatch(/empty/);
     expect(
       studioProblem({
         ...v2,
         v2: {
           ...v2.v2,
-          blocks: [{ id: 'g', type: 'gallery', images: [] }],
+          gallery: Array.from({ length: 11 }, (_, i) => ({
+            id: `g${i}`,
+            url: 'https://img.example/x.png',
+            description: '',
+          })),
         },
       }),
-    ).toMatch(/1 to 10/);
+    ).toMatch(/up to 10/);
   });
 
   it('posts once, edits after, and posts a new message when the layout changes', async () => {
@@ -435,6 +514,7 @@ describe('using buttons and menus in Discord', () => {
       guildId: 'g',
       channelId: 'c',
       userId: 'u',
+      userName: 'Quinn',
       messageId: 'posted',
       customId: 'sp:b:roles',
       values: [],
