@@ -519,6 +519,48 @@ describe('server API', () => {
     expect(lib.templates.map((t) => t.name)).toEqual(['Two']);
   });
 
+  it('lists roles for button actions and holds Free to one template per action', async () => {
+    const studio = await body<{
+      message: object;
+      roles: { id: string; name: string }[];
+      sendLimit: number;
+    }>(await call('/9001/studio'));
+    // Discord's own bot roles can't be given out, so they aren't listed.
+    expect(studio.roles.map((r) => r.name)).toEqual(['Moderator']);
+    expect(studio.sendLimit).toBe(1);
+    const tooMany = {
+      ...studio.message,
+      components: [
+        {
+          id: 'b',
+          type: 'button',
+          label: 'Go',
+          emoji: '',
+          colour: 'blurple',
+          link: false,
+          url: '',
+          actions: [
+            {
+              id: 'a',
+              type: 'send',
+              templates: ['1', '2'],
+              dm: false,
+              ephemeral: false,
+            },
+          ],
+        },
+      ],
+    };
+    const res = await call('/9001/studio/test', {
+      method: 'POST',
+      body: JSON.stringify(tooMany),
+    });
+    expect(res.status).toBe(400);
+    expect((await body<{ message: string }>(res)).message).toMatch(
+      /up to 1 template/,
+    );
+  });
+
   it('posts a test message, uploads pictures and lists server emojis', async () => {
     const { message } = await body<{ message: object }>(
       await call('/9001/studio'),

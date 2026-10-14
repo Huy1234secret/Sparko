@@ -239,6 +239,27 @@ function getTemplateRow(db: Db, guildId: string, moduleId: string, id: string) {
   return row;
 }
 
+/** One template, or undefined when it's gone. */
+export function getTemplate<T>(
+  db: Db,
+  guildId: string,
+  moduleId: string,
+  id: string,
+) {
+  const r = db
+    .prepare(
+      'SELECT * FROM templates WHERE guild_id = ? AND module_id = ? AND id = ?',
+    )
+    .get(guildId, moduleId, Number(id)) as Row | undefined;
+  return r
+    ? {
+        id: String(r.id),
+        name: r.name as string,
+        message: JSON.parse(r.json as string) as T,
+      }
+    : undefined;
+}
+
 /** Renames a template or saves a new message into it. */
 export function updateTemplate(
   db: Db,

@@ -3,6 +3,7 @@ import { DiscordCodes, DiscordError, type Rest } from './discord.ts';
 import { getModule } from './store.ts';
 import { getPosted, setPosted } from './tickets.ts';
 import { Plain } from './ticket-actions.ts';
+import { rememberPost } from './studio-actions.ts';
 import {
   normaliseStudio,
   studioPayload,
@@ -37,6 +38,7 @@ export async function publishStudio(
           `/channels/${posted.channelId}/messages/${posted.messageId}`,
           body,
         );
+        rememberPost(db, guildId, posted.messageId, m, now);
         return;
       } catch (e) {
         if (
@@ -53,6 +55,7 @@ export async function publishStudio(
       channelId: m.channel,
       messageId: message.id,
     });
+    rememberPost(db, guildId, message.id, m, now);
   } catch (e) {
     if (
       e instanceof DiscordError &&

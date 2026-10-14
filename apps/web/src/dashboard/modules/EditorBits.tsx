@@ -224,6 +224,9 @@ function UploadButton({
   );
 }
 
+/** Open popovers, newest last; Escape closes only the newest. */
+const openPopovers: object[] = [];
+
 /** Closes a popover on Escape or a press outside it. */
 export function useDismiss(
   open: boolean,
@@ -236,11 +239,19 @@ export function useDismiss(
   });
   useEffect(() => {
     if (!open) return;
+    const me = {};
+    openPopovers.push(me);
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        close.current();
-      }
+      if (e.key !== 'Escape' || openPopovers.at(-1) !== me) return;
+      // An open list inside the popover closes first.
+      if (
+        (e.target as Element | null)?.closest?.(
+          '[role="combobox"][aria-expanded="true"], [aria-haspopup="listbox"][aria-expanded="true"]',
+        )
+      )
+        return;
+      e.stopPropagation();
+      close.current();
     };
     const press = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node))
@@ -250,6 +261,7 @@ export function useDismiss(
     document.addEventListener('keydown', key, true);
     document.addEventListener('pointerdown', press);
     return () => {
+      openPopovers.splice(openPopovers.indexOf(me), 1);
       document.removeEventListener('keydown', key, true);
       document.removeEventListener('pointerdown', press);
     };
@@ -379,4 +391,85 @@ export function UrlPopover({
       </div>
     </div>
   );
+}
+
+/**
+ * Drag to reorder, for any list: drag an item's handle, or focus it and
+ * use the arrow keys. `grid` is for items that wrap across rows.
+ */
+export function useReorder({
+  onMove,
+  mode = 'list',
+}: {
+  onMove: (from: number, to: number) => void;
+  mode?: 'list' | 'grid';
+}) {
+  // The list element, kept in state so nothing reads a ref while rendering.
+  const [listEl, list] = useState<HTMLElement | null>(null);
+  const [group] = useState(() => Math.random().toString(36).slice(2, 8));
+  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
+  const items = () =>
+    Array.from(
+      listEl?.querySelectorAll<HTMLElement>(`[data-reorder="${group}"]`) ?? [],
+    );
+  const overAt = (x: number, y: number) => {
+    const all = items();
+    const at = all.findIndex((el) => {
+      const r = el.getBoundingClientRect();
+      return mode === 'list'
+        ? y < r.top + r.height / 2
+        : y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+    });
+    return at < 0 ? all.length : at;
+  };
+  const start = (from: number) => (e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    let over = from;
+    setDrag({ from, over });
+    const move = (ev: PointerEvent) => {
+      over = overAt(ev.clientX, ev.clientY);
+      setDrag({ from, over });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      setDrag(null);
+      const to = over > from ? over - 1 : over;
+      if (to !== from) onMove(from, to);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  };
+  const keys =
+    (from: number, count: number) => (e: React.KeyboardEvent<HTMLElement>) => {
+      const back = e.key === 'ArrowUp' || e.key === 'ArrowLeft';
+      const ahead = e.key === 'ArrowDown' || e.key === 'ArrowRight';
+      if (!back && !ahead) return;
+      e.preventDefault();
+      const to = from + (back ? -1 : 1);
+      if (to >= 0 && to < count) onMove(from, to);
+    };
+  const dropClass = (i: number, count: number) => {
+    if (!drag) return null;
+    if (drag.from === i) return 'is-dragged';
+    if (drag.over === drag.from || drag.over === drag.from + 1) return null;
+    if (drag.over === i) return 'is-drop-before';
+    if (drag.over === count && i === count - 1) return 'is-drop-after';
+    return null;
+  };
+  /** Props for each item and its handle. */
+  const item = (i: number) => ({ 'data-reorder': group, 'data-index': i });
+  return { list, start, keys, dropClass, item, dragging: drag !== null };
+}
+
+/** Moves one entry of a list to another place. */
+export function moveItem<T>(list: T[], from: number, to: number) {
+  const next = [...list];
+  const [x] = next.splice(from, 1);
+  next.splice(to, 0, x!);
+  return next;
 }

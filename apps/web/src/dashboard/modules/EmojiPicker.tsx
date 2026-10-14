@@ -7,6 +7,7 @@ import {
   Spinner,
   cx,
   rememberEmojis,
+  renderDiscordText,
 } from '../../ui';
 import { useServerEmojis, type ServerEmoji } from '../../data';
 import { useDismiss } from './EditorBits';
@@ -89,9 +90,11 @@ export function EmojiButton({
 function EmojiPicker({
   serverId,
   onPick,
+  className,
 }: {
   serverId: string;
   onPick: (text: string) => void;
+  className?: string;
 }) {
   const [tab, setTab] = useState<'emoji' | 'server'>('emoji');
   const [query, setQuery] = useState('');
@@ -131,7 +134,11 @@ function EmojiPicker({
     `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`;
 
   return (
-    <div className="sp-emoji-pop" role="dialog" aria-label="Emoji">
+    <div
+      className={cx('sp-emoji-pop', className)}
+      role="dialog"
+      aria-label="Emoji"
+    >
       <Segmented
         label="Emoji set"
         value={tab}
@@ -241,6 +248,62 @@ function EmojiPicker({
       <p className="sp-emoji-pop__name" aria-live="polite">
         {hover || 'Pick an emoji'}
       </p>
+    </div>
+  );
+}
+
+/**
+ * The round emoji box in button and menu settings: empty until an emoji is
+ * picked, which then shows inside it.
+ */
+export function EmojiField({
+  serverId,
+  value,
+  onChange,
+  label,
+}: {
+  serverId: string;
+  value: string;
+  onChange: (emoji: string) => void;
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useDismiss(open, () => setOpen(false), wrap);
+  return (
+    <div ref={wrap} className="sp-pop-anchor sp-emoji-field">
+      <button
+        type="button"
+        className={cx('sp-emoji-circle', !!value && 'is-set')}
+        aria-label={
+          value ? `${label}: change the emoji` : `${label}: add an emoji`
+        }
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {value && renderDiscordText(value)}
+      </button>
+      {value && (
+        <button
+          type="button"
+          className="sp-emoji-circle__clear"
+          aria-label={`${label}: remove the emoji`}
+          onClick={() => onChange('')}
+        >
+          ×
+        </button>
+      )}
+      {open && (
+        <EmojiPicker
+          serverId={serverId}
+          className="sp-emoji-pop--start"
+          onPick={(text) => {
+            onChange(text);
+            setOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

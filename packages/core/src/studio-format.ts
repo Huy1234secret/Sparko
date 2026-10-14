@@ -28,6 +28,49 @@ export type StudioEmbed = {
 };
 export type LinkButton = { id: string; label: string; url: string };
 
+/** What a button or a menu option does when someone uses it, in order. */
+export type StudioAction =
+  | {
+      id: string;
+      type: 'send';
+      /** Template ids, sent one after another. */
+      templates: string[];
+      /** Sends to the person who clicked, in their DMs. */
+      dm: boolean;
+      /** Sends a reply only the person who clicked can see. */
+      ephemeral: boolean;
+    }
+  | { id: string; type: 'role'; mode: 'give' | 'take'; roles: string[] };
+
+export type ButtonColour = 'blurple' | 'grey' | 'green' | 'red';
+export type StudioButton = {
+  id: string;
+  type: 'button';
+  label: string;
+  /** A Unicode emoji, or a server emoji written as <:name:id>. */
+  emoji: string;
+  colour: ButtonColour;
+  /** A link button opens `url`; any other button runs its actions. */
+  link: boolean;
+  url: string;
+  actions: StudioAction[];
+};
+export type MenuOption = {
+  id: string;
+  label: string;
+  emoji: string;
+  description: string;
+  actions: StudioAction[];
+};
+export type StudioMenu = {
+  id: string;
+  type: 'menu';
+  placeholder: string;
+  multiple: boolean;
+  options: MenuOption[];
+};
+export type StudioComponent = StudioButton | StudioMenu;
+
 /** One piece of a Components V2 message. */
 export type V2Block =
   | { id: string; type: 'text'; content: string }
@@ -60,7 +103,8 @@ export type StudioMessage = {
   content: string;
   /** Up to 10 embeds, shown in this order. */
   embeds: StudioEmbed[];
-  buttons: LinkButton[];
+  /** Buttons and menus under the message, in order. */
+  components: StudioComponent[];
   v2: { container: boolean; accent: string; blocks: V2Block[] };
 };
 
@@ -115,7 +159,7 @@ export const studioDefault = (channel: string): StudioMessage => ({
       description: 'Write your announcement here.',
     },
   ],
-  buttons: [],
+  components: [],
   v2: v2Default(),
 });
 
@@ -130,6 +174,8 @@ export const embedIsEmpty = (e: StudioEmbed) =>
   !e.fields.some((f) => f.name.trim() || f.value.trim());
 
 type Legacy = Partial<StudioMessage> & {
+  /** Before buttons could run actions, a message only had link buttons. */
+  buttons?: LinkButton[];
   useEmbed?: boolean;
   embed?: Partial<StudioEmbed> & { thumbnail?: unknown };
 };
@@ -150,7 +196,7 @@ const asEmbed = (
 
 /** Fills in parts older saved messages don't have. */
 export const normaliseStudio = (input: StudioMessage): StudioMessage => {
-  const { useEmbed, embed, ...m } = input as Legacy;
+  const { useEmbed, embed, buttons, ...m } = input as Legacy;
   const embeds = Array.isArray(m.embeds)
     ? m.embeds
     : embed && useEmbed !== false
@@ -159,7 +205,20 @@ export const normaliseStudio = (input: StudioMessage): StudioMessage => {
   return {
     ...(m as StudioMessage),
     content: typeof m.content === 'string' ? m.content : '',
-    buttons: Array.isArray(m.buttons) ? m.buttons : [],
+    components: Array.isArray(m.components)
+      ? m.components
+      : (buttons ?? []).map(
+          (b): StudioButton => ({
+            id: b.id,
+            type: 'button',
+            label: b.label,
+            emoji: '',
+            colour: 'grey',
+            link: true,
+            url: b.url,
+            actions: [],
+          }),
+        ),
     embeds: embeds.map(asEmbed),
     layout: m.layout === 'v2' ? 'v2' : 'embed',
     v2: m.v2 ?? v2Default(),
@@ -292,7 +351,162 @@ export function studioProblem(input: unknown): string | null {
     !(m.embeds as StudioEmbed[]).some((e) => !embedIsEmpty(e))
   )
     return 'Add some text or an embed. Discord won’t send an empty message.';
-  return buttonsProblem(m.buttons, 25);
+  return componentsProblem(m.components);
+}
+
+/** The rows Discord shows: up to five buttons side by side, a menu alone. */
+export function componentRows(list: StudioComponent[]) {
+  const rows: StudioComponent[][] = [];
+  for (const c of list) {
+    const last = rows.at(-1);
+    if (c.type === 'button' && last?.[0]?.type === 'button' && last.length < 5)
+      last.push(c);
+    else rows.push([c]);
+  }
+  return rows;
+}
+
+function actionsProblem(list: unknown): string | null {
+  if (!Array.isArray(list) || list.length > 10)
+    return 'Use up to 10 actions on a button or option.';
+  for (const a of list as StudioAction[]) {
+    if (!id(a?.id)) return 'An action is damaged. Remove it and add it again.';
+    if (a.type === 'send') {
+      if (
+        !Array.isArray(a.templates) ||
+        !a.templates.length ||
+        a.templates.length > 10 ||
+        !a.templates.every((t) => /^\d{1,12}$/.test(t))
+      )
+        return 'Pick the templates a “Send message” action sends.';
+      if (typeof a.dm !== 'boolean' || typeof a.ephemeral !== 'boolean')
+        return 'An action is damaged. Remove it and add it again.';
+    } else if (a.type === 'role') {
+      if (
+        !['give', 'take'].includes(a.mode) ||
+        !Array.isArray(a.roles) ||
+        !a.roles.length ||
+        a.roles.length > 25 ||
+        !a.roles.every((r) => /^\d{1,25}$/.test(r))
+      )
+        return 'Pick the roles a “Give or take role” action changes.';
+    } else return 'An action is damaged. Remove it and add it again.';
+  }
+  return null;
+}
+
+const emojiOk = (e: unknown) =>
+  typeof e === 'string' &&
+  e.length <= 64 &&
+  (!e || /^<a?:\w{1,32}:\d{1,25}>$/.test(e) || !/[<>:\s]/.test(e));
+
+function componentsProblem(list: unknown): string | null {
+  if (!Array.isArray(list)) return 'The buttons are damaged.';
+  if (componentRows(list as StudioComponent[]).length > 5)
+    return 'Discord shows up to 5 rows of buttons and menus. A menu takes a row of its own.';
+  for (const c of list as StudioComponent[]) {
+    if (!id(c?.id)) return 'A button is damaged. Remove it and add it again.';
+    if (c.type === 'button') {
+      if (!str(c.label, 80) || !emojiOk(c.emoji))
+        return 'Button text holds up to 80 characters.';
+      if (!c.label.trim() && !c.emoji)
+        return 'Every button needs some text or an emoji.';
+      if (!['blurple', 'grey', 'green', 'red'].includes(c.colour))
+        return 'A button is damaged. Remove it and add it again.';
+      if (c.link) {
+        if (!https(c.url))
+          return 'Link buttons need a link that starts with https://.';
+      } else {
+        const p = actionsProblem(c.actions);
+        if (p) return p;
+        if (!c.actions.length)
+          return 'Give every action button something to do, or make it a link.';
+      }
+    } else if (c.type === 'menu') {
+      if (!str(c.placeholder, 150))
+        return 'Menu placeholders hold up to 150 characters.';
+      if (typeof c.multiple !== 'boolean')
+        return 'A menu is damaged. Remove it and add it again.';
+      if (
+        !Array.isArray(c.options) ||
+        !c.options.length ||
+        c.options.length > 25
+      )
+        return 'A menu holds 1 to 25 options.';
+      for (const o of c.options) {
+        if (!id(o?.id) || !emojiOk(o.emoji))
+          return 'A menu option is damaged. Remove it and add it again.';
+        if (!str(o.label, 100) || !o.label.trim())
+          return 'Every menu option needs a title of up to 100 characters.';
+        if (!str(o.description, 100))
+          return 'Option descriptions hold up to 100 characters.';
+        const p = actionsProblem(o.actions);
+        if (p) return p;
+      }
+    } else return 'A button is damaged. Remove it and add it again.';
+  }
+  return null;
+}
+
+/** The most templates one "Send message" action can send on a plan. */
+export const sendLimit = (plan: 'free' | 'plus' | undefined) =>
+  plan === 'plus' ? 10 : 1;
+/** Checks the parts of a message that depend on the server's plan. */
+export function planProblem(
+  m: StudioMessage,
+  plan: 'free' | 'plus' | undefined,
+) {
+  const max = sendLimit(plan);
+  const actions = m.components.flatMap((c) =>
+    c.type === 'button' ? c.actions : c.options.flatMap((o) => o.actions),
+  );
+  return actions.some((a) => a.type === 'send' && a.templates.length > max)
+    ? `A “Send message” action sends up to ${max} template${max === 1 ? '' : 's'} on this plan.`
+    : null;
+}
+
+/** Discord's form of an emoji written as text. */
+export function emojiPayload(e: string) {
+  if (!e) return undefined;
+  const custom = e.match(/^<(a?):(\w{1,32}):(\d{1,25})>$/);
+  return custom
+    ? { id: custom[3]!, name: custom[2]!, animated: !!custom[1] }
+    : { name: e };
+}
+
+const buttonStyles = { blurple: 1, grey: 2, green: 3, red: 4 } as const;
+/** The custom ids Sparko gives Studio buttons and menus. */
+export const studioCustomId = (c: StudioComponent) =>
+  `sp:${c.type === 'button' ? 'b' : 'm'}:${c.id}`;
+
+/** Discord's action rows for a message's buttons and menus. */
+export function componentsPayload(list: StudioComponent[]) {
+  return componentRows(list).map((row) => ({
+    type: 1,
+    components: row.map((c) => {
+      if (c.type === 'menu')
+        return {
+          type: 3,
+          custom_id: studioCustomId(c),
+          ...(c.placeholder.trim() ? { placeholder: c.placeholder } : {}),
+          min_values: 1,
+          max_values: c.multiple ? c.options.length : 1,
+          options: c.options.map((o) => ({
+            label: o.label,
+            value: o.id,
+            ...(o.description.trim() ? { description: o.description } : {}),
+            ...(o.emoji ? { emoji: emojiPayload(o.emoji) } : {}),
+          })),
+        };
+      return {
+        type: 2,
+        style: c.link ? 5 : buttonStyles[c.colour],
+        ...(c.label.trim() ? { label: c.label } : {}),
+        ...(c.emoji ? { emoji: emojiPayload(c.emoji) } : {}),
+        ...(c.link ? { url: c.url } : { custom_id: studioCustomId(c) }),
+      };
+    }),
+  }));
 }
 
 const colour = (h: string) => Number.parseInt(h.slice(1), 16);
@@ -397,14 +611,10 @@ export function studioPayload(input: StudioMessage, ctx: { now: number }) {
           }
         : {}),
     }));
-  // Up to five link buttons fit on a row.
-  const rows: LinkButton[][] = [];
-  for (let i = 0; i < m.buttons.length; i += 5)
-    rows.push(m.buttons.slice(i, i + 5));
   return {
     content: m.content,
     embeds,
-    components: rows.map(linkRow),
+    components: componentsPayload(m.components),
     allowed_mentions,
   };
 }

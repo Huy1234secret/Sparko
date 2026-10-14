@@ -351,7 +351,28 @@ const studioDefault = (server: Server, channelId: string): StudioMessage => ({
       ],
     },
   ],
-  buttons: [{ id: 'b1', label: 'Jam rules', url: 'https://pixelplaza.gg/jam' }],
+  components: [
+    {
+      id: 'b1',
+      type: 'button',
+      label: 'Jam rules',
+      emoji: '',
+      colour: 'grey',
+      link: true,
+      url: 'https://pixelplaza.gg/jam',
+      actions: [],
+    },
+    {
+      id: 'b2',
+      type: 'button',
+      label: 'I’m in',
+      emoji: '🎨',
+      colour: 'green',
+      link: false,
+      url: '',
+      actions: [{ id: 'a1', type: 'role', mode: 'give', roles: ['9201'] }],
+    },
+  ],
   layout: 'embed',
   v2: {
     container: true,
@@ -398,7 +419,7 @@ const simple = (
       fields: [],
     },
   ],
-  buttons: [],
+  components: [],
 });
 
 type SupportState = {
@@ -546,6 +567,13 @@ export function createSupportMock(h: Helpers) {
             ),
           },
         ],
+        roles: [
+          { id: '9201', name: 'Artist', color: '#EB459E' },
+          { id: '9202', name: 'Event pings', color: '#FACC15' },
+          { id: '9203', name: 'Moderator', color: '#5865F2' },
+          { id: '9204', name: 'Member', color: null },
+        ],
+        sendLimit: server.plan === 'plus' ? 10 : 1,
         templateLimit: server.plan === 'plus' ? 500 : 100,
         folderLimit: server.plan === 'plus' ? 100 : 20,
         versions: [
@@ -592,7 +620,7 @@ export function createSupportMock(h: Helpers) {
                   description: 'Spring jam this weekend. Theme coming soon!',
                 },
               ],
-              buttons: [],
+              components: [],
             },
           },
         ],

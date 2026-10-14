@@ -11,6 +11,7 @@ import {
 } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
 import {
+  planProblem,
   studioPayload,
   studioProblem,
   useCheckChannel,
@@ -32,8 +33,14 @@ import {
 } from './frame';
 import { BlockSettings, V2Canvas, newBlock, v2Issue } from './StudioCanvas';
 import { StudioLibrary } from './StudioLibrary';
-import { ChannelPicker, ColourChoice, VersionHistory, newId } from './parts';
-import { EmbedCanvas, MAX_BUTTONS, MAX_EMBEDS, newEmbed } from './EmbedCanvas';
+import { ChannelPicker, ColourChoice, VersionHistory } from './parts';
+import { EmbedCanvas, MAX_EMBEDS, newEmbed } from './EmbedCanvas';
+import {
+  StudioDataProvider,
+  newButton,
+  newMenu,
+  roomFor,
+} from './ComponentsEditor';
 import { InsertProvider, useInsertTarget } from './EditorBits';
 import { EmojiButton } from './EmojiPicker';
 import { PlusMenu, type PlusItem } from './PlusMenu';
@@ -130,7 +137,10 @@ function StudioEditor({
   const v2 = message.layout === 'v2';
   const channel = channels.find((c) => c.id === message.channel);
   const locked = !!channel && !channel.canPost;
-  const problem = v2 ? v2Issue(message.v2) : studioProblem(forChecks(message));
+  const problem = v2
+    ? v2Issue(message.v2)
+    : (studioProblem(forChecks(message)) ??
+      planProblem(message, server.plan === 'plus' ? 'plus' : 'free'));
   const size = embedSize(message);
   const json = JSON.stringify(studioPayload(message, { now: 0 }), null, 2);
 
@@ -168,14 +178,22 @@ function StudioEditor({
         },
         {
           label: 'Add button',
-          disabled: message.buttons.length >= MAX_BUTTONS,
-          note: 'A message holds up to 25 buttons.',
+          disabled: !roomFor(message.components, 'button'),
+          note: 'Discord shows up to 5 rows of buttons and menus.',
           onSelect: () => {
-            const id = newId();
-            onChange({
-              buttons: [...message.buttons, { id, label: 'Open', url: '' }],
-            });
-            setFocus({ id });
+            const button = newButton();
+            onChange({ components: [...message.components, button] });
+            setFocus({ id: button.id });
+          },
+        },
+        {
+          label: 'Add menu',
+          disabled: !roomFor(message.components, 'menu'),
+          note: 'Discord shows up to 5 rows of buttons and menus.',
+          onSelect: () => {
+            const menu = newMenu();
+            onChange({ components: [...message.components, menu] });
+            setFocus({ id: menu.id });
           },
         },
         {
@@ -522,7 +540,8 @@ export function StudioModule({
     const problem =
       message.layout === 'v2'
         ? v2Issue(message.v2)
-        : studioProblem(forChecks(message));
+        : (studioProblem(forChecks(message)) ??
+          planProblem(message, server.plan === 'plus' ? 'plus' : 'free'));
     if (problem) return;
     await flow.run(() => actions.postTest.mutateAsync(message));
   };
@@ -562,28 +581,38 @@ export function StudioModule({
       {tab === 'settings' &&
         (template && message ? (
           <InsertProvider>
-            <p className="sp-edit-banner" role="status">
-              <Icon name="info" size="sm" />
-              <span>
-                You’re editing <b>{template.name}</b>. Save your changes before
-                you leave.
-              </span>
-            </p>
-            <StudioEditor
-              server={server}
-              message={message}
-              channels={channels}
-              saving={actions.updateTemplate.isPending}
-              dirty={dirty}
-              tried={tried}
-              phase={flow.phase}
-              onChange={edit}
-              onSave={save}
-              onPost={() => void post()}
-              onFix={() => setFixOpen(true)}
-              onCheck={() => recheck()}
-              checking={checkChannel.isPending}
-            />
+            <StudioDataProvider
+              value={{
+                serverId: server.id,
+                templates: studio.data.templates,
+                folders: studio.data.folders,
+                roles: studio.data.roles,
+                sendLimit: studio.data.sendLimit,
+              }}
+            >
+              <p className="sp-edit-banner" role="status">
+                <Icon name="info" size="sm" />
+                <span>
+                  You’re editing <b>{template.name}</b>. Save your changes
+                  before you leave.
+                </span>
+              </p>
+              <StudioEditor
+                server={server}
+                message={message}
+                channels={channels}
+                saving={actions.updateTemplate.isPending}
+                dirty={dirty}
+                tried={tried}
+                phase={flow.phase}
+                onChange={edit}
+                onSave={save}
+                onPost={() => void post()}
+                onFix={() => setFixOpen(true)}
+                onCheck={() => recheck()}
+                checking={checkChannel.isPending}
+              />
+            </StudioDataProvider>
           </InsertProvider>
         ) : (
           <div className="sp-card">

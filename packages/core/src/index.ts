@@ -9,3 +9,4 @@ export * from './tickets.ts';
 export * from './ticket-actions.ts';
 export * from './studio.ts';
 export * from './templates.ts';
+export * from './studio-actions.ts';

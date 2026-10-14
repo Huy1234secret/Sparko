@@ -576,12 +576,17 @@ describe('Message Studio', () => {
 
     await userEvent.click(plus);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Add button' }));
-    const dialog = screen.getByRole('dialog', { name: 'Link button' });
+    const dialog = screen.getByRole('dialog', { name: 'Button settings' });
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Link button' }),
+    );
     await userEvent.type(
-      within(dialog).getByRole('textbox', { name: 'Link' }),
+      within(dialog).getByRole('textbox', { name: 'URL' }),
       'https://example.com',
     );
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Close' }),
+    );
     expect(screen.getByText(/"url": "https:\/\/example.com"/)).toBeTruthy();
 
     // The colour wheel recolours the embed.
@@ -632,6 +637,80 @@ describe('Message Studio', () => {
       document.querySelector('.dc-embed__desc img.dc-custom-emoji'),
     ).toHaveAttribute('alt', ':pixel_heart:');
   }, 20_000);
+
+  it('sets up buttons with actions, link buttons and menus', async () => {
+    await openEditor();
+    const json = () => document.querySelector('.sp-json')!.textContent ?? '';
+
+    // An action button: its colour, text and a "Send message" action.
+    await userEvent.click(
+      screen.getByRole('button', { name: /Edit button I’m in/ }),
+    );
+    const panel = screen.getByRole('dialog', { name: 'Button settings' });
+    await userEvent.click(within(panel).getByRole('radio', { name: 'Red' }));
+    expect(json()).toMatch(/"style": 4/);
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Add an action' }),
+    );
+    await userEvent.click(
+      within(panel).getByRole('menuitem', { name: 'Send message' }),
+    );
+    await userEvent.click(
+      within(panel).getByRole('combobox', { name: 'Send message template' }),
+    );
+    await userEvent.click(screen.getByRole('option', { name: /Weekly recap/ }));
+    // Free servers send one template per action, so the rest are off.
+    expect(
+      screen.getByRole('option', { name: /Server rules/ }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(
+      within(panel).getByRole('checkbox', { name: /DM user/ }),
+    );
+    expect(
+      within(panel).getByRole('checkbox', { name: /Send as ephemeral/ }),
+    ).toBeDisabled();
+
+    // Switching to a link checks the link.
+    await userEvent.click(
+      within(panel).getByRole('radio', { name: 'Link button' }),
+    );
+    await userEvent.type(
+      within(panel).getByRole('textbox', { name: 'URL' }),
+      'nope',
+    );
+    expect(
+      within(panel).getByText('Use a link that starts with https://.'),
+    ).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }));
+
+    // A menu from the plus menu, with a second option and its actions.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add to the message' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add menu' }));
+    const menu = screen.getByRole('dialog', { name: 'Menu settings' });
+    await userEvent.click(
+      within(menu).getByRole('button', { name: 'Add option' }),
+    );
+    expect(
+      within(menu).getByRole('textbox', { name: 'Option 2 title' }),
+    ).toHaveValue('Option 2');
+    await userEvent.click(
+      within(menu).getByRole('button', { name: 'Actions for option 2' }),
+    );
+    expect(within(menu).getByText('Option 2 actions')).toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole('button', { name: 'Return' }));
+    await userEvent.click(within(menu).getByRole('button', { name: 'Close' }));
+    expect(json()).toMatch(/"custom_id": "sp:m:/);
+
+    // Rearranging from the keyboard, and removing with the trash.
+    screen.getByRole('button', { name: /Move button Jam rules/ }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(json().indexOf('I’m in')).toBeLessThan(json().indexOf('Jam rules'));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove menu' }));
+    expect(json()).not.toMatch(/sp:m:/);
+  }, 30_000);
 
   it('posts a test, reports the locked channel, and posts once it is fixed', async () => {
     await openEditor();

@@ -12,6 +12,7 @@ import {
   addAudit,
   defaultDbPath,
   discordRest,
+  handleStudioInteraction,
   ticketActions,
   ticketButtonPrefix,
   markOnlyInstalled,
@@ -113,6 +114,27 @@ function wire(c: Client) {
       interaction.inGuild()
     ) {
       void openTicket(interaction);
+      return;
+    }
+    // Buttons and menus on Message Studio messages.
+    if (
+      (interaction.isButton() || interaction.isStringSelectMenu()) &&
+      interaction.customId.startsWith('sp:') &&
+      interaction.inGuild()
+    ) {
+      handleStudioInteraction(rest, db, {
+        id: interaction.id,
+        token: interaction.token,
+        applicationId: interaction.applicationId,
+        guildId: interaction.guildId,
+        channelId: interaction.channelId,
+        userId: interaction.user.id,
+        messageId: interaction.message.id,
+        customId: interaction.customId,
+        values: interaction.isStringSelectMenu() ? interaction.values : [],
+      }).catch((error: unknown) =>
+        console.error('A Message Studio button failed', error),
+      );
       return;
     }
     if (!interaction.isChatInputCommand()) return;

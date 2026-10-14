@@ -1818,3 +1818,399 @@
   outline-offset: -1px;
   color: var(--sp-danger);
 }
+
+/* Message Studio: buttons and menus under the message */
+.sp-comps {
+  max-width: 516px;
+}
+.sp-comps__menu-row {
+  display: block;
+}
+.sp-comp {
+  position: relative;
+  transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
+}
+/* Hovering a trash button fades what it would remove, but not the trash. */
+.sp-comp.is-fading > .sp-comp__face,
+.sp-action.is-fading > :not(.sp-trash) {
+  opacity: 0.25;
+}
+.sp-comp__face,
+.sp-action > * {
+  transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-comp.is-dragged,
+.sp-action.is-dragged {
+  opacity: 0.4;
+}
+.sp-comp__face {
+  cursor: pointer;
+}
+.sp-comp__face.dc-btn {
+  padding-left: 6px;
+}
+.sp-comp__face.dc-select {
+  padding-left: 6px;
+  max-width: none;
+}
+.sp-comp__face:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sp-dc-link);
+}
+.sp-handle {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: currentColor;
+  opacity: 0.85;
+  cursor: grab;
+  touch-action: none;
+}
+.sp-handle:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.sp-handle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--sp-dc-link);
+}
+.sp-comp--button.is-drop-before::before,
+.sp-comp--button.is-drop-after::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--sp-dc-link);
+}
+.sp-comp--button.is-drop-before::before {
+  left: -6px;
+}
+.sp-comp--button.is-drop-after::after {
+  right: -6px;
+}
+.sp-comp--menu.is-drop-before::before,
+.sp-comp--menu.is-drop-after::after,
+.sp-action.is-drop-before::before,
+.sp-action.is-drop-after::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--sp-brand);
+}
+.sp-comp--menu.is-drop-before::before,
+.sp-action.is-drop-before::before {
+  top: -6px;
+}
+.sp-comp--menu.is-drop-after::after,
+.sp-action.is-drop-after::after {
+  bottom: -6px;
+}
+.sp-comp--menu.is-drop-before::before,
+.sp-comp--menu.is-drop-after::after {
+  background: var(--sp-dc-link);
+}
+
+/* The red trash: faint until its row is hovered, bright on its own hover */
+.sp-trash {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: rgb(237 66 69 / 0.55);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    background-color var(--sp-dur-fast) var(--sp-ease-out),
+    opacity var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-trash:hover,
+.sp-trash:focus-visible {
+  outline: none;
+  background: #ed4245;
+}
+.sp-trash:focus-visible {
+  box-shadow: var(--sp-ring);
+}
+.sp-comp__trash {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 2;
+  opacity: 0;
+}
+.sp-comp:hover > .sp-comp__trash,
+.sp-comp:focus-within > .sp-comp__trash {
+  opacity: 1;
+}
+.sp-comp.is-fading > .sp-comp__trash {
+  opacity: 1;
+}
+
+/* Settings panels for a button or a menu */
+.sp-settings-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: var(--sp-z-popover);
+  display: grid;
+  gap: 14px;
+  width: min(440px, calc(100vw - 48px));
+  padding: 16px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-card);
+  background: var(--sp-surface);
+  box-shadow: var(--sp-shadow-overlay);
+  color: var(--sp-text);
+  font-family: var(--sp-font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: left;
+  white-space: normal;
+  cursor: default;
+  animation: sp-pop var(--sp-dur-base) var(--sp-ease-out);
+}
+.sp-settings-pop__head {
+  display: grid;
+  gap: 2px;
+}
+.sp-settings-pop__title {
+  margin: 0;
+  font: var(--sp-text-h3);
+}
+.sp-settings-pop__head .sp-hint {
+  margin: 0;
+}
+.sp-settings-pop__sep {
+  width: calc(100% + 32px);
+  height: 1px;
+  margin: 0 -16px;
+  border: 0;
+  background: var(--sp-line);
+}
+.sp-settings-pop__type {
+  width: 100%;
+}
+.sp-settings-pop__type > * {
+  flex: 1 1 0;
+}
+.sp-bs__top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+.sp-colour-squares {
+  display: grid;
+  grid-template-columns: repeat(2, 20px);
+  gap: 4px;
+  padding-bottom: 2px;
+}
+.sp-colour-square {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  opacity: 0.1;
+  cursor: pointer;
+  transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-colour-square:hover:not(:disabled) {
+  opacity: 0.4;
+}
+.sp-colour-square.is-on {
+  opacity: 1;
+}
+.sp-colour-square:disabled {
+  cursor: not-allowed;
+}
+.sp-colour-square:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-colour-square--green {
+  background: #248046;
+}
+.sp-colour-square--blurple {
+  background: #5865f2;
+}
+.sp-colour-square--red {
+  background: #da373c;
+}
+.sp-colour-square--grey {
+  background: #6d6f78;
+}
+
+/* The round emoji box */
+.sp-emoji-field {
+  position: relative;
+}
+.sp-emoji-circle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--sp-line-strong);
+  border-radius: 50%;
+  background: var(--sp-raised);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sp-emoji-circle:hover {
+  border-color: var(--sp-line-hover);
+}
+.sp-emoji-circle:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-emoji-circle .dc-custom-emoji {
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  vertical-align: 0;
+}
+.sp-emoji-circle__clear {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sp-line-strong);
+  color: var(--sp-text);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sp-emoji-pop--start {
+  right: auto;
+  left: 0;
+}
+
+/* Actions and menu options */
+.sp-actions,
+.sp-options,
+.sp-option-actions {
+  display: grid;
+  gap: 10px;
+}
+.sp-actions__head,
+.sp-option-actions__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sp-option-actions__head {
+  justify-content: flex-start;
+}
+.sp-actions__head .sp-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sp-actions__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-action {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-subtle);
+  transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-action > .sp-handle {
+  align-self: center;
+  color: var(--sp-muted);
+}
+.sp-action__body,
+.sp-option__body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.sp-action__title {
+  color: var(--sp-muted);
+  font: 500 12px/16px var(--sp-font-sans);
+}
+.sp-action__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 20px;
+}
+.sp-action__checks .sp-check {
+  min-height: 32px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.sp-action__mode {
+  justify-self: start;
+}
+.sp-action__trash {
+  opacity: 0.8;
+}
+.sp-action:hover > .sp-action__trash {
+  opacity: 1;
+}
+.sp-option__body {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+}
+.sp-option__body > .sp-field:last-child {
+  grid-column: 1 / -1;
+}
+.sp-label--small {
+  color: var(--sp-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.sp-option__gear {
+  justify-items: center;
+}
+.sp-gear {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sp-radius-control);
+  background: none;
+  color: var(--sp-muted);
+  cursor: pointer;
+}
+.sp-gear:hover,
+.sp-gear:focus-visible {
+  outline: none;
+  background: var(--sp-raised);
+  color: var(--sp-text);
+}
