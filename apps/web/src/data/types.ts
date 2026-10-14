@@ -256,14 +256,35 @@ export type StudioMessage = {
 export type StudioTemplate = {
   id: string;
   name: string;
+  /** The folder it's in, or null at the top level. */
+  folderId: string | null;
+  /** Its place among the templates and folders beside it. */
+  position: number;
+  /** "Saved 5 min ago by Rhea". */
   meta: string;
   message: StudioMessage;
+};
+export type StudioFolder = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  position: number;
+};
+export type LibraryMove = {
+  kind: 'template' | 'folder';
+  id: string;
+  /** Where it goes: a folder, or null for the top level. */
+  folderId: string | null;
+  /** Its place among the other items already there. */
+  index: number;
 };
 export type StudioState = {
   message: StudioMessage;
   channels: Channel[];
   templates: StudioTemplate[];
+  folders: StudioFolder[];
   templateLimit: number;
+  folderLimit: number;
   versions: Version<StudioMessage>[];
 };
 
@@ -295,7 +316,21 @@ export interface PanelApi {
   publishStudio(serverId: string, message: StudioMessage): Promise<void>;
   saveTemplate(
     serverId: string,
-    template: { name: string; message: StudioMessage },
+    template: { name: string; message: StudioMessage; folderId: string | null },
   ): Promise<void>;
+  updateTemplate(
+    serverId: string,
+    id: string,
+    change: { name?: string; message?: StudioMessage },
+  ): Promise<void>;
+  cloneTemplate(serverId: string, id: string): Promise<void>;
   deleteTemplate(serverId: string, id: string): Promise<void>;
+  addFolder(
+    serverId: string,
+    folder: { name: string; parentId: string | null },
+  ): Promise<void>;
+  renameFolder(serverId: string, id: string, name: string): Promise<void>;
+  /** Deletes the folder and everything inside it. */
+  deleteFolder(serverId: string, id: string): Promise<void>;
+  moveLibraryItem(serverId: string, move: LibraryMove): Promise<void>;
 }

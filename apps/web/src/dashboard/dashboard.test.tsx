@@ -555,33 +555,123 @@ describe('Message Studio', () => {
     expect(screen.getByText('Published changes')).toBeInTheDocument();
   });
 
-  it('uses, saves and deletes templates', async () => {
+  it('keeps templates and folders: add, clone, move, edit and delete', async () => {
     open(`${pixel}/studio?tab=items`);
+    expect(
+      await screen.findByText(/You have 4\/100/, {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
+
+    // Deleting asks first.
     await userEvent.click(
-      await screen.findByRole(
-        'button',
-        { name: 'Delete Server rules' },
-        { timeout: 4000 },
-      ),
+      screen.getByRole('button', { name: 'Delete Server rules' }),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    await waitFor(() => expect(screen.queryByText('Server rules')).toBeNull());
     await userEvent.click(
-      screen.getByRole('button', { name: 'Save current as a template' }),
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete',
+      }),
+    );
+    await waitFor(() => expect(screen.queryByText('Server rules')).toBeNull());
+
+    // + Template saves what's in the editor.
+    await userEvent.click(screen.getByRole('button', { name: 'New template' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }),
     );
     expect(
       await screen.findByText('Saved “Spring art jam announcement”'),
     ).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Use Weekly recap' }),
+      screen.getByRole('button', { name: 'Clone Maintenance notice' }),
+    );
+    expect(
+      await screen.findByText('Maintenance notice (copy)'),
+    ).toBeInTheDocument();
+
+    // Picking a card up with the keyboard and dropping it into a folder.
+    const card = screen.getByRole('listitem', {
+      name: 'Template Maintenance notice (copy)',
+    });
+    card.focus();
+    await userEvent.keyboard(' ');
+    const recaps = screen.getByRole('listitem', { name: 'Folder Recaps' });
+    for (let i = 0; i < 6 && !recaps.className.includes('is-drop-into'); i++)
+      await userEvent.keyboard('{ArrowUp}');
+    expect(recaps).toHaveClass('is-drop-into');
+    await userEvent.keyboard(' ');
+    await waitFor(() =>
+      expect(screen.queryByText('Maintenance notice (copy)')).toBeNull(),
+    );
+    expect(screen.getByText('Containing 2 templates.')).toBeInTheDocument();
+
+    // A new folder.
+    await userEvent.click(screen.getByRole('button', { name: 'New folder' }));
+    await userEvent.type(
+      within(screen.getByRole('dialog')).getByRole('textbox', {
+        name: 'Name',
+      }),
+      'Events',
+    );
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }),
+    );
+    expect(
+      await screen.findByRole('listitem', { name: 'Folder Events' }),
+    ).toBeInTheDocument();
+
+    // Opening a folder, then editing a template from it.
+    await userEvent.click(screen.getByText('Recaps'));
+    expect(
+      screen.getByRole('button', { name: 'All templates' }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit Weekly recap' }),
     );
     expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue(
       'This week in Pixel Plaza',
     );
     expect(
-      screen.getByRole('button', { name: 'Publish changes' }),
+      screen.getByText('Editing the template “Weekly recap”'),
     ).toBeInTheDocument();
+
+    // A folder with things in it asks twice before it goes.
+    // Coming back to the tab starts at the top level again.
+    await userEvent.click(screen.getByRole('tab', { name: /Templates/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete Recaps' }),
+    );
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Continue',
+      }),
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByText('Are you sure?'),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete everything',
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('listitem', { name: 'Folder Recaps' }),
+      ).toBeNull(),
+    );
+    // An empty folder only asks once.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete Events' }),
+    );
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete',
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('listitem', { name: 'Folder Events' }),
+      ).toBeNull(),
+    );
   });
 });
 

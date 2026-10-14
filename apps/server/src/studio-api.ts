@@ -1,15 +1,24 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   addAudit,
+  addFolder,
   addTemplate,
   addVersion,
   ago,
+  cloneTemplate,
+  countLibrary,
+  deleteFolder,
   deleteTemplate,
   enqueueJob,
   getGuild,
   getModule,
-  listTemplates,
+  libraryLimits,
+  listLibrary,
   listVersions,
+  moveLibraryItem,
+  renameFolder,
+  savedLine,
+  updateTemplate,
   normaliseStudio,
   studioDefault,
   studioProblem,
@@ -42,8 +51,28 @@ export function studioRoutes({
   view: (guildId: string) => Promise<GuildView | undefined>;
   now: () => number;
 }) {
-  const limitOf = (guildId: string) =>
-    getGuild(db, guildId)?.plan === 'plus' ? 100 : 10;
+  const limitsOf = (guildId: string) =>
+    libraryLimits(getGuild(db, guildId)?.plan);
+  const nameOf = (value: unknown, what: string) => {
+    const name = typeof value === 'string' ? value.trim() : '';
+    if (!name || name.length > 80)
+      throw new BadRequest(`Give the ${what} a name of up to 80 characters.`);
+    return name;
+  };
+  const folderOf = (value: unknown) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string' && /^\d{1,12}$/.test(value)) return value;
+    throw new BadRequest('That folder isn’t valid.');
+  };
+  const messageOf = (value: unknown) => {
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      studioProblem({ ...value, name: 'x' }) === 'The message is missing.'
+    )
+      throw new BadRequest('The message is missing.');
+    return normaliseStudio(value as StudioMessage);
+  };
 
   return async function handle({
     req,
@@ -72,15 +101,27 @@ export function studioRoutes({
             ),
         ),
         channels,
-        templates: listTemplates<StudioMessage>(db, guildId, 'studio').map(
-          (t) => ({
-            id: t.id,
-            name: t.name,
-            meta: `Saved ${ago(t.at, now()).toLowerCase()}${/^\d/.test(ago(t.at, now())) ? ' ago' : ''} by ${t.who === user.name ? 'you' : t.who}`,
-            message: normaliseStudio(t.message),
-          }),
-        ),
-        templateLimit: limitOf(guildId),
+        ...(() => {
+          const { templates, folders } = listLibrary<StudioMessage>(
+            db,
+            guildId,
+            'studio',
+          );
+          const limits = limitsOf(guildId);
+          return {
+            templates: templates.map((t) => ({
+              id: t.id,
+              name: t.name,
+              folderId: t.folderId,
+              position: t.position,
+              meta: savedLine(t.at, now(), t.who === user.name ? 'you' : t.who),
+              message: normaliseStudio(t.message),
+            })),
+            folders,
+            templateLimit: limits.templates,
+            folderLimit: limits.folders,
+          };
+        })(),
         versions: listVersions<StudioMessage>(db, guildId, 'studio').map(
           (x) => ({
             id: x.id,
@@ -128,18 +169,18 @@ export function studioRoutes({
       return true;
     }
     if (path === '/studio/templates' && method === 'POST') {
-      const body = await readJson<{ name?: unknown; message?: unknown }>(req);
-      const name = typeof body?.name === 'string' ? body.name.trim() : '';
-      if (!name || name.length > 80)
-        throw new BadRequest(
-          'Give the template a name of up to 80 characters.',
-        );
+      const body = await readJson<{
+        name?: unknown;
+        message?: unknown;
+        folderId?: unknown;
+      }>(req);
+      const name = nameOf(body?.name, 'template');
+      const message = messageOf(body?.message);
+      const folderId = folderOf(body?.folderId);
       if (
-        studioProblem({ ...(body?.message as object), name }) ===
-        'The message is missing.'
+        countLibrary(db, guildId, 'studio').templates >=
+        limitsOf(guildId).templates
       )
-        throw new BadRequest('The message is missing.');
-      if (listTemplates(db, guildId, 'studio').length >= limitOf(guildId))
         throw new BadRequest('You’ve used every template on this plan.');
       addTemplate(
         db,
@@ -148,17 +189,104 @@ export function studioRoutes({
           moduleId: 'studio',
           name,
           who: user.name,
-          message: normaliseStudio(body!.message as StudioMessage),
+          message,
+          folderId,
         },
         now(),
       );
       res.writeHead(204).end();
       return true;
     }
-    const del = path.match(/^\/studio\/templates\/(\d{1,12})$/);
-    if (del && method === 'DELETE') {
-      deleteTemplate(db, guildId, del[1]!);
+    if (path === '/studio/folders' && method === 'POST') {
+      const body = await readJson<{ name?: unknown; parentId?: unknown }>(req);
+      const name = nameOf(body?.name, 'folder');
+      const parentId = folderOf(body?.parentId);
+      if (
+        countLibrary(db, guildId, 'studio').folders >= limitsOf(guildId).folders
+      )
+        throw new BadRequest('You’ve used every folder on this plan.');
+      addFolder(db, { guildId, moduleId: 'studio', name, parentId }, now());
       res.writeHead(204).end();
+      return true;
+    }
+    if (path === '/studio/library/move' && method === 'POST') {
+      const body = await readJson<{
+        kind?: unknown;
+        id?: unknown;
+        folderId?: unknown;
+        index?: unknown;
+      }>(req);
+      if (
+        (body?.kind !== 'template' && body?.kind !== 'folder') ||
+        typeof body.id !== 'string' ||
+        !/^\d{1,12}$/.test(body.id) ||
+        typeof body.index !== 'number' ||
+        !Number.isInteger(body.index) ||
+        body.index < 0
+      )
+        throw new BadRequest('That move isn’t valid.');
+      moveLibraryItem(db, guildId, 'studio', {
+        kind: body.kind,
+        id: body.id,
+        folderId: folderOf(body.folderId),
+        index: body.index,
+      });
+      res.writeHead(204).end();
+      return true;
+    }
+    const clone = path.match(/^\/studio\/templates\/(\d{1,12})\/clone$/);
+    if (clone && method === 'POST') {
+      if (
+        countLibrary(db, guildId, 'studio').templates >=
+        limitsOf(guildId).templates
+      )
+        throw new BadRequest('You’ve used every template on this plan.');
+      cloneTemplate(db, guildId, 'studio', clone[1]!, user.name, now());
+      res.writeHead(204).end();
+      return true;
+    }
+    const template = path.match(/^\/studio\/templates\/(\d{1,12})$/);
+    if (template && method === 'PATCH') {
+      const body = await readJson<{ name?: unknown; message?: unknown }>(req);
+      updateTemplate(
+        db,
+        guildId,
+        'studio',
+        template[1]!,
+        {
+          ...(body?.name === undefined
+            ? {}
+            : { name: nameOf(body.name, 'template') }),
+          ...(body?.message === undefined
+            ? {}
+            : { message: messageOf(body.message) }),
+          who: user.name,
+        },
+        now(),
+      );
+      res.writeHead(204).end();
+      return true;
+    }
+    if (template && method === 'DELETE') {
+      deleteTemplate(db, guildId, 'studio', template[1]!);
+      res.writeHead(204).end();
+      return true;
+    }
+    const folder = path.match(/^\/studio\/folders\/(\d{1,12})$/);
+    if (folder && method === 'PATCH') {
+      const body = await readJson<{ name?: unknown }>(req);
+      renameFolder(
+        db,
+        guildId,
+        'studio',
+        folder[1]!,
+        nameOf(body?.name, 'folder'),
+      );
+      res.writeHead(204).end();
+      return true;
+    }
+    if (folder && method === 'DELETE') {
+      json(res, 200, deleteFolder(db, guildId, 'studio', folder[1]!));
       return true;
     }
     return false;

@@ -141,6 +141,20 @@ const migrations = [
     created_at INTEGER NOT NULL
   );
   CREATE INDEX templates_by_module ON templates (guild_id, module_id, id DESC);`,
+  // 5: template folders, and a shared order for templates and folders.
+  `CREATE TABLE template_folders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    module_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    parent_id INTEGER,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX template_folders_by_module ON template_folders (guild_id, module_id);
+  ALTER TABLE templates ADD COLUMN folder_id INTEGER;
+  ALTER TABLE templates ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+  UPDATE templates SET position = -id;`,
 ];
 
 export function openDb(path: string): Db {

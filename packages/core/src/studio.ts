@@ -329,49 +329,7 @@ export function studioPayload(
   };
 }
 
-// Templates and publishing ----------------------------------------------------
-
-type Row = Record<string, unknown>;
-
-export function listTemplates<T>(db: Db, guildId: string, moduleId: string) {
-  return (
-    db
-      .prepare(
-        'SELECT * FROM templates WHERE guild_id = ? AND module_id = ? ORDER BY id DESC',
-      )
-      .all(guildId, moduleId) as Row[]
-  ).map((r) => ({
-    id: String(r.id),
-    name: r.name as string,
-    who: r.who_name as string,
-    at: r.created_at as number,
-    message: JSON.parse(r.json as string) as T,
-  }));
-}
-
-export function addTemplate(
-  db: Db,
-  t: {
-    guildId: string;
-    moduleId: string;
-    name: string;
-    who: string;
-    message: unknown;
-  },
-  now: number,
-) {
-  db.prepare(
-    `INSERT INTO templates (guild_id, module_id, name, json, who_name, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(t.guildId, t.moduleId, t.name, JSON.stringify(t.message), t.who, now);
-}
-
-export function deleteTemplate(db: Db, guildId: string, id: string) {
-  db.prepare('DELETE FROM templates WHERE guild_id = ? AND id = ?').run(
-    guildId,
-    Number(id),
-  );
-}
+// Publishing ------------------------------------------------------------------
 
 /**
  * Posts the Studio message, or edits the one already posted with the same
