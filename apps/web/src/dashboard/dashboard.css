@@ -727,6 +727,12 @@
 .sp-lottie svg {
   display: block;
 }
+.sp-lottie__frame {
+  display: block;
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+}
 .sp-lottie:not(.sp-lottie--original) [fill='rgb(0,0,0)'] {
   fill: currentColor;
 }

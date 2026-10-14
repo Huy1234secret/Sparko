@@ -44,6 +44,16 @@ import {
 import { InsertProvider, useInsertTarget } from './EditorBits';
 import { EmojiButton } from './EmojiPicker';
 import { PlusMenu, type PlusItem } from './PlusMenu';
+import { preloadAnimations } from '../../ui';
+
+// Every animated icon on this page, fetched ahead so none waits on first use.
+const icons = import.meta.glob<string>(
+  [
+    '../../../../../design-system/assets/icons/animated-icons/{edit,clone,remove,upload,plus,plus-menu,setting,close,folder,image}-*.json',
+    '../../../../../design-system/assets/icons/{close-button-hover,folder-icon-add}.json',
+  ],
+  { query: '?url', import: 'default', eager: true },
+);
 
 /** Characters Discord counts toward the 6,000 shared by a message's embeds. */
 const embedSize = (m: StudioMessage) =>
@@ -470,6 +480,10 @@ export function StudioModule({
   const saved = template && { ...template.message, name: template.name };
   const message = saved ? (draft ?? saved) : null;
   const dirty = !!saved && JSON.stringify(message) !== JSON.stringify(saved);
+
+  useEffect(() => {
+    preloadAnimations(Object.values(icons));
+  }, []);
 
   // Leaving the page with unsaved changes asks first.
   useEffect(() => {

@@ -6,6 +6,7 @@ import {
   Segmented,
   Spinner,
   cx,
+  preloadAnimations,
   rememberEmojis,
   renderDiscordText,
 } from '../../ui';
@@ -68,6 +69,10 @@ export function EmojiButton({
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), wrap);
+  // The hover animation is fetched now, so the first hover plays at once.
+  useEffect(() => {
+    if (face) preloadAnimations([face.hover], true);
+  }, [face]);
   return (
     <div ref={wrap} className="sp-pop-anchor">
       <button

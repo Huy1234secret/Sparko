@@ -76,6 +76,21 @@ const reducedMotion = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/**
+ * Starts loading the player and some animation files ahead of time, so
+ * icons play at once the first time they're needed.
+ */
+export function preloadAnimations(srcs: string[], keepColours = false) {
+  const go = () => {
+    void loadPlayer().catch(() => undefined);
+    for (const src of srcs)
+      void loadFile(src, keepColours).catch(() => undefined);
+  };
+  if (typeof window.requestIdleCallback === 'function')
+    window.requestIdleCallback(go, { timeout: 1500 });
+  else setTimeout(go, 200);
+}
+
 export type LottieIconProps = {
   src: string;
   size?: number;
@@ -116,31 +131,49 @@ export function LottieIcon({
     latest.current = { open, onDone, startAt };
   });
 
+  // The animation on screen; a new file replaces it only once it's ready,
+  // so switching animations never leaves the icon blank.
+  const shown = useRef<{ item: AnimationItem; el: HTMLElement } | null>(null);
   useEffect(() => {
-    let item: AnimationItem | undefined;
     let gone = false;
     Promise.all([loadPlayer(), loadFile(src, !!original)])
       .then(([lottie, data]) => {
         if (gone || !box.current) return;
-        item = lottie.loadAnimation({
-          container: box.current,
+        const el = document.createElement('span');
+        el.className = 'sp-lottie__frame';
+        box.current.append(el);
+        const item = lottie.loadAnimation({
+          container: el,
           renderer: 'svg',
           loop: false,
           autoplay: false,
           animationData: structuredClone(data),
           rendererSettings: { preserveAspectRatio: 'xMidYMid meet' },
         });
-        item.goToAndStop(latest.current.open ? item.totalFrames - 1 : 0, true);
+        item.goToAndStop(
+          latest.current.startAt ??
+            (latest.current.open ? item.totalFrames - 1 : 0),
+          true,
+        );
         item.addEventListener('complete', () => latest.current.onDone?.());
+        shown.current?.item.destroy();
+        shown.current?.el.remove();
+        shown.current = { item, el };
         setAnim(item);
       })
       // Without the animation the space stays empty; nothing else breaks.
       .catch(() => undefined);
     return () => {
       gone = true;
-      item?.destroy();
     };
   }, [src, original]);
+  useEffect(
+    () => () => {
+      shown.current?.item.destroy();
+      shown.current = null;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!anim || open === undefined) return;

@@ -59,7 +59,9 @@ function MaskIcon({ src, label }: { src: string; label: string }) {
 /** The folder picture: opens while hovered, and fills up when something lands in it. */
 function FolderPicture({ open, added }: { open: boolean; added: number }) {
   const [adding, setAdding] = useState(0);
-  const [shown, setShown] = useState(0);
+  // Drops counted before this card appeared (say, before opening the
+  // folder and coming back) don't play again.
+  const [shown, setShown] = useState(added);
   if (added !== shown) {
     setShown(added);
     if (added) setAdding(added);
