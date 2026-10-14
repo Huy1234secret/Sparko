@@ -4,7 +4,6 @@ import {
   useContext,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from 'react';
 import {
@@ -112,7 +111,7 @@ export function roomFor(list: StudioComponent[], kind: 'button' | 'menu') {
 }
 
 /** The red trash button; hovering it fades what it would remove. */
-function TrashButton({
+export function TrashButton({
   label,
   onClick,
   onHover,
@@ -915,5 +914,3 @@ export function ComponentsArea({
     </div>
   );
 }
-
-export type { CSSProperties };

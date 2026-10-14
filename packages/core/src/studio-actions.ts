@@ -8,6 +8,7 @@ import {
   type StudioComponent,
   type StudioMessage,
 } from './studio-format.ts';
+import { getGuild } from './store.ts';
 import { getTemplate } from './templates.ts';
 
 /**
@@ -67,6 +68,8 @@ export type StudioInteraction = {
   guildId: string;
   channelId: string;
   userId: string;
+  /** The clicker's name in the server, for {user.name}. */
+  userName: string;
   messageId: string;
   customId: string;
   /** What was picked in a menu. */
@@ -137,10 +140,13 @@ export async function handleStudioInteraction(
         continue;
       }
       const message = normaliseStudio(template.message);
-      const body = studioPayload(message, { now }) as Record<
-        string,
-        unknown
-      > & {
+      const guild = getGuild(db, i.guildId);
+      const body = studioPayload(message, {
+        now,
+        user: { id: i.userId, name: i.userName },
+        server: guild && { name: guild.name, members: guild.memberCount },
+        channel: i.channelId,
+      }) as Record<string, unknown> & {
         flags?: number;
       };
       try {

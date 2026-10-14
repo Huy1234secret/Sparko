@@ -1,6 +1,6 @@
 import type { Db } from './db.ts';
 import { DiscordCodes, DiscordError, type Rest } from './discord.ts';
-import { getModule } from './store.ts';
+import { getGuild, getModule } from './store.ts';
 import { getPosted, setPosted } from './tickets.ts';
 import { Plain } from './ticket-actions.ts';
 import { rememberPost } from './studio-actions.ts';
@@ -24,11 +24,19 @@ export async function publishStudio(
   db: Db,
   guildId: string,
   now = Date.now(),
+  /** Who posted it, for {user} and the like. */
+  user?: { id: string; name: string },
 ) {
   const { config } = getModule<StudioMessage>(db, guildId, 'studio');
   if (!config) return;
   const m = normaliseStudio(config);
-  const body = studioPayload(m, { now });
+  const guild = getGuild(db, guildId);
+  const body = studioPayload(m, {
+    now,
+    user,
+    server: guild && { name: guild.name, members: guild.memberCount },
+    channel: m.channel,
+  });
   const key = `studio:${m.layout}`;
   const posted = getPosted(db, guildId, key);
   try {

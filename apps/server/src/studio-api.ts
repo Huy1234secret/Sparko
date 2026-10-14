@@ -187,7 +187,16 @@ export function studioRoutes({
         },
         at,
       );
-      enqueueJob(db, { guildId, moduleId: 'studio', kind: 'studio' }, at);
+      enqueueJob(
+        db,
+        {
+          guildId,
+          moduleId: 'studio',
+          kind: 'studio',
+          payload: { userId: user.id, userName: user.name },
+        },
+        at,
+      );
       res.writeHead(204).end();
       return true;
     }
@@ -224,7 +233,16 @@ export function studioRoutes({
         },
         at,
       );
-      enqueueJob(db, { guildId, moduleId: 'studio', kind: 'studio' }, at);
+      enqueueJob(
+        db,
+        {
+          guildId,
+          moduleId: 'studio',
+          kind: 'studio',
+          payload: { userId: user.id, userName: user.name },
+        },
+        at,
+      );
       res.writeHead(204).end();
       return true;
     }
