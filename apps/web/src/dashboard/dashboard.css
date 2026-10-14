@@ -1103,7 +1103,8 @@
   display: grid;
   justify-items: end;
   gap: 8px;
-  padding: 0 40px 12px 0;
+  /* The line sits 15–17px from the right edge; items stop 8px before it. */
+  padding: 0 25px 12px 0;
 }
 .sp-plus-menu__line {
   position: absolute;
