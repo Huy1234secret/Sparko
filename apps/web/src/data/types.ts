@@ -239,19 +239,31 @@ export type StudioMessage = {
   /** The Components V2 layout: blocks, optionally in a coloured container. */
   v2: { container: boolean; accent: string; blocks: V2Block[] };
   content: string;
-  useEmbed: boolean;
-  embed: {
-    author: string;
-    title: string;
-    description: string;
-    color: string;
-    image: string;
-    footer: string;
-    thumbnail: boolean;
-    timestamp: boolean;
-    fields: { id: string; name: string; value: string; inline: boolean }[];
-  };
+  /** Up to 10 embeds, shown in this order. */
+  embeds: StudioEmbed[];
   buttons: { id: string; label: string; url: string }[];
+};
+export type StudioEmbed = {
+  id: string;
+  author: string;
+  authorIcon: string;
+  authorUrl: string;
+  title: string;
+  description: string;
+  color: string;
+  image: string;
+  thumbnail: string;
+  footer: string;
+  footerIcon: string;
+  timestamp: boolean;
+  fields: { id: string; name: string; value: string; inline: boolean }[];
+};
+/** One of the server's own emojis. */
+export type ServerEmoji = {
+  id: string;
+  name: string;
+  animated: boolean;
+  url: string;
 };
 export type StudioTemplate = {
   id: string;
@@ -333,4 +345,9 @@ export interface PanelApi {
   /** Deletes the folder and everything inside it. */
   deleteFolder(serverId: string, id: string): Promise<void>;
   moveLibraryItem(serverId: string, move: LibraryMove): Promise<void>;
+  /** Posts the message in its channel as a new message. */
+  postStudioTest(serverId: string, message: StudioMessage): Promise<void>;
+  /** Uploads a picture (up to 5 MB) and returns a link Discord can load. */
+  uploadImage(serverId: string, file: File): Promise<string>;
+  listServerEmojis(serverId: string): Promise<ServerEmoji[]>;
 }

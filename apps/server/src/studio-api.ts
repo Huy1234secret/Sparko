@@ -18,6 +18,7 @@ import {
   moveLibraryItem,
   renameFolder,
   savedLine,
+  setPosted,
   updateTemplate,
   normaliseStudio,
   studioDefault,
@@ -25,10 +26,12 @@ import {
   writeModule,
   type Db,
   type GuildView,
+  type Rest,
   type StoredUser,
   type StudioMessage,
 } from '@sparko/core';
 import { BadRequest, json, readJson } from './http.ts';
+import type { Media } from './media.ts';
 
 type Call = {
   req: IncomingMessage;
@@ -46,10 +49,16 @@ export function studioRoutes({
   db,
   view,
   now,
+  rest,
+  media,
 }: {
   db: Db;
   view: (guildId: string) => Promise<GuildView | undefined>;
   now: () => number;
+  /** Discord with the bot token, for the server's own emojis. */
+  rest?: Rest | undefined;
+  /** Where uploaded pictures go; uploads are off without it. */
+  media?: Media | undefined;
 }) {
   const limitsOf = (guildId: string) =>
     libraryLimits(getGuild(db, guildId)?.plan);
@@ -166,6 +175,67 @@ export function studioRoutes({
       );
       enqueueJob(db, { guildId, moduleId: 'studio', kind: 'studio' }, at);
       res.writeHead(204).end();
+      return true;
+    }
+    if (path === '/studio/test' && method === 'POST') {
+      // Posts the message as a new one, even if an earlier test is there.
+      const message = await readJson<unknown>(req);
+      const problem = studioProblem(message);
+      if (problem) throw new BadRequest(problem);
+      const m = normaliseStudio(message as StudioMessage);
+      const at = now();
+      writeModule(db, guildId, 'studio', { on: true, config: m }, at);
+      setPosted(db, guildId, `studio:${m.layout}`, null);
+      addVersion(
+        db,
+        {
+          guildId,
+          moduleId: 'studio',
+          title: `Posted “${m.name}”`,
+          who: user,
+          config: m,
+        },
+        at,
+      );
+      addAudit(
+        db,
+        {
+          guildId,
+          who: user.name,
+          what: 'posted a message',
+          detail: m.name,
+          icon: 'message-square-text',
+        },
+        at,
+      );
+      enqueueJob(db, { guildId, moduleId: 'studio', kind: 'studio' }, at);
+      res.writeHead(204).end();
+      return true;
+    }
+    if (path === '/studio/uploads' && method === 'POST') {
+      if (!media)
+        throw new BadRequest('Uploads aren’t set up on this server yet.');
+      json(res, 200, await media.save(req, guildId));
+      return true;
+    }
+    if (path === '/studio/emojis' && method === 'GET') {
+      const list = rest
+        ? await rest
+            .get<
+              { id: string; name: string; animated?: boolean }[]
+            >(`/guilds/${guildId}/emojis`)
+            .catch(() => [])
+        : [];
+      json(
+        res,
+        200,
+        list.map((e) => ({
+          id: e.id,
+          name: e.name,
+          animated: !!e.animated,
+          url: `https://cdn.discordapp.com/emojis/${e.id}.${e.animated ? 'gif' : 'webp'}?size=48`,
+        })),
+      );
       return true;
     }
     if (path === '/studio/templates' && method === 'POST') {

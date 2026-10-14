@@ -473,73 +473,160 @@ describe('Tickets', () => {
   });
 });
 
-describe('Message Studio', () => {
-  it('previews edits live and checks fields, links and colours before publishing', async () => {
-    open(`${pixel}/studio`);
-    const title = await screen.findByRole(
-      'textbox',
-      { name: /^Title/ },
+/** Opens the first sample template in the editor. */
+async function openEditor() {
+  open(`${pixel}/studio?tab=items`);
+  await userEvent.click(
+    await screen.findByRole(
+      'button',
+      { name: 'Edit Spring art jam announcement' },
       { timeout: 4000 },
-    );
-    await userEvent.clear(title);
-    await userEvent.type(title, 'Summer Jam');
-    expect(document.querySelector('.dc-embed__title')).toHaveTextContent(
-      'Summer Jam',
-    );
+    ),
+  );
+  await screen.findByText('Live preview');
+}
 
-    await userEvent.clear(screen.getByRole('textbox', { name: /Image link/ }));
-    await userEvent.type(
-      screen.getByRole('textbox', { name: /Image link/ }),
-      'x',
-    );
-    expect(
-      screen.getByText(
-        'The link must start with https:// so Discord can load it.',
-      ),
-    ).toBeInTheDocument();
-    await userEvent.clear(screen.getByRole('textbox', { name: /Image link/ }));
-
-    const hex = screen.getByRole('textbox', { name: 'Custom colour, hex' });
-    await userEvent.clear(hex);
-    await userEvent.type(hex, '#12');
-    expect(
-      screen.getByText('Use a hex colour like #FACC15.'),
-    ).toBeInTheDocument();
-    await userEvent.type(hex, '3456');
-    expect(screen.queryByText('Use a hex colour like #FACC15.')).toBeNull();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Add a field' }));
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'Field 4 name' }),
-      'Judges',
-    );
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Publish changes' }),
-    );
-    expect(
-      screen.getByText('Fields need both a name and a value.'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Fix the highlighted fields first.'),
-    ).toBeInTheDocument();
-  }, 20_000);
-
-  it('publishes, reports the locked channel, and updates once it is fixed', async () => {
+describe('Message Studio', () => {
+  it('asks for a template first, then edits it right in the preview', async () => {
     open(`${pixel}/studio`);
     expect(
       await screen.findByText(
-        'Sparko can’t post in #announcements',
+        'Select a template to start editing!',
         {},
         { timeout: 4000 },
       ),
     ).toBeInTheDocument();
-    await userEvent.type(
-      screen.getByRole('textbox', { name: /^Text/ }),
-      ' See you there.',
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open templates' }),
     );
     await userEvent.click(
-      screen.getByRole('button', { name: 'Publish changes' }),
+      await screen.findByRole('button', {
+        name: 'Edit Spring art jam announcement',
+      }),
     );
+    expect(screen.getByText(/You’re editing/)).toHaveTextContent(
+      'Spring art jam announcement',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit title' }));
+    const title = screen.getByRole('textbox', { name: 'title' });
+    await userEvent.clear(title);
+    await userEvent.type(title, 'Summer Jam{Enter}');
+    expect(document.querySelector('.dc-embed__title')).toHaveTextContent(
+      'Summer Jam',
+    );
+
+    // Writing in the empty field at the end adds a field, and another appears.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit field 4 name' }),
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'field 4 name' }),
+      'Judges{Enter}',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Edit field 5 name' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Move field 1 up' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Move field 4 down' }),
+    ).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Move field 4 up' }),
+    );
+    expect(
+      screen.getAllByRole('button', { name: /^Edit field \d name$/ })[2],
+    ).toHaveTextContent('Judges');
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Field 3 inline' }),
+    );
+
+    // Saving from the settings card (the save bar offers it too).
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Save template' })[0]!,
+    );
+    expect(
+      await screen.findByText('Saved “Spring art jam announcement”'),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('adds embeds, buttons and pictures from the plus menu', async () => {
+    await openEditor();
+    const plus = screen.getByRole('button', { name: 'Add to the message' });
+    await userEvent.click(plus);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add embed' }));
+    expect(
+      screen.getByRole('button', { name: 'Colour of embed 2' }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(plus);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add image' }));
+    const pictureLink = within(
+      screen.getByRole('dialog', { name: 'Image URL' }),
+    ).getByRole('textbox', { name: 'Image URL' });
+    await userEvent.type(pictureLink, 'not a link{Enter}');
+    expect(
+      screen.getByText('Use a link that starts with https://.'),
+    ).toBeInTheDocument();
+    await userEvent.clear(pictureLink);
+    await userEvent.type(pictureLink, 'https://img.example/a.png{Enter}');
+    expect(screen.queryByRole('dialog', { name: 'Image URL' })).toBeNull();
+
+    await userEvent.click(plus);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add button' }));
+    const dialog = screen.getByRole('dialog', { name: 'Link button' });
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: 'Link' }),
+      'https://example.com',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+    expect(screen.getByText(/"url": "https:\/\/example.com"/)).toBeTruthy();
+
+    // The colour wheel recolours the embed.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Colour of embed 1' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: '#5865F2' }));
+    expect(screen.getByText(/"color": 5793266/)).toBeTruthy();
+  }, 20_000);
+
+  it('adds emoji where you were writing, from Unicode or the server', async () => {
+    await openEditor();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit description' }),
+    );
+    const description = screen.getByRole('textbox', { name: 'description' });
+    await userEvent.type(description, '{End} ');
+    await userEvent.click(screen.getByRole('button', { name: 'Add an emoji' }));
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: 'grinning face' },
+        { timeout: 4000 },
+      ),
+    );
+    expect(document.querySelector('.dc-embed__desc')).toHaveTextContent(
+      /500 XP\. 😀$/,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add an emoji' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Server' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'pixel_heart' }),
+    );
+    expect(
+      document.querySelector('.dc-embed__desc img.dc-custom-emoji'),
+    ).toHaveAttribute('alt', ':pixel_heart:');
+  }, 20_000);
+
+  it('posts a test, reports the locked channel, and posts once it is fixed', async () => {
+    await openEditor();
+    expect(
+      screen.getByText('Sparko can’t post in #announcements'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Post test' }));
     expect(
       await screen.findByText('Couldn’t apply', {
         selector: '.sp-pipeline__step',
@@ -547,12 +634,14 @@ describe('Message Studio', () => {
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Check again' }));
     expect(
-      await screen.findByText('Updated in #announcements', {
+      await screen.findByText('Posted in #announcements', {
         selector: '.sp-pipeline__step',
       }),
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: /Versions/ }));
-    expect(screen.getByText('Published changes')).toBeInTheDocument();
+    expect(
+      screen.getByText('Posted “Spring art jam announcement”'),
+    ).toBeInTheDocument();
   });
 
   it('keeps templates and folders: add, clone, move, edit and delete', async () => {
@@ -627,12 +716,12 @@ describe('Message Studio', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Edit Weekly recap' }),
     );
-    expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue(
+    expect(document.querySelector('.dc-embed__title')).toHaveTextContent(
       'This week in Pixel Plaza',
     );
-    expect(
-      screen.getByText('Editing the template “Weekly recap”'),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/You’re editing/)).toHaveTextContent(
+      'Weekly recap',
+    );
 
     // A folder with things in it asks twice before it goes.
     // Coming back to the tab starts at the top level again.
@@ -675,34 +764,10 @@ describe('Message Studio', () => {
   });
 });
 
-describe('editing in the preview', () => {
-  it('edits the embed title right in the preview', async () => {
-    open(`${pixel}/studio`);
-    await userEvent.click(
-      await screen.findByRole(
-        'button',
-        { name: 'Edit embed title' },
-        { timeout: 4000 },
-      ),
-    );
-    const inPlace = screen.getByRole('textbox', { name: 'embed title' });
-    await userEvent.clear(inPlace);
-    await userEvent.type(inPlace, 'Summer Jam{Enter}');
-    // The form follows what was typed in the preview.
-    expect(screen.getByRole('textbox', { name: /^Title/ })).toHaveValue(
-      'Summer Jam',
-    );
-  });
-
+describe('Components V2 in the editor', () => {
   it('builds a Components V2 message from blocks', async () => {
-    open(`${pixel}/studio`);
-    await userEvent.click(
-      await screen.findByRole(
-        'radio',
-        { name: 'Components V2' },
-        { timeout: 4000 },
-      ),
-    );
+    await openEditor();
+    await userEvent.click(screen.getByRole('radio', { name: 'V2 components' }));
     // Text is edited where it's shown.
     await userEvent.click(
       screen.getAllByRole('button', { name: 'Edit text' })[0]!,
@@ -713,17 +778,15 @@ describe('editing in the preview', () => {
     await userEvent.tab();
     expect(document.querySelector('.dc-h2')).toHaveTextContent('Summer Jam');
 
-    // Add an image gallery after the first block; its link goes in the side panel.
+    // An image block from the plus menu; its link goes in the side panel.
     await userEvent.click(
-      screen.getByRole('button', { name: 'Add a block after block 1' }),
+      screen.getByRole('button', { name: 'Add to the message' }),
     );
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Images' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add image' }));
     expect(
       screen.getByRole('textbox', { name: 'Image 1 link' }),
     ).toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Publish changes' }),
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Post test' }));
     expect(
       screen.getAllByText('Image links must start with https://.').length,
     ).toBeGreaterThan(0);
@@ -731,10 +794,6 @@ describe('editing in the preview', () => {
       screen.getByRole('textbox', { name: 'Image 1 link' }),
       'img.example/a.png',
     );
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Remove block 2' }),
-    );
-    expect(screen.queryByRole('textbox', { name: 'Image 1 link' })).toBeNull();
   }, 20_000);
 });
 

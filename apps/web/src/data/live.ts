@@ -203,6 +203,31 @@ export function withBackend(
       if (!(await backend()).live) return sample.deleteFolder(id, folderId);
       await call('DELETE', `${server(id)}/studio/folders/${folderId}`);
     },
+    async postStudioTest(id, message) {
+      if (!(await backend()).live) return sample.postStudioTest(id, message);
+      await call('POST', `${server(id)}/studio/test`, message);
+    },
+    async uploadImage(id, file) {
+      if (!(await backend()).live) return sample.uploadImage(id, file);
+      const res = await fetch(`${server(id)}/studio/uploads`, {
+        method: 'POST',
+        headers: { 'content-type': file.type || 'application/octet-stream' },
+        body: file,
+      });
+      const info = (await res.json().catch(() => ({}))) as {
+        url?: string;
+        message?: string;
+      };
+      if (!res.ok || !info.url)
+        throw new Error(
+          info.message ?? 'The picture didn’t upload. Try again.',
+        );
+      return info.url;
+    },
+    async listServerEmojis(id) {
+      if (!(await backend()).live) return sample.listServerEmojis(id);
+      return getJson(`${server(id)}/studio/emojis`);
+    },
     async moveLibraryItem(id, move) {
       if (!(await backend()).live) return sample.moveLibraryItem(id, move);
       await call('POST', `${server(id)}/studio/library/move`, move);

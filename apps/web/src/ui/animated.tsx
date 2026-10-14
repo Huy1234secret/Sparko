@@ -80,9 +80,12 @@ export type LottieIconProps = {
   className?: string | undefined;
   /** Held animations: plays to the end while true and back while false. */
   open?: boolean | undefined;
-  /** Each change plays the animation once, from `from` to the end. */
+  /** Each change plays the animation once, from `from` to `to` (or the end). */
   playKey?: number | undefined;
   from?: number | undefined;
+  to?: number | undefined;
+  /** Shows this frame once the animation has loaded. */
+  startAt?: number | undefined;
   onDone?: (() => void) | undefined;
   /** For icons drawn as a white shape: that shape takes the text colour. */
   solid?: boolean | undefined;
@@ -95,15 +98,17 @@ export function LottieIcon({
   open,
   playKey,
   from = 0,
+  to,
+  startAt,
   onDone,
   solid,
 }: LottieIconProps) {
   const box = useRef<HTMLSpanElement>(null);
   const [anim, setAnim] = useState<AnimationItem | null>(null);
   // Read when the animation loads or finishes, without reloading it.
-  const latest = useRef({ open, onDone });
+  const latest = useRef({ open, onDone, startAt });
   useEffect(() => {
-    latest.current = { open, onDone };
+    latest.current = { open, onDone, startAt };
   });
 
   useEffect(() => {
@@ -145,16 +150,19 @@ export function LottieIcon({
   useEffect(() => {
     if (!anim || !playKey) return;
     if (reducedMotion()) {
+      // Jump to where the animation would have ended.
+      if (to !== undefined) anim.goToAndStop(Math.max(0, to - 1), true);
       latest.current.onDone?.();
       return;
     }
     anim.setDirection(1);
-    if (from > 0) anim.playSegments([from, anim.totalFrames], true);
+    if (from > 0 || to !== undefined)
+      anim.playSegments([from, to ?? anim.totalFrames], true);
     else {
       anim.resetSegments(true);
       anim.goToAndPlay(0, true);
     }
-  }, [anim, playKey, from]);
+  }, [anim, playKey, from, to]);
 
   return (
     <span

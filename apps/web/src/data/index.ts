@@ -183,6 +183,13 @@ export function useSaveTickets(serverId: string) {
     onSuccess: refresh,
   });
 }
+export const useServerEmojis = (serverId: string, enabled = true) =>
+  useQuery({
+    queryKey: ['emojis', serverId],
+    queryFn: () => api.listServerEmojis(serverId),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
 export function useStudioActions(serverId: string) {
   const refresh = useRefresh(serverId);
   const client = useQueryClient();
@@ -234,6 +241,14 @@ export function useStudioActions(serverId: string) {
       mutationFn: (id: string) => api.deleteFolder(serverId, id),
       ...toRefresh,
     }),
+    postTest: useMutation({
+      mutationFn: (message: StudioMessage) =>
+        api.postStudioTest(serverId, message),
+      ...toRefresh,
+    }),
+    upload: useMutation({
+      mutationFn: (file: File) => api.uploadImage(serverId, file),
+    }),
     // Shows the move straight away and puts it back if the server says no.
     move: useMutation({
       mutationFn: (move: LibraryMove) => api.moveLibraryItem(serverId, move),
@@ -255,3 +270,4 @@ export function useStudioActions(serverId: string) {
     }),
   };
 }
+export * from './studio-format';

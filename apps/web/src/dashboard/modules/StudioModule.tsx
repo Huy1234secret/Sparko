@@ -1,26 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
-  Checkbox,
-  DiscordMessage,
   EmptyState,
   Icon,
   Input,
   Notice,
   Segmented,
   Switch,
-  Textarea,
-  renderDiscordText,
   useToast,
 } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
 import {
+  studioPayload,
+  studioProblem,
   useCheckChannel,
   useStudio,
   useStudioActions,
   type Server,
   type StudioMessage,
-  type StudioTemplate,
 } from '../../data';
 import { FixPermissionModal, fixes } from '../FixPermissionModal';
 import {
@@ -33,238 +30,401 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
-import { BlockSettings, InlineEdit, V2Canvas, v2Issue } from './StudioCanvas';
+import { BlockSettings, V2Canvas, newBlock, v2Issue } from './StudioCanvas';
 import { StudioLibrary } from './StudioLibrary';
-import {
-  ChannelPicker,
-  ColourChoice,
-  isHttpsUrl,
-  newId,
-  VersionHistory,
-} from './parts';
+import { ChannelPicker, ColourChoice, VersionHistory, newId } from './parts';
+import { EmbedCanvas, MAX_BUTTONS, MAX_EMBEDS, newEmbed } from './EmbedCanvas';
+import { InsertProvider, useInsertTarget } from './EditorBits';
+import { EmojiButton } from './EmojiPicker';
+import { PlusMenu, type PlusItem } from './PlusMenu';
 
-type Embed = StudioMessage['embed'];
-type Field = Embed['fields'][number];
-type LinkButton = StudioMessage['buttons'][number];
+/** Characters Discord counts toward the 6,000 shared by a message's embeds. */
+const embedSize = (m: StudioMessage) =>
+  m.embeds.reduce(
+    (n, e) =>
+      n +
+      e.author.length +
+      e.title.length +
+      e.description.length +
+      e.footer.length +
+      e.fields.reduce((k, f) => k + f.name.length + f.value.length, 0),
+    0,
+  );
 
-const maxFields = 25;
-const maxButtons = 5;
-const maxEmbed = 6000;
-const isHex = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
+/** Pictures uploaded in the sample data live in this browser, as blob: links. */
+const forChecks = (m: StudioMessage): StudioMessage =>
+  JSON.parse(
+    JSON.stringify(m).replace(/"blob:[^"]*"/g, '"https://upload.invalid"'),
+  ) as StudioMessage;
 
-/** Characters Discord counts toward an embed's 6,000 limit. */
-const embedSize = (e: Embed) =>
-  e.author.length +
-  e.title.length +
-  e.description.length +
-  e.footer.length +
-  e.fields.reduce((n, f) => n + f.name.length + f.value.length, 0);
-
-function problems(m: StudioMessage, hexText: string | null) {
-  const e = m.embed;
-  const embedEmpty =
-    !e.title.trim() &&
-    !e.description.trim() &&
-    !e.author.trim() &&
-    !e.image.trim() &&
-    e.fields.length === 0;
-  return {
-    empty: !m.content.trim() && (!m.useEmbed || embedEmpty),
-    hex: m.useEmbed && hexText !== null && !isHex(hexText),
-    image: m.useEmbed && !!e.image.trim() && !isHttpsUrl(e.image.trim()),
-    fields: m.useEmbed
-      ? e.fields
-          .filter((f) => !f.name.trim() || !f.value.trim())
-          .map((f) => f.id)
-      : [],
-    buttons: m.buttons
-      .filter((b) => !b.label.trim() || !isHttpsUrl(b.url.trim()))
-      .map((b) => b.id),
-    size: m.useEmbed && embedSize(e) > maxEmbed,
-  };
+function Info({ text }: { text: string }) {
+  return (
+    <span className="sp-info-tip" title={text} aria-label={text} role="img">
+      <Icon name="info" size="sm" />
+    </span>
+  );
 }
 
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-/** The message as Discord would show it. */
-export function StudioPreview({
-  message,
-  server,
-  onEdit,
+/** The emoji button and the plus menu above the preview. */
+function PreviewTools({
+  serverId,
+  items,
+  onEmoji,
 }: {
-  message: StudioMessage;
-  server: Server;
-  /** When set, the title, text, fields and footer can be edited in place. */
-  onEdit?: (patch: Partial<StudioMessage>) => void;
+  serverId: string;
+  items: PlusItem[];
+  onEmoji: (text: string) => void;
 }) {
-  const e = message.embed;
-  const image = e.image.trim();
-  const stampText = e.timestamp ? 'Today at 18:42' : '';
-  const editEmbed = (patch: Partial<StudioMessage['embed']>) =>
-    onEdit?.({ embed: { ...e, ...patch } });
-  const editable = (
-    value: string,
-    label: string,
-    set: (v: string) => void,
-    o: { multiline?: boolean; placeholder?: string; maxLength?: number } = {},
-  ) => (
-    <InlineEdit
-      value={value}
-      label={label}
-      onChange={set}
-      {...(o.multiline ? { multiline: true } : {})}
-      {...(o.placeholder ? { placeholder: o.placeholder } : {})}
-      {...(o.maxLength ? { maxLength: o.maxLength } : {})}
-    />
-  );
-  const footerText = e.footer.trim();
+  const target = useInsertTarget();
   return (
-    <DiscordMessage
-      content={
-        onEdit
-          ? editable(
-              message.content,
-              'message text',
-              (content) => onEdit({ content }),
+    <div className="sp-preview-tools">
+      <EmojiButton
+        serverId={serverId}
+        onPick={(text) => {
+          const insert = target.get();
+          if (insert) insert(text);
+          else onEmoji(text);
+        }}
+      />
+      <PlusMenu items={items} />
+    </div>
+  );
+}
+
+function StudioEditor({
+  server,
+  message,
+  channels,
+  saving,
+  dirty,
+  tried,
+  phase,
+  onChange,
+  onSave,
+  onPost,
+  onFix,
+  onCheck,
+  checking,
+}: {
+  server: Server;
+  message: StudioMessage;
+  channels: { id: string; name: string; category: string; canPost: boolean }[];
+  saving: boolean;
+  dirty: boolean;
+  tried: boolean;
+  phase: string;
+  onChange: (patch: Partial<StudioMessage>) => void;
+  onSave: () => void;
+  onPost: () => void;
+  onFix: () => void;
+  onCheck: () => void;
+  checking: boolean;
+}) {
+  const [focus, setFocus] = useState<{
+    id: string;
+    pop?: 'image';
+  } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const paused = !!server.paused;
+  const v2 = message.layout === 'v2';
+  const channel = channels.find((c) => c.id === message.channel);
+  const locked = !!channel && !channel.canPost;
+  const problem = v2 ? v2Issue(message.v2) : studioProblem(forChecks(message));
+  const size = embedSize(message);
+  const json = JSON.stringify(studioPayload(message, { now: 0 }), null, 2);
+
+  const addBlock = (type: Parameters<typeof newBlock>[0]) => {
+    const block = newBlock(type);
+    onChange({ v2: { ...message.v2, blocks: [...message.v2.blocks, block] } });
+    setSelected(block.id);
+  };
+  const items: PlusItem[] = v2
+    ? [
+        ...(message.v2.container
+          ? []
+          : [
               {
-                multiline: true,
-                placeholder: 'Click to add text above the embed',
-                maxLength: 2000,
+                label: 'Add container',
+                onSelect: () =>
+                  onChange({ v2: { ...message.v2, container: true } }),
               },
-            )
-          : message.content.trim()
-            ? renderDiscordText(message.content)
-            : undefined
-      }
-      {...(message.useEmbed
-        ? {
-            embed: {
-              color: e.color,
-              ...(e.author.trim() ? { author: e.author } : {}),
-              ...(onEdit
-                ? {
-                    title: editable(
-                      e.title,
-                      'embed title',
-                      (title) => editEmbed({ title }),
-                      {
-                        placeholder: 'Click to add a title',
-                        maxLength: 256,
-                      },
-                    ),
-                    description: editable(
-                      e.description,
-                      'embed description',
-                      (description) => editEmbed({ description }),
-                      {
-                        multiline: true,
-                        placeholder: 'Click to add a description',
-                        maxLength: 4096,
-                      },
-                    ),
-                  }
-                : {
-                    ...(e.title.trim() ? { title: e.title } : {}),
-                    ...(e.description.trim()
-                      ? { description: renderDiscordText(e.description) }
-                      : {}),
-                  }),
-              ...(e.fields.length
-                ? {
-                    fields: e.fields.map((f) => ({
-                      name: onEdit
-                        ? editable(
-                            f.name,
-                            'field name',
-                            (name) =>
-                              editEmbed({
-                                fields: e.fields.map((x) =>
-                                  x.id === f.id ? { ...x, name } : x,
-                                ),
-                              }),
-                            { placeholder: 'Name', maxLength: 256 },
-                          )
-                        : f.name || 'Name',
-                      value: onEdit
-                        ? editable(
-                            f.value,
-                            'field value',
-                            (value) =>
-                              editEmbed({
-                                fields: e.fields.map((x) =>
-                                  x.id === f.id ? { ...x, value } : x,
-                                ),
-                              }),
-                            { placeholder: 'Value', maxLength: 1024 },
-                          )
-                        : f.value || 'Value',
-                      inline: f.inline,
-                    })),
-                  }
-                : {}),
-              ...(onEdit
-                ? {
-                    footer: (
-                      <>
-                        {editable(
-                          e.footer,
-                          'footer',
-                          (footer) => editEmbed({ footer }),
-                          {
-                            placeholder: 'Click to add a footer',
-                            maxLength: 2048,
-                          },
-                        )}
-                        {stampText && ` • ${stampText}`}
-                      </>
-                    ),
-                  }
-                : footerText || stampText
-                  ? {
-                      footer: [footerText, stampText]
-                        .filter(Boolean)
-                        .join(' • '),
-                    }
-                  : {}),
-              ...(e.thumbnail
-                ? {
-                    thumbnail: (
-                      <span className="sp-dc-thumb">
-                        {initialsOf(server.name)}
-                      </span>
-                    ),
-                  }
-                : {}),
-              ...(isHttpsUrl(image)
-                ? {
-                    image: (
-                      <span className="sp-dc-image">
-                        <Icon name="image" />
-                        {image.split('/').pop()}
-                      </span>
-                    ),
-                  }
-                : {}),
-            },
+            ]),
+        { label: 'Add text', onSelect: () => addBlock('text') },
+        { label: 'Add button', onSelect: () => addBlock('buttons') },
+        { label: 'Add image', onSelect: () => addBlock('gallery') },
+        { label: 'Add separator', onSelect: () => addBlock('separator') },
+      ].map((item) => ({
+        ...item,
+        disabled: message.v2.blocks.length >= 30,
+        note: 'A message holds up to 30 blocks.',
+      }))
+    : [
+        {
+          label: 'Add embed',
+          disabled: message.embeds.length >= MAX_EMBEDS,
+          note: 'A message holds up to 10 embeds.',
+          onSelect: () => onChange({ embeds: [...message.embeds, newEmbed()] }),
+        },
+        {
+          label: 'Add button',
+          disabled: message.buttons.length >= MAX_BUTTONS,
+          note: 'A message holds up to 25 buttons.',
+          onSelect: () => {
+            const id = newId();
+            onChange({
+              buttons: [...message.buttons, { id, label: 'Open', url: '' }],
+            });
+            setFocus({ id });
+          },
+        },
+        {
+          label: 'Add image',
+          disabled: message.embeds.length >= MAX_EMBEDS,
+          note: 'A message holds up to 10 embeds.',
+          // An image on its own is an embed with only a picture in it.
+          onSelect: () => {
+            const embed = newEmbed();
+            onChange({ embeds: [...message.embeds, embed] });
+            setFocus({ id: embed.id, pop: 'image' });
+          },
+        },
+      ];
+
+  return (
+    <div className="sp-studio">
+      {locked && (
+        <Notice
+          tone="danger"
+          title={`Sparko can’t post in #${channel.name}`}
+          actions={
+            <>
+              <Button size="sm" onClick={onFix}>
+                Show me how
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={checking}
+                onClick={onCheck}
+              >
+                Check again
+              </Button>
+            </>
           }
-        : {})}
-      components={
-        message.buttons.length
-          ? [
-              message.buttons.map((b) => ({
-                label: b.label || 'Untitled',
-                style: 'link' as const,
-              })),
-            ]
-          : []
-      }
-    />
+        >
+          It’s missing Send Messages and Embed Links there. Fix it in Discord,
+          or pick another channel.
+        </Notice>
+      )}
+      <div className="sp-studio__grid">
+        <section className="sp-studio__canvas" aria-labelledby="studio-preview">
+          <Segmented
+            label="Message type"
+            className="sp-studio__type"
+            value={message.layout}
+            onChange={(layout) => {
+              setSelected(null);
+              onChange({ layout });
+            }}
+            options={[
+              { value: 'embed', label: 'Embed message' },
+              { value: 'v2', label: 'V2 components' },
+            ]}
+          />
+          <div className="sp-preview-head">
+            <h2 id="studio-preview" className="sp-section-title">
+              Live preview
+            </h2>
+            <PreviewTools
+              serverId={server.id}
+              items={items}
+              onEmoji={(text) =>
+                onChange({ content: (message.content + text).slice(0, 2000) })
+              }
+            />
+          </div>
+          <fieldset className="sp-fieldset" disabled={paused}>
+            <legend className="sp-sr-only">Message</legend>
+            {v2 ? (
+              <div className="dc-chat">
+                <V2Canvas
+                  v2={message.v2}
+                  onChange={(next) => onChange({ v2: next })}
+                  selected={selected}
+                  onSelect={setSelected}
+                  disabled={paused}
+                />
+              </div>
+            ) : (
+              <EmbedCanvas
+                message={message}
+                serverId={server.id}
+                onChange={onChange}
+                focus={focus}
+              />
+            )}
+          </fieldset>
+          {tried && problem && (
+            <p className="sp-field-error">
+              <Icon name="circle-alert" />
+              {problem}
+            </p>
+          )}
+          {!v2 && message.embeds.length > 0 && (
+            <div className="sp-embed-size">
+              <div className="sp-field__row">
+                <span className="sp-hint">Embed size</span>
+                <span className="sp-hint sp-tnum">
+                  {size.toLocaleString('en-US')} / 6,000
+                </span>
+              </div>
+              <div
+                className="sp-progress sp-progress--sm"
+                role="progressbar"
+                aria-label="Embed characters used"
+                aria-valuenow={size}
+                aria-valuemin={0}
+                aria-valuemax={6000}
+              >
+                <span
+                  className={
+                    'sp-progress__bar' + (size > 6000 ? ' is-over' : '')
+                  }
+                  style={{ width: `${Math.min(100, (size / 6000) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </section>
+
+        <div className="sp-stack sp-studio__side">
+          <section className="sp-card" aria-labelledby="studio-settings">
+            <div className="sp-card__head">
+              <div className="sp-card__titles">
+                <h2 className="sp-card__title" id="studio-settings">
+                  Message settings
+                </h2>
+                <p className="sp-card__sub">
+                  Name it, pick where it goes, and post a test.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant={dirty ? 'primary' : 'secondary'}
+                loading={saving}
+                disabled={!dirty || paused}
+                onClick={onSave}
+              >
+                Save template
+              </Button>
+            </div>
+            <div className="sp-card__body">
+              <Input
+                label="Template name"
+                maxLength={80}
+                value={message.name}
+                onChange={(e) => onChange({ name: e.target.value })}
+              />
+              <div className="sp-post-row">
+                <ChannelPicker
+                  label="Post in"
+                  channels={channels}
+                  value={message.channel}
+                  onChange={(id) => onChange({ channel: id })}
+                  error={locked ? 'Sparko can’t post here yet.' : undefined}
+                />
+                <Button
+                  variant="primary"
+                  icon="send"
+                  loading={phase === 'saving' || phase === 'applying'}
+                  loadingLabel="Posting…"
+                  disabled={paused || !message.channel}
+                  onClick={onPost}
+                >
+                  Post test
+                </Button>
+              </div>
+              <div className="sp-field">
+                <div className="sp-field__row">
+                  <span className="sp-label" id="studio-json">
+                    Discord JSON{' '}
+                    <Info text="What Sparko sends to Discord for this message. Useful with other tools." />
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={copied ? 'check' : 'copy'}
+                    onClick={() => {
+                      void navigator.clipboard
+                        ?.writeText(json)
+                        .then(() => setCopied(true));
+                    }}
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </Button>
+                </div>
+                <pre
+                  className="sp-json"
+                  aria-labelledby="studio-json"
+                  tabIndex={0}
+                >
+                  {json}
+                </pre>
+              </div>
+            </div>
+          </section>
+
+          {v2 && (
+            <section className="sp-card" aria-labelledby="studio-block">
+              <div className="sp-card__head">
+                <div className="sp-card__titles">
+                  <h2 className="sp-card__title" id="studio-block">
+                    Box and selected block
+                  </h2>
+                  <p className="sp-card__sub">
+                    {message.v2.blocks.length} of 30 blocks
+                  </p>
+                </div>
+                <Switch
+                  checked={message.v2.container}
+                  onChange={(container) =>
+                    onChange({ v2: { ...message.v2, container } })
+                  }
+                  description="Wrap in a box"
+                />
+              </div>
+              <div className="sp-card__body">
+                {message.v2.container && (
+                  <div className="sp-field">
+                    <span className="sp-label">Colour bar</span>
+                    <ColourChoice
+                      value={message.v2.accent}
+                      onChange={(accent) =>
+                        onChange({ v2: { ...message.v2, accent } })
+                      }
+                    />
+                  </div>
+                )}
+                <BlockSettings
+                  block={message.v2.blocks.find((b) => b.id === selected)}
+                  onChange={(block) =>
+                    onChange({
+                      v2: {
+                        ...message.v2,
+                        blocks: message.v2.blocks.map((b) =>
+                          b.id === block.id ? block : b,
+                        ),
+                      },
+                    })
+                  }
+                />
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -276,20 +436,30 @@ export function StudioModule({
   server: Server;
 }) {
   const studio = useStudio(server.id);
-  const { publish, updateTemplate } = useStudioActions(server.id);
+  const actions = useStudioActions(server.id);
   const checkChannel = useCheckChannel(server.id);
   const flow = useSaveFlow(server.id, 'studio');
   const [tab, setTab] = useModuleTab();
+  // The template open in the editor, and its unsaved changes.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<StudioMessage | null>(null);
-  // What's typed in the custom hex box, while it isn't the saved colour.
-  const [hexText, setHexText] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
-  const [view, setView] = useState<'desktop' | 'phone'>('desktop');
   const [fixOpen, setFixOpen] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
-  // The template loaded with "Edit", so its changes can be saved back.
-  const [editing, setEditing] = useState<StudioTemplate | null>(null);
   const toast = useToast();
+
+  const template = studio.data?.templates.find((t) => t.id === editingId);
+  // The template as saved; its name is the template's own.
+  const saved = template && { ...template.message, name: template.name };
+  const message = saved ? (draft ?? saved) : null;
+  const dirty = !!saved && JSON.stringify(message) !== JSON.stringify(saved);
+
+  // Leaving the page with unsaved changes asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   if (studio.isPending)
     return (
@@ -311,56 +481,50 @@ export function StudioModule({
       </div>
     );
 
-  const saved = studio.data.message;
-  const message = draft ?? saved;
-  const embed = message.embed;
-  const dirty = JSON.stringify(message) !== JSON.stringify(saved);
   const paused = !!server.paused;
   const channels = studio.data.channels;
-  const channel = channels.find((c) => c.id === message.channel);
-  const locked = !!channel && !channel.canPost;
-  const bad = problems(message, hexText);
-  const v2 = message.layout === 'v2';
-  const v2Problem = v2 ? v2Issue(message.v2) : null;
-  const invalid = v2
-    ? v2Problem !== null
-    : bad.empty ||
-      bad.hex ||
-      bad.image ||
-      bad.size ||
-      bad.fields.length > 0 ||
-      bad.buttons.length > 0;
-  const size = embedSize(embed);
+  const channel = channels.find((c) => c.id === message?.channel);
 
-  const edit = (patch: Partial<StudioMessage>) => {
-    setDraft({ ...message, ...patch });
-    flow.clear();
-  };
-  const editEmbed = (patch: Partial<Embed>) =>
-    edit({ embed: { ...embed, ...patch } });
-  const editField = (id: string, patch: Partial<Field>) =>
-    editEmbed({
-      fields: embed.fields.map((f) => (f.id === id ? { ...f, ...patch } : f)),
-    });
-  const moveField = (index: number, by: number) => {
-    const fields = [...embed.fields];
-    const [item] = fields.splice(index, 1);
-    fields.splice(index + by, 0, item!);
-    editEmbed({ fields });
-  };
-  const editButton = (id: string, patch: Partial<LinkButton>) =>
-    edit({
-      buttons: message.buttons.map((b) =>
-        b.id === id ? { ...b, ...patch } : b,
-      ),
-    });
-  const load = (next: StudioMessage, title: string) => {
+  const open = (id: string, next: StudioMessage) => {
+    setEditingId(id);
     setDraft(next);
-    setHexText(null);
     setTried(false);
     flow.clear();
     setTab('settings');
-    toast({ title, body: 'Publish to update the message in Discord.' });
+  };
+  const edit = (patch: Partial<StudioMessage>) => {
+    if (!message) return;
+    setDraft({ ...message, ...patch });
+    flow.clear();
+  };
+  const save = () => {
+    if (!template || !message) return;
+    const name = message.name.trim() || template.name;
+    actions.updateTemplate.mutate(
+      { id: template.id, name, message: { ...message, name } },
+      {
+        onSuccess: () => {
+          setDraft(null);
+          toast({ tone: 'success', title: `Saved “${name}”` });
+        },
+        onError: (e) =>
+          toast({
+            tone: 'danger',
+            title: 'Couldn’t save the template',
+            body: e instanceof Error ? e.message : 'Try again in a moment.',
+          }),
+      },
+    );
+  };
+  const post = async () => {
+    if (!message) return;
+    setTried(true);
+    const problem =
+      message.layout === 'v2'
+        ? v2Issue(message.v2)
+        : studioProblem(forChecks(message));
+    if (problem) return;
+    await flow.run(() => actions.postTest.mutateAsync(message));
   };
   const recheck = (after?: () => void) =>
     channel &&
@@ -380,7 +544,7 @@ export function StudioModule({
       <PausedNotice server={server} />
       <SavePipeline
         phase={flow.phase}
-        liveLabel={`Updated in #${channel?.name ?? ''}`}
+        liveLabel={`Posted in #${channel?.name ?? ''}`}
         error={flow.error}
       />
       <ModuleTabs
@@ -395,707 +559,60 @@ export function StudioModule({
         ]}
       />
 
-      {tab === 'settings' && (
-        <>
-          {editing &&
-            studio.data.templates.some((t) => t.id === editing.id) && (
-              <Notice
-                tone="info"
-                title={`Editing the template “${editing.name}”`}
-                actions={
-                  <>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      loading={updateTemplate.isPending}
-                      disabled={invalid}
-                      onClick={() =>
-                        updateTemplate.mutate(
-                          { id: editing.id, message },
-                          {
-                            onSuccess: () =>
-                              toast({
-                                tone: 'success',
-                                title: `Saved “${editing.name}”`,
-                              }),
-                            onError: (e) =>
-                              toast({
-                                tone: 'danger',
-                                title: 'Couldn’t save the template',
-                                body:
-                                  e instanceof Error
-                                    ? e.message
-                                    : 'Try again in a moment.',
-                              }),
-                          },
-                        )
-                      }
-                    >
-                      Save template
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditing(null)}
-                    >
-                      Done
-                    </Button>
-                  </>
-                }
-              >
-                Changes here can be saved back to the template. Publishing still
-                posts the message in Discord.
-              </Notice>
-            )}
-          {locked && (
-            <Notice
-              tone="danger"
-              title={`Sparko can’t post in #${channel.name}`}
+      {tab === 'settings' &&
+        (template && message ? (
+          <InsertProvider>
+            <p className="sp-edit-banner" role="status">
+              <Icon name="info" size="sm" />
+              <span>
+                You’re editing <b>{template.name}</b>. Save your changes before
+                you leave.
+              </span>
+            </p>
+            <StudioEditor
+              server={server}
+              message={message}
+              channels={channels}
+              saving={actions.updateTemplate.isPending}
+              dirty={dirty}
+              tried={tried}
+              phase={flow.phase}
+              onChange={edit}
+              onSave={save}
+              onPost={() => void post()}
+              onFix={() => setFixOpen(true)}
+              onCheck={() => recheck()}
+              checking={checkChannel.isPending}
+            />
+          </InsertProvider>
+        ) : (
+          <div className="sp-card">
+            <EmptyState
+              icon="square-pen"
+              title="Select a template to start editing!"
               actions={
-                <>
-                  <button
-                    type="button"
-                    className="sp-link-btn"
-                    onClick={() => setFixOpen(true)}
-                  >
-                    Show me how
-                  </button>
-                  <button
-                    type="button"
-                    className="sp-link-btn"
-                    onClick={() => recheck()}
-                  >
-                    {checkChannel.isPending ? 'Checking…' : 'Check again'}
-                  </button>
-                </>
+                <Button variant="primary" onClick={() => setTab('items')}>
+                  Open templates
+                </Button>
               }
             >
-              It’s missing Send Messages and Embed Links there. Fix it in
-              Discord, or pick another channel.
-            </Notice>
-          )}
-          <div className="sp-split sp-split--lead">
-            <fieldset className="sp-stack sp-fieldset" disabled={paused}>
-              <legend className="sp-sr-only">Message editor</legend>
-              <section className="sp-card" aria-labelledby="ms1">
-                <div className="sp-card__head">
-                  <div className="sp-card__titles">
-                    <h2 className="sp-card__title" id="ms1">
-                      Message
-                    </h2>
-                    <p className="sp-card__sub">
-                      {v2
-                        ? 'Where it goes and how it’s laid out.'
-                        : 'Plain text above the embed. Mentions here notify people.'}
-                    </p>
-                  </div>
-                </div>
-                <div className="sp-card__body">
-                  <div className="sp-field-grid">
-                    <Input
-                      label={
-                        <>
-                          Name{' '}
-                          <span className="sp-label__opt">
-                            (only staff see this)
-                          </span>
-                        </>
-                      }
-                      maxLength={80}
-                      value={message.name}
-                      onChange={(e) => edit({ name: e.target.value })}
-                    />
-                    <ChannelPicker
-                      label="Post in"
-                      channels={channels}
-                      value={message.channel}
-                      onChange={(id) => edit({ channel: id })}
-                      error={locked ? 'Sparko can’t post here yet.' : undefined}
-                    />
-                  </div>
-                  <Segmented
-                    label="Layout"
-                    value={message.layout}
-                    onChange={(layout) => {
-                      setSelected(null);
-                      edit({ layout });
-                    }}
-                    options={[
-                      { value: 'embed', label: 'Classic embed' },
-                      { value: 'v2', label: 'Components V2' },
-                    ]}
-                  />
-                  <p className="sp-hint">
-                    {v2
-                      ? 'Build the message from blocks: text, images, separators and buttons, in a coloured box. Edit everything right in the preview.'
-                      : 'Text with an embed card underneath. Click the title, text or fields in the preview to edit them there.'}
-                  </p>
-                  {!v2 && (
-                    <Textarea
-                      label="Text"
-                      rows={2}
-                      maxLength={2000}
-                      hint="**bold**, #channel and @role work like in Discord."
-                      value={message.content}
-                      error={
-                        tried && bad.empty
-                          ? 'Add some text or an embed. Discord won’t send an empty message.'
-                          : undefined
-                      }
-                      onChange={(e) => edit({ content: e.target.value })}
-                    />
-                  )}
-                </div>
-              </section>
-
-              {v2 ? (
-                <>
-                  <section className="sp-card" aria-labelledby="ms-v2">
-                    <div className="sp-card__head">
-                      <div className="sp-card__titles">
-                        <h2 className="sp-card__title" id="ms-v2">
-                          Box
-                        </h2>
-                        <p className="sp-card__sub">
-                          Wrap the blocks in a box with a coloured bar, like an
-                          embed.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={message.v2.container}
-                        onChange={(container) =>
-                          edit({ v2: { ...message.v2, container } })
-                        }
-                        description="Wrap in a box"
-                      />
-                    </div>
-                    {message.v2.container && (
-                      <div className="sp-card__body">
-                        <div className="sp-field">
-                          <span className="sp-label">Colour bar</span>
-                          <ColourChoice
-                            value={message.v2.accent}
-                            onChange={(accent) =>
-                              edit({ v2: { ...message.v2, accent } })
-                            }
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </section>
-                  <section className="sp-card" aria-labelledby="ms-block">
-                    <div className="sp-card__head">
-                      <div className="sp-card__titles">
-                        <h2 className="sp-card__title" id="ms-block">
-                          Selected block
-                        </h2>
-                        <p className="sp-card__sub">
-                          {message.v2.blocks.length} of 30 blocks
-                        </p>
-                      </div>
-                    </div>
-                    <div className="sp-card__body">
-                      <BlockSettings
-                        block={message.v2.blocks.find((b) => b.id === selected)}
-                        onChange={(block) =>
-                          edit({
-                            v2: {
-                              ...message.v2,
-                              blocks: message.v2.blocks.map((b) =>
-                                b.id === block.id ? block : b,
-                              ),
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </section>
-                </>
-              ) : (
-                <>
-                  <section className="sp-card" aria-labelledby="ms2">
-                    <div className="sp-card__head">
-                      <div className="sp-card__titles">
-                        <h2 className="sp-card__title" id="ms2">
-                          Embed
-                        </h2>
-                        <p className="sp-card__sub">
-                          A card with a colour bar, fields and an image.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={message.useEmbed}
-                        onChange={(useEmbed) => edit({ useEmbed })}
-                        description="Include an embed"
-                      />
-                    </div>
-                    {message.useEmbed && (
-                      <div className="sp-card__body">
-                        <Input
-                          label={
-                            <>
-                              Author line{' '}
-                              <span className="sp-label__opt">(optional)</span>
-                            </>
-                          }
-                          maxLength={256}
-                          value={embed.author}
-                          onChange={(e) =>
-                            editEmbed({ author: e.target.value })
-                          }
-                        />
-                        <Input
-                          label="Title"
-                          maxLength={256}
-                          value={embed.title}
-                          suffix={
-                            <span className="sp-tnum">
-                              {256 - embed.title.length}
-                            </span>
-                          }
-                          onChange={(e) => editEmbed({ title: e.target.value })}
-                        />
-                        <Textarea
-                          label="Description"
-                          rows={4}
-                          maxLength={4096}
-                          hint="Up to 4,096 characters."
-                          value={embed.description}
-                          onChange={(e) =>
-                            editEmbed({ description: e.target.value })
-                          }
-                        />
-                        <div className="sp-field">
-                          <span className="sp-label">Colour bar</span>
-                          <div className="sp-item-box__row sp-wrap-row">
-                            <ColourChoice
-                              value={embed.color}
-                              onChange={(color) => {
-                                setHexText(null);
-                                editEmbed({ color });
-                              }}
-                            />
-                            <div
-                              className={
-                                'sp-input sp-hex-input' +
-                                (bad.hex ? ' is-error' : '')
-                              }
-                            >
-                              <input
-                                aria-label="Custom colour, hex"
-                                maxLength={7}
-                                value={hexText ?? embed.color}
-                                aria-invalid={bad.hex || undefined}
-                                onChange={(e) => {
-                                  const value = e.target.value.trim();
-                                  if (isHex(value)) {
-                                    setHexText(null);
-                                    editEmbed({ color: value.toUpperCase() });
-                                  } else {
-                                    setHexText(value);
-                                    flow.clear();
-                                  }
-                                }}
-                              />
-                            </div>
-                          </div>
-                          {bad.hex && (
-                            <p className="sp-field-error">
-                              <Icon name="circle-alert" />
-                              Use a hex colour like #FACC15.
-                            </p>
-                          )}
-                        </div>
-                        <Input
-                          label={
-                            <>
-                              Image link{' '}
-                              <span className="sp-label__opt">(optional)</span>
-                            </>
-                          }
-                          icon="image"
-                          placeholder="https://"
-                          value={embed.image}
-                          error={
-                            bad.image
-                              ? 'The link must start with https:// so Discord can load it.'
-                              : undefined
-                          }
-                          onChange={(e) => editEmbed({ image: e.target.value })}
-                        />
-                        <Input
-                          label={
-                            <>
-                              Footer{' '}
-                              <span className="sp-label__opt">(optional)</span>
-                            </>
-                          }
-                          maxLength={2048}
-                          value={embed.footer}
-                          onChange={(e) =>
-                            editEmbed({ footer: e.target.value })
-                          }
-                        />
-                        <div className="sp-switch-list">
-                          <Switch
-                            checked={embed.thumbnail}
-                            onChange={(thumbnail) => editEmbed({ thumbnail })}
-                            label="Server icon in the corner"
-                            description={`Shows ${server.name}’s icon as a thumbnail.`}
-                          />
-                          <Switch
-                            checked={embed.timestamp}
-                            onChange={(timestamp) => editEmbed({ timestamp })}
-                            label="Show the time it was posted"
-                            description="Each member sees it in their own time zone."
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </section>
-
-                  {message.useEmbed && (
-                    <section className="sp-card" aria-labelledby="ms3">
-                      <div className="sp-card__head">
-                        <div className="sp-card__titles">
-                          <h2 className="sp-card__title" id="ms3">
-                            Fields
-                          </h2>
-                          <p className="sp-card__sub">
-                            Short name-and-value pairs. Side by side ones sit up
-                            to three in a row.
-                          </p>
-                        </div>
-                        <span className="sp-hint sp-tnum">
-                          {embed.fields.length} of {maxFields}
-                        </span>
-                      </div>
-                      <div className="sp-card__body" style={{ gap: 12 }}>
-                        {embed.fields.map((f, i) => {
-                          const wrong = tried && bad.fields.includes(f.id);
-                          return (
-                            <div key={f.id} className="sp-item-box">
-                              <div className="sp-pair">
-                                <div
-                                  className={
-                                    'sp-input' +
-                                    (wrong && !f.name.trim() ? ' is-error' : '')
-                                  }
-                                >
-                                  <input
-                                    aria-label={`Field ${i + 1} name`}
-                                    placeholder="Name"
-                                    maxLength={256}
-                                    value={f.name}
-                                    onChange={(e) =>
-                                      editField(f.id, { name: e.target.value })
-                                    }
-                                  />
-                                </div>
-                                <div
-                                  className={
-                                    'sp-input' +
-                                    (wrong && !f.value.trim()
-                                      ? ' is-error'
-                                      : '')
-                                  }
-                                >
-                                  <input
-                                    aria-label={`Field ${i + 1} value`}
-                                    placeholder="Value"
-                                    maxLength={1024}
-                                    value={f.value}
-                                    onChange={(e) =>
-                                      editField(f.id, { value: e.target.value })
-                                    }
-                                  />
-                                </div>
-                              </div>
-                              {wrong && (
-                                <p className="sp-field-error">
-                                  <Icon name="circle-alert" />
-                                  Fields need both a name and a value.
-                                </p>
-                              )}
-                              <div className="sp-item-box__row">
-                                <span style={{ marginRight: 'auto' }}>
-                                  <Checkbox
-                                    checked={f.inline}
-                                    onChange={(inline) =>
-                                      editField(f.id, { inline })
-                                    }
-                                    label="Side by side"
-                                  />
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  iconOnly
-                                  icon="arrow-up"
-                                  aria-label={`Move field ${i + 1} up`}
-                                  disabled={i === 0}
-                                  onClick={() => moveField(i, -1)}
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  iconOnly
-                                  icon="arrow-down"
-                                  aria-label={`Move field ${i + 1} down`}
-                                  disabled={i === embed.fields.length - 1}
-                                  onClick={() => moveField(i, 1)}
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  iconOnly
-                                  icon="trash-2"
-                                  aria-label={`Remove field ${i + 1}`}
-                                  onClick={() =>
-                                    editEmbed({
-                                      fields: embed.fields.filter(
-                                        (x) => x.id !== f.id,
-                                      ),
-                                    })
-                                  }
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <Button
-                          size="sm"
-                          icon="plus"
-                          style={{ justifySelf: 'start' }}
-                          disabled={embed.fields.length >= maxFields}
-                          onClick={() =>
-                            editEmbed({
-                              fields: [
-                                ...embed.fields,
-                                {
-                                  id: newId(),
-                                  name: '',
-                                  value: '',
-                                  inline: true,
-                                },
-                              ],
-                            })
-                          }
-                        >
-                          Add a field
-                        </Button>
-                      </div>
-                    </section>
-                  )}
-
-                  <section className="sp-card" aria-labelledby="ms4">
-                    <div className="sp-card__head">
-                      <div className="sp-card__titles">
-                        <h2 className="sp-card__title" id="ms4">
-                          Link buttons
-                        </h2>
-                        <p className="sp-card__sub">
-                          Open a website when pressed.
-                        </p>
-                      </div>
-                      <span className="sp-hint sp-tnum">
-                        {message.buttons.length} of {maxButtons}
-                      </span>
-                    </div>
-                    <div className="sp-card__body" style={{ gap: 12 }}>
-                      {message.buttons.map((b, i) => {
-                        const wrong = tried && bad.buttons.includes(b.id);
-                        return (
-                          <div
-                            key={b.id}
-                            className="sp-stack"
-                            style={{ gap: 6 }}
-                          >
-                            <div className="sp-link-row">
-                              <div className="sp-input">
-                                <input
-                                  aria-label={`Button ${i + 1} label`}
-                                  placeholder="Label"
-                                  maxLength={80}
-                                  value={b.label}
-                                  onChange={(e) =>
-                                    editButton(b.id, { label: e.target.value })
-                                  }
-                                />
-                              </div>
-                              <div
-                                className={
-                                  'sp-input' + (wrong ? ' is-error' : '')
-                                }
-                              >
-                                <input
-                                  aria-label={`Button ${i + 1} link`}
-                                  placeholder="https://"
-                                  value={b.url}
-                                  aria-invalid={wrong || undefined}
-                                  onChange={(e) =>
-                                    editButton(b.id, { url: e.target.value })
-                                  }
-                                />
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                iconOnly
-                                icon="trash-2"
-                                aria-label={`Remove button ${i + 1}`}
-                                onClick={() =>
-                                  edit({
-                                    buttons: message.buttons.filter(
-                                      (x) => x.id !== b.id,
-                                    ),
-                                  })
-                                }
-                              />
-                            </div>
-                            {wrong && (
-                              <p className="sp-field-error">
-                                <Icon name="circle-alert" />
-                                Give it a label and a link that starts with
-                                https://.
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                      <Button
-                        size="sm"
-                        icon="plus"
-                        style={{ justifySelf: 'start' }}
-                        disabled={message.buttons.length >= maxButtons}
-                        onClick={() =>
-                          edit({
-                            buttons: [
-                              ...message.buttons,
-                              { id: newId(), label: '', url: '' },
-                            ],
-                          })
-                        }
-                      >
-                        Add a link button
-                      </Button>
-                    </div>
-                  </section>
-                </>
-              )}
-            </fieldset>
-
-            <section className="sp-stack sp-sticky-lg" aria-labelledby="msv">
-              <div className="sp-preview-head">
-                <h2 id="msv" className="sp-section-title">
-                  Live preview
-                </h2>
-                <Segmented
-                  label="Preview size"
-                  value={view}
-                  onChange={setView}
-                  options={[
-                    {
-                      value: 'desktop',
-                      label: (
-                        <>
-                          <Icon name="monitor" size="sm" />
-                          Desktop
-                        </>
-                      ),
-                    },
-                    {
-                      value: 'phone',
-                      label: (
-                        <>
-                          <Icon name="smartphone" size="sm" />
-                          Phone
-                        </>
-                      ),
-                    },
-                  ]}
-                />
-              </div>
-              <div
-                className={
-                  'dc-preview-frame' + (view === 'phone' ? ' sp-phone' : '')
-                }
-              >
-                <div className="dc-chat">
-                  {v2 ? (
-                    <V2Canvas
-                      v2={message.v2}
-                      onChange={(next) => edit({ v2: next })}
-                      selected={selected}
-                      onSelect={setSelected}
-                      disabled={paused}
-                    />
-                  ) : (
-                    <StudioPreview
-                      message={message}
-                      server={server}
-                      {...(paused ? {} : { onEdit: edit })}
-                    />
-                  )}
-                </div>
-              </div>
-              {v2 && v2Problem && tried && (
-                <p className="sp-field-error">
-                  <Icon name="circle-alert" />
-                  {v2Problem}
-                </p>
-              )}
-              {!v2 && message.useEmbed && (
-                <div className="sp-embed-size">
-                  <div className="sp-field__row">
-                    <span className="sp-hint">Embed size</span>
-                    <span className="sp-hint sp-tnum">
-                      {size.toLocaleString('en-US')} / 6,000
-                    </span>
-                  </div>
-                  <div
-                    className="sp-progress sp-progress--sm"
-                    role="progressbar"
-                    aria-label="Embed characters used"
-                    aria-valuenow={size}
-                    aria-valuemin={0}
-                    aria-valuemax={maxEmbed}
-                  >
-                    <div
-                      className={
-                        'sp-progress__bar' + (bad.size ? ' is-over' : '')
-                      }
-                      style={{
-                        width: `${Math.min(100, (size / maxEmbed) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                  {bad.size && (
-                    <p className="sp-field-error">
-                      <Icon name="circle-alert" />
-                      Discord rejects embeds over 6,000 characters. Shorten the
-                      description or fields.
-                    </p>
-                  )}
-                </div>
-              )}
-            </section>
+              Pick one with Edit in Templates, or add a new one there.
+            </EmptyState>
           </div>
-        </>
-      )}
+        ))}
 
       {tab === 'items' && (
         <StudioLibrary
           server={server}
           studio={studio.data}
-          current={message}
-          editingId={editing?.id ?? null}
+          current={message ?? studio.data.message}
+          editingId={template?.id ?? null}
           onEdit={(t) => {
-            load(
-              { ...t.message, channel: message.channel },
-              `Editing “${t.name}”`,
-            );
-            setEditing(t);
+            open(t.id, { ...t.message, name: t.name });
+            toast({
+              title: `Editing “${t.name}”`,
+              body: 'Save template keeps your changes; Post test sends it.',
+            });
           }}
         />
       )}
@@ -1103,12 +620,22 @@ export function StudioModule({
       {tab === 'history' && (
         <VersionHistory
           title="Versions"
-          description="Every publish is kept. Restoring loads it into the editor; Discord only changes when you publish again."
+          description="Every post is kept. Restoring loads it into the template that’s open in the editor; nothing changes until you save."
           versions={studio.data.versions}
-          currentLabel={`Live in #${channels.find((c) => c.id === saved.channel)?.name ?? ''}`}
+          currentLabel="Last posted"
           onRestore={(restored) => {
-            load(restored, 'Version loaded into the editor');
-            setEditing(null);
+            if (!template) {
+              toast({
+                tone: 'danger',
+                title: 'Open a template first',
+                body: 'Restoring loads a version into the template you’re editing.',
+              });
+              return;
+            }
+            open(template.id, {
+              ...restored,
+              name: message?.name ?? template.name,
+            });
           }}
         />
       )}
@@ -1121,30 +648,12 @@ export function StudioModule({
         onClose={() => setFixOpen(false)}
       />
       <ModuleSaveBar
-        visible={(dirty || hexText !== null) && !paused}
-        saving={flow.phase === 'saving'}
-        saveLabel="Publish changes"
-        error={
-          tried && invalid
-            ? (v2Problem ?? 'Fix the highlighted fields first.')
-            : flow.saveError
-        }
-        onReset={() => {
-          setDraft(null);
-          setHexText(null);
-          setTried(false);
-        }}
-        onSave={async () => {
-          setTried(true);
-          if (invalid) {
-            setTab('settings');
-            return;
-          }
-          if (await flow.run(() => publish.mutateAsync(message))) {
-            setDraft(null);
-            setTried(false);
-          }
-        }}
+        visible={dirty && !paused}
+        saving={actions.updateTemplate.isPending}
+        saveLabel="Save template"
+        error={null}
+        onReset={() => setDraft(null)}
+        onSave={save}
       />
     </>
   );

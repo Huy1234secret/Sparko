@@ -57,4 +57,8 @@ Modules without their own settings page yet can be switched on and off; what the
 - Templates (`/studio/templates`) are saved per server, up to 100 on Free and 500 on Plus, and can be sorted into folders (`/studio/folders`), 20 on Free and 100 on Plus. Folders can hold folders.
 - Templates and folders share one order inside each folder. `POST /studio/library/move` with `{ kind, id, folderId, index }` puts an item at `index` among the other items in `folderId` (`null` is the top level); a folder can't move inside itself.
 - `POST /studio/templates/:id/clone` puts the copy right after the original. Deleting a folder deletes everything in it and answers with how many templates and folders went.
-- Every publish is kept as a version.
+- A message holds up to 10 embeds; their text adds up to Discord's 6,000-character limit. Messages saved before this are read as one embed.
+- `POST /studio/test` posts the message as a new message in its channel and keeps it as a version.
+- `POST /studio/uploads` takes a PNG, JPEG, GIF or WebP picture of up to 5 MB as the request body and answers with a public link. The bytes decide the type. Files are kept in `MEDIA_DIR` (default: a `media` folder next to the database) and served at `/media/<name>` so Discord can load them.
+- `GET /studio/emojis` lists the server's own emojis for the emoji picker.
+- Every post is kept as a version.

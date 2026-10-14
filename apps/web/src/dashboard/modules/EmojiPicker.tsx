@@ -1,0 +1,246 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  EmptyState,
+  Input,
+  LottieIcon,
+  Segmented,
+  Spinner,
+  cx,
+  rememberEmojis,
+} from '../../ui';
+import { useServerEmojis, type ServerEmoji } from '../../data';
+import { useDismiss } from './EditorBits';
+
+/**
+ * An emoji picker like the ones in chat apps: every emoji Discord can show,
+ * by group and searchable, and a tab with the server's own emojis.
+ */
+type Emoji = { emoji: string; name: string };
+type Group = { name: string; emojis: Emoji[] };
+
+/** Discord draws emojis with Twemoji, which covers Emoji 15.0. */
+const DISCORD_EMOJI_VERSION = 15.0;
+
+let groups: Promise<Group[]> | undefined;
+const loadGroups = () =>
+  (groups ??= import('unicode-emoji-json/data-by-group.json').then((m) =>
+    (
+      m.default as {
+        name: string;
+        emojis: { emoji: string; name: string; emoji_version: string }[];
+      }[]
+    ).map((g) => ({
+      name: g.name,
+      emojis: g.emojis
+        .filter((e) => Number(e.emoji_version) <= DISCORD_EMOJI_VERSION)
+        .map(({ emoji, name }) => ({ emoji, name })),
+    })),
+  ));
+
+// The emoji files the button picks from, one per visit.
+const faces = import.meta.glob<string>(
+  '../../../../../design-system/assets/icons/animated-icons/emoji-button/emoji_*_hover.json',
+  { query: '?url', import: 'default', eager: true },
+);
+const faceList = Object.values(faces);
+
+/** The round button that opens the picker; its face is picked at random. */
+export function EmojiButton({
+  serverId,
+  onPick,
+}: {
+  serverId: string;
+  onPick: (text: string) => void;
+}) {
+  const [face] = useState(
+    () => faceList[Math.floor(Math.random() * faceList.length)] ?? '',
+  );
+  // It plays once when it appears, then each time the pointer comes over it.
+  const [play, setPlay] = useState(1);
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useDismiss(open, () => setOpen(false), wrap);
+  return (
+    <div ref={wrap} className="sp-pop-anchor">
+      <button
+        type="button"
+        className={cx('sp-emoji-btn', open && 'is-open')}
+        aria-label="Add an emoji"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onPointerEnter={() => setPlay((n) => n + 1)}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {face && <LottieIcon src={face} size={24} playKey={play} />}
+      </button>
+      {open && (
+        <EmojiPicker
+          serverId={serverId}
+          onPick={(text) => {
+            onPick(text);
+            setOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EmojiPicker({
+  serverId,
+  onPick,
+}: {
+  serverId: string;
+  onPick: (text: string) => void;
+}) {
+  const [tab, setTab] = useState<'emoji' | 'server'>('emoji');
+  const [query, setQuery] = useState('');
+  const [list, setList] = useState<Group[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [hover, setHover] = useState<string>('');
+  const scroller = useRef<HTMLDivElement>(null);
+  const server = useServerEmojis(serverId, tab === 'server');
+  useEffect(() => {
+    let gone = false;
+    loadGroups()
+      .then((g) => !gone && setList(g))
+      .catch(() => !gone && setFailed(true));
+    return () => {
+      gone = true;
+    };
+  }, []);
+  useEffect(() => {
+    if (server.data) rememberEmojis(server.data);
+  }, [server.data]);
+
+  const q = query.trim().toLowerCase();
+  const shown = useMemo(
+    () =>
+      (list ?? [])
+        .map((g) => ({
+          ...g,
+          emojis: q ? g.emojis.filter((e) => e.name.includes(q)) : g.emojis,
+        }))
+        .filter((g) => g.emojis.length),
+    [list, q],
+  );
+  const serverShown = (server.data ?? []).filter((e) =>
+    e.name.toLowerCase().includes(q),
+  );
+  const codeOf = (e: ServerEmoji) =>
+    `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`;
+
+  return (
+    <div className="sp-emoji-pop" role="dialog" aria-label="Emoji">
+      <Segmented
+        label="Emoji set"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'emoji', label: 'Emoji' },
+          { value: 'server', label: 'Server' },
+        ]}
+      />
+      <Input
+        icon="search"
+        aria-label="Search emoji"
+        placeholder="Find an emoji"
+        value={query}
+        autoFocus
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {tab === 'emoji' && !q && list && (
+        <div
+          className="sp-emoji-pop__groups"
+          role="toolbar"
+          aria-label="Groups"
+        >
+          {list.map((g, i) => (
+            <button
+              key={g.name}
+              type="button"
+              title={g.name}
+              aria-label={g.name}
+              onClick={() =>
+                scroller.current
+                  ?.querySelector(`[data-group="${i}"]`)
+                  ?.scrollIntoView({ block: 'start' })
+              }
+            >
+              {g.emojis[0]?.emoji}
+            </button>
+          ))}
+        </div>
+      )}
+      <div ref={scroller} className="sp-emoji-pop__scroll">
+        {tab === 'emoji' ? (
+          failed ? (
+            <p className="sp-hint">
+              The emoji list didn’t load. Try again later.
+            </p>
+          ) : !list ? (
+            <div className="sp-emoji-pop__wait">
+              <Spinner />
+            </div>
+          ) : shown.length ? (
+            shown.map((g) => (
+              <section
+                key={g.name}
+                data-group={list.findIndex((x) => x.name === g.name)}
+                aria-label={g.name}
+              >
+                <h4 className="sp-emoji-pop__group">{g.name}</h4>
+                <div className="sp-emoji-grid">
+                  {g.emojis.map((e) => (
+                    <button
+                      key={e.emoji}
+                      type="button"
+                      className="sp-emoji-cell"
+                      aria-label={e.name}
+                      onPointerEnter={() => setHover(`${e.emoji}  ${e.name}`)}
+                      onFocus={() => setHover(`${e.emoji}  ${e.name}`)}
+                      onClick={() => onPick(e.emoji)}
+                    >
+                      {e.emoji}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))
+          ) : (
+            <p className="sp-hint">No emoji match “{query}”.</p>
+          )
+        ) : server.isPending ? (
+          <div className="sp-emoji-pop__wait">
+            <Spinner />
+          </div>
+        ) : serverShown.length ? (
+          <div className="sp-emoji-grid">
+            {serverShown.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                className="sp-emoji-cell"
+                aria-label={e.name}
+                onPointerEnter={() => setHover(`:${e.name}:`)}
+                onFocus={() => setHover(`:${e.name}:`)}
+                onClick={() => onPick(codeOf(e))}
+              >
+                <img src={e.url} alt="" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon="smile" title="No server emojis">
+            {q
+              ? `None match “${query}”.`
+              : 'Emojis added in Server Settings show up here.'}
+          </EmptyState>
+        )}
+      </div>
+      <p className="sp-emoji-pop__name" aria-live="polite">
+        {hover || 'Pick an emoji'}
+      </p>
+    </div>
+  );
+}

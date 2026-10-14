@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  embedDefault,
   getPosted,
+  normaliseStudio,
   IS_COMPONENTS_V2,
   openDb,
   publishStudio,
@@ -46,33 +48,51 @@ const v2: StudioMessage = {
 };
 
 describe('Message Studio messages', () => {
-  it('builds a classic message with an embed and link buttons', () => {
+  it('builds a classic message with embeds and link buttons', () => {
     const m: StudioMessage = {
       ...base,
       content: 'Hi @everyone',
-      embed: {
-        ...base.embed,
-        footer: 'Team',
-        thumbnail: true,
-        timestamp: true,
-      },
+      embeds: [
+        {
+          ...base.embeds[0]!,
+          author: 'Sparko',
+          authorIcon: 'https://cdn/a.png',
+          authorUrl: 'https://example.com',
+          footer: 'Team',
+          thumbnail: 'https://cdn/icon.png',
+          timestamp: true,
+          fields: [
+            { id: 'f1', name: 'When', value: '', inline: true },
+            { id: 'f2', name: '', value: '', inline: false },
+          ],
+        },
+        // Empty embeds are left out.
+        { ...embedDefault('e2') },
+        { ...embedDefault('e3'), image: 'https://cdn/big.png' },
+      ],
       buttons: [{ id: 'x', label: 'Go', url: 'https://example.com' }],
     };
     expect(studioProblem(m)).toBeNull();
-    const body = studioPayload(m, {
-      serverIcon: 'https://cdn/icon.png',
-      now: 0,
-    });
+    const body = studioPayload(m, { now: 0 });
+    expect(body.embeds).toHaveLength(2);
     expect(body).toMatchObject({
       content: 'Hi @everyone',
       embeds: [
         {
           title: 'Big news',
           color: 0xfacc15,
+          author: {
+            name: 'Sparko',
+            icon_url: 'https://cdn/a.png',
+            url: 'https://example.com',
+          },
           footer: { text: 'Team' },
           thumbnail: { url: 'https://cdn/icon.png' },
           timestamp: '1970-01-01T00:00:00.000Z',
+          // A blank value stands in as a zero-width space.
+          fields: [{ name: 'When', value: '\u200b', inline: true }],
         },
+        { image: { url: 'https://cdn/big.png' } },
       ],
       components: [
         {
@@ -87,7 +107,7 @@ describe('Message Studio messages', () => {
 
   it('builds a Components V2 message inside a container', () => {
     expect(studioProblem(v2)).toBeNull();
-    const body = studioPayload(v2, { serverIcon: null, now: 0 }) as {
+    const body = studioPayload(v2, { now: 0 }) as unknown as {
       flags: number;
       components: {
         type: number;
@@ -105,12 +125,38 @@ describe('Message Studio messages', () => {
   });
 
   it('refuses messages Discord would reject', () => {
-    expect(studioProblem({ ...base, content: '', useEmbed: false })).toMatch(
+    expect(studioProblem({ ...base, content: '', embeds: [] })).toMatch(
       /empty/,
     );
     expect(
-      studioProblem({ ...base, embed: { ...base.embed, image: 'http://x' } }),
+      studioProblem({
+        ...base,
+        embeds: [{ ...base.embeds[0]!, image: 'http://x' }],
+      }),
     ).toMatch(/https/);
+    expect(
+      studioProblem({
+        ...base,
+        embeds: Array.from({ length: 11 }, (_, i) => embedDefault(`e${i}`)),
+      }),
+    ).toMatch(/10 embeds/);
+  });
+
+  it('reads messages saved before there could be several embeds', () => {
+    const old = {
+      ...base,
+      embeds: undefined,
+      useEmbed: true,
+      embed: { title: 'Old', thumbnail: true, fields: [] },
+    } as unknown as StudioMessage;
+    const m = normaliseStudio(old);
+    expect(m.embeds).toHaveLength(1);
+    expect(m.embeds[0]).toMatchObject({
+      title: 'Old',
+      thumbnail: '',
+      id: 'e1',
+    });
+    expect('embed' in m).toBe(false);
     expect(studioProblem({ ...v2, v2: { ...v2.v2, blocks: [] } })).toMatch(
       /at least one/,
     );

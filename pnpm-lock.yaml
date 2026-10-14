@@ -65,6 +65,9 @@ importers:
       react-router-dom:
         specifier: 7.18.4
         version: 7.18.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      unicode-emoji-json:
+        specifier: 0.8.0
+        version: 0.8.0
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 6.9.1
@@ -1287,6 +1290,9 @@ packages:
   undici@6.29.0:
     resolution: {integrity: sha512-R+RODBqp6i2pPflGdq+xIOUkl+RNfGgHwoinecKu/JCuf2uO06cOKoDbI2P7Dn6KcswdKwrczbU6IYJ6K8X+wg==}
     engines: {node: '>=18.17'}
+
+  unicode-emoji-json@0.8.0:
+    resolution: {integrity: sha512-3wDXXvp6YGoKGhS2O2H7+V+bYduOBydN1lnI0uVfr1cIdY02uFFiEH1i3kE5CCE4l6UqbLKVmEFW9USxTAMD1g==}
 
   update-browserslist-db@1.3.4:
     resolution: {integrity: sha512-t8wonIOdQyOjtPd2VktlBu6QjTVTks6v8bSi7kd0r2Vll8TK1JYDZtRRdbmCHOAMphkZgrzK+L+vXK4pyZ8t4A==}
@@ -2608,6 +2614,8 @@ snapshots:
   undici-types@7.16.0: {}
 
   undici@6.29.0: {}
+
+  unicode-emoji-json@0.8.0: {}
 
   update-browserslist-db@1.3.4(browserslist@4.29.3):
     dependencies:

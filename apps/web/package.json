@@ -15,7 +15,8 @@
     "lottie-web": "5.12.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-router-dom": "7.18.4"
+    "react-router-dom": "7.18.4",
+    "unicode-emoji-json": "0.8.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "6.9.1",

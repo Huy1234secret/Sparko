@@ -4,6 +4,7 @@ import type {
   PanelApi,
   Person,
   Server,
+  ServerEmoji,
   Session,
   StudioFolder,
   StudioMessage,
@@ -44,7 +45,42 @@ type SupportApi = Pick<
   | 'renameFolder'
   | 'deleteFolder'
   | 'moveLibraryItem'
+  | 'postStudioTest'
+  | 'uploadImage'
+  | 'listServerEmojis'
 >;
+
+/** Pretend server emojis, drawn as small pictures so they work offline. */
+const emojiPicture = (fill: string, text: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="${fill}"/><text x="16" y="21" font-family="sans-serif" font-size="14" font-weight="700" text-anchor="middle" fill="#fff">${text}</text></svg>`,
+  )}`;
+const sampleEmojis: ServerEmoji[] = [
+  {
+    id: '9100',
+    name: 'pixel_heart',
+    animated: false,
+    url: emojiPicture('#ED4245', '♥'),
+  },
+  {
+    id: '9101',
+    name: 'jam',
+    animated: false,
+    url: emojiPicture('#FACC15', 'J'),
+  },
+  {
+    id: '9102',
+    name: 'gg',
+    animated: false,
+    url: emojiPicture('#5865F2', 'GG'),
+  },
+  {
+    id: '9103',
+    name: 'sparkle',
+    animated: true,
+    url: emojiPicture('#57F287', '✦'),
+  },
+];
 
 const people: Record<string, Partial<Person>> = {
   tomoko: {
@@ -288,28 +324,33 @@ const studioDefault = (server: Server, channelId: string): StudioMessage => ({
   name: 'Spring art jam announcement',
   channel: channelId,
   content: '@Artists the spring jam starts Saturday!',
-  useEmbed: true,
-  embed: {
-    author: `${server.name} events`,
-    title: 'Spring Art Jam',
-    description:
-      'Draw anything with the theme **bloom** and post it in #art-share before Sunday 22:00. Everyone who enters gets 500 XP.',
-    color: '#FACC15',
-    image: 'https://pixelplaza.gg/img/jam-banner.png',
-    footer: 'Hosted by the event team',
-    thumbnail: true,
-    timestamp: true,
-    fields: [
-      { id: 'f1', name: 'Theme', value: 'Bloom', inline: true },
-      { id: 'f2', name: 'Deadline', value: 'Sunday 22:00', inline: true },
-      {
-        id: 'f3',
-        name: 'Prize',
-        value: 'Artist role + 2,000 XP',
-        inline: true,
-      },
-    ],
-  },
+  embeds: [
+    {
+      id: 'e1',
+      author: `${server.name} events`,
+      authorIcon: '',
+      authorUrl: '',
+      footerIcon: '',
+      title: 'Spring Art Jam',
+      description:
+        'Draw anything with the theme **bloom** and post it in #art-share before Sunday 22:00. Everyone who enters gets 500 XP.',
+      color: '#FACC15',
+      image: 'https://pixelplaza.gg/img/jam-banner.png',
+      footer: 'Hosted by the event team',
+      thumbnail: '',
+      timestamp: true,
+      fields: [
+        { id: 'f1', name: 'Theme', value: 'Bloom', inline: true },
+        { id: 'f2', name: 'Deadline', value: 'Sunday 22:00', inline: true },
+        {
+          id: 'f3',
+          name: 'Prize',
+          value: 'Artist role + 2,000 XP',
+          inline: true,
+        },
+      ],
+    },
+  ],
   buttons: [{ id: 'b1', label: 'Jam rules', url: 'https://pixelplaza.gg/jam' }],
   layout: 'embed',
   v2: {
@@ -346,15 +387,17 @@ const simple = (
   ...base,
   name,
   content: '',
-  embed: {
-    ...base.embed,
-    author: '',
-    title,
-    description,
-    color,
-    image: '',
-    fields: [],
-  },
+  embeds: [
+    {
+      ...base.embeds[0]!,
+      author: '',
+      title,
+      description,
+      color,
+      image: '',
+      fields: [],
+    },
+  ],
   buttons: [],
 });
 
@@ -522,12 +565,14 @@ export function createSupportMock(h: Helpers) {
             when: 'Yesterday, 19:40',
             config: {
               ...base,
-              embed: {
-                ...base.embed,
-                description:
-                  'Draw anything with the theme **bloom** and post it in #art-share before Saturday 22:00.',
-                fields: base.embed.fields.slice(0, 2),
-              },
+              embeds: [
+                {
+                  ...base.embeds[0]!,
+                  description:
+                    'Draw anything with the theme **bloom** and post it in #art-share before Saturday 22:00.',
+                  fields: base.embeds[0]!.fields.slice(0, 2),
+                },
+              ],
             },
           },
           {
@@ -539,12 +584,14 @@ export function createSupportMock(h: Helpers) {
             config: {
               ...base,
               content: '',
-              embed: {
-                ...base.embed,
-                image: '',
-                fields: [],
-                description: 'Spring jam this weekend. Theme coming soon!',
-              },
+              embeds: [
+                {
+                  ...base.embeds[0]!,
+                  image: '',
+                  fields: [],
+                  description: 'Spring jam this weekend. Theme coming soon!',
+                },
+              ],
               buttons: [],
             },
           },
@@ -792,6 +839,30 @@ export function createSupportMock(h: Helpers) {
         (t) => !t.folderId || !tree.has(t.folderId),
       );
       return h.wait(undefined);
+    },
+    async postStudioTest(serverId, message) {
+      const s = of(serverId);
+      s.studio.message = h.copy(message);
+      s.studio.versions.unshift({
+        id: id('v'),
+        title: `Posted “${message.name}”`,
+        who: 'You',
+        whoColor: h.you().avatarColor,
+        when: 'Just now',
+        config: h.copy(message),
+      });
+      return h.wait(undefined);
+    },
+    async uploadImage(_serverId, file) {
+      if (file.size > 5 * 1024 * 1024)
+        throw new Error('Pictures can be up to 5 MB.');
+      if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type))
+        throw new Error('Upload a PNG, JPEG, GIF or WebP picture.');
+      // The sample data keeps the picture in this browser only.
+      return h.wait(URL.createObjectURL(file));
+    },
+    async listServerEmojis() {
+      return h.wait(sampleEmojis);
     },
     async moveLibraryItem(serverId, move) {
       const s = of(serverId);

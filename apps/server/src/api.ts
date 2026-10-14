@@ -29,6 +29,7 @@ import {
 } from '@sparko/core';
 import type { createAuth, DiscordGuild } from './auth.ts';
 import { BadRequest, json, readJson } from './http.ts';
+import type { Media } from './media.ts';
 import { studioRoutes } from './studio-api.ts';
 import { ticketRoutes } from './tickets-api.ts';
 
@@ -63,6 +64,7 @@ export function createApi({
   views,
   discord,
   publicUrl,
+  media,
   now = Date.now,
   applyWaitMs = 15_000,
 }: {
@@ -72,6 +74,8 @@ export function createApi({
   /** Discord's REST API with the bot token, when it's set. */
   discord?: Rest | undefined;
   publicUrl: string;
+  /** Uploaded pictures; uploads are off without it. */
+  media?: Media | undefined;
   now?: () => number;
   applyWaitMs?: number;
 }) {
@@ -235,7 +239,13 @@ export function createApi({
       config: v.config,
     }));
 
-  const studio = studioRoutes({ db, view: (id) => view(id), now });
+  const studio = studioRoutes({
+    db,
+    view: (id) => view(id),
+    now,
+    rest: discord,
+    media,
+  });
   const tickets = ticketRoutes({
     db,
     rest: discord,
