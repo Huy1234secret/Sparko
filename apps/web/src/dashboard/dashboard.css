@@ -537,54 +537,255 @@
 .sp-progress__bar.is-over {
   background: var(--sp-danger);
 }
-.sp-template-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+/* Message Studio: templates and folders */
+.sp-lib-usage {
+  margin: 0;
 }
-.sp-template {
+.sp-mask-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  -webkit-mask: var(--sp-mask) center / contain no-repeat;
+  mask: var(--sp-mask) center / contain no-repeat;
+  margin: 0 2px;
+  vertical-align: -3px;
+}
+.sp-lib-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font: 500 14px/20px var(--sp-font-sans);
+  color: var(--sp-muted);
+}
+.sp-lib-crumbs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sp-lib-crumbs__item [aria-current] {
+  color: var(--sp-text);
+  font-weight: 600;
+}
+.sp-lib-crumb {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px dashed transparent;
+  border-radius: var(--sp-radius-chip);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sp-lib-crumb:hover {
+  color: var(--sp-text);
+  background: var(--sp-raised);
+}
+.sp-lib-crumb:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-lib-grid.is-dragging .sp-lib-crumb,
+.sp-lib-crumb.is-drop {
+  border-color: var(--sp-line-strong);
+}
+.sp-lib-crumb.is-drop {
+  border-color: var(--sp-brand-edge);
+  background: var(--sp-brand-soft);
+  color: var(--sp-text);
+}
+.sp-lib-grid {
   display: grid;
-  overflow: hidden;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  margin: 0;
   padding: 0;
-  align-content: start;
+  list-style: none;
 }
-.sp-template__preview {
-  padding: 14px;
-  background: var(--sp-dc-bg);
-}
-.sp-template__embed {
-  max-width: none;
-  padding: 6px 12px 12px 10px;
-}
-.sp-template__embed .dc-embed__title {
-  font-size: 14px;
-}
-.sp-template__embed .dc-embed__desc {
-  font-size: 13px;
-}
-.sp-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.sp-template__body {
-  padding: 14px;
+.sp-lib-card {
+  position: relative;
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px 12px;
+  align-content: start;
+  padding: 16px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition:
+    border-color var(--sp-dur-fast) var(--sp-ease-out),
+    opacity var(--sp-dur-fast) var(--sp-ease-out);
 }
-.sp-template__titles {
+.sp-lib-card:hover {
+  border-color: var(--sp-line-strong);
+}
+.sp-lib-card:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-lib-card--folder {
+  grid-template-columns: 40px minmax(0, 1fr);
+  cursor: pointer;
+}
+.sp-lib-card__icon {
+  position: relative;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  color: var(--sp-text);
+  --sp-anim-fill: var(--sp-surface);
+}
+.sp-lib-card__icon > .sp-lottie {
+  grid-area: 1 / 1;
+}
+.sp-lib-card__icon > .is-hidden {
+  visibility: hidden;
+}
+.sp-lib-card__titles {
   display: grid;
   gap: 2px;
+  align-content: center;
+  min-width: 0;
 }
-.sp-template__name {
-  margin: 0;
-  font: 600 14px/20px var(--sp-font-sans);
-}
-.sp-template__confirm {
-  display: grid;
+.sp-lib-card__name {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  font: 400 13px/18px var(--sp-font-sans);
+  min-width: 0;
+  margin: 0;
+  font: var(--sp-text-h3);
+  letter-spacing: -0.006em;
+}
+.sp-lib-card__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-lib-card__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-lib-card__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sp-lib-card__actions .sp-btn {
+  cursor: pointer;
+}
+/* Where a dragged card will land */
+.sp-lib-card.is-dragged {
+  opacity: 0.4;
+}
+.sp-lib-card.is-drop-before::before,
+.sp-lib-card.is-drop-after::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--sp-brand);
+}
+.sp-lib-card.is-drop-before::before {
+  left: -8px;
+}
+.sp-lib-card.is-drop-after::after {
+  right: -8px;
+}
+.sp-lib-card.is-drop-into {
+  border-color: var(--sp-brand-edge);
+  background: var(--sp-brand-soft);
+}
+/* A finger resting on a card: the border fills in until the drag starts */
+.sp-lib-card.is-pressing {
+  border-color: var(--sp-brand-edge);
+  transition: border-color 2s linear;
+  transform: scale(0.98);
+}
+.sp-lib-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--sp-z-popover);
+  pointer-events: none;
+  border-color: var(--sp-brand-edge);
+  box-shadow: var(--sp-shadow-overlay);
+  cursor: grabbing;
+}
+
+/* Animated icons: the outline follows the text colour, the fill the background */
+.sp-lottie {
+  display: inline-grid;
+  flex: none;
+  pointer-events: none;
+}
+.sp-lottie svg {
+  display: block;
+}
+.sp-lottie [fill='rgb(0,0,0)'] {
+  fill: currentColor;
+}
+.sp-lottie [stroke='rgb(0,0,0)'] {
+  stroke: currentColor;
+}
+.sp-lottie [fill='rgb(255,255,255)'] {
+  fill: var(--sp-anim-fill, transparent);
+}
+.sp-lottie [stroke='rgb(255,255,255)'] {
+  stroke: var(--sp-anim-fill, transparent);
+}
+.sp-lottie [fill='rgb(255,0,0)'] {
+  fill: var(--sp-brand);
+}
+.sp-lottie [stroke='rgb(255,0,0)'] {
+  stroke: var(--sp-brand);
+}
+.sp-lottie--solid [fill='rgb(255,255,255)'] {
+  fill: currentColor;
+}
+.sp-lottie--solid [stroke='rgb(255,255,255)'] {
+  stroke: currentColor;
+}
+.sp-lottie--solid [fill='rgb(0,0,0)'] {
+  fill: var(--sp-anim-fill, transparent);
+}
+.sp-lottie--solid [stroke='rgb(0,0,0)'] {
+  stroke: var(--sp-anim-fill, transparent);
+}
+.sp-btn {
+  --sp-anim-fill: transparent;
+}
+.sp-btn--secondary {
+  --sp-anim-fill: var(--sp-raised);
+}
+.sp-btn--secondary:hover:not(:disabled) {
+  --sp-anim-fill: var(--sp-raised-hover);
+}
+.sp-btn--primary {
+  --sp-anim-fill: var(--sp-brand);
+}
+.sp-btn--primary:hover:not(:disabled) {
+  --sp-anim-fill: var(--sp-brand-hover);
+}
+.sp-btn--danger {
+  --sp-anim-fill: var(--sp-danger-fill);
+}
+.sp-btn--danger:hover:not(:disabled) {
+  --sp-anim-fill: var(--sp-danger-fill-hover);
+}
+.sp-btn--sm > .sp-lottie {
+  margin: -2px -2px -2px -4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-lib-card.is-pressing {
+    transition: none;
+    transform: none;
+  }
 }
 @media (max-width: 599px) {
   .sp-pair,

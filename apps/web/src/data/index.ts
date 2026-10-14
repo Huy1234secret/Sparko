@@ -6,16 +6,20 @@ import {
 } from '@tanstack/react-query';
 import { adoptServers, mockApi } from './mock';
 import { backend, withBackend } from './live';
+import { applyMove } from './library';
 import type {
+  LibraryMove,
   ModuleState,
   PanelApi,
   StudioMessage,
+  StudioState,
   TicketPanel,
   TicketPriority,
   WelcomeConfig,
 } from './types';
 
 export * from './types';
+export * from './library';
 
 /** Real sign-in and servers where the backend runs; sample data for the rest. */
 export const api: PanelApi = withBackend(mockApi, adoptServers);
@@ -181,20 +185,73 @@ export function useSaveTickets(serverId: string) {
 }
 export function useStudioActions(serverId: string) {
   const refresh = useRefresh(serverId);
+  const client = useQueryClient();
+  const toRefresh = { onSuccess: refresh };
   return {
     publish: useMutation({
       mutationFn: (message: StudioMessage) =>
         api.publishStudio(serverId, message),
-      onSuccess: refresh,
+      ...toRefresh,
     }),
     saveTemplate: useMutation({
-      mutationFn: (t: { name: string; message: StudioMessage }) =>
-        api.saveTemplate(serverId, t),
-      onSuccess: refresh,
+      mutationFn: (t: {
+        name: string;
+        message: StudioMessage;
+        folderId: string | null;
+      }) => api.saveTemplate(serverId, t),
+      ...toRefresh,
+    }),
+    updateTemplate: useMutation({
+      mutationFn: ({
+        id,
+        ...change
+      }: {
+        id: string;
+        name?: string;
+        message?: StudioMessage;
+      }) => api.updateTemplate(serverId, id, change),
+      ...toRefresh,
+    }),
+    cloneTemplate: useMutation({
+      mutationFn: (id: string) => api.cloneTemplate(serverId, id),
+      ...toRefresh,
     }),
     deleteTemplate: useMutation({
       mutationFn: (id: string) => api.deleteTemplate(serverId, id),
-      onSuccess: refresh,
+      ...toRefresh,
+    }),
+    addFolder: useMutation({
+      mutationFn: (f: { name: string; parentId: string | null }) =>
+        api.addFolder(serverId, f),
+      ...toRefresh,
+    }),
+    renameFolder: useMutation({
+      mutationFn: ({ id, name }: { id: string; name: string }) =>
+        api.renameFolder(serverId, id, name),
+      ...toRefresh,
+    }),
+    deleteFolder: useMutation({
+      mutationFn: (id: string) => api.deleteFolder(serverId, id),
+      ...toRefresh,
+    }),
+    // Shows the move straight away and puts it back if the server says no.
+    move: useMutation({
+      mutationFn: (move: LibraryMove) => api.moveLibraryItem(serverId, move),
+      onMutate: async (move) => {
+        await client.cancelQueries({ queryKey: keys.studio(serverId) });
+        const before = client.getQueryData<StudioState>(keys.studio(serverId));
+        if (before)
+          client.setQueryData<StudioState>(keys.studio(serverId), {
+            ...before,
+            ...applyMove(before, move),
+          });
+        return { before };
+      },
+      onError: (_e, _move, context) => {
+        if (context?.before)
+          client.setQueryData(keys.studio(serverId), context.before);
+      },
+      onSettled: refresh,
     }),
   };
 }

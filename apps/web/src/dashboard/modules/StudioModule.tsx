@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Badge,
   Button,
   Checkbox,
   DiscordMessage,
@@ -24,7 +23,6 @@ import {
   type StudioTemplate,
 } from '../../data';
 import { FixPermissionModal, fixes } from '../FixPermissionModal';
-import { planName } from '../shared';
 import {
   ModuleHeader,
   ModuleSaveBar,
@@ -36,6 +34,7 @@ import {
   useSaveFlow,
 } from './frame';
 import { BlockSettings, InlineEdit, V2Canvas, v2Issue } from './StudioCanvas';
+import { StudioLibrary } from './StudioLibrary';
 import {
   ChannelPicker,
   ColourChoice,
@@ -269,171 +268,6 @@ export function StudioPreview({
   );
 }
 
-function Templates({
-  server,
-  templates,
-  limit,
-  current,
-  onUse,
-}: {
-  server: Server;
-  templates: StudioTemplate[];
-  limit: number;
-  current: StudioMessage;
-  onUse: (t: StudioTemplate) => void;
-}) {
-  const { saveTemplate, deleteTemplate } = useStudioActions(server.id);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const toast = useToast();
-  const full = templates.length >= limit;
-  const save = (name: string, message: StudioMessage) =>
-    saveTemplate.mutate(
-      { name, message },
-      {
-        onSuccess: () =>
-          toast({
-            tone: 'success',
-            title: `Saved “${name}”`,
-            body: 'Welcome and Tickets can use it too.',
-          }),
-        onError: (e) =>
-          toast({
-            tone: 'danger',
-            title: 'Couldn’t save the template',
-            body: e instanceof Error ? e.message : 'Try again in a moment.',
-          }),
-      },
-    );
-  const inEditor = (t: StudioTemplate) =>
-    JSON.stringify(t.message) === JSON.stringify(current);
-  return (
-    <div className="sp-stack">
-      <div className="sp-inbox-bar">
-        <p className="sp-hint" style={{ margin: 0 }}>
-          {templates.length} of {limit} templates on {planName(server)}. Welcome
-          and Tickets can use these too.
-        </p>
-        <Button
-          size="sm"
-          icon="plus"
-          disabled={full || saveTemplate.isPending}
-          onClick={() => save(current.name.trim() || 'Untitled', current)}
-        >
-          Save current as a template
-        </Button>
-      </div>
-      {templates.length ? (
-        <div className="sp-template-grid">
-          {templates.map((t) => (
-            <article key={t.id} className="sp-card sp-template">
-              <div className="sp-template__preview" aria-hidden="true">
-                <div
-                  className="dc-embed sp-template__embed"
-                  style={
-                    {
-                      '--dc-color': t.message.embed.color,
-                    } as React.CSSProperties
-                  }
-                >
-                  <div className="dc-embed__main">
-                    <div className="dc-embed__title">
-                      {t.message.embed.title || t.name}
-                    </div>
-                    <div className="dc-embed__desc sp-clamp-2">
-                      {renderDiscordText(
-                        t.message.embed.description || t.message.content,
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="sp-template__body">
-                <div className="sp-template__titles">
-                  <h3 className="sp-template__name">
-                    {t.name}{' '}
-                    {inEditor(t) && (
-                      <Badge size="sm" tone="success">
-                        In the editor
-                      </Badge>
-                    )}
-                  </h3>
-                  <span className="sp-hint">{t.meta}</span>
-                </div>
-                {confirmId === t.id ? (
-                  <div role="alert" className="sp-template__confirm">
-                    <span>
-                      Delete “{t.name}”? Messages already posted stay in
-                      Discord.
-                    </span>
-                    <div className="sp-item-box__row">
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        loading={deleteTemplate.isPending}
-                        onClick={() =>
-                          deleteTemplate.mutate(t.id, {
-                            onSuccess: () => setConfirmId(null),
-                          })
-                        }
-                      >
-                        Delete
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        autoFocus
-                        onClick={() => setConfirmId(null)}
-                      >
-                        Keep it
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="sp-item-box__row">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={inEditor(t)}
-                      aria-label={`Use ${t.name}`}
-                      onClick={() => onUse(t)}
-                    >
-                      Use
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={full || saveTemplate.isPending}
-                      aria-label={`Duplicate ${t.name}`}
-                      onClick={() => save(`${t.name} (copy)`, t.message)}
-                    >
-                      Duplicate
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      icon="trash-2"
-                      aria-label={`Delete ${t.name}`}
-                      onClick={() => setConfirmId(t.id)}
-                    />
-                  </div>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <div className="sp-card">
-          <EmptyState icon="copy" title="No templates yet">
-            Save a message you post often, like rules or a weekly recap, and
-            start from it next time.
-          </EmptyState>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function StudioModule({
   module,
   server,
@@ -442,7 +276,7 @@ export function StudioModule({
   server: Server;
 }) {
   const studio = useStudio(server.id);
-  const { publish } = useStudioActions(server.id);
+  const { publish, updateTemplate } = useStudioActions(server.id);
   const checkChannel = useCheckChannel(server.id);
   const flow = useSaveFlow(server.id, 'studio');
   const [tab, setTab] = useModuleTab();
@@ -453,6 +287,8 @@ export function StudioModule({
   const [view, setView] = useState<'desktop' | 'phone'>('desktop');
   const [fixOpen, setFixOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  // The template loaded with "Edit", so its changes can be saved back.
+  const [editing, setEditing] = useState<StudioTemplate | null>(null);
   const toast = useToast();
 
   if (studio.isPending)
@@ -561,6 +397,56 @@ export function StudioModule({
 
       {tab === 'settings' && (
         <>
+          {editing &&
+            studio.data.templates.some((t) => t.id === editing.id) && (
+              <Notice
+                tone="info"
+                title={`Editing the template “${editing.name}”`}
+                actions={
+                  <>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      loading={updateTemplate.isPending}
+                      disabled={invalid}
+                      onClick={() =>
+                        updateTemplate.mutate(
+                          { id: editing.id, message },
+                          {
+                            onSuccess: () =>
+                              toast({
+                                tone: 'success',
+                                title: `Saved “${editing.name}”`,
+                              }),
+                            onError: (e) =>
+                              toast({
+                                tone: 'danger',
+                                title: 'Couldn’t save the template',
+                                body:
+                                  e instanceof Error
+                                    ? e.message
+                                    : 'Try again in a moment.',
+                              }),
+                          },
+                        )
+                      }
+                    >
+                      Save template
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditing(null)}
+                    >
+                      Done
+                    </Button>
+                  </>
+                }
+              >
+                Changes here can be saved back to the template. Publishing still
+                posts the message in Discord.
+              </Notice>
+            )}
           {locked && (
             <Notice
               tone="danger"
@@ -1199,17 +1085,18 @@ export function StudioModule({
       )}
 
       {tab === 'items' && (
-        <Templates
+        <StudioLibrary
           server={server}
-          templates={studio.data.templates}
-          limit={studio.data.templateLimit}
+          studio={studio.data}
           current={message}
-          onUse={(t) =>
+          editingId={editing?.id ?? null}
+          onEdit={(t) => {
             load(
               { ...t.message, channel: message.channel },
-              `“${t.name}” loaded into the editor`,
-            )
-          }
+              `Editing “${t.name}”`,
+            );
+            setEditing(t);
+          }}
         />
       )}
 
@@ -1219,9 +1106,10 @@ export function StudioModule({
           description="Every publish is kept. Restoring loads it into the editor; Discord only changes when you publish again."
           versions={studio.data.versions}
           currentLabel={`Live in #${channels.find((c) => c.id === saved.channel)?.name ?? ''}`}
-          onRestore={(restored) =>
-            load(restored, 'Version loaded into the editor')
-          }
+          onRestore={(restored) => {
+            load(restored, 'Version loaded into the editor');
+            setEditing(null);
+          }}
         />
       )}
 

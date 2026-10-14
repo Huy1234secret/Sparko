@@ -5,6 +5,7 @@ import type {
   Person,
   Server,
   Session,
+  StudioFolder,
   StudioMessage,
   StudioState,
   Ticket,
@@ -13,6 +14,7 @@ import type {
   TicketPanel,
   TicketsState,
 } from './types';
+import { applyMove, folderTree, itemsIn, movesIntoItself } from './library';
 
 type Helpers = {
   wait: <T>(value: T, slow?: boolean) => Promise<T>;
@@ -35,7 +37,13 @@ type SupportApi = Pick<
   | 'getStudio'
   | 'publishStudio'
   | 'saveTemplate'
+  | 'updateTemplate'
+  | 'cloneTemplate'
   | 'deleteTemplate'
+  | 'addFolder'
+  | 'renameFolder'
+  | 'deleteFolder'
+  | 'moveLibraryItem'
 >;
 
 const people: Record<string, Partial<Person>> = {
@@ -435,17 +443,29 @@ export function createSupportMock(h: Helpers) {
       studio: {
         message: base,
         channels,
+        folders: [
+          {
+            id: 'f-recaps',
+            name: 'Recaps',
+            parentId: null,
+            position: 1,
+          },
+        ],
         templates: [
           {
             id: id('t'),
             name: base.name,
-            meta: 'Edited today by you',
+            folderId: null,
+            position: 0,
+            meta: 'Saved just now by you',
             message: base,
           },
           {
             id: id('t'),
             name: 'Weekly recap',
-            meta: 'Edited 2 days ago by Ayo',
+            folderId: 'f-recaps',
+            position: 0,
+            meta: 'Saved 2 days ago by Ayo',
             message: simple(
               base,
               'Weekly recap',
@@ -457,7 +477,9 @@ export function createSupportMock(h: Helpers) {
           {
             id: id('t'),
             name: 'Server rules',
-            meta: 'Edited 9 Oct by Rhea',
+            folderId: null,
+            position: 2,
+            meta: 'Saved on 9 Oct by Rhea',
             message: simple(
               base,
               'Server rules',
@@ -469,7 +491,9 @@ export function createSupportMock(h: Helpers) {
           {
             id: id('t'),
             name: 'Maintenance notice',
-            meta: 'Edited 28 Sep by you',
+            folderId: null,
+            position: 3,
+            meta: 'Saved on 28 Sep by you',
             message: simple(
               base,
               'Maintenance notice',
@@ -479,7 +503,8 @@ export function createSupportMock(h: Helpers) {
             ),
           },
         ],
-        templateLimit: server.plan === 'plus' ? 100 : 10,
+        templateLimit: server.plan === 'plus' ? 500 : 100,
+        folderLimit: server.plan === 'plus' ? 100 : 20,
         versions: [
           {
             id: id('v'),
@@ -667,16 +692,65 @@ export function createSupportMock(h: Helpers) {
       });
       return h.wait(undefined);
     },
-    async saveTemplate(serverId, { name, message }) {
+    async saveTemplate(serverId, { name, message, folderId }) {
       const s = of(serverId);
       if (s.studio.templates.length >= s.studio.templateLimit)
         throw new Error('You’ve used every template on this plan.');
-      s.studio.templates.unshift({
+      const t = {
         id: id('t'),
         name,
+        folderId,
+        position: -1,
         meta: 'Saved just now by you',
         message: h.copy(message),
-      });
+      };
+      s.studio.templates.push(t);
+      Object.assign(
+        s.studio,
+        applyMove(s.studio, { kind: 'template', id: t.id, folderId, index: 0 }),
+      );
+      return h.wait(undefined);
+    },
+    async updateTemplate(serverId, templateId, change) {
+      const s = of(serverId);
+      s.studio.templates = s.studio.templates.map((t) =>
+        t.id === templateId
+          ? {
+              ...t,
+              ...(change.name ? { name: change.name } : {}),
+              ...(change.message ? { message: h.copy(change.message) } : {}),
+              meta: 'Saved just now by you',
+            }
+          : t,
+      );
+      return h.wait(undefined);
+    },
+    async cloneTemplate(serverId, templateId) {
+      const s = of(serverId);
+      const t = s.studio.templates.find((x) => x.id === templateId);
+      if (!t) throw new Error('That template no longer exists.');
+      if (s.studio.templates.length >= s.studio.templateLimit)
+        throw new Error('You’ve used every template on this plan.');
+      const copy = {
+        ...h.copy(t),
+        id: id('t'),
+        name: `${t.name} (copy)`.slice(0, 80),
+        meta: 'Saved just now by you',
+      };
+      const index =
+        itemsIn(s.studio, t.folderId).findIndex(
+          (x) => x.kind === 'template' && x.id === t.id,
+        ) + 1;
+      s.studio.templates.push(copy);
+      Object.assign(
+        s.studio,
+        applyMove(s.studio, {
+          kind: 'template',
+          id: copy.id,
+          folderId: t.folderId,
+          index,
+        }),
+      );
       return h.wait(undefined);
     },
     async deleteTemplate(serverId, templateId) {
@@ -684,6 +758,46 @@ export function createSupportMock(h: Helpers) {
       s.studio.templates = s.studio.templates.filter(
         (t) => t.id !== templateId,
       );
+      return h.wait(undefined);
+    },
+    async addFolder(serverId, { name, parentId }) {
+      const s = of(serverId);
+      if (s.studio.folders.length >= s.studio.folderLimit)
+        throw new Error('You’ve used every folder on this plan.');
+      const f: StudioFolder = { id: id('f'), name, parentId, position: -1 };
+      s.studio.folders.push(f);
+      Object.assign(
+        s.studio,
+        applyMove(s.studio, {
+          kind: 'folder',
+          id: f.id,
+          folderId: parentId,
+          index: 0,
+        }),
+      );
+      return h.wait(undefined);
+    },
+    async renameFolder(serverId, folderId, name) {
+      const s = of(serverId);
+      s.studio.folders = s.studio.folders.map((f) =>
+        f.id === folderId ? { ...f, name } : f,
+      );
+      return h.wait(undefined);
+    },
+    async deleteFolder(serverId, folderId) {
+      const s = of(serverId);
+      const tree = folderTree(s.studio, folderId);
+      s.studio.folders = s.studio.folders.filter((f) => !tree.has(f.id));
+      s.studio.templates = s.studio.templates.filter(
+        (t) => !t.folderId || !tree.has(t.folderId),
+      );
+      return h.wait(undefined);
+    },
+    async moveLibraryItem(serverId, move) {
+      const s = of(serverId);
+      if (movesIntoItself(s.studio, move))
+        throw new Error('A folder can’t go inside itself.');
+      Object.assign(s.studio, applyMove(s.studio, move));
       return h.wait(undefined);
     },
   };

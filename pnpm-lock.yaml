@@ -53,6 +53,9 @@ importers:
       '@tanstack/react-query':
         specifier: 5.104.1
         version: 5.104.1(react@19.3.0)
+      lottie-web:
+        specifier: 5.12.2
+        version: 5.12.2
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -1031,6 +1034,9 @@ packages:
 
   lodash@4.18.1:
     resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
+
+  lottie-web@5.12.2:
+    resolution: {integrity: sha512-uvhvYPC8kGPjXT3MyKMrL3JitEAmDMp30lVkuq/590Mw9ok6pWcFCwXJveo0t5uqYw1UREQHofD+jVpdjBv8wg==}
 
   lru-cache@11.5.3:
     resolution: {integrity: sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg==}
@@ -2384,6 +2390,8 @@ snapshots:
   lodash.snakecase@4.1.1: {}
 
   lodash@4.18.1: {}
+
+  lottie-web@5.12.2: {}
 
   lru-cache@11.5.3: {}
 

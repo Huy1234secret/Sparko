@@ -377,7 +377,7 @@ describe('server API', () => {
       templateLimit: number;
     }>(await call('/9001/studio'));
     expect(studio.message).toMatchObject({ layout: 'embed', channel: '501' });
-    expect(studio.templateLimit).toBe(10);
+    expect(studio.templateLimit).toBe(100);
 
     const v2 = {
       ...studio.message,
@@ -424,5 +424,87 @@ describe('server API', () => {
       (await body<{ templates: unknown[] }>(await call('/9001/studio')))
         .templates,
     ).toHaveLength(0);
+  });
+
+  it('keeps templates in folders, in the order people put them', async () => {
+    type Library = {
+      templates: { id: string; name: string; folderId: string | null }[];
+      folders: { id: string; name: string; parentId: string | null }[];
+      folderLimit: number;
+    };
+    const message = (
+      await body<{ message: object }>(await call('/9001/studio'))
+    ).message;
+    const post = (path: string, data?: unknown) =>
+      call(`/9001${path}`, {
+        method: 'POST',
+        ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+      });
+    for (const name of ['One', 'Two'])
+      expect((await post('/studio/templates', { name, message })).status).toBe(
+        204,
+      );
+    expect((await post('/studio/folders', { name: 'Recaps' })).status).toBe(
+      204,
+    );
+    let lib = await body<Library>(await call('/9001/studio'));
+    expect(lib.folderLimit).toBe(20);
+    const folder = lib.folders[0]!;
+    const one = lib.templates.find((t) => t.name === 'One')!;
+
+    // A new folder inside, and a template moved into the outer one.
+    expect(
+      (await post('/studio/folders', { name: 'Old', parentId: folder.id }))
+        .status,
+    ).toBe(204);
+    expect(
+      (
+        await post('/studio/library/move', {
+          kind: 'template',
+          id: one.id,
+          folderId: folder.id,
+          index: 0,
+        })
+      ).status,
+    ).toBe(204);
+    lib = await body<Library>(await call('/9001/studio'));
+    const inner = lib.folders.find((f) => f.name === 'Old')!;
+    expect(inner.parentId).toBe(folder.id);
+    expect(lib.templates.find((t) => t.id === one.id)!.folderId).toBe(
+      folder.id,
+    );
+
+    // A folder can't go inside itself.
+    const loop = await post('/studio/library/move', {
+      kind: 'folder',
+      id: folder.id,
+      folderId: inner.id,
+      index: 0,
+    });
+    expect(loop.status).toBe(409);
+
+    // A clone sits next to the original, in the same folder.
+    expect((await post(`/studio/templates/${one.id}/clone`)).status).toBe(204);
+    lib = await body<Library>(await call('/9001/studio'));
+    expect(lib.templates.find((t) => t.name === 'One (copy)')!.folderId).toBe(
+      folder.id,
+    );
+
+    // Renaming, then deleting the folder takes everything inside with it.
+    expect(
+      (
+        await call(`/9001/studio/folders/${folder.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: 'Weekly' }),
+        })
+      ).status,
+    ).toBe(204);
+    const gone = await call(`/9001/studio/folders/${folder.id}`, {
+      method: 'DELETE',
+    });
+    expect(await gone.json()).toEqual({ templates: 2, folders: 1 });
+    lib = await body<Library>(await call('/9001/studio'));
+    expect(lib.folders).toHaveLength(0);
+    expect(lib.templates.map((t) => t.name)).toEqual(['Two']);
   });
 });

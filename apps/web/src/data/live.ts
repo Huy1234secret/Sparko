@@ -173,9 +173,39 @@ export function withBackend(
       if (!(await backend()).live) return sample.saveTemplate(id, template);
       await call('POST', `${server(id)}/studio/templates`, template);
     },
+    async updateTemplate(id, templateId, change) {
+      if (!(await backend()).live)
+        return sample.updateTemplate(id, templateId, change);
+      await call(
+        'PATCH',
+        `${server(id)}/studio/templates/${templateId}`,
+        change,
+      );
+    },
+    async cloneTemplate(id, templateId) {
+      if (!(await backend()).live) return sample.cloneTemplate(id, templateId);
+      await call('POST', `${server(id)}/studio/templates/${templateId}/clone`);
+    },
     async deleteTemplate(id, templateId) {
       if (!(await backend()).live) return sample.deleteTemplate(id, templateId);
       await call('DELETE', `${server(id)}/studio/templates/${templateId}`);
+    },
+    async addFolder(id, folder) {
+      if (!(await backend()).live) return sample.addFolder(id, folder);
+      await call('POST', `${server(id)}/studio/folders`, folder);
+    },
+    async renameFolder(id, folderId, name) {
+      if (!(await backend()).live)
+        return sample.renameFolder(id, folderId, name);
+      await call('PATCH', `${server(id)}/studio/folders/${folderId}`, { name });
+    },
+    async deleteFolder(id, folderId) {
+      if (!(await backend()).live) return sample.deleteFolder(id, folderId);
+      await call('DELETE', `${server(id)}/studio/folders/${folderId}`);
+    },
+    async moveLibraryItem(id, move) {
+      if (!(await backend()).live) return sample.moveLibraryItem(id, move);
+      await call('POST', `${server(id)}/studio/library/move`, move);
     },
     async checkChannel(id, channelId) {
       if (!(await backend()).live) return sample.checkChannel(id, channelId);
