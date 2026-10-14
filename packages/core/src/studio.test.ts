@@ -15,6 +15,8 @@ import {
   normaliseStudio,
   IS_COMPONENTS_V2,
   openDb,
+  editStudioMessage,
+  parseMessageLink,
   publishStudio,
   studioDefault,
   studioPayload,
@@ -401,6 +403,51 @@ describe('Message Studio messages', () => {
       `PATCH /channels/100/messages/${first.messageId}`,
       'POST /channels/100/messages',
     ]);
+  });
+});
+
+describe('editing a message Sparko sent', () => {
+  it('reads message links', () => {
+    expect(parseMessageLink('https://discord.com/channels/1/22/333')).toEqual({
+      guildId: '1',
+      channelId: '22',
+      messageId: '333',
+    });
+    expect(
+      parseMessageLink(' https://ptb.discord.com/channels/1/22/333/ '),
+    ).toMatchObject({ messageId: '333' });
+    expect(parseMessageLink('https://discord.com/channels/1/22')).toBeNull();
+    expect(parseMessageLink('https://evil.example/channels/1/2/3')).toBeNull();
+  });
+
+  it('edits the message, and says plainly why it couldn’t', async () => {
+    const db = openDb(':memory:');
+    const calls: [string, unknown][] = [];
+    let fail: DiscordError | null = null;
+    const rest = {
+      patch: async (p: string, body: unknown) => {
+        if (fail) throw fail;
+        calls.push([p, body]);
+        return {};
+      },
+    } as unknown as Rest;
+    const target = { channelId: '22', messageId: '333' };
+    await editStudioMessage(rest, db, 'g', target, base);
+    expect(calls[0]![0]).toBe('/channels/22/messages/333');
+    // A classic message drops embeds the template doesn't have.
+    expect(calls[0]![1]).toMatchObject({ embeds: expect.any(Array) });
+    fail = new DiscordError(
+      403,
+      50005,
+      'Cannot edit a message authored by another user',
+    );
+    await expect(
+      editStudioMessage(rest, db, 'g', target, base),
+    ).rejects.toThrow(/only edit messages it sent/);
+    fail = new DiscordError(404, 10008, 'Unknown Message');
+    await expect(
+      editStudioMessage(rest, db, 'g', target, base),
+    ).rejects.toThrow(/no longer exists/);
   });
 });
 

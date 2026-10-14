@@ -942,3 +942,13 @@ export function studioPayload(
     allowed_mentions,
   };
 }
+
+/** A Discord message link: https://discord.com/channels/<server>/<channel>/<message>. */
+export function parseMessageLink(link: string) {
+  const m = link
+    .trim()
+    .match(
+      /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/channels\/(\d{1,25})\/(\d{1,25})\/(\d{1,25})\/?$/,
+    );
+  return m ? { guildId: m[1]!, channelId: m[2]!, messageId: m[3]! } : null;
+}

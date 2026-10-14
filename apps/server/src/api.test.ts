@@ -573,6 +573,34 @@ describe('server API', () => {
     );
   });
 
+  it('edits a message Sparko sent, from its link', async () => {
+    const { message } = await body<{ message: object }>(
+      await call('/9001/studio'),
+    );
+    const edit = (link: string) =>
+      call('/9001/studio/edit', {
+        method: 'POST',
+        body: JSON.stringify({ message, link }),
+      });
+    const other = await edit('https://discord.com/channels/42/500/600');
+    expect(other.status).toBe(400);
+    expect((await body<{ message: string }>(other)).message).toMatch(
+      /another server/,
+    );
+    expect((await edit('not a link')).status).toBe(400);
+    expect(
+      (await edit('https://discord.com/channels/9001/500/600')).status,
+    ).toBe(204);
+    // Earlier tests leave jobs queued; this one is the newest.
+    let job = claimJob(db);
+    while (job && job.kind !== 'studio-edit') {
+      finishJob(db, job.id, null, Date.now());
+      job = claimJob(db);
+    }
+    expect(job?.payload).toMatchObject({ channelId: '500', messageId: '600' });
+    finishJob(db, job!.id, null, Date.now());
+  });
+
   it('posts a test message, uploads pictures and lists server emojis', async () => {
     const { message } = await body<{ message: object }>(
       await call('/9001/studio'),

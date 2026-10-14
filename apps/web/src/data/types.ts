@@ -395,6 +395,12 @@ export interface PanelApi {
   moveLibraryItem(serverId: string, move: LibraryMove): Promise<void>;
   /** Posts the message in its channel as a new message. */
   postStudioTest(serverId: string, message: StudioMessage): Promise<void>;
+  /** Turns a message Sparko already sent (by its link) into this one. */
+  editStudioMessage(
+    serverId: string,
+    message: StudioMessage,
+    link: string,
+  ): Promise<void>;
   /** Uploads a picture (up to 5 MB) and returns a link Discord can load. */
   uploadImage(serverId: string, file: File): Promise<string>;
   listServerEmojis(serverId: string): Promise<ServerEmoji[]>;

@@ -246,6 +246,16 @@ export function useStudioActions(serverId: string) {
         api.postStudioTest(serverId, message),
       ...toRefresh,
     }),
+    editMessage: useMutation({
+      mutationFn: ({
+        message,
+        link,
+      }: {
+        message: StudioMessage;
+        link: string;
+      }) => api.editStudioMessage(serverId, message, link),
+      ...toRefresh,
+    }),
     upload: useMutation({
       mutationFn: (file: File) => api.uploadImage(serverId, file),
     }),

@@ -207,6 +207,11 @@ export function withBackend(
       if (!(await backend()).live) return sample.postStudioTest(id, message);
       await call('POST', `${server(id)}/studio/test`, message);
     },
+    async editStudioMessage(id, message, link) {
+      if (!(await backend()).live)
+        return sample.editStudioMessage(id, message, link);
+      await call('POST', `${server(id)}/studio/edit`, { message, link });
+    },
     async uploadImage(id, file) {
       if (!(await backend()).live) return sample.uploadImage(id, file);
       const res = await fetch(`${server(id)}/studio/uploads`, {

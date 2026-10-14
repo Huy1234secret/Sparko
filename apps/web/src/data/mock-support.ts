@@ -16,6 +16,7 @@ import type {
   TicketsState,
 } from './types';
 import { applyMove, folderTree, itemsIn, movesIntoItself } from './library';
+import { parseMessageLink } from './studio-format';
 
 type Helpers = {
   wait: <T>(value: T, slow?: boolean) => Promise<T>;
@@ -46,6 +47,7 @@ type SupportApi = Pick<
   | 'deleteFolder'
   | 'moveLibraryItem'
   | 'postStudioTest'
+  | 'editStudioMessage'
   | 'uploadImage'
   | 'listServerEmojis'
 >;
@@ -863,6 +865,24 @@ export function createSupportMock(h: Helpers) {
       s.studio.versions.unshift({
         id: id('v'),
         title: `Posted “${message.name}”`,
+        who: 'You',
+        whoColor: h.you().avatarColor,
+        when: 'Just now',
+        config: h.copy(message),
+      });
+      return h.wait(undefined);
+    },
+    async editStudioMessage(serverId, message, link) {
+      const target = parseMessageLink(link);
+      if (!target)
+        throw new Error(
+          'Paste a message link, like https://discord.com/channels/…/…/…',
+        );
+      if (target.guildId !== serverId)
+        throw new Error('That message is in another server.');
+      of(serverId).studio.versions.unshift({
+        id: id('v'),
+        title: `Edited a message with “${message.name}”`,
         who: 'You',
         whoColor: h.you().avatarColor,
         when: 'Just now',
