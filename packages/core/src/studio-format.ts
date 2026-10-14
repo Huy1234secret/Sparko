@@ -97,26 +97,32 @@ type LegacyV2Block =
 
 /** A picture in a Components V2 image gallery. */
 export type GalleryImage = { id: string; url: string; description: string };
-/** The parts of a Components V2 message. */
-export type V2Part = 'text' | 'gallery' | 'components';
+/**
+ * Where a button, a menu or the gallery sits in a Components V2 message:
+ * above or below the container, inside it after a line of the text (line
+ * -1 is the top of the container), or, for a button, beside a line.
+ */
+export type V2Slot =
+  | { at: 'above' }
+  | { at: 'below' }
+  | { at: 'line'; line: number }
+  | { at: 'beside'; line: number };
+/** A placed item: a button or menu by its id, or "gallery". */
+export type V2Place = { id: string; slot: V2Slot };
 /**
  * A Components V2 message: one container with a colour bar, its text
- * (split by {separator} into sections), a thumbnail beside the first
- * section, an image gallery, and the message's buttons and menus.
- * The gallery and the buttons can also sit above or below the container;
- * the text always stays inside. Each part is in exactly one of the lists.
+ * ({separator} draws a divider), a thumbnail beside the first stretch of
+ * text, and an image gallery. The message's buttons and menus, and the
+ * gallery, can sit between lines of the text, a button beside a line, or
+ * above or below the container. Items in the same place keep the order of
+ * `place`.
  */
 export type StudioV2 = {
   accent: string;
   text: string;
   thumbnail: string;
   gallery: GalleryImage[];
-  /** The parts inside the container, in the order they're shown. */
-  order: V2Part[];
-  /** Parts above the container. */
-  above: V2Part[];
-  /** Parts below the container. */
-  below: V2Part[];
+  place: V2Place[];
 };
 export type StudioMessage = {
   name: string;
@@ -136,10 +142,8 @@ export const v2Default = (): StudioV2 => ({
   text: '## Big news\nWrite your announcement here.',
   thumbnail: '',
   gallery: [],
-  // The gallery sits at the bottom until it's moved.
-  order: ['text', 'components', 'gallery'],
-  above: [],
-  below: [],
+  // Everything sits at the end of the container until it's moved.
+  place: [],
 });
 
 /** Reads a Components V2 message saved as separate blocks. */
@@ -241,35 +245,102 @@ const asEmbed = (
   };
 };
 
-const v2Of = (v: unknown): StudioV2 => {
+/** The lines of a V2 message's text, which items are placed against. */
+export const v2Lines = (text: string) => text.split('\n');
+
+const sameSlot = (a: V2Slot, b: V2Slot) =>
+  a.at === b.at &&
+  (a.at === 'above' ||
+    a.at === 'below' ||
+    a.line === (b as { line: number }).line);
+
+/**
+ * Tidies where things sit: every button and menu and the gallery gets one
+ * place (new ones go at the end of the container), lines are kept within
+ * the text, menus can't sit beside a line, and a line has at most one
+ * button beside it. Messages saved with the older part order are read too.
+ */
+export function placeOf(
+  v: Partial<StudioV2> & {
+    order?: string[];
+    above?: string[];
+    below?: string[];
+  },
+  components: StudioComponent[],
+): V2Place[] {
+  const last = v2Lines(typeof v.text === 'string' ? v.text : '').length - 1;
+  const ids = [...components.map((c) => c.id), 'gallery'];
+  let saved: V2Place[] = Array.isArray(v.place) ? v.place : [];
+  if (!Array.isArray(v.place) && Array.isArray(v.order)) {
+    // Older messages placed "the buttons" and "the gallery" as two parts,
+    // inside the container (before or after the text) or outside it.
+    const slotFor = (part: string): V2Slot => {
+      if (v.above?.includes(part)) return { at: 'above' };
+      if (v.below?.includes(part)) return { at: 'below' };
+      const order = v.order ?? [];
+      return order.indexOf(part) < order.indexOf('text')
+        ? { at: 'line', line: -1 }
+        : { at: 'line', line: last };
+    };
+    const parts = [...(v.above ?? []), ...v.order, ...(v.below ?? [])];
+    saved = parts.flatMap((part) =>
+      part === 'components'
+        ? components.map((c) => ({ id: c.id, slot: slotFor(part) }))
+        : part === 'gallery'
+          ? [{ id: 'gallery', slot: slotFor(part) }]
+          : [],
+    );
+  }
+  const kind = new Map(components.map((c) => [c.id, c.type]));
+  const seen = new Set<string>();
+  const besides = new Set<number>();
+  const out: V2Place[] = [];
+  for (const p of saved) {
+    if (!p || !ids.includes(p.id) || seen.has(p.id)) continue;
+    const s = p.slot as V2Slot | undefined;
+    let slot: V2Slot =
+      s?.at === 'above' || s?.at === 'below'
+        ? { at: s.at }
+        : (s?.at === 'line' || s?.at === 'beside') && Number.isInteger(s.line)
+          ? {
+              at: s.at,
+              line: Math.max(
+                s.at === 'beside' ? 0 : -1,
+                Math.min(last, s.line),
+              ),
+            }
+          : { at: 'line', line: last };
+    if (slot.at === 'beside') {
+      if (kind.get(p.id) !== 'button' || besides.has(slot.line))
+        slot = { at: 'line', line: slot.line };
+      else besides.add(slot.line);
+    }
+    seen.add(p.id);
+    out.push({ id: p.id, slot });
+  }
+  for (const id of ids)
+    if (!seen.has(id)) out.push({ id, slot: { at: 'line', line: last } });
+  return out;
+}
+
+const v2Of = (v: unknown, components: StudioComponent[]): StudioV2 => {
   const x = (v ?? {}) as Partial<StudioV2> & { blocks?: LegacyV2Block[] };
-  if (Array.isArray(x.blocks)) return fromBlocks(x).v2;
-  const base = v2Default();
-  // Each part goes in one place; text is always inside, and anything
-  // missing goes back inside.
-  const seen = new Set<V2Part>();
-  const take = (list: unknown, outside: boolean) =>
-    (Array.isArray(list) ? list : []).filter((p): p is V2Part => {
-      const ok =
-        (p === 'gallery' || p === 'components' || (p === 'text' && !outside)) &&
-        !seen.has(p);
-      if (ok) seen.add(p);
-      return ok;
-    });
-  const above = take(x.above, true);
-  const below = take(x.below, true);
-  const inside = take(x.order ?? base.order, false);
-  const order = [...inside, ...base.order.filter((p) => !seen.has(p))];
+  const base = Array.isArray(x.blocks) ? fromBlocks(x).v2 : v2Default();
+  const merged = Array.isArray(x.blocks)
+    ? base
+    : { ...base, ...x, place: x.place as V2Place[] };
   return {
-    accent: typeof x.accent === 'string' ? x.accent : base.accent,
-    text: typeof x.text === 'string' ? x.text : base.text,
-    thumbnail: typeof x.thumbnail === 'string' ? x.thumbnail : '',
-    gallery: Array.isArray(x.gallery) ? x.gallery : [],
-    order,
-    above,
-    below,
+    accent: typeof merged.accent === 'string' ? merged.accent : base.accent,
+    text: typeof merged.text === 'string' ? merged.text : base.text,
+    thumbnail: typeof merged.thumbnail === 'string' ? merged.thumbnail : '',
+    gallery: Array.isArray(merged.gallery) ? merged.gallery : [],
+    place: placeOf(merged, components),
   };
 };
+
+/** The items placed in a slot, in order. */
+export const placedIn = (place: V2Place[], slot: V2Slot) =>
+  place.filter((p) => sameSlot(p.slot, slot));
 
 /** Fills in parts older saved messages don't have. */
 export const normaliseStudio = (input: StudioMessage): StudioMessage => {
@@ -285,26 +356,27 @@ export const normaliseStudio = (input: StudioMessage): StudioMessage => {
     : embed && useEmbed !== false
       ? [embed]
       : [];
+  const components: StudioComponent[] = Array.isArray(m.components)
+    ? m.components
+    : buttons.map(
+        (b): StudioButton => ({
+          id: b.id,
+          type: 'button',
+          label: b.label,
+          emoji: '',
+          colour: 'grey',
+          link: true,
+          url: b.url,
+          actions: [],
+        }),
+      );
   return {
     ...(m as StudioMessage),
     content: typeof m.content === 'string' ? m.content : '',
-    components: Array.isArray(m.components)
-      ? m.components
-      : buttons.map(
-          (b): StudioButton => ({
-            id: b.id,
-            type: 'button',
-            label: b.label,
-            emoji: '',
-            colour: 'grey',
-            link: true,
-            url: b.url,
-            actions: [],
-          }),
-        ),
+    components,
     embeds: embeds.map(asEmbed),
     layout: m.layout === 'v2' ? 'v2' : 'embed',
-    v2: v2Of(m.v2),
+    v2: v2Of(m.v2, components),
   };
 };
 
@@ -625,15 +697,46 @@ export function studioPayload(
   const fill = (text: string) => fillVariables(text, ctx);
   if (m.layout === 'v2') {
     const v = m.v2;
-    const sections = v2Sections(v.text);
-    const text = sections.flatMap((t, i) => {
-      const parts: object[] = [];
-      if (i > 0) parts.push({ type: 14, divider: true, spacing: 1 });
-      if (!t.trim()) return parts;
-      const display = { type: 10, content: fill(t) };
+    const byId = new Map(m.components.map((c) => [c.id, c]));
+    const gallery = {
+      type: 12,
+      items: v.gallery.map((i) => ({
+        media: { url: i.url },
+        ...(i.description ? { description: i.description } : {}),
+      })),
+    };
+    // Items in one place, in order: rows of buttons and menus, and the gallery.
+    const items = (slot: V2Slot) => {
+      const out: object[] = [];
+      let run: StudioComponent[] = [];
+      const flushRun = () => {
+        out.push(...componentsPayload(run, fill));
+        run = [];
+      };
+      for (const p of placedIn(v.place, slot)) {
+        const c = byId.get(p.id);
+        if (c) run.push(c);
+        else if (p.id === 'gallery' && v.gallery.length) {
+          flushRun();
+          out.push(gallery);
+        }
+      }
+      flushRun();
+      return out;
+    };
+    // The container: the text line by line, cut where {separator} is or
+    // where something is placed, with buttons beside the lines they're on.
+    const inside: object[] = [...items({ at: 'line', line: -1 })];
+    let chunk: string[] = [];
+    let thumbnail = !!v.thumbnail;
+    const flush = () => {
+      const text = chunk.join('\n').replace(/^\n+|\n+$/g, '');
+      chunk = [];
+      if (!text.trim()) return;
+      const display = { type: 10, content: fill(text) };
       // The thumbnail sits beside the first stretch of text.
-      parts.push(
-        i === 0 && v.thumbnail
+      inside.push(
+        thumbnail
           ? {
               type: 9,
               components: [display],
@@ -641,35 +744,47 @@ export function studioPayload(
             }
           : display,
       );
-      return parts;
+      thumbnail = false;
+    };
+    v2Lines(v.text).forEach((line, i) => {
+      const beside = placedIn(v.place, { at: 'beside', line: i })
+        .map((p) => byId.get(p.id))
+        .find((c) => c?.type === 'button');
+      const pieces = line.split('{separator}');
+      pieces.forEach((piece, j) => {
+        if (j > 0) {
+          flush();
+          inside.push({ type: 14, divider: true, spacing: 1 });
+        }
+        if (!beside || j < pieces.length - 1) chunk.push(piece);
+      });
+      if (beside) {
+        // The line (its last part, after any divider) gets the button.
+        flush();
+        inside.push({
+          type: 9,
+          components: [
+            { type: 10, content: fill(pieces.at(-1)!.trim()) || '\u200b' },
+          ],
+          accessory: componentsPayload([beside], fill)[0]!.components[0],
+        });
+      }
+      const after = items({ at: 'line', line: i });
+      if (after.length) {
+        flush();
+        inside.push(...after);
+      }
     });
-    const gallery = v.gallery.length
-      ? [
-          {
-            type: 12,
-            items: v.gallery.map((i) => ({
-              media: { url: i.url },
-              ...(i.description ? { description: i.description } : {}),
-            })),
-          },
-        ]
-      : [];
-    const partOf = (part: V2Part) =>
-      part === 'text'
-        ? text
-        : part === 'gallery'
-          ? gallery
-          : componentsPayload(m.components, fill);
-    const inside = v.order.flatMap(partOf);
+    flush();
     return {
       flags: IS_COMPONENTS_V2,
       // Rows of buttons and galleries can also sit outside the container.
       components: [
-        ...v.above.flatMap(partOf),
+        ...items({ at: 'above' }),
         ...(inside.length
           ? [{ type: 17, accent_color: colour(v.accent), components: inside }]
           : []),
-        ...v.below.flatMap(partOf),
+        ...items({ at: 'below' }),
       ],
       allowed_mentions,
     };

@@ -752,7 +752,22 @@ const dcStyle: Record<ButtonColour, string> = {
   red: 'dc-btn--danger',
 };
 
-function ComponentItem({
+/** What an item needs from whatever lets it be dragged. */
+export type ItemDrag = {
+  item: (
+    i: number,
+    key?: string,
+  ) => { [attr: `data-${string}`]: string | number | undefined };
+  start: (i: number) => (e: React.PointerEvent<HTMLElement>) => void;
+  keys: (
+    i: number,
+    count: number,
+  ) => (e: React.KeyboardEvent<HTMLElement>) => void;
+  dropClass: (i: number, count?: number) => string | null;
+};
+
+/** A button or menu in the preview: click to edit it, drag its dots to move it. */
+export function ComponentItem({
   component,
   index,
   count,
@@ -764,7 +779,7 @@ function ComponentItem({
   component: StudioComponent;
   index: number;
   count: number;
-  reorder: Omit<ReturnType<typeof useReorder>, 'list'>;
+  reorder: ItemDrag;
   startOpen: boolean;
   onChange: (c: StudioComponent) => void;
   onRemove: () => void;

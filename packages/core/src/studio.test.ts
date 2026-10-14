@@ -68,9 +68,7 @@ const v2: StudioMessage = {
     gallery: [
       { id: 'i', url: 'https://img.example/1.png', description: 'One' },
     ],
-    order: ['text', 'components', 'gallery'],
-    above: [],
-    below: [],
+    place: [],
   },
   components: [
     {
@@ -180,50 +178,61 @@ describe('Message Studio messages', () => {
     );
     expect('content' in body).toBe(false);
     // The gallery can be moved, say to the top.
-    const moved = studioPayload(
-      { ...v2, v2: { ...v2.v2, order: ['gallery', 'text', 'components'] } },
-      { now: 0 },
-    ) as unknown as typeof body;
+    const at = (place: StudioMessage['v2']['place']) =>
+      studioPayload(
+        { ...v2, v2: { ...v2.v2, place } },
+        {
+          now: 0,
+        },
+      ) as unknown as typeof body;
+    const moved = at([{ id: 'gallery', slot: { at: 'line', line: -1 } }]);
     expect(moved.components[0]!.components[0]!.type).toBe(12);
-    // The buttons and the gallery can sit outside the container too.
-    const outside = studioPayload(
+    // A button can sit beside a line, as a section with the button on it.
+    const beside = at([{ id: 'x', slot: { at: 'beside', line: 0 } }]);
+    expect(beside.components[0]!.components.map((c) => c.type)).toEqual([
+      9, 14, 9, 12,
+    ]);
+    expect(beside.components[0]!.components[2]).toMatchObject({
+      type: 9,
+      components: [{ content: 'Prize' }],
+      accessory: { type: 2, label: 'Rules' },
+    });
+    // …or between lines.
+    const lines = studioPayload(
       {
         ...v2,
         v2: {
           ...v2.v2,
-          order: ['text'],
-          above: ['gallery'],
-          below: ['components'],
+          text: 'One\nTwo',
+          thumbnail: '',
+          place: [{ id: 'x', slot: { at: 'line', line: 0 } }],
         },
       },
       { now: 0 },
     ) as unknown as typeof body;
+    expect(lines.components[0]!.components.map((c) => c.type)).toEqual([
+      10, 1, 10, 12,
+    ]);
+    // The buttons and the gallery can sit outside the container too.
+    const outside = at([
+      { id: 'gallery', slot: { at: 'above' } },
+      { id: 'x', slot: { at: 'below' } },
+    ]);
     expect(outside.components.map((c) => c.type)).toEqual([12, 17, 1]);
     expect(outside.components[1]!.components.map((c) => c.type)).toEqual([
       9, 14, 10,
     ]);
     // With nothing inside, there's no empty container.
-    const bare = studioPayload(
-      {
-        ...v2,
-        v2: {
-          ...v2.v2,
-          text: '',
-          order: ['text', 'gallery'],
-          below: ['components'],
-        },
-      },
-      { now: 0 },
-    ) as unknown as typeof body;
-    expect(bare.components.map((c) => c.type)).toEqual([17, 1]);
     const empty = studioPayload(
       {
         ...v2,
         v2: {
           ...v2.v2,
           text: '',
-          order: ['text'],
-          above: ['gallery', 'components'],
+          place: [
+            { id: 'gallery', slot: { at: 'above' } },
+            { id: 'x', slot: { at: 'above' } },
+          ],
         },
       },
       { now: 0 },
@@ -231,19 +240,48 @@ describe('Message Studio messages', () => {
     expect(empty.components.map((c) => c.type)).toEqual([12, 1]);
   });
 
-  it('keeps each V2 part in one place, with the text inside', () => {
+  it('keeps every V2 item in one valid place', () => {
+    const menu = {
+      id: 'm',
+      type: 'menu',
+      placeholder: '',
+      multiple: false,
+      options: [],
+    } as unknown as StudioMessage['components'][number];
     const m = normaliseStudio({
       ...v2,
+      components: [...v2.components, menu],
       v2: {
         ...v2.v2,
-        order: ['gallery'],
-        above: ['text', 'components', 'gallery'],
-        below: ['components'],
+        place: [
+          { id: 'x', slot: { at: 'beside', line: 9 } },
+          { id: 'x', slot: { at: 'above' } },
+          { id: 'm', slot: { at: 'beside', line: 0 } },
+          { id: 'gone', slot: { at: 'above' } },
+        ],
       },
     });
-    expect(m.v2.above).toEqual(['components', 'gallery']);
-    expect(m.v2.below).toEqual([]);
-    expect(m.v2.order).toEqual(['text']);
+    // Lines stay within the text, menus can't sit beside a line, and
+    // anything unplaced goes to the end of the container.
+    expect(m.v2.place).toEqual([
+      { id: 'x', slot: { at: 'beside', line: 0 } },
+      { id: 'm', slot: { at: 'line', line: 0 } },
+      { id: 'gallery', slot: { at: 'line', line: 0 } },
+    ]);
+    // Messages saved with the older part order are read too.
+    const { place: _, ...older } = v2.v2;
+    const old = normaliseStudio({
+      ...v2,
+      v2: {
+        ...older,
+        order: ['gallery', 'text'],
+        below: ['components'],
+      } as unknown as StudioMessage['v2'],
+    });
+    expect(old.v2.place).toEqual([
+      { id: 'gallery', slot: { at: 'line', line: -1 } },
+      { id: 'x', slot: { at: 'below' } },
+    ]);
   });
 
   it('reads Components V2 messages saved as blocks', () => {
@@ -255,9 +293,13 @@ describe('Message Studio messages', () => {
       gallery: [
         { id: 'i', url: 'https://img.example/1.png', description: 'One' },
       ],
-      order: ['text', 'components', 'gallery'],
-      above: [],
-      below: [],
+      place: [
+        ...m.components.map((c) => ({
+          id: c.id,
+          slot: { at: 'line', line: 2 },
+        })),
+        { id: 'gallery', slot: { at: 'line', line: 2 } },
+      ],
     });
     expect(m.components).toMatchObject([
       { type: 'button', link: true, label: 'Rules' },

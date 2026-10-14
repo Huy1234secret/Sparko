@@ -7,6 +7,9 @@ export {
   studioVariables,
   v2Sections,
   normaliseStudio,
+  placeOf,
+  placedIn,
+  v2Lines,
   studioPayload,
   studioProblem,
 } from '../../../../packages/core/src/studio-format.ts';

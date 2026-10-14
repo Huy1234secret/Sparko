@@ -208,23 +208,29 @@ export type TicketsState = {
 
 export type LinkButton = { id: string; label: string; url: string };
 export type GalleryImage = { id: string; url: string; description: string };
-/** The parts of a Components V2 message. */
-export type V2Part = 'text' | 'gallery' | 'components';
+/**
+ * Where a button, a menu or the gallery sits in a Components V2 message:
+ * above or below the container, inside it after a line of the text (line
+ * -1 is the top), or, for a button, beside a line.
+ */
+export type V2Slot =
+  | { at: 'above' }
+  | { at: 'below' }
+  | { at: 'line'; line: number }
+  | { at: 'beside'; line: number };
+/** A placed item: a button or menu by its id, or "gallery". */
+export type V2Place = { id: string; slot: V2Slot };
 /**
  * A Components V2 message: one container with a colour bar, its text
- * (split by {separator}), a thumbnail, an image gallery, and the message's
- * buttons and menus.
+ * ({separator} draws a divider), a thumbnail, an image gallery, and where
+ * each button, menu and the gallery sits.
  */
 export type StudioV2 = {
   accent: string;
   text: string;
   thumbnail: string;
   gallery: GalleryImage[];
-  /** The parts inside the container, in order. */
-  order: V2Part[];
-  /** The gallery or buttons can sit above or below the container instead. */
-  above: V2Part[];
-  below: V2Part[];
+  place: V2Place[];
 };
 
 export type StudioMessage = {
