@@ -60,8 +60,13 @@ function open(path: string) {
 describe('entry pages', () => {
   it('signs in and lists servers with Sparko apart from ones to add it to', async () => {
     const router = open('/signin');
+    // The first page in this file waits for the dashboard code to load.
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Continue with Discord' }),
+      await screen.findByRole(
+        'button',
+        { name: 'Continue with Discord' },
+        { timeout: 4000 },
+      ),
     );
     expect(
       await screen.findByRole(
