@@ -379,9 +379,7 @@ const studioDefault = (server: Server, channelId: string): StudioMessage => ({
     text: '## Spring Art Jam\nDraw anything with the theme **bloom**, {user}.{separator}**Deadline:** Sunday 22:00\n**Prize:** Artist role + 2,000 XP',
     thumbnail: '',
     gallery: [],
-    order: ['text', 'components', 'gallery'],
-    above: [],
-    below: [],
+    place: [],
   },
 });
 const simple = (

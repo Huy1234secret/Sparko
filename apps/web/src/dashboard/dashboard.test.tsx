@@ -895,23 +895,29 @@ describe('Components V2 in the editor', () => {
     expect(json()).toMatch(/"type": 12/);
     expect(json()).toMatch(/img\.example\/a\.png/);
 
-    // The gallery can move above the text.
-    screen.getByRole('button', { name: /Move the gallery/ }).focus();
-    await userEvent.keyboard('{ArrowUp}{ArrowUp}');
-    expect(json().indexOf('"type": 12')).toBeLessThan(
-      json().indexOf('Summer Jam'),
-    );
-    // …and out of the container, below it.
-    for (let i = 0; i < 4; i++) {
+    // The gallery can move above the text, and out of the container.
+    const moveGallery = async (key: string) => {
       screen.getByRole('button', { name: /Move the gallery/ }).focus();
-      await userEvent.keyboard('{ArrowDown}');
-    }
-    expect(document.querySelector('.sp-v2-part--gallery')).toHaveClass(
-      'is-outside',
-    );
+      await userEvent.keyboard(key);
+    };
+    await moveGallery('{ArrowUp}');
     expect(json().indexOf('"type": 17')).toBeLessThan(
       json().indexOf('"type": 12'),
     );
+    expect(json().indexOf('"type": 12')).toBeLessThan(
+      json().indexOf('Summer Jam'),
+    );
+    await moveGallery('{ArrowUp}');
+    expect(json().indexOf('"type": 12')).toBeLessThan(
+      json().indexOf('"type": 17'),
+    );
+    // A button can sit beside a line of the text.
+    screen.getByRole('button', { name: /Move button Jam rules/ }).focus();
+    await userEvent.keyboard('{ArrowUp}');
+    expect(json()).toMatch(/"accessory": \{\s+"type": 2/);
+    expect(
+      document.querySelector('.sp-v2-text__side .sp-comp'),
+    ).toHaveTextContent('Jam rules');
     await userEvent.click(
       screen.getByRole('button', { name: 'Remove image 1' }),
     );
