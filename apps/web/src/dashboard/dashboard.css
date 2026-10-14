@@ -2377,3 +2377,165 @@
   color: var(--sp-muted);
   font: 400 12px/16px var(--sp-font-sans);
 }
+
+/* Dropdowns: picked values as outlined chips, an animated search box, and
+   options that outline on hover and draw a tick when picked. Roles are
+   filled with their colour (or gradient): faint until hovered or picked. */
+.sp-combo__trigger {
+  overflow: hidden;
+}
+.sp-combo__trigger.sp-input--chips {
+  min-height: 44px;
+}
+.sp-combo__trigger .sp-input__value {
+  overflow: visible;
+}
+.sp-combo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--sp-brand-edge);
+  border-radius: var(--sp-radius-chip);
+  color: var(--sp-text);
+  font: 500 13px/18px var(--sp-font-sans);
+  white-space: nowrap;
+}
+.sp-combo-chip:has(.sp-chip__remove) {
+  padding-right: 4px;
+}
+.sp-combo-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-combo-chip .sp-i {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+.sp-combo-chip--role {
+  border-color: transparent;
+  background: var(--role-fill);
+  color: #fff;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+}
+.sp-combo-chip--role .sp-chip__remove {
+  color: #fff;
+}
+.sp-combo-chip--role .sp-chip__remove:hover {
+  background: rgb(0 0 0 / 0.25);
+  color: #fff;
+}
+
+.sp-combo > .sp-combo__pop {
+  max-width: 400px;
+}
+.sp-combo__search-icon {
+  color: var(--sp-muted);
+}
+.sp-popover__search:focus-within .sp-combo__search-icon {
+  color: var(--sp-text);
+}
+/* No scroll bars; the list still scrolls. */
+.sp-combo__list,
+.sp-combo__trigger {
+  scrollbar-width: none;
+}
+.sp-combo__list::-webkit-scrollbar,
+.sp-combo__trigger::-webkit-scrollbar {
+  display: none;
+}
+
+.sp-combo-option {
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 40px;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition:
+    background-color var(--sp-dur-fast) var(--sp-ease-out),
+    box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-combo-option[data-active='true'],
+.sp-combo-option[aria-selected='true'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--sp-brand-edge);
+}
+.sp-combo-option[aria-selected='true'] {
+  padding-right: 0;
+}
+.sp-combo-option[aria-disabled='true'] {
+  box-shadow: none;
+}
+.sp-combo-option__tick {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  flex: none;
+  width: 52px;
+  margin: 1px 1px 1px auto;
+  padding-left: 12px;
+  border-radius: 0 calc(var(--sp-radius-chip) - 1px)
+    calc(var(--sp-radius-chip) - 1px) 0;
+  background: linear-gradient(90deg, transparent, var(--sp-brand) 12px);
+  color: var(--sp-on-brand);
+  transition: opacity var(--sp-dur-base) var(--sp-ease-out);
+}
+.sp-combo-option__tick.is-leaving {
+  opacity: 0;
+  transition-delay: 0.45s;
+}
+
+/* Role options sit on their colour at 25%, and full when hovered or picked;
+   the text stays at full strength on top. */
+.sp-combo-option--role {
+  margin-block: 2px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+}
+.sp-combo-option--role::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--role-fill);
+  opacity: 0.25;
+  transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-combo-option--role > .sp-i {
+  color: inherit;
+}
+.sp-combo-option--role[data-active='true'],
+.sp-combo-option--role[aria-selected='true'] {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.55);
+}
+.sp-combo-option--role[data-active='true']::before,
+.sp-combo-option--role[aria-selected='true']::before {
+  opacity: 1;
+}
+.sp-combo-option--role[aria-disabled='true']::before {
+  opacity: 0.25;
+}
+.sp-combo-option--role .sp-option__meta {
+  color: inherit;
+}
+.sp-combo-option--role .sp-combo-option__tick {
+  width: 28px;
+  height: 28px;
+  margin: auto 6px auto auto;
+  padding: 0;
+  align-self: center;
+  border-radius: 6px;
+  background: #fff;
+  color: #1c1917;
+}
+[data-theme='light']
+  .sp-combo-option--role:not([data-active='true']):not([aria-selected='true']) {
+  color: var(--sp-text);
+  text-shadow: none;
+}

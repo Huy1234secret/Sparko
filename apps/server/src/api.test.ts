@@ -48,8 +48,14 @@ const view = (): GuildView => ({
     },
   ],
   roles: [
-    { id: '301', name: 'Moderator', color: 0, managed: false },
-    { id: '302', name: 'Sparko', color: 0, managed: true },
+    {
+      id: '301',
+      name: 'Moderator',
+      color: 0xfacc15,
+      color2: 0xed4245,
+      managed: false,
+    },
+    { id: '302', name: 'Sparko', color: 0, color2: null, managed: true },
   ],
 });
 /** Signed in as Quinn, who manages server 9001 only. */
@@ -528,8 +534,11 @@ describe('server API', () => {
       roles: { id: string; name: string }[];
       sendLimit: number;
     }>(await call('/9001/studio'));
-    // Discord's own bot roles can't be given out, so they aren't listed.
-    expect(studio.roles.map((r) => r.name)).toEqual(['Moderator']);
+    // Discord's own bot roles can't be given out, so they aren't listed;
+    // gradient roles bring both colours.
+    expect(studio.roles).toEqual([
+      { id: '301', name: 'Moderator', color: '#facc15', color2: '#ed4245' },
+    ]);
     expect(studio.sendLimit).toBe(1);
     const tooMany = {
       ...studio.message,

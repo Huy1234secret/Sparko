@@ -22,7 +22,14 @@ export type GuildView = {
   /** Sparko's server-wide permissions. */
   perms: bigint;
   channels: ChannelView[];
-  roles: { id: string; name: string; color: number; managed: boolean }[];
+  roles: {
+    id: string;
+    name: string;
+    color: number;
+    /** The second colour of a gradient role, if it is one. */
+    color2: number | null;
+    managed: boolean;
+  }[];
 };
 
 type DiscordChannel = {
@@ -56,6 +63,7 @@ export function guildViews(rest: Rest, ttlMs = 60_000) {
         roles: (RoleInfo & {
           name: string;
           color: number;
+          colors?: { secondary_color?: number | null };
           position: number;
           managed: boolean;
         })[];
@@ -118,6 +126,7 @@ export function guildViews(rest: Rest, ttlMs = 60_000) {
         id: r.id,
         name: r.name,
         color: r.color,
+        color2: r.colors?.secondary_color ?? null,
         managed: r.managed,
       }));
     return { perms, channels: list, roles };
