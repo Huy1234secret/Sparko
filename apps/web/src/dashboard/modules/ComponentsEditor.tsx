@@ -42,7 +42,7 @@ import {
 } from './EditorBits';
 import { EmojiField } from './EmojiPicker';
 import { PlusMenu } from './PlusMenu';
-import { newId } from './parts';
+import { newId, roleItems } from './parts';
 import dragIcon from '../../../../../design-system/assets/icons/drag.png';
 import linkIcon from '../../../../../design-system/assets/icons/external-link.png';
 import { animIcons } from '../../ui';
@@ -222,14 +222,10 @@ function ActionCard({
         }
       : {}),
   }));
-  const roleItems: ComboItem[] = data.roles.map((r) => ({
-    value: r.id,
-    label: r.name,
-    icon: 'at-sign',
-    // Roles without a colour show in Discord's grey.
-    color: r.color ?? '#99AAB5',
-    ...(r.color && r.color2 ? { color2: r.color2 } : {}),
-  }));
+  const roles = roleItems(
+    data.roles,
+    action.type === 'role' ? action.roles : [],
+  );
   return (
     <li
       {...reorder.item(index, action.id)}
@@ -320,7 +316,7 @@ function ActionCard({
               label={<span className="sp-sr-only">Roles</span>}
               placeholder="Pick roles"
               searchPlaceholder="Search roles"
-              items={roleItems}
+              items={roles}
               value={action.roles}
               onChange={(roles) => onChange({ ...action, roles })}
             />

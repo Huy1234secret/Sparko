@@ -1,4 +1,4 @@
-import type { GreetKind, WelcomeConfig } from './studio-format';
+import type { GreetKind, ReactionRole, WelcomeConfig } from './studio-format';
 
 /**
  * What the dashboard reads and writes. The sample source (mock.ts) and,
@@ -112,7 +112,51 @@ export type ApplyResult =
   | { status: 'live' }
   | { status: 'error'; message: string };
 
+/** A role as pickers show it. */
+export type RoleOption = {
+  id: string;
+  name: string;
+  color: string | null;
+  /** The second colour of a gradient role. */
+  color2?: string | null;
+  /** False when it's above Sparko's own role, so Sparko can't give it. */
+  assignable?: boolean;
+};
+
+export type RRTemplate = {
+  id: string;
+  name: string;
+  meta: string;
+  config: ReactionRole;
+};
+export type RRLogEntry = {
+  id: string;
+  action: 'added' | 'removed' | 'refused' | 'failed';
+  template: string;
+  userId: string;
+  userName: string;
+  roleId: string;
+  reason: string;
+  at: number;
+};
+export type RRState = {
+  templates: RRTemplate[];
+  limit: number;
+  channels: Channel[];
+  roles: RoleOption[];
+  log: RRLogEntry[];
+};
+
 export interface PanelApi {
+  getReactionRoles(serverId: string): Promise<RRState>;
+  addReactionRole(serverId: string, name: string): Promise<{ id: string }>;
+  saveReactionRole(
+    serverId: string,
+    id: string,
+    change: { name?: string; config?: ReactionRole },
+  ): Promise<void>;
+  cloneReactionRole(serverId: string, id: string): Promise<{ id: string }>;
+  deleteReactionRole(serverId: string, id: string): Promise<void>;
   /** Null when signed out. */
   getSession(): Promise<Session | null>;
   signOut(): Promise<void>;
@@ -315,6 +359,8 @@ export type StudioTemplate = {
   /** "Saved 5 min ago by Rhea". */
   meta: string;
   message: StudioMessage;
+  /** Where else it's used, for the tags on its card. */
+  usedIn?: { kind: 'welcome' | 'reaction-role'; where: string }[];
 };
 export type StudioFolder = {
   id: string;
@@ -336,13 +382,7 @@ export type StudioState = {
   templates: StudioTemplate[];
   folders: StudioFolder[];
   /** Roles a button can give or take; Discord's own bot roles are left out. */
-  roles: {
-    id: string;
-    name: string;
-    color: string | null;
-    /** The second colour of a gradient role. */
-    color2?: string | null;
-  }[];
+  roles: RoleOption[];
   /** How many templates one "Send message" action can send on this plan. */
   sendLimit: number;
   templateLimit: number;

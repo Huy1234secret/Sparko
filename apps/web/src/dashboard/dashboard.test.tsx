@@ -372,6 +372,60 @@ describe('Welcome messages', () => {
   });
 });
 
+describe('Reaction roles', () => {
+  it('adds one, sets its roles and checks them before saving', async () => {
+    open(`${pixel}/role-menus?tab=items`);
+    expect(
+      await screen.findByText(/You have 0\/10/, {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /RR Template/ }));
+    expect(await screen.findByText(/You’re editing/)).toHaveTextContent(
+      'Reaction role',
+    );
+    // Roles Sparko can't give can't be picked.
+    await userEvent.click(
+      screen.getByRole('button', { name: /Reaction 1 role/ }),
+    );
+    expect(screen.getByRole('option', { name: /Moderator/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await userEvent.click(screen.getByRole('option', { name: /Artist/ }));
+
+    // A second reaction with the same emoji is refused on save.
+    await userEvent.click(screen.getByRole('button', { name: 'Add reaction' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText('Give each reaction an emoji.'),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove item 2' }),
+    );
+
+    // Buttons get their settings from the gear.
+    await userEvent.click(screen.getByRole('radio', { name: 'Buttons' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /^Settings for/ }),
+    );
+    const dialog = screen.getByRole('dialog', { name: /Editing/ });
+    expect(
+      within(dialog).getByRole('button', { name: /Gives role/ }),
+    ).toHaveTextContent('Artist');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+
+    // It has an emoji, so it saves and goes live.
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Live in #/, { selector: '.sp-pipeline__step' }),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('logs each role it gave or took', async () => {
+    open(`${pixel}/role-menus?tab=history`);
+    expect(await screen.findByText('Nothing yet')).toBeInTheDocument();
+  });
+});
+
 describe('Tickets', () => {
   it('lists tickets needing a reply, longest waits first, and searches them', async () => {
     open(`${pixel}/tickets`);

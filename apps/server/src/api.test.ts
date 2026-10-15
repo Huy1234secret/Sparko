@@ -55,8 +55,16 @@ const view = (): GuildView => ({
       color: 0xfacc15,
       color2: 0xed4245,
       managed: false,
+      assignable: true,
     },
-    { id: '302', name: 'Sparko', color: 0, color2: null, managed: true },
+    {
+      id: '302',
+      name: 'Sparko',
+      color: 0,
+      color2: null,
+      managed: true,
+      assignable: false,
+    },
   ],
 });
 /** Signed in as Quinn, who manages server 9001 only. */
@@ -478,6 +486,75 @@ describe('server API', () => {
     ).toHaveLength(0);
   });
 
+  it('makes reaction roles, checks them, and has the bot post them', async () => {
+    const made = await body<{ id: string }>(
+      await call('/9001/reaction-roles', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Games' }),
+      }),
+    );
+    type RR = {
+      templates: {
+        id: string;
+        name: string;
+        config: { message: string; items: { role: string }[] };
+      }[];
+      roles: { id: string; assignable: boolean }[];
+      limit: number;
+    };
+    const state = await body<RR>(await call('/9001/reaction-roles'));
+    expect(state.limit).toBe(10);
+    expect(state.roles).toContainEqual(
+      expect.objectContaining({ id: '302', assignable: false }),
+    );
+    const rr = state.templates.find((t) => t.id === made.id)!;
+    // A role Sparko can't give is refused.
+    const bad = await call(`/9001/reaction-roles/${made.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        config: {
+          ...rr.config,
+          items: rr.config.items.map((i) => ({ ...i, role: '302' })),
+        },
+      }),
+    });
+    expect((await body<{ message: string }>(bad)).message).toContain(
+      'can’t give that role',
+    );
+    const ok = await call(`/9001/reaction-roles/${made.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        config: {
+          ...rr.config,
+          items: rr.config.items.map((i) => ({ ...i, role: '301' })),
+        },
+      }),
+    });
+    expect(ok.status).toBe(204);
+    let job = claimJob(db)!;
+    while (job.kind !== 'rr-sync') {
+      finishJob(db, job.id, null, Date.now());
+      job = claimJob(db)!;
+    }
+    expect(job.payload).toEqual({ id: made.id });
+    finishJob(db, job.id, null, Date.now());
+
+    // Its message template is tagged in Message Studio.
+    const studio = await body<{
+      templates: { id: string; usedIn: { kind: string; where: string }[] }[];
+    }>(await call('/9001/studio'));
+    expect(
+      studio.templates.find((t) => t.id === rr.config.message)?.usedIn,
+    ).toEqual([{ kind: 'reaction-role', where: 'Reaction roles (Games)' }]);
+
+    // Deleting it has the bot take the message down.
+    await call(`/9001/reaction-roles/${made.id}`, { method: 'DELETE' });
+    expect(claimJob(db)?.kind).toBe('rr-sync');
+    await call(`/9001/studio/templates/${rr.config.message}`, {
+      method: 'DELETE',
+    });
+  });
+
   it('keeps templates in folders, in the order people put them', async () => {
     type Library = {
       templates: { id: string; name: string; folderId: string | null }[];
@@ -569,7 +646,13 @@ describe('server API', () => {
     // Discord's own bot roles can't be given out, so they aren't listed;
     // gradient roles bring both colours.
     expect(studio.roles).toEqual([
-      { id: '301', name: 'Moderator', color: '#facc15', color2: '#ed4245' },
+      {
+        id: '301',
+        name: 'Moderator',
+        color: '#facc15',
+        color2: '#ed4245',
+        assignable: true,
+      },
     ]);
     expect(studio.sendLimit).toBe(1);
     const tooMany = {

@@ -5,6 +5,7 @@ import { RevealIcon, animIcons, type RevealHover } from '../ui';
 const animated: Record<string, RevealHover | undefined> = {
   studio: animIcons.studio,
   welcome: animIcons.hand,
+  'role-menus': animIcons.reactionRole,
 };
 
 /**

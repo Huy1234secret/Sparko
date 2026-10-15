@@ -21,6 +21,7 @@ import {
   PausedNotice,
   SavePipeline,
   syncState,
+  editorTabIcons,
   useModuleTab,
   useSaveFlow,
 } from './frame';
@@ -397,6 +398,7 @@ export function StudioModule({
         tab={tab}
         onChange={setTab}
         labels={['Editor', 'Templates', 'Versions']}
+        icons={editorTabIcons.slice(0, 2)}
         counts={[
           undefined,
           studio.data.templates.length,

@@ -33,6 +33,7 @@ import {
   type StudioTemplate,
 } from '../../data';
 import { AnimatedIconButton, measure, slideFrom } from './EditorBits';
+import { svgIcons } from '../../ui';
 
 import folderAddAnim from '../../../../../design-system/assets/icons/folder-icon-add.json?url';
 import folderSvg from '../../../../../design-system/assets/icons/folder-icon.svg?url';
@@ -64,6 +65,33 @@ function MaskIcon({ src, label }: { src: string; label: string }) {
       aria-label={label}
       style={{ '--sp-mask': `url("${src}")` } as CSSProperties}
     />
+  );
+}
+
+const tagLook = {
+  welcome: { label: 'Welcome Message', icon: svgIcons.welcomeTag },
+  'reaction-role': { label: 'Reaction Role', icon: svgIcons.reactionRole },
+} as const;
+
+/** Tags for where else a template is used; hovering says exactly where. */
+function UsedTags({ uses }: { uses: NonNullable<StudioTemplate['usedIn']> }) {
+  const kinds = [...new Set(uses.map((u) => u.kind))];
+  return (
+    <span className="sp-lib-tags">
+      {kinds.map((kind) => {
+        const where = uses.filter((u) => u.kind === kind).map((u) => u.where);
+        return (
+          <span
+            key={kind}
+            className={`sp-lib-tag sp-lib-tag--${kind}`}
+            title={`This message template is currently being used in ${where.join(', ')}.`}
+          >
+            <MaskIcon src={tagLook[kind].icon} label="" />
+            {tagLook[kind].label}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
@@ -659,6 +687,9 @@ export function StudioLibrary({
                     }
                     added={added[key] ?? 0}
                   />
+                )}
+                {x.kind === 'template' && !!x.item.usedIn?.length && (
+                  <UsedTags uses={x.item.usedIn} />
                 )}
                 <div className="sp-lib-card__titles">
                   <h3 className="sp-lib-card__name">

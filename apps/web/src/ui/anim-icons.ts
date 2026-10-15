@@ -84,6 +84,10 @@ export const animIcons = {
   boostMessage: pair('boost-message-icon'),
   log: pair('log-icon'),
   sparkle: pair('sparkle-icon'),
+  /** Reaction roles: the module, and the Editor and Templates tabs. */
+  reactionRole: pair('reaction-role-icon'),
+  settingOutline: pair('setting-icon-outline', true),
+  template: pair('template-icon'),
   upload: set('upload-button', ['reveal', 'hover', 'select']),
 };
 export type RevealHover = {
@@ -93,3 +97,16 @@ export type RevealHover = {
   solid?: boolean;
 };
 type Two = RevealHover;
+
+const svgs = import.meta.glob<string>(
+  '../../../../design-system/assets/icons/animated-icons/*.svg',
+  { query: '?url', import: 'default', eager: true },
+);
+const svg = (name: string) =>
+  svgs[`../../../../design-system/assets/icons/animated-icons/${name}.svg`] ??
+  '';
+/** Still icons that sit beside the animated ones. */
+export const svgIcons = {
+  reactionRole: svg('reaction-role-icon'),
+  welcomeTag: svg('tag-welcome-message'),
+};

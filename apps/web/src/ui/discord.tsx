@@ -183,7 +183,7 @@ export function rememberEmojis(list: { id: string; url: string }[]) {
 export function renderDiscordText(text: string): ReactNode[] {
   return text
     .split(
-      /(<a?:\w{1,32}:\d{1,25}>|\{[a-z.]+\}|@everyone|@here|@[A-Za-z][\w.-]*|#[a-z0-9-]+|\*\*[^*]+\*\*)/g,
+      /(<a?:\w{1,32}:\d{1,25}>|\{[a-z.-]+\}|@everyone|@here|@[A-Za-z][\w.-]*|#[a-z0-9-]+|\*\*[^*]+\*\*)/g,
     )
     .filter(Boolean)
     .map((part, i) => {
@@ -202,7 +202,7 @@ export function renderDiscordText(text: string): ReactNode[] {
           />
         );
       // {variables} show as chips; Sparko fills them in when it sends.
-      if (/^\{[a-z.]+\}$/.test(part))
+      if (/^\{[a-z.-]+\}$/.test(part))
         return (
           <span key={i} className="dc-var">
             {part}

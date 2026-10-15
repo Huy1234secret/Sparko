@@ -9,11 +9,14 @@ import type {
   StudioFolder,
   StudioMessage,
   StudioState,
+  StudioTemplate,
   Ticket,
   TicketDetail,
   TicketMessage,
   TicketPanel,
   TicketsState,
+  RRLogEntry,
+  RRTemplate,
 } from './types';
 import {
   applyMove,
@@ -23,7 +26,7 @@ import {
   nameTaken,
   uniqueTemplateName,
 } from './library';
-import { greetPresets, parseMessageLink } from './studio-format';
+import { greetPresets, parseMessageLink, rrDefault } from './studio-format';
 
 type Helpers = {
   wait: <T>(value: T, slow?: boolean) => Promise<T>;
@@ -31,6 +34,8 @@ type Helpers = {
   server: (id: string) => Server;
   channels: (serverId: string) => Channel[];
   you: () => Session['user'];
+  /** Templates Welcome messages send, and in which message. */
+  welcomeUses?: (serverId: string) => { id: string; where: string }[];
 };
 
 type SupportApi = Pick<
@@ -57,6 +62,11 @@ type SupportApi = Pick<
   | 'editStudioMessage'
   | 'uploadImage'
   | 'listServerEmojis'
+  | 'getReactionRoles'
+  | 'addReactionRole'
+  | 'saveReactionRole'
+  | 'cloneReactionRole'
+  | 'deleteReactionRole'
 >;
 
 /** Pretend server emojis, drawn as small pictures so they work offline. */
@@ -421,6 +431,7 @@ type SupportState = {
   panel: TicketPanel;
   panelVersions: TicketsState['versions'];
   studio: StudioState;
+  rr: { templates: RRTemplate[]; log: RRLogEntry[] };
 };
 
 export function createSupportMock(h: Helpers) {
@@ -497,6 +508,7 @@ export function createSupportMock(h: Helpers) {
           },
         },
       ],
+      rr: { templates: [], log: [] },
       studio: {
         message: base,
         channels,
@@ -577,7 +589,13 @@ export function createSupportMock(h: Helpers) {
             color: '#FACC15',
             color2: '#ED4245',
           },
-          { id: '9203', name: 'Moderator', color: '#5865F2' },
+          // Above Sparko's own role, so it can't give it.
+          {
+            id: '9203',
+            name: 'Moderator',
+            color: '#5865F2',
+            assignable: false,
+          },
           { id: '9204', name: 'Member', color: null },
         ],
         sendLimit: server.plan === 'plus' ? 10 : 1,
@@ -758,7 +776,127 @@ export function createSupportMock(h: Helpers) {
     },
     async getStudio(serverId) {
       const s = of(serverId);
-      return h.wait(h.copy({ ...s.studio, channels: h.channels(serverId) }));
+      // Where each template is used outside Message Studio.
+      const uses = new Map<string, NonNullable<StudioTemplate['usedIn']>>();
+      const add = (
+        id: string,
+        kind: 'welcome' | 'reaction-role',
+        where: string,
+      ) => {
+        if (!id) return;
+        const list = uses.get(id) ?? [];
+        if (!list.some((u) => u.where === where)) list.push({ kind, where });
+        uses.set(id, list);
+      };
+      for (const u of h.welcomeUses?.(serverId) ?? [])
+        add(u.id, 'welcome', u.where);
+      for (const r of s.rr.templates)
+        for (const t of [
+          r.config.message,
+          r.config.response.claim,
+          r.config.response.remove,
+        ])
+          add(t, 'reaction-role', `Reaction roles (${r.name})`);
+      return h.wait(
+        h.copy({
+          ...s.studio,
+          templates: s.studio.templates.map((t) => ({
+            ...t,
+            usedIn: uses.get(t.id) ?? [],
+          })),
+          channels: h.channels(serverId),
+        }),
+      );
+    },
+    async getReactionRoles(serverId) {
+      const s = of(serverId);
+      return h.wait(
+        h.copy({
+          templates: s.rr.templates,
+          limit: h.server(serverId).plan === 'plus' ? 50 : 10,
+          channels: h.channels(serverId),
+          roles: s.studio.roles,
+          log: s.rr.log,
+        }),
+      );
+    },
+    async addReactionRole(serverId, name) {
+      guardPaused(serverId);
+      const s = of(serverId);
+      if (
+        s.rr.templates.length >= (h.server(serverId).plan === 'plus' ? 50 : 10)
+      )
+        throw new Error('You’ve used every reaction role on this plan.');
+      const channel = h.channels(serverId).find((c) => c.canPost)?.id ?? '';
+      const message = {
+        ...s.studio.message,
+        name,
+        channel,
+        layout: 'embed' as const,
+        content: '',
+        components: [],
+        embeds: [
+          {
+            ...s.studio.message.embeds[0]!,
+            id: 'e1',
+            title: 'Pick your roles',
+            description:
+              'React below to get a role. React again to drop it.\n\n{role-list}',
+            fields: [],
+            image: '',
+          },
+        ],
+      };
+      const { id: messageId } = await api.saveTemplate(serverId, {
+        name,
+        message,
+        folderId: null,
+      });
+      const rr = {
+        id: id('rr'),
+        name: uniqueTemplateName(s.rr.templates, name),
+        meta: 'Saved just now by you',
+        config: rrDefault(channel, messageId),
+      };
+      s.rr.templates.unshift(rr);
+      return h.wait({ id: rr.id });
+    },
+    async saveReactionRole(serverId, rrId, change) {
+      guardPaused(serverId);
+      const s = of(serverId);
+      if (change.name && nameTaken(s.rr.templates, change.name, rrId))
+        throw new Error(
+          `A reaction role named “${change.name.trim()}” already exists. Pick another name.`,
+        );
+      s.rr.templates = s.rr.templates.map((t) =>
+        t.id === rrId
+          ? {
+              ...t,
+              ...(change.name ? { name: change.name } : {}),
+              ...(change.config ? { config: h.copy(change.config) } : {}),
+              meta: 'Saved just now by you',
+            }
+          : t,
+      );
+      return h.wait(undefined);
+    },
+    async cloneReactionRole(serverId, rrId) {
+      const s = of(serverId);
+      const t = s.rr.templates.find((x) => x.id === rrId);
+      if (!t) throw new Error('That reaction role no longer exists.');
+      const copy = {
+        ...h.copy(t),
+        id: id('rr'),
+        name: uniqueTemplateName(s.rr.templates, `${t.name} (copy)`),
+        meta: 'Saved just now by you',
+      };
+      s.rr.templates.splice(s.rr.templates.indexOf(t) + 1, 0, copy);
+      return h.wait({ id: copy.id });
+    },
+    async deleteReactionRole(serverId, rrId) {
+      const s = of(serverId);
+      s.rr.templates = s.rr.templates.filter((t) => t.id !== rrId);
+      return h.wait(undefined);
     },
     async publishStudio(serverId, message) {
       guardPaused(serverId);

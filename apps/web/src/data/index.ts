@@ -16,7 +16,7 @@ import type {
   TicketPanel,
   TicketPriority,
 } from './types';
-import type { WelcomeConfig } from './studio-format';
+import type { ReactionRole, WelcomeConfig } from './studio-format';
 
 export * from './types';
 export * from './library';
@@ -45,6 +45,7 @@ export const keys = {
   ticket: (id: string, n: number) => ['tickets', id, 'one', n] as const,
   ticketsConfig: (id: string) => ['tickets', id, 'config'] as const,
   studio: (id: string) => ['studio', id] as const,
+  rr: (id: string) => ['rr', id] as const,
 };
 
 export const useSession = () =>
@@ -84,6 +85,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: keys.welcome(serverId) }),
       client.invalidateQueries({ queryKey: ['tickets', serverId] }),
       client.invalidateQueries({ queryKey: keys.studio(serverId) }),
+      client.invalidateQueries({ queryKey: keys.rr(serverId) }),
     ]);
 }
 
@@ -277,6 +279,40 @@ export function useStudioActions(serverId: string) {
           client.setQueryData(keys.studio(serverId), context.before);
       },
       onSettled: refresh,
+    }),
+  };
+}
+export const useReactionRoles = (serverId: string) =>
+  useQuery({
+    queryKey: keys.rr(serverId),
+    queryFn: () => api.getReactionRoles(serverId),
+  });
+export function useRRActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  const options = { onSuccess: refresh };
+  return {
+    add: useMutation({
+      mutationFn: (name: string) => api.addReactionRole(serverId, name),
+      ...options,
+    }),
+    save: useMutation({
+      mutationFn: ({
+        id,
+        ...change
+      }: {
+        id: string;
+        name?: string;
+        config?: ReactionRole;
+      }) => api.saveReactionRole(serverId, id, change),
+      ...options,
+    }),
+    clone: useMutation({
+      mutationFn: (id: string) => api.cloneReactionRole(serverId, id),
+      ...options,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => api.deleteReactionRole(serverId, id),
+      ...options,
     }),
   };
 }

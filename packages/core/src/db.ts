@@ -177,6 +177,27 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX greet_log_by_guild ON greet_log (guild_id, id DESC);`,
+  // 8: reaction role messages Sparko posted, and what they did.
+  `CREATE TABLE rr_posts (
+    message_id TEXT PRIMARY KEY,
+    guild_id TEXT NOT NULL,
+    template_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    emojis TEXT NOT NULL DEFAULT '[]'
+  );
+  CREATE INDEX rr_posts_by_template ON rr_posts (guild_id, template_id);
+  CREATE TABLE rr_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    template TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    role_id TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX rr_log_by_guild ON rr_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {
