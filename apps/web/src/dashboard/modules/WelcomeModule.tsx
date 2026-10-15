@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
@@ -10,8 +10,11 @@ import {
   Modal,
   Notice,
   Segmented,
+  RevealIcon,
   Tabs,
+  animIcons,
   cx,
+  type RevealHover,
   preloadAnimations,
   preloadCombobox,
   useToast,
@@ -74,6 +77,34 @@ const tabLabels: Record<Tab, string> = {
   boost: 'Boost message',
   logs: 'Logs',
 };
+
+const tabIcons: Record<Tab, { icon: string; anim: RevealHover | undefined }> = {
+  join: { icon: 'user-plus', anim: animIcons.joinMessage },
+  leave: { icon: 'log-out', anim: animIcons.leaveMessage },
+  boost: { icon: 'zap', anim: animIcons.boostMessage },
+  logs: { icon: 'scroll-text', anim: animIcons.log },
+};
+
+/** A button with the sparkle icon, which draws in and plays on hover. */
+function SparkleButton(props: ComponentProps<typeof Button>) {
+  const [hoverKey, setHoverKey] = useState(0);
+  return (
+    <Button
+      {...props}
+      onPointerEnter={(e) => {
+        setHoverKey((k) => k + 1);
+        props.onPointerEnter?.(e);
+      }}
+    >
+      <RevealIcon
+        anim={animIcons.sparkle}
+        fallback="sparkles"
+        hoverKey={hoverKey}
+      />
+      {props.children}
+    </Button>
+  );
+}
 
 /** The open tab, kept in the address so links and Back work. */
 function useTab() {
@@ -418,6 +449,8 @@ export function WelcomeModule({
         tabs={(['join', 'leave', 'boost', 'logs'] as Tab[]).map((value) => ({
           value,
           label: tabLabels[value],
+          icon: tabIcons[value].icon,
+          anim: tabIcons[value].anim,
           ...(value === 'logs' ? { count: welcome.data.log.length } : {}),
         }))}
       />
@@ -521,15 +554,14 @@ export function WelcomeModule({
                           >
                             Create new template
                           </AnimatedIconButton>
-                          <Button
+                          <SparkleButton
                             variant="primary"
                             size="sm"
-                            icon="sparkles"
                             disabled={paused}
                             onClick={() => setPresetsOpen(true)}
                           >
                             Use a default template
-                          </Button>
+                          </SparkleButton>
                         </div>
                       }
                     >
@@ -763,9 +795,7 @@ function GreetSettingsCard({
             label: deleteLabels[s] ?? `${s} seconds`,
           }))}
         />
-        <Button icon="sparkles" onClick={onPresets}>
-          Use default templates
-        </Button>
+        <SparkleButton onClick={onPresets}>Use default templates</SparkleButton>
       </div>
     </section>
   );
@@ -810,7 +840,9 @@ function PresetPicker({
     <Modal
       open={open}
       onClose={onClose}
-      icon="sparkles"
+      icon={
+        <RevealIcon anim={animIcons.sparkle} fallback="sparkles" size={22} />
+      }
       title="Default templates"
       description={
         replacing

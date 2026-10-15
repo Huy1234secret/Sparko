@@ -13,6 +13,21 @@ const file = (name: string) => {
   if (!url) throw new Error(`No animated icon called ${name}`);
   return url;
 };
+/**
+ * An icon that draws in and plays on hover, or undefined until its files
+ * are added, so pages fall back to a still icon.
+ */
+const pair = (name: string, solid = false): Two | undefined => {
+  const at = (s: string) =>
+    files[
+      `../../../../design-system/assets/icons/animated-icons/${name}-${s}.json`
+    ];
+  const reveal = at('reveal');
+  const hover = at('hover');
+  return reveal && hover
+    ? { reveal, hover, ...(solid ? { solid } : {}) }
+    : undefined;
+};
 /** A button-style icon: it draws in, plays on hover, and plays when pressed. */
 const set = (name: string, states: string[]) =>
   Object.fromEntries(states.map((s) => [s, file(`${name}-${s}`)]));
@@ -58,7 +73,21 @@ export const animIcons = {
     switch: file('dark-light-mode-select'),
   },
   tick: { reveal: file('tick-reveal') },
+  /** Welcome messages: the module, its tabs, and its sparkle buttons. */
+  hand: pair('hand-wave-icon'),
+  joinMessage: pair('join-message-icon'),
+  // Drawn as a plain white shape, unlike the other three.
+  leaveMessage: pair('leave-message-icon', true),
+  boostMessage: pair('boost-message-icon'),
+  log: pair('log-icon'),
+  sparkle: pair('sparkle-icon'),
   upload: set('upload-button', ['reveal', 'hover', 'select']) as Three,
 };
-type Two = { reveal: string; hover: string };
+export type RevealHover = {
+  reveal: string;
+  hover: string;
+  /** Drawn as a plain white shape (see LottieIcon's `solid`). */
+  solid?: boolean;
+};
+type Two = RevealHover;
 type Three = Two & { select: string };

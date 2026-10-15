@@ -1424,11 +1424,18 @@
   cursor: default;
 }
 .sp-efield__inline {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  accent-color: var(--sp-dc-blurple);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  color: var(--sp-dc-muted, #b5bac1);
   cursor: pointer;
+}
+.sp-efield__inline:has(:checked) {
+  color: var(--sp-dc-blurple);
+}
+.sp-efield__inline:has(:focus-visible) {
+  border-radius: 4px;
+  box-shadow: var(--sp-ring);
 }
 .sp-link-chip {
   gap: 6px;
@@ -2806,4 +2813,22 @@ body:has(> .sp-settings-scrim) > #root {
   display: grid;
   justify-items: center;
   gap: 10px;
+}
+
+/* Checkboxes: the animated box draws itself, so the CSS box steps back. */
+.sp-check__box--anim,
+.sp-choice-input:checked + .sp-check__box--anim {
+  border-color: transparent;
+  background: none;
+  color: var(--sp-muted);
+}
+.sp-choice-input:checked + .sp-check__box--anim {
+  color: var(--sp-brand);
+}
+.sp-check:hover .sp-check__box--anim {
+  border-color: transparent;
+  color: var(--sp-text);
+}
+.sp-choice-input:checked + .sp-check__box--anim .sp-lottie {
+  opacity: 1;
 }

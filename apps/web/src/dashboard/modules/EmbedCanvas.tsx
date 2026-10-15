@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { cx } from '../../ui';
+import { AnimatedCheck, cx } from '../../ui';
 import type { StudioEmbed, StudioMessage } from '../../data';
 import {
   CloseButton,
@@ -163,14 +163,19 @@ function FieldRow({
                 <MaskIcon src={downIcon} size={10} />
               </button>
             </span>
-            <input
-              type="checkbox"
+            <label
               className="sp-efield__inline"
-              aria-label={`Field ${number} inline`}
               title="Inline: sits beside other inline fields"
-              checked={field.inline}
-              onChange={(e) => onChange({ inline: e.target.checked })}
-            />
+            >
+              <input
+                type="checkbox"
+                className="sp-choice-input"
+                aria-label={`Field ${number} inline`}
+                checked={field.inline}
+                onChange={(e) => onChange({ inline: e.target.checked })}
+              />
+              <AnimatedCheck checked={field.inline} size={16} />
+            </label>
           </span>
         )}
         <EditText
