@@ -124,20 +124,22 @@ export function RRItems({
 }) {
   const [gear, setGear] = useState<string | null>(null);
   const [dragged, setDragged] = useState<number | null>(null);
-  const [menuOpen, setMenuOpen] = useState(true);
+  // The blank option keeps its id once typed in, so the cursor stays put.
+  const [nextId, setNextId] = useState(() => rrItem().id);
   const items = rr.items;
   const limit = rrLimits[rr.kind];
   const sortable = rr.kind !== 'reaction';
   // A menu always has one blank option to type into, up to its limit.
   const shown =
     rr.kind === 'menu' && items.length < limit
-      ? [...items, rrItem({ id: 'next' })]
+      ? [...items, rrItem({ id: nextId })]
       : items;
 
   const edit = (id: string, patch: Partial<RRItem>) => {
-    if (id === 'next') {
+    if (id === nextId) {
       // Typing in the blank option makes it real.
-      onChange([...items, rrItem({ ...patch })]);
+      onChange([...items, rrItem({ ...patch, id })]);
+      setNextId(rrItem().id);
       return;
     }
     onChange(items.map((i) => (i.id === id ? { ...i, ...patch } : i)));
@@ -184,7 +186,7 @@ export function RRItems({
   const list = (
     <ul className="sp-rr-items" aria-label={`${rr.kind} list`}>
       {shown.map((i, index) => {
-        const real = i.id !== 'next';
+        const real = i.id !== nextId;
         const emoji = (
           <EmojiField
             serverId={serverId}
@@ -364,23 +366,7 @@ export function RRItems({
 
   return (
     <div className="sp-rr-items-wrap">
-      {rr.kind === 'menu' ? (
-        <>
-          {/* Shown like Discord's own menu; pressing it lists the options. */}
-          <button
-            type="button"
-            className="dc-select sp-rr-menu-face"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((o) => !o)}
-          >
-            <span>{rr.placeholder || 'Make a selection'}</span>
-            <Icon name={menuOpen ? 'chevron-up' : 'chevron-down'} size="sm" />
-          </button>
-          {menuOpen && list}
-        </>
-      ) : (
-        list
-      )}
+      {list}
       {rr.kind !== 'menu' && (
         <Button
           size="sm"
@@ -416,7 +402,6 @@ export function RRItems({
 
 /** How the reactions, buttons or menu show under the message. */
 export function RRPreview({ rr }: { rr: ReactionRole }) {
-  const [open, setOpen] = useState(false);
   if (rr.kind === 'reaction')
     return (
       <div className="sp-rr-preview dc-reactions" aria-label="Reactions">
@@ -453,30 +438,10 @@ export function RRPreview({ rr }: { rr: ReactionRole }) {
   }
   return (
     <div className="sp-rr-preview" aria-label="Menu">
-      <button
-        type="button"
-        className="dc-select"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
+      <span className="dc-select">
         <span>{rr.placeholder || 'Make a selection'}</span>
         <Icon name="chevron-down" size="sm" />
-      </button>
-      {open && (
-        <ul className="dc-select__list">
-          {rr.items.map((o) => (
-            <li key={o.id} className="dc-select__option">
-              {o.emoji && (
-                <span className="dc-emoji">{renderDiscordText(o.emoji)}</span>
-              )}
-              <span>
-                <b>{o.label}</b>
-                {o.description && <small>{o.description}</small>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      </span>
     </div>
   );
 }
