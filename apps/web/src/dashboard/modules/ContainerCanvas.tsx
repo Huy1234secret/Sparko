@@ -611,6 +611,10 @@ export function ContainerCanvas({
       !placedIn(place, { at: 'line', line: n - 1 }).length;
     if (joins) prev.to = n;
     else stretches.push({ from: n, to: n });
+    // A divider with nothing written after it, before the end or the next
+    // divider, still gets a Description box to type into.
+    if (divides(n) && (n === lines.length - 1 || divides(n + 1)))
+      stretches.push({ from: n + 1, to: n });
   });
   /** Rewrites lines `from`–`to`, keeping everything placed after them in step. */
   const editLines = (from: number, to: number, text: string) => {
@@ -721,9 +725,19 @@ export function ContainerCanvas({
               <div className="sp-v2__body" data-issue="text">
                 {slotView({ at: 'line', line: -1 })}
                 {stretches.map(({ from, to }) => {
-                  const side = besideAt(from);
+                  const side = to < from ? undefined : besideAt(from);
                   return (
-                    <Fragment key={from}>
+                    <Fragment
+                      // Typing in an empty box after a divider keeps its key.
+                      key={
+                        to >= from &&
+                        lines
+                          .slice(from, to + 1)
+                          .every((l) => l.trim() === '{separator}')
+                          ? `s${from}`
+                          : `t${from}`
+                      }
+                    >
                       <div
                         className={cx(
                           'sp-v2-text',
@@ -734,9 +748,11 @@ export function ContainerCanvas({
                           <EditText
                             value={lines.slice(from, to + 1).join('\n')}
                             label={
-                              stretches.length > 1
-                                ? `text, lines ${from + 1}–${to + 1}`
-                                : 'text'
+                              to < from
+                                ? `text after line ${from}`
+                                : stretches.length > 1
+                                  ? `text, lines ${from + 1}–${to + 1}`
+                                  : 'text'
                             }
                             placeholder="Description"
                             multiline
@@ -757,7 +773,7 @@ export function ContainerCanvas({
                           from === thumbAt && thumb
                         )}
                       </div>
-                      {slotView({ at: 'line', line: to })}
+                      {to >= from && slotView({ at: 'line', line: to })}
                     </Fragment>
                   );
                 })}

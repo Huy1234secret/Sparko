@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import {
+  AnimatedButton,
   Badge,
   Button,
   Combobox,
@@ -7,8 +8,10 @@ import {
   Icon,
   Input,
   Modal,
+  RevealIcon,
   Segmented,
   Switch,
+  animIcons,
   cx,
   preloadCombobox,
   svgIcons,
@@ -334,115 +337,123 @@ export function ReactionRolesModule({
         }
         error={flow.error}
       />
-      {tabs}
-
-      {tab === 'items' && (
-        <RRLibrary
-          templates={templates}
-          limit={data.limit}
-          channels={data.channels}
-          editingId={editingId}
-          adding={actions.add.isPending}
-          onAdd={add}
-          onEdit={open}
-          onClone={(t) =>
-            actions.clone.mutate(t.id, {
-              onSuccess: () => toast({ title: `Copied “${t.name}”` }),
-              onError: (e) =>
-                toast({
-                  tone: 'danger',
-                  title: 'Couldn’t copy it',
-                  body: e.message,
-                }),
-            })
-          }
-          onDelete={setDeleting}
-        />
+      {!isOn && (
+        <p className="sp-edit-banner sp-greet-off-note" role="status">
+          <Icon name="info" size="sm" />
+          <span>Reaction roles are off. Turn them on above to edit them.</span>
+        </p>
       )}
+      <div className={cx('sp-greet-body', !isOn && 'is-off')} inert={!isOn}>
+        {tabs}
 
-      {tab === 'history' && <RRLog entries={data.log} />}
+        {tab === 'items' && (
+          <RRLibrary
+            templates={templates}
+            limit={data.limit}
+            channels={data.channels}
+            editingId={editingId}
+            adding={actions.add.isPending}
+            onAdd={add}
+            onEdit={open}
+            onClone={(t) =>
+              actions.clone.mutate(t.id, {
+                onSuccess: () => toast({ title: `Copied “${t.name}”` }),
+                onError: (e) =>
+                  toast({
+                    tone: 'danger',
+                    title: 'Couldn’t copy it',
+                    body: e.message,
+                  }),
+              })
+            }
+            onDelete={setDeleting}
+          />
+        )}
 
-      {tab === 'settings' &&
-        (current && template ? (
-          <InsertProvider>
-            <IssueProvider value={issue}>
-              <StudioDataProvider
-                value={{
-                  serverId: server.id,
-                  templates: studio.data.templates,
-                  folders: studio.data.folders,
-                  roles: studio.data.roles,
-                  sendLimit: studio.data.sendLimit,
-                }}
-              >
-                <RREditor
-                  server={server}
-                  rr={current}
-                  studio={studio.data}
-                  channels={data.channels}
-                  roles={data.roles}
-                  tried={tried}
-                  side={side}
-                  onSide={setSide}
-                  messageOf={messageOf}
-                  onChange={edit}
-                  onMessage={editMessage}
-                  onNewResponse={(which) =>
-                    studioActions.saveTemplate.mutate(
-                      {
-                        name: `${current.name} ${which === 'claim' ? 'claimed' : 'removed'}`,
-                        message: {
-                          ...savedMessage(current.message)!,
-                          name: 'Response',
-                          layout: 'embed',
-                          content: '',
-                          components: [],
-                          embeds: [
-                            {
-                              ...savedMessage(current.message)!.embeds[0]!,
-                              id: 'e1',
-                              title: '',
-                              description:
-                                which === 'claim'
-                                  ? 'You now have {role}.'
-                                  : 'Removed {role}.',
-                              fields: [],
-                              image: '',
-                              thumbnail: '',
-                              author: '',
-                              footer: '',
-                            },
-                          ],
+        {tab === 'history' && <RRLog entries={data.log} />}
+
+        {tab === 'settings' &&
+          (current && template ? (
+            <InsertProvider>
+              <IssueProvider value={issue}>
+                <StudioDataProvider
+                  value={{
+                    serverId: server.id,
+                    templates: studio.data.templates,
+                    folders: studio.data.folders,
+                    roles: studio.data.roles,
+                    sendLimit: studio.data.sendLimit,
+                  }}
+                >
+                  <RREditor
+                    server={server}
+                    rr={current}
+                    studio={studio.data}
+                    channels={data.channels}
+                    roles={data.roles}
+                    tried={tried}
+                    side={side}
+                    onSide={setSide}
+                    messageOf={messageOf}
+                    onChange={edit}
+                    onMessage={editMessage}
+                    onNewResponse={(which) =>
+                      studioActions.saveTemplate.mutate(
+                        {
+                          name: `${current.name} ${which === 'claim' ? 'claimed' : 'removed'}`,
+                          message: {
+                            ...savedMessage(current.message)!,
+                            name: 'Response',
+                            layout: 'embed',
+                            content: '',
+                            components: [],
+                            embeds: [
+                              {
+                                ...savedMessage(current.message)!.embeds[0]!,
+                                id: 'e1',
+                                title: '',
+                                description:
+                                  which === 'claim'
+                                    ? 'You now have {role}.'
+                                    : 'Removed {role}.',
+                                fields: [],
+                                image: '',
+                                thumbnail: '',
+                                author: '',
+                                footer: '',
+                              },
+                            ],
+                          },
+                          folderId: null,
                         },
-                        folderId: null,
-                      },
-                      {
-                        onSuccess: ({ id }) =>
-                          edit({
-                            response: { ...current.response, [which]: id },
-                          }),
-                      },
-                    )
-                  }
-                />
-              </StudioDataProvider>
-            </IssueProvider>
-          </InsertProvider>
-        ) : (
-          <div className="sp-card">
-            <EmptyState
-              icon={<EditingIcon />}
-              title="Select a reaction role to start editing!"
-              actions={
-                <Button variant="primary" onClick={() => setTab('items')}>
-                  Open templates
-                </Button>
-              }
-            >
-              Pick one in Templates, or add a new one there.
-            </EmptyState>
-          </div>
-        ))}
+                        {
+                          onSuccess: ({ id }) =>
+                            edit({
+                              response: { ...current.response, [which]: id },
+                            }),
+                        },
+                      )
+                    }
+                  />
+                </StudioDataProvider>
+              </IssueProvider>
+            </InsertProvider>
+          ) : (
+            <div className="sp-card">
+              <EmptyState
+                icon={<EditingIcon />}
+                title="Select a reaction role to start editing!"
+                actions={
+                  <Button variant="primary" onClick={() => setTab('items')}>
+                    Open templates
+                  </Button>
+                }
+              >
+                Pick one in Templates, or add a new one there.
+              </EmptyState>
+            </div>
+          ))}
+      </div>
 
       <Modal
         open={!!deleting}
@@ -693,7 +704,20 @@ function RREditor({
 
       {/* The message a member gets when a role is given or taken. */}
       <div className="sp-studio__grid sp-rr-response" data-issue="response">
-        <div className="sp-stack">
+        <div
+          className={cx('sp-stack', !rr.response.on && 'sp-rr-off')}
+          inert={!rr.response.on}
+        >
+          <Segmented
+            label="Response for"
+            className="sp-studio__type"
+            value={side}
+            onChange={onSide}
+            options={[
+              { value: 'claim', label: 'Claim message' },
+              { value: 'remove', label: 'Remove message' },
+            ]}
+          />
           {response && responseId ? (
             <MessageCanvas
               key={responseId}
@@ -704,48 +728,24 @@ function RREditor({
               roleVariables
               check={(m) => ({ ...m, channel: '1' })}
               onChange={(patch) => onMessage(responseId, patch)}
-              above={
-                <Segmented
-                  label="Response for"
-                  className="sp-studio__type"
-                  value={side}
-                  onChange={onSide}
-                  options={[
-                    { value: 'claim', label: 'Claim message' },
-                    { value: 'remove', label: 'Remove message' },
-                  ]}
-                />
-              }
             />
           ) : (
-            <div className="sp-card">
-              <Segmented
-                label="Response for"
-                className="sp-studio__type sp-rr-response__side"
-                value={side}
-                onChange={onSide}
-                options={[
-                  { value: 'claim', label: 'Claim message' },
-                  { value: 'remove', label: 'Remove message' },
-                ]}
-              />
-              <EmptyState
-                icon={<EditingIcon />}
-                title={`No ${side === 'claim' ? 'claim' : 'remove'} message yet`}
-                actions={
-                  <AnimatedIconButton
-                    reveal={plusAnimations.reveal}
-                    hover={plusAnimations.hover}
-                    select={plusAnimations.select}
-                    onClick={() => onNewResponse(side)}
-                  >
-                    Create new template
-                  </AnimatedIconButton>
-                }
-              >
-                Use an existing template on the right, or make a new one.
-              </EmptyState>
-            </div>
+            <EmptyState
+              icon={<EditingIcon />}
+              title={`No ${side === 'claim' ? 'claim' : 'remove'} message yet`}
+              actions={
+                <AnimatedIconButton
+                  reveal={plusAnimations.reveal}
+                  hover={plusAnimations.hover}
+                  select={plusAnimations.select}
+                  onClick={() => onNewResponse(side)}
+                >
+                  Create new template
+                </AnimatedIconButton>
+              }
+            >
+              Use an existing template on the right, or make a new one.
+            </EmptyState>
           )}
         </div>
         <section
@@ -769,7 +769,10 @@ function RREditor({
               description="Send a response"
             />
           </div>
-          <div className="sp-card__body">
+          <div
+            className={cx('sp-card__body', !rr.response.on && 'sp-rr-off')}
+            inert={!rr.response.on}
+          >
             <Combobox
               label="Claim message"
               searchPlaceholder="Search templates"
@@ -794,7 +797,6 @@ function RREditor({
               label="Send to"
               searchable={false}
               value={rr.response.delivery}
-              disabled={!rr.response.on}
               hint={
                 rr.kind === 'reaction'
                   ? 'Reactions can’t answer privately, so in the channel the reply mentions the member and is deleted after 10 seconds.'
@@ -864,7 +866,7 @@ function RRLibrary({
           </p>
         </div>
         <AnimatedIconButton
-          variant="primary"
+          size="sm"
           reveal={plusAnimations.reveal}
           hover={plusAnimations.hover}
           select={plusAnimations.select}
@@ -906,25 +908,36 @@ function RRLibrary({
                   <span className="sp-hint">{t.meta}</span>
                 </button>
                 <span className="sp-rr-card__actions">
-                  <Button
+                  <AnimatedButton
+                    anim={animIcons.edit.hover}
                     size="sm"
                     variant="ghost"
-                    icon="copy"
+                    aria-label={`Edit ${t.name} settings`}
+                    onClick={() => onEdit(t)}
+                  >
+                    Edit
+                  </AnimatedButton>
+                  <AnimatedButton
+                    anim={animIcons.clone.hover}
+                    solid
+                    size="sm"
+                    variant="ghost"
                     disabled={full}
                     aria-label={`Clone ${t.name}`}
                     onClick={() => onClone(t)}
                   >
                     Clone
-                  </Button>
-                  <Button
+                  </AnimatedButton>
+                  <AnimatedButton
+                    anim={animIcons.remove.hover}
+                    solid
                     size="sm"
                     variant="ghost"
-                    icon="trash-2"
                     aria-label={`Delete ${t.name}`}
                     onClick={() => onDelete(t)}
                   >
                     Delete
-                  </Button>
+                  </AnimatedButton>
                 </span>
               </li>
             );
@@ -932,13 +945,14 @@ function RRLibrary({
         </ul>
       ) : (
         <EmptyState
-          icon="smile"
-          title="No reaction roles yet"
-          actions={
-            <Button variant="primary" icon="plus" onClick={onAdd}>
-              Add your first
-            </Button>
+          icon={
+            <RevealIcon
+              anim={animIcons.template}
+              fallback="file-text"
+              size={36}
+            />
           }
+          title="No reaction roles yet"
         >
           Members react, click a button or pick from a menu to get roles.
         </EmptyState>

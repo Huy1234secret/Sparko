@@ -952,16 +952,82 @@
   box-shadow: var(--sp-ring);
 }
 
-/* The plus menu: a short menu list, placed like the dropdowns. */
+/* The plus menu: items drop down along a line from the button, or up
+   when there's more room above. It's placed like the dropdowns. */
 .sp-plus-menu {
-  gap: 2px;
-  min-width: 180px;
-  max-height: none;
+  z-index: var(--sp-z-popover);
+  display: grid;
+  justify-items: end;
+  gap: 8px;
   overflow-y: auto;
+  /* The line sits 15–17px from the right edge; items stop 8px before it. */
+  padding: 8px 25px 12px 0;
+}
+.sp-plus-menu[data-side='top'] {
+  padding: 12px 25px 8px 0;
+}
+.sp-plus-menu__line {
+  position: absolute;
+  top: 0;
+  right: 15px;
+  bottom: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--sp-line-strong);
+  transform-origin: top;
+  animation: sp-plus-line var(--sp-dur-base) var(--sp-ease-out) both;
+}
+.sp-plus-menu[data-side='top'] .sp-plus-menu__line {
+  transform-origin: bottom;
+}
+.sp-plus-menu__line::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sp-line-strong);
+}
+.sp-plus-menu[data-side='top'] .sp-plus-menu__line::after {
+  top: -3px;
+  bottom: auto;
 }
 .sp-plus-menu__item {
-  font-weight: 500;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-surface);
+  box-shadow: var(--sp-shadow-sm);
+  color: var(--sp-text);
+  font: 600 14px/20px var(--sp-font-sans);
   white-space: nowrap;
+  cursor: pointer;
+  animation: sp-plus-item var(--sp-dur-base) var(--sp-ease-out) both;
+  animation-delay: calc(var(--i) * 45ms + 60ms);
+}
+.sp-plus-menu__item:hover:not(:disabled),
+.sp-plus-menu__item:focus-visible {
+  outline: none;
+  border-color: var(--sp-line-strong);
+  background: var(--sp-raised);
+}
+.sp-plus-menu__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@keyframes sp-plus-line {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes sp-plus-item {
+  from {
+    opacity: 0;
+    transform: translate(12px, -6px);
+  }
 }
 
 /* Emoji picker */
@@ -2394,21 +2460,20 @@ body:has(> .sp-settings-scrim) > #root {
 }
 .sp-combo__pop,
 .sp-vars-pop,
-.sp-emoji-pop,
-.sp-plus-menu {
+.sp-emoji-pop {
   animation: sp-wipe-down 200ms var(--sp-ease-out) both;
 }
 .sp-combo__pop[data-side='top'],
 .sp-vars-pop[data-side='top'],
-.sp-emoji-pop[data-side='top'],
-.sp-plus-menu[data-side='top'] {
+.sp-emoji-pop[data-side='top'] {
   animation-name: sp-wipe-up;
 }
 @media (prefers-reduced-motion: reduce) {
   .sp-combo__pop,
   .sp-vars-pop,
   .sp-emoji-pop,
-  .sp-plus-menu {
+  .sp-plus-menu__line,
+  .sp-plus-menu__item {
     animation: none;
   }
 }
@@ -2788,7 +2853,8 @@ body:has(> .sp-settings-scrim) > #root {
   gap: 16px;
   transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
 }
-.sp-greet-body.is-off {
+.sp-greet-body.is-off,
+.sp-rr-off {
   opacity: 0.45;
   filter: grayscale(0.4);
   user-select: none;
@@ -2946,12 +3012,9 @@ body:has(> .sp-settings-scrim) > #root {
   outline: none;
   box-shadow: var(--sp-ring);
 }
-.sp-rr-menu-face {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  cursor: pointer;
+.sp-fieldset > .dc-chat:has(+ .sp-rr-preview) {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
 }
 .sp-rr-preview {
   display: grid;
@@ -2997,10 +3060,6 @@ body:has(> .sp-settings-scrim) > #root {
 .dc-select__option small {
   display: block;
   color: var(--sp-dc-muted);
-}
-.sp-rr-response__side {
-  margin: 16px 16px 0;
-  width: auto;
 }
 /* Menu options: emoji and title, the description under them, and copy,
    remove and the gear stacked on the right. */
@@ -3069,33 +3128,59 @@ body:has(> .sp-settings-scrim) > #root {
   align-items: center;
   gap: 6px;
 }
+/* While on, the tick and the colour bar drift through the colours. */
+@keyframes sp-shuffle-ink {
+  0%,
+  100% {
+    color: #ed4245;
+  }
+  20% {
+    color: #faa61a;
+  }
+  40% {
+    color: #fee75c;
+  }
+  60% {
+    color: #57f287;
+  }
+  80% {
+    color: #5865f2;
+  }
+}
+@keyframes sp-shuffle-bar {
+  0%,
+  100% {
+    border-left-color: #ed4245;
+  }
+  20% {
+    border-left-color: #faa61a;
+  }
+  40% {
+    border-left-color: #fee75c;
+  }
+  60% {
+    border-left-color: #57f287;
+  }
+  80% {
+    border-left-color: #5865f2;
+  }
+}
 .sp-cp__shuffle.is-on .sp-check__box--anim {
-  border-radius: 6px;
-  background: conic-gradient(
-    #ed4245,
-    #faa61a,
-    #fee75c,
-    #57f287,
-    #5865f2,
-    #eb459e,
-    #ed4245
-  );
-  color: #fff;
+  animation: sp-shuffle-ink 4s linear infinite;
+  --sp-anim-fill: transparent;
+}
+/* Only the outline takes the colour; the box stays unfilled. */
+.sp-cp__shuffle.is-on .sp-check__box--anim [fill='rgb(255,255,255)'] {
+  fill: transparent;
 }
 .sp-embed-wrap.is-shuffle .dc-embed,
 .sp-embed-wrap.is-shuffle.sp-v2-wrap > * {
-  border-left-color: transparent;
-  background-image: linear-gradient(
-    to bottom,
-    #ed4245,
-    #faa61a,
-    #fee75c,
-    #57f287,
-    #5865f2,
-    #eb459e
-  );
-  background-size: 4px 100%;
-  background-repeat: no-repeat;
-  background-origin: border-box;
-  background-position: left;
+  animation: sp-shuffle-bar 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-cp__shuffle.is-on .sp-check__box--anim,
+  .sp-embed-wrap.is-shuffle .dc-embed,
+  .sp-embed-wrap.is-shuffle.sp-v2-wrap > * {
+    animation-duration: 20s;
+  }
 }
