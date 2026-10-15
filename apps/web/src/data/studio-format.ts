@@ -9,6 +9,7 @@ export {
   normaliseStudio,
   parseMessageLink,
   placeOf,
+  splitSeparatorLines,
   placedIn,
   v2Lines,
   studioPayload,

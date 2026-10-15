@@ -938,9 +938,12 @@ describe('Components V2 in the editor', () => {
       (document.querySelector('.sp-code__text') as HTMLTextAreaElement).value;
     await userEvent.click(screen.getByRole('radio', { name: 'V2 components' }));
 
-    // The text is edited where it's shown; {separator} draws a line.
-    await userEvent.click(screen.getByRole('button', { name: 'Edit text' }));
-    const text = screen.getByRole('textbox', { name: 'text' });
+    // The text is edited where it's shown, a stretch between dividers at a
+    // time; {separator} draws a line.
+    await userEvent.click(
+      screen.getAllByRole('button', { name: /^Edit text/ })[0]!,
+    );
+    const text = screen.getByRole('textbox', { name: /^text/ });
     await userEvent.clear(text);
     await userEvent.type(text, '## Summer Jam{{separator}See you there ');
     // A variable goes where the caret was.
@@ -970,7 +973,11 @@ describe('Components V2 in the editor', () => {
       screen.getByRole('button', { name: /Move the gallery/ }).focus();
       await userEvent.keyboard(key);
     };
-    await moveGallery('{ArrowUp}');
+    // Up past each line of text, to the top of the container.
+    for (let i = 0; i < 10; i++) {
+      if (json().indexOf('"type": 12') < json().indexOf('Summer Jam')) break;
+      await moveGallery('{ArrowUp}');
+    }
     expect(json().indexOf('"type": 17')).toBeLessThan(
       json().indexOf('"type": 12'),
     );

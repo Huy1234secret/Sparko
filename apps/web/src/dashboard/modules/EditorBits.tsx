@@ -95,9 +95,12 @@ export function EditText({
   maxLength,
   className,
   render = (v) => renderDiscordText(v),
+  onDone,
 }: {
   value: string;
   onChange: (value: string) => void;
+  /** Called when editing ends, to tidy what was written. */
+  onDone?: () => void;
   label: string;
   placeholder: string;
   multiline?: boolean;
@@ -135,6 +138,7 @@ export function EditText({
     onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       remember(e.currentTarget);
       setEditing(false);
+      onDone?.();
     },
     onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       remember(e.currentTarget),
@@ -491,6 +495,36 @@ export function slideFrom(
 }
 
 /**
+ * Keeps a dragged item under the pointer, even when the page scrolls
+ * under it mid-drag. `shift` is how far the page has scrolled since.
+ */
+export function follower(
+  el: HTMLElement,
+  x0: number,
+  y0: number,
+  { lockX = false } = {},
+) {
+  const r0 = el.getBoundingClientRect();
+  let tx = 0;
+  let ty = 0;
+  let px = x0;
+  let py = y0;
+  const shift = () => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left - tx - r0.left, y: r.top - ty - r0.top };
+  };
+  const to = (x = px, y = py) => {
+    px = x;
+    py = y;
+    const s = shift();
+    tx = lockX ? 0 : x - x0 - s.x;
+    ty = y - y0 - s.y;
+    el.style.transform = `translate(${tx}px, ${ty}px)`;
+  };
+  return { to, shift, pointer: () => ({ x: px, y: py }) };
+}
+
+/**
  * Drag to reorder, for any list: drag an item's handle, or focus it and
  * use the arrow keys. While dragging, the item follows the pointer and the
  * others slide aside to show where it will land; let go and it settles
@@ -592,25 +626,31 @@ export function useReorder({
       });
     };
 
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - x0;
-      const dy = ev.clientY - y0;
-      dragged.style.transform = `translate(${mode === 'list' ? 0 : dx}px, ${dy}px)`;
-      const next = overAt(ev.clientX, ev.clientY);
+    const follow = follower(dragged, x0, y0, { lockX: mode === 'list' });
+    const update = (x?: number, y?: number) => {
+      follow.to(x, y);
+      // The places were measured before any scrolling; so is the pointer.
+      const p = follow.pointer();
+      const s = follow.shift();
+      const next = overAt(p.x - s.x, p.y - s.y);
       if (next === over) return;
       over = next;
       setDrag({ from, over });
       preview(over > from ? over - 1 : over);
     };
+    const move = (ev: PointerEvent) => update(ev.clientX, ev.clientY);
+    const scroll = () => update();
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
+      window.removeEventListener('scroll', scroll, true);
       commit(els, from, over > from ? over - 1 : over);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
+    window.addEventListener('scroll', scroll, true);
   };
   const keys =
     (from: number, count: number) => (e: React.KeyboardEvent<HTMLElement>) => {

@@ -263,12 +263,15 @@ describe('Message Studio messages', () => {
         ],
       },
     });
+    // Each {separator} gets a line of its own, and what was on the line
+    // moves with its last part.
+    expect(m.v2.text).toBe('## Hello {user}\n{separator}\nPrize');
     // Lines stay within the text, menus can't sit beside a line, and
     // anything unplaced goes to the end of the container.
     expect(m.v2.place).toEqual([
-      { id: 'x', slot: { at: 'beside', line: 0 } },
-      { id: 'm', slot: { at: 'line', line: 0 } },
-      { id: 'gallery', slot: { at: 'line', line: 0 } },
+      { id: 'x', slot: { at: 'beside', line: 2 } },
+      { id: 'm', slot: { at: 'line', line: 2 } },
+      { id: 'gallery', slot: { at: 'line', line: 2 } },
     ]);
     // Messages saved with the older part order are read too.
     const { place: _, ...older } = v2.v2;
