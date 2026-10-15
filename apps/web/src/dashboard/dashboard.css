@@ -1618,6 +1618,10 @@
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
 }
+/* The box around it shows focus; the field itself has no ring. */
+.sp-cp__num input:focus-visible {
+  box-shadow: none;
+}
 .sp-cp__num input::-webkit-inner-spin-button,
 .sp-cp__num input::-webkit-outer-spin-button {
   -webkit-appearance: none;
