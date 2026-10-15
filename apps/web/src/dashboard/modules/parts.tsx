@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { Avatar, Badge, Button, Combobox, Modal, Segmented } from '../../ui';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Combobox,
+  LoopIcon,
+  Modal,
+  Segmented,
+} from '../../ui';
+import { AnimatedIconButton } from './EditorBits';
+import restoreReveal from '../../../../../design-system/assets/icons/animated-icons/restore-arrow-reveal.json?url';
+import restoreHover from '../../../../../design-system/assets/icons/animated-icons/restore-arrow-hover.json?url';
+import restoreSelect from '../../../../../design-system/assets/icons/animated-icons/restore-arrow-select.json?url';
 import type { Channel, Version } from '../../data';
 
 /**
@@ -129,16 +141,18 @@ export function VersionHistory<T>({
               {v.who} · {v.when}
             </span>
             <span className="sp-row__end">
-              <Button
+              <AnimatedIconButton
                 variant="ghost"
                 size="sm"
-                icon="rotate-ccw"
+                reveal={restoreReveal}
+                hover={restoreHover}
+                select={restoreSelect}
                 disabled={i === 0}
                 aria-label={`Restore “${v.title}”`}
                 onClick={() => setRestoreId(v.id)}
               >
                 Restore
-              </Button>
+              </AnimatedIconButton>
             </span>
           </div>
         ))}
@@ -146,7 +160,7 @@ export function VersionHistory<T>({
       <Modal
         open={!!restoring}
         onClose={() => setRestoreId(null)}
-        icon="rotate-ccw"
+        icon={<LoopIcon src={restoreSelect} delay={2000} size={22} solid />}
         title="Load this version into the editor?"
         description={
           restoring

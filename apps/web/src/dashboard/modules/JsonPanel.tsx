@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Button, Icon, cx, useToast } from '../../ui';
+import { Icon, cx, useToast } from '../../ui';
 import {
   fromDiscord,
   jsonErrorLine,
@@ -7,11 +7,19 @@ import {
   type StudioMessage,
 } from '../../data';
 import { AnimatedIconButton, InfoTip, uploadAnimations } from './EditorBits';
+import cloneReveal from '../../../../../design-system/assets/icons/animated-icons/clone-button-reveal.json?url';
+import cloneHover from '../../../../../design-system/assets/icons/animated-icons/clone-button-hover.json?url';
 import downloadReveal from '../../../../../design-system/assets/icons/animated-icons/download-button-reveal.json?url';
 import downloadHover from '../../../../../design-system/assets/icons/animated-icons/download-button-hover.json?url';
 import downloadSelect from '../../../../../design-system/assets/icons/animated-icons/download-button-select.json?url';
 
-export const jsonAnimations = [downloadReveal, downloadHover, downloadSelect];
+export const jsonAnimations = [
+  downloadReveal,
+  downloadHover,
+  downloadSelect,
+  cloneReveal,
+  cloneHover,
+];
 
 /** One line of the editor, in pixels; the red bar for a bad line uses it. */
 const LINE = 18;
@@ -126,10 +134,12 @@ export function JsonPanel({
           >
             Export
           </AnimatedIconButton>
-          <Button
+          <AnimatedIconButton
             size="sm"
             variant="ghost"
-            icon={copied ? 'check' : 'copy'}
+            reveal={cloneReveal}
+            hover={cloneHover}
+            select={cloneHover}
             onClick={() => {
               void navigator.clipboard
                 ?.writeText(shown)
@@ -137,7 +147,7 @@ export function JsonPanel({
             }}
           >
             {copied ? 'Copied' : 'Copy'}
-          </Button>
+          </AnimatedIconButton>
         </span>
         <input
           ref={file}

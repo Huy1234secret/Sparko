@@ -1271,7 +1271,12 @@
 }
 .sp-embed__line {
   position: relative;
-  flex-wrap: wrap;
+}
+/* Editing the author or footer keeps it on its line, beside its buttons. */
+.sp-embed__line > .sp-edit-text,
+.sp-embed__line > .sp-edit-box {
+  flex: 1;
+  min-width: 0;
 }
 .sp-embed-tools {
   display: inline-flex;
@@ -2054,10 +2059,10 @@ body:has(> .sp-settings-scrim) > #root {
   color: var(--sp-text);
 }
 .sp-tip__bubble {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  z-index: calc(var(--sp-z-popover) + 1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
   width: max-content;
   max-width: 260px;
   padding: 8px 10px;
@@ -2066,19 +2071,10 @@ body:has(> .sp-settings-scrim) > #root {
   box-shadow: var(--sp-shadow-overlay);
   color: var(--sp-tooltip-text);
   font: 400 12px/17px var(--sp-font-sans);
-  text-align: left;
-  white-space: normal;
-  opacity: 0;
+  text-transform: none;
+  letter-spacing: normal;
   pointer-events: none;
-  transform: translate(-50%, 4px);
-  transition:
-    opacity var(--sp-dur-fast) var(--sp-ease-out),
-    transform var(--sp-dur-fast) var(--sp-ease-out);
-}
-.sp-tip:hover > .sp-tip__bubble,
-.sp-tip:focus-visible > .sp-tip__bubble {
-  opacity: 1;
-  transform: translate(-50%, 0);
+  animation: sp-fade var(--sp-dur-fast) var(--sp-ease-out);
 }
 
 /* Anything being dragged lifts off the page and follows the pointer. */
@@ -2132,6 +2128,8 @@ body:has(> .sp-settings-scrim) > #root {
   display: grid;
   gap: 8px;
   max-width: 516px;
+  /* The same room under the name as a classic message's text line. */
+  margin-top: 8px;
 }
 .sp-v2-slot {
   margin: 0;

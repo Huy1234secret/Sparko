@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Avatar, Button, Icon, SearchIcon } from '../ui';
+import { Avatar, Button, Icon, LottieIcon, SearchIcon } from '../ui';
+import darkHover from '../../../../design-system/assets/icons/animated-icons/dark-mode-hover.json?url';
+import lightHover from '../../../../design-system/assets/icons/animated-icons/light-mode-hover.json?url';
+import modeSwitch from '../../../../design-system/assets/icons/animated-icons/dark-light-mode-select.json?url';
+
+/**
+ * The switch animation turns the moon (dark) into the sun (light) over its
+ * first half, and the sun back into the moon over its second.
+ */
+const SUN = 30;
+const MOON_AGAIN = 60;
 import { useSession, useSignOut } from '../data';
 import { useTheme } from '../state/theme';
 import { isMac } from './shared';
@@ -9,15 +19,50 @@ export function ThemeButton() {
   const { theme, toggle } = useTheme();
   const label =
     theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+  // At rest the switch shows the theme in use: the moon for dark, the sun
+  // for light. Hovering plays that theme's own hover; switching plays one
+  // turning into the other.
+  const [anim, setAnim] = useState<'switch' | 'hover'>('switch');
+  const [hoverKey, setHoverKey] = useState(0);
+  const [turn, setTurn] = useState(0);
+  const light = theme === 'light';
   return (
     <span className="sp-tip sp-tip--end sp-tip--below">
       <Button
         variant="ghost"
-        iconOnly
-        icon={theme === 'dark' ? 'sun' : 'moon'}
+        // Square like an icon-only button, but holding the animated icon.
+        className="sp-btn--icon"
         aria-label={label}
-        onClick={toggle}
-      />
+        onPointerEnter={() => {
+          setAnim('hover');
+          setHoverKey((k) => k + 1);
+        }}
+        onClick={() => {
+          setAnim('switch');
+          setTurn((t) => t + 1);
+          toggle();
+        }}
+      >
+        {anim === 'hover' ? (
+          <LottieIcon
+            src={light ? lightHover : darkHover}
+            size={20}
+            solid
+            startAt={0}
+            playKey={hoverKey}
+          />
+        ) : (
+          <LottieIcon
+            src={modeSwitch}
+            size={20}
+            solid
+            startAt={light ? SUN : 0}
+            playKey={turn}
+            from={light ? 0 : SUN}
+            to={light ? SUN : MOON_AGAIN}
+          />
+        )}
+      </Button>
       <span className="sp-tooltip" role="tooltip" data-side="bottom">
         {label}
       </span>
