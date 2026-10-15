@@ -261,7 +261,11 @@ function EmbedBlock({
     <div
       {...reorder.item(index, embed.id)}
       data-issue={`embed:${embed.id}`}
-      className={cx('sp-embed-wrap', reorder.dropClass(index))}
+      className={cx(
+        'sp-embed-wrap',
+        embed.shuffle && 'is-shuffle',
+        reorder.dropClass(index),
+      )}
       style={{ '--dc-color': embed.color } as CSSProperties}
     >
       <div className="sp-embed-gutter">
@@ -435,6 +439,8 @@ function EmbedBlock({
         <ColourPicker
           value={embed.color}
           onChange={(color) => onChange({ color })}
+          shuffle={!!embed.shuffle}
+          onShuffle={(shuffle) => onChange({ shuffle })}
           onClose={close}
         />
       )}

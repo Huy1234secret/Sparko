@@ -679,7 +679,10 @@ export function ContainerCanvas({
         <div ref={root} className="sp-v2-message">
           {slotView({ at: 'above' })}
           <div
-            className="sp-embed-wrap sp-v2-wrap"
+            className={cx(
+              'sp-embed-wrap sp-v2-wrap',
+              v.shuffle && 'is-shuffle',
+            )}
             style={{ '--dc-color': v.accent } as CSSProperties}
           >
             <div className="sp-embed-gutter sp-v2-gutter">
@@ -765,6 +768,8 @@ export function ContainerCanvas({
                 value={v.accent}
                 title="Container colour"
                 onChange={(accent) => edit({ accent })}
+                shuffle={!!v.shuffle}
+                onShuffle={(shuffle) => edit({ shuffle })}
                 onClose={() => setPop(null)}
               />
             )}

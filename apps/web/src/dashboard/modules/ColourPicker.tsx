@@ -1,5 +1,13 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { Button, Segmented, useKeepOnScreen } from '../../ui';
+import {
+  Button,
+  Checkbox,
+  RevealIcon,
+  Segmented,
+  animIcons,
+  cx,
+  useKeepOnScreen,
+} from '../../ui';
 import { CloseButton, useDismiss } from './EditorBits';
 
 /**
@@ -127,12 +135,18 @@ export function ColourPicker({
   onChange,
   onClose,
   title = 'Colour picker',
+  shuffle,
+  onShuffle,
 }: {
   value: string;
   onChange: (hex: string) => void;
   onClose: () => void;
   title?: string;
+  /** "Shuffle colour": a random colour each time the message is sent. */
+  shuffle?: boolean;
+  onShuffle?: (on: boolean) => void;
 }) {
+  const [shuffleHover, setShuffleHover] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   // Hue and saturation are kept here so greys and black don't lose them.
   const [hsv, setHsv] = useState<Hsv>(() =>
@@ -349,6 +363,29 @@ export function ColourPicker({
           </>
         )}
       </div>
+      {onShuffle && (
+        <div
+          className={cx('sp-cp__shuffle', shuffle && 'is-on')}
+          onPointerEnter={() => setShuffleHover((k) => k + 1)}
+        >
+          <Checkbox
+            checked={!!shuffle}
+            onChange={onShuffle}
+            label={
+              <span className="sp-cp__shuffle-label">
+                <RevealIcon
+                  anim={animIcons.shuffle}
+                  fallback="refresh-cw"
+                  size={18}
+                  hoverKey={shuffleHover}
+                />
+                Shuffle colour
+              </span>
+            }
+            description="A random colour each time the message is sent."
+          />
+        </div>
+      )}
     </div>
   );
 }
