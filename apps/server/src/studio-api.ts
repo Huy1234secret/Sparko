@@ -23,6 +23,7 @@ import {
   setPosted,
   updateTemplate,
   normaliseStudio,
+  parseMessageLink,
   studioDefault,
   studioProblem,
   writeModule,
@@ -243,6 +244,65 @@ export function studioRoutes({
           moduleId: 'studio',
           kind: 'studio',
           payload: { userId: user.id, userName: user.name },
+        },
+        at,
+      );
+      res.writeHead(204).end();
+      return true;
+    }
+    if (path === '/studio/edit' && method === 'POST') {
+      // Turns a message Sparko already sent into this template.
+      const body = await readJson<{ message?: unknown; link?: unknown }>(req);
+      const problem = studioProblem(body.message);
+      if (problem) throw new BadRequest(problem);
+      const target = parseMessageLink(
+        typeof body.link === 'string' ? body.link : '',
+      );
+      if (!target)
+        throw new BadRequest(
+          'Paste a message link, like https://discord.com/channels/…/…/…',
+        );
+      if (target.guildId !== guildId)
+        throw new BadRequest('That message is in another server.');
+      const m = normaliseStudio(body.message as StudioMessage);
+      const tooMany = planProblem(m, getGuild(db, guildId)?.plan);
+      if (tooMany) throw new BadRequest(tooMany);
+      const at = now();
+      addVersion(
+        db,
+        {
+          guildId,
+          moduleId: 'studio',
+          title: `Edited a message with “${m.name}”`,
+          who: user,
+          config: m,
+        },
+        at,
+      );
+      addAudit(
+        db,
+        {
+          guildId,
+          who: user.name,
+          what: 'edited a message',
+          detail: m.name,
+          icon: 'message-square-text',
+        },
+        at,
+      );
+      enqueueJob(
+        db,
+        {
+          guildId,
+          moduleId: 'studio',
+          kind: 'studio-edit',
+          payload: {
+            userId: user.id,
+            userName: user.name,
+            channelId: target.channelId,
+            messageId: target.messageId,
+            message: m,
+          },
         },
         at,
       );

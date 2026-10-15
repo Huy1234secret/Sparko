@@ -12,6 +12,7 @@ import {
   addAudit,
   defaultDbPath,
   discordRest,
+  editStudioMessage,
   handleStudioInteraction,
   ticketActions,
   ticketButtonPrefix,
@@ -23,6 +24,7 @@ import {
   requeueRunning,
   setStatus,
   upsertGuild,
+  type StudioMessage,
 } from '@sparko/core';
 import { commands, handleCommand } from './commands.ts';
 import { startJobLoop, type Handlers } from './jobs.ts';
@@ -65,6 +67,24 @@ const handlers: Handlers = {
       by.userId && by.userName
         ? { id: by.userId, name: by.userName }
         : undefined,
+    );
+  },
+  'studio-edit': (job) => {
+    const p = job.payload as {
+      userId: string;
+      userName: string;
+      channelId: string;
+      messageId: string;
+      message: StudioMessage;
+    };
+    return editStudioMessage(
+      rest,
+      db,
+      job.guildId,
+      { channelId: p.channelId, messageId: p.messageId },
+      p.message,
+      Date.now(),
+      { id: p.userId, name: p.userName },
     );
   },
 };

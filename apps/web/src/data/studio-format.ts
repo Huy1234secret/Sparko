@@ -7,6 +7,7 @@ export {
   studioVariables,
   v2Sections,
   normaliseStudio,
+  parseMessageLink,
   placeOf,
   placedIn,
   v2Lines,

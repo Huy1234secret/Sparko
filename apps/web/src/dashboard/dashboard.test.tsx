@@ -644,6 +644,32 @@ describe('Message Studio', () => {
     ).toHaveAttribute('alt', ':pixel_heart:');
   }, 20_000);
 
+  it('turns a message Sparko sent into the template, from its link', async () => {
+    await openEditor();
+    const field = screen.getByRole('textbox', { name: /Edit message/ });
+    const button = screen.getByRole('button', { name: 'Edit message' });
+    expect(button).toBeDisabled();
+    await userEvent.type(field, 'https://discord.com/channels/42/1/2');
+    expect(
+      screen.getByText('That message is in another server.'),
+    ).toBeInTheDocument();
+    expect(button).toBeDisabled();
+    await userEvent.clear(field);
+    await userEvent.type(
+      field,
+      'https://discord.com/channels/900000000000000001/1/2',
+    );
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    expect(
+      await screen.findByText(
+        'Message edited in Discord',
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('edits the message as JSON, and points at problems on saving', async () => {
     await openEditor();
     const code = document.querySelector<HTMLTextAreaElement>('.sp-code__text')!;

@@ -10,6 +10,7 @@ import {
 } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
 import {
+  parseMessageLink,
   planIssue,
   planProblem,
   studioIssue,
@@ -123,6 +124,7 @@ function StudioEditor({
   onChange,
   onSave,
   onPost,
+  onEdit,
   onFix,
   onCheck,
   checking,
@@ -137,6 +139,8 @@ function StudioEditor({
   onChange: (patch: Partial<StudioMessage>) => void;
   onSave: () => void;
   onPost: () => void;
+  /** Turns the message at this link into the template. */
+  onEdit: (link: string) => void;
   onFix: () => void;
   onCheck: () => void;
   checking: boolean;
@@ -147,6 +151,16 @@ function StudioEditor({
   } | null>(null);
   const paused = !!server.paused;
   const v2 = message.layout === 'v2';
+  // A link to a message Sparko sent, to turn into this template.
+  const [link, setLink] = useState('');
+  const target = parseMessageLink(link);
+  const linkError = !link.trim()
+    ? undefined
+    : !target
+      ? 'Paste a message link: right-click a message in Discord and pick Copy Message Link.'
+      : target.guildId !== server.id
+        ? 'That message is in another server.'
+        : undefined;
   const channel = channels.find((c) => c.id === message.channel);
   const locked = !!channel && !channel.canPost;
   const problem =
@@ -406,6 +420,30 @@ function StudioEditor({
                   Post test
                 </Button>
               </div>
+              <div className="sp-post-row" data-issue="link">
+                <Input
+                  label={
+                    <>
+                      Edit message{' '}
+                      <InfoTip text="Turns a message Sparko already sent into this template. It keeps its place and its link. In Discord, right-click the message, pick Copy Message Link, and paste it here." />
+                    </>
+                  }
+                  placeholder="https://discord.com/channels/…"
+                  inputMode="url"
+                  value={link}
+                  error={linkError}
+                  onChange={(e) => setLink(e.target.value)}
+                />
+                <Button
+                  icon="square-pen"
+                  loading={phase === 'saving' || phase === 'applying'}
+                  loadingLabel="Editing…"
+                  disabled={paused || !target || !!linkError}
+                  onClick={() => onEdit(link.trim())}
+                >
+                  Edit message
+                </Button>
+              </div>
               <JsonPanel
                 message={message}
                 onChange={(next) => onChange(next)}
@@ -439,6 +477,8 @@ export function StudioModule({
   // A problem found on saving or posting: the page goes to it and flashes
   // it red, and a button or menu with the problem opens its settings.
   const [issue, setIssue] = useState<ShownIssue | null>(null);
+  // What the last send did, for the progress line.
+  const [done, setDone] = useState<'post' | 'edit'>('post');
   useEffect(() => {
     if (!issue) return;
     // Two frames: one for settings panels to open, one for them to draw.
@@ -544,7 +584,15 @@ export function StudioModule({
     if (!message) return;
     setTried(true);
     if (blocked(message, 'post')) return;
+    setDone('post');
     await flow.run(() => actions.postTest.mutateAsync(message));
+  };
+  const editPosted = async (link: string) => {
+    if (!message) return;
+    setTried(true);
+    if (blocked(message, 'edit the message')) return;
+    setDone('edit');
+    await flow.run(() => actions.editMessage.mutateAsync({ message, link }));
   };
   const recheck = (after?: () => void) =>
     channel &&
@@ -564,7 +612,11 @@ export function StudioModule({
       <PausedNotice server={server} />
       <SavePipeline
         phase={flow.phase}
-        liveLabel={`Posted in #${channel?.name ?? ''}`}
+        liveLabel={
+          done === 'edit'
+            ? 'Message edited in Discord'
+            : `Posted in #${channel?.name ?? ''}`
+        }
         error={flow.error}
       />
       <ModuleTabs
@@ -610,6 +662,7 @@ export function StudioModule({
                   onChange={edit}
                   onSave={save}
                   onPost={() => void post()}
+                  onEdit={(link) => void editPosted(link)}
                   onFix={() => setFixOpen(true)}
                   onCheck={() => recheck()}
                   checking={checkChannel.isPending}

@@ -80,3 +80,61 @@ export async function publishStudio(
     throw e;
   }
 }
+
+// Editing a message already in Discord ----------------------------------------
+
+/**
+ * Turns a message Sparko already sent into this template: the message
+ * keeps its place in the channel and its link, and its buttons and menus
+ * do what the template's do.
+ */
+export async function editStudioMessage(
+  rest: Rest,
+  db: Db,
+  guildId: string,
+  target: { channelId: string; messageId: string },
+  message: StudioMessage,
+  now = Date.now(),
+  user?: { id: string; name: string },
+) {
+  const m = normaliseStudio(message);
+  const guild = getGuild(db, guildId);
+  const body = studioPayload(m, {
+    now,
+    user,
+    server: guild && { name: guild.name, members: guild.memberCount },
+    channel: target.channelId,
+  });
+  try {
+    await rest.patch(
+      `/channels/${target.channelId}/messages/${target.messageId}`,
+      // A classic message drops anything the template doesn't have.
+      m.layout === 'v2' ? body : { embeds: [], ...body },
+    );
+    rememberPost(db, guildId, target.messageId, m, now);
+  } catch (e) {
+    if (e instanceof DiscordError && e.code === DiscordCodes.cannotEditOthers)
+      throw new Plain(
+        'Sparko can only edit messages it sent. Copy the link of one of Sparko’s messages.',
+      );
+    if (
+      e instanceof DiscordError &&
+      (e.code === DiscordCodes.unknownMessage ||
+        e.code === DiscordCodes.unknownChannel)
+    )
+      throw new Plain('That message no longer exists. Check the link.');
+    if (
+      e instanceof DiscordError &&
+      (e.code === DiscordCodes.missingPermissions ||
+        e.code === DiscordCodes.missingAccess)
+    )
+      throw new Plain(
+        'Sparko can’t see that channel. Give it View Channel and Read Message History there.',
+      );
+    if (e instanceof DiscordError && e.status === 400)
+      throw new Plain(
+        `Discord didn’t accept the edit: ${e.message}. A message can’t switch between the classic and V2 layouts; if that’s the problem, post this one as a new message.`,
+      );
+    throw e;
+  }
+}
