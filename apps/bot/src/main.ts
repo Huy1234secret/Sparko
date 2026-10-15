@@ -8,6 +8,11 @@ import {
   Partials,
   type ButtonInteraction,
   type Guild,
+  type MessageReaction,
+  type PartialMessageReaction,
+  type PartialUser,
+  type StringSelectMenuInteraction,
+  type User,
 } from 'discord.js';
 import {
   addAudit,
@@ -22,6 +27,11 @@ import {
   openDb,
   Plain,
   publishStudio,
+  rrButtonPrefix,
+  rrPostByMessage,
+  rrSummary,
+  syncReactionRole,
+  applyReactionRole,
   pruneJobs,
   requeueRunning,
   setStatus,
@@ -76,6 +86,14 @@ const handlers: Handlers = {
         : undefined,
     );
   },
+  'rr-sync': (job) =>
+    syncReactionRole(
+      rest,
+      db,
+      job.guildId,
+      (job.payload as { id: string }).id,
+      Date.now(),
+    ),
   'studio-edit': (job) => {
     const p = job.payload as {
       userId: string;
@@ -159,6 +177,15 @@ function wire(c: Client) {
       void openTicket(interaction);
       return;
     }
+    // Reaction role buttons and menus.
+    if (
+      (interaction.isButton() || interaction.isStringSelectMenu()) &&
+      interaction.customId.startsWith('rr:') &&
+      interaction.inCachedGuild()
+    ) {
+      void reactionRoleInteraction(interaction);
+      return;
+    }
     // Buttons and menus on Message Studio messages.
     if (
       (interaction.isButton() || interaction.isStringSelectMenu()) &&
@@ -236,11 +263,136 @@ function wire(c: Client) {
       failed(`Updating ${after.id} in ${after.guild.id}`),
     );
   });
+  c.on(Events.MessageReactionAdd, (reaction, user) => {
+    void reactionRoleReaction(reaction, user, 'react');
+  });
+  c.on(Events.MessageReactionRemove, (reaction, user) => {
+    void reactionRoleReaction(reaction, user, 'unreact');
+  });
   c.on(Events.GuildMemberRemove, (member) => {
     memberLeft(db, rest, member).catch(
       failed(`Saying goodbye to ${member.id} in ${member.guild.id}`),
     );
   });
+}
+
+/** Sends a direct message; people who don't take DMs simply don't get it. */
+async function dm(userId: string, body: object) {
+  try {
+    const channel = await rest.post<{ id: string }>('/users/@me/channels', {
+      recipient_id: userId,
+    });
+    await rest.post(`/channels/${channel.id}/messages`, body);
+  } catch {
+    // Closed DMs aren't an error worth reporting.
+  }
+}
+
+/** Someone reacted on (or took a reaction off) a reaction role message. */
+async function reactionRoleReaction(
+  reaction: MessageReaction | PartialMessageReaction,
+  user: User | PartialUser,
+  action: 'react' | 'unreact',
+) {
+  try {
+    if (user.bot || !reaction.message.guildId) return;
+    if (!rrPostByMessage(db, reaction.message.id)) return;
+    const guild = client.guilds.cache.get(reaction.message.guildId);
+    if (!guild) return;
+    const member = await guild.members.fetch(user.id);
+    const e = reaction.emoji;
+    const emoji = e.id
+      ? `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`
+      : e.name;
+    if (!emoji) return;
+    const done = await applyReactionRole(rest, db, {
+      messageId: reaction.message.id,
+      user: { id: member.id, name: member.displayName },
+      roles: [...member.roles.cache.keys()],
+      roleName: (id) => guild.roles.cache.get(id)?.name,
+      action,
+      emoji,
+    });
+    if (!done || done.off) return;
+    // A refused reaction is taken back off, so it doesn't look like it worked.
+    if (action === 'react' && done.refused.length && !done.given.length)
+      await reaction.users.remove(user.id).catch(() => {});
+    const note = done.response ?? {
+      content: rrSummary(done),
+      allowed_mentions: { parse: [] },
+    };
+    if (!done.response && !done.refused.length) return;
+    // Reactions can't answer privately in the channel, so a channel reply
+    // mentions them and is deleted after ten seconds.
+    if (done.delivery !== 'dm') {
+      const sent = await rest
+        .post<{ id: string }>(`/channels/${done.channelId}/messages`, {
+          ...note,
+          content:
+            `<@${member.id}> ${(note as { content?: string }).content ?? ''}`.trim(),
+          allowed_mentions: { parse: [], users: [member.id] },
+        })
+        .catch(() => null);
+      if (sent)
+        setTimeout(() => {
+          rest
+            .delete(`/channels/${done.channelId}/messages/${sent.id}`)
+            .catch(() => {});
+        }, 10_000).unref();
+    }
+    if (done.delivery !== 'channel') await dm(member.id, note);
+  } catch (error) {
+    console.error('A reaction role reaction failed', error);
+  }
+}
+
+/** A member used a reaction role button or menu. */
+async function reactionRoleInteraction(
+  interaction:
+    | ButtonInteraction<'cached'>
+    | StringSelectMenuInteraction<'cached'>,
+) {
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const { member } = interaction;
+    const base = {
+      messageId: interaction.message.id,
+      user: { id: member.id, name: member.displayName },
+      roles: [...member.roles.cache.keys()],
+      roleName: (id: string) => interaction.guild.roles.cache.get(id)?.name,
+    };
+    const done = await applyReactionRole(
+      rest,
+      db,
+      interaction.isButton()
+        ? {
+            ...base,
+            action: 'button',
+            item: interaction.customId.slice(rrButtonPrefix.length),
+          }
+        : { ...base, action: 'menu', items: interaction.values },
+    );
+    const summary = rrSummary(done);
+    const response = done && !done.off ? done.response : null;
+    if (response && done && !done.off && done.delivery !== 'channel')
+      await dm(member.id, response);
+    if (response && done && !done.off && done.delivery !== 'dm')
+      // Sent as Discord's own JSON, so Components V2 responses work too.
+      await rest.patch(
+        `/webhooks/${interaction.applicationId}/${interaction.token}/messages/@original`,
+        response,
+      );
+    else
+      await interaction.editReply({
+        content: summary,
+        allowedMentions: { parse: [] },
+      });
+  } catch (error) {
+    console.error('A reaction role button or menu failed', error);
+    await interaction
+      .editReply('Sparko couldn’t change your roles just now. Try again.')
+      .catch(() => {});
+  }
 }
 
 /** A member pressed a ticket panel button. */
@@ -284,11 +436,17 @@ async function connect(members: boolean, content: boolean) {
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMessageReactions,
       ...(members ? [GatewayIntentBits.GuildMembers] : []),
       ...(content ? [GatewayIntentBits.MessageContent] : []),
     ],
     // Someone Sparko hasn't seen yet can still leave.
-    partials: [Partials.GuildMember, Partials.User],
+    partials: [
+      Partials.GuildMember,
+      Partials.User,
+      Partials.Message,
+      Partials.Reaction,
+    ],
   });
   wire(c);
   await c.login(token);

@@ -810,6 +810,10 @@ export type StudioVars = {
     | undefined;
   /** The channel the message goes to. */
   channel?: string | undefined;
+  /** The role a reaction role just gave or took. */
+  role?: { id: string; name: string } | undefined;
+  /** A reaction role's roles, one line each, for {role-list}. */
+  roleList?: string | undefined;
 };
 
 export type StudioVariable = {
@@ -817,6 +821,8 @@ export type StudioVariable = {
   about: string;
   /** Filled in only by welcome, leave and boost messages. */
   member?: true;
+  /** Filled in only by reaction role responses. */
+  role?: true;
 };
 
 /** Variables people can write in Studio messages, in braces. */
@@ -865,6 +871,18 @@ export const studioVariables: StudioVariable[] = [
     about: 'The server’s boost level, 0 to 3.',
     member: true,
   },
+  {
+    name: 'role',
+    about: 'Mentions the role that was given or taken, without pinging it.',
+    role: true,
+  },
+  { name: 'role.name', about: 'The role’s name.', role: true },
+  { name: 'role.id', about: 'The role’s Discord ID.', role: true },
+  {
+    name: 'role-list',
+    about: 'Lists every role on the message, with its emoji, one per line.',
+    role: true,
+  },
 ];
 
 /**
@@ -889,12 +907,16 @@ export function fillVariables(text: string, ctx: { now: number } & StudioVars) {
     'server.boosts': ctx.server?.boosts?.toLocaleString('en-US'),
     'server.level': ctx.server?.level?.toString(),
     channel: ctx.channel && `<#${ctx.channel}>`,
+    role: ctx.role && `<@&${ctx.role.id}>`,
+    'role.name': ctx.role?.name,
+    'role.id': ctx.role?.id,
+    'role-list': ctx.roleList,
     date: `<t:${unix}:D>`,
     time: `<t:${unix}:t>`,
     separator: '',
   };
   return text.replace(
-    /\{([a-z.]+)\}/g,
+    /\{([a-z.-]+)\}/g,
     (whole, name: string) => values[name] ?? whole,
   );
 }

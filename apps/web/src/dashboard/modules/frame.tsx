@@ -6,7 +6,15 @@ import {
   type ReactNode,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Tabs, PausedBanner, Icon, LoopIcon, SaveBar, Switch } from '../../ui';
+import {
+  Tabs,
+  PausedBanner,
+  Icon,
+  LoopIcon,
+  SaveBar,
+  Switch,
+  type RevealHover,
+} from '../../ui';
 import { ModuleIcon, useIconHover } from '../ModuleIcon';
 import type { SparkoModule } from '../../content/modules';
 import { api, type Server } from '../../data';
@@ -294,12 +302,15 @@ export function ModuleTabs({
   onChange,
   labels = ['Settings', 'Items', 'History'],
   counts = [],
+  icons = [],
 }: {
   module: SparkoModule;
   tab: ModuleTab;
   onChange: (tab: ModuleTab) => void;
   labels?: [string, string, string];
   counts?: (number | undefined)[];
+  /** Animated icons for the tabs, with still ones to stand in. */
+  icons?: { icon: string; anim: RevealHover | undefined }[];
 }) {
   const values: ModuleTab[] = ['settings', 'items', 'history'];
   return (
@@ -310,11 +321,19 @@ export function ModuleTabs({
       tabs={values.map((value, i) => ({
         value,
         label: labels[i]!,
+        ...(icons[i] ? { icon: icons[i].icon, anim: icons[i].anim } : {}),
         ...(counts[i] != null ? { count: counts[i] } : {}),
       }))}
     />
   );
 }
+
+/** The Editor, Templates and Logs (or Versions) tabs' icons. */
+export const editorTabIcons = [
+  { icon: 'square-pen', anim: animIcons.settingOutline },
+  { icon: 'file-text', anim: animIcons.template },
+  { icon: 'scroll-text', anim: animIcons.log },
+];
 
 export function PausedNotice({ server }: { server: Server }) {
   if (!server.paused) return null;

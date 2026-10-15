@@ -7,9 +7,10 @@ import {
   LoopIcon,
   Modal,
   Segmented,
+  type ComboItem,
 } from '../../ui';
 import { AnimatedIconButton } from './EditorBits';
-import type { Channel, Version } from '../../data';
+import type { Channel, RoleOption, Version } from '../../data';
 import { animIcons } from '../../ui';
 const restoreReveal = animIcons.restore.reveal;
 const restoreHover = animIcons.restore.hover;
@@ -202,3 +203,27 @@ export const isHttpsUrl = (value: string) => {
   }
 };
 export const newId = () => Math.random().toString(36).slice(2, 9);
+
+/**
+ * Roles for a role picker. Ones Sparko can't give (above its own role, or
+ * managed by an app) can't be picked, unless already picked.
+ */
+export function roleItems(
+  roles: RoleOption[],
+  picked: string[] = [],
+): ComboItem[] {
+  return roles.map((r) => ({
+    value: r.id,
+    label: r.name,
+    icon: 'at-sign',
+    // Roles without a colour show in Discord's grey.
+    color: r.color ?? '#99AAB5',
+    ...(r.color && r.color2 ? { color2: r.color2 } : {}),
+    ...(r.assignable === false
+      ? {
+          disabled: !picked.includes(r.id),
+          note: 'Above Sparko’s role',
+        }
+      : {}),
+  }));
+}

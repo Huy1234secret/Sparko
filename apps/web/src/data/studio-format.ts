@@ -41,3 +41,19 @@ export {
   type GreetSettings,
   type WelcomeConfig,
 } from '../../../../packages/core/src/welcome.ts';
+// Reaction roles share their checks and role logic with the bot.
+export {
+  emojiKey,
+  rrDecide,
+  rrDefault,
+  rrIssue,
+  rrItem,
+  rrLimits,
+  rrRoleList,
+  type ReactionRole,
+  type RRDelivery,
+  type RRIssue,
+  type RRItem,
+  type RRKind,
+  type RRMode,
+} from '../../../../packages/core/src/reaction-roles.ts';

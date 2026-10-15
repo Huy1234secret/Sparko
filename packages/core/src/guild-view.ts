@@ -29,6 +29,8 @@ export type GuildView = {
     /** The second colour of a gradient role, if it is one. */
     color2: number | null;
     managed: boolean;
+    /** Sparko can give and take it: below its own top role, not managed. */
+    assignable: boolean;
   }[];
 };
 
@@ -119,6 +121,13 @@ export function guildViews(rest: Rest, ttlMs = 60_000) {
           ),
         };
       });
+    const top = Math.max(
+      0,
+      ...guild.roles
+        .filter((r) => member.roles.includes(r.id))
+        .map((r) => r.position),
+    );
+    const canManage = has(perms, Perm.manageRoles);
     const roles = guild.roles
       .filter((r) => r.id !== guild.id)
       .sort((a, b) => b.position - a.position)
@@ -128,6 +137,7 @@ export function guildViews(rest: Rest, ttlMs = 60_000) {
         color: r.color,
         color2: r.colors?.secondary_color ?? null,
         managed: r.managed,
+        assignable: canManage && !r.managed && r.position < top,
       }));
     return { perms, channels: list, roles };
   }

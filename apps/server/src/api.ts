@@ -31,6 +31,7 @@ import {
 import type { createAuth, DiscordGuild } from './auth.ts';
 import { BadRequest, json, readJson } from './http.ts';
 import type { Media } from './media.ts';
+import { rrRoutes } from './rr-api.ts';
 import { studioRoutes } from './studio-api.ts';
 import { ticketRoutes } from './tickets-api.ts';
 
@@ -234,6 +235,7 @@ export function createApi({
     rest: discord,
     media,
   });
+  const reactionRoles = rrRoutes({ db, view: (id) => view(id), now });
   const tickets = ticketRoutes({
     db,
     rest: discord,
@@ -329,6 +331,16 @@ export function createApi({
       });
     } else if (rest.startsWith('/studio')) {
       const handled = await studio({
+        req,
+        res,
+        method,
+        path: rest,
+        guildId,
+        user,
+      });
+      if (!handled) json(res, 404, { error: 'not_found' });
+    } else if (rest.startsWith('/reaction-roles')) {
+      const handled = await reactionRoles({
         req,
         res,
         method,

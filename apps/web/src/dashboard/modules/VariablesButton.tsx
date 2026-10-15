@@ -16,12 +16,15 @@ export const variablesAnimations = [bookReveal, bookHover, bookOpen];
 export function VariablesButton({
   v2,
   member,
+  role,
   onPick,
 }: {
   /** Components V2 messages also have {separator}. */
   v2: boolean;
   /** Welcome, leave and boost messages fill in more about the member. */
   member?: boolean;
+  /** Reaction role responses fill in the role. */
+  role?: boolean;
   onPick: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -38,7 +41,9 @@ export function VariablesButton({
   useDismiss(open, () => toggle(false), wrap);
   usePlacement(open, wrap, pop, menuPlacement);
   const list = [
-    ...studioVariables.filter((v) => member || !v.member),
+    ...studioVariables.filter(
+      (v) => (member || !v.member) && (role || !v.role),
+    ),
     ...(v2
       ? [
           {

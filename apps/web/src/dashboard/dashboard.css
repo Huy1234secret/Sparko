@@ -2793,3 +2793,216 @@ body:has(> .sp-settings-scrim) > #root {
   filter: grayscale(0.4);
   user-select: none;
 }
+
+/* Tags on Message Studio templates used elsewhere */
+.sp-lib-tags {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+.sp-lib-card:has(.sp-lib-tags) .sp-lib-card__titles {
+  padding-right: 110px;
+}
+.sp-lib-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  border: 1px solid var(--sp-line);
+  border-radius: 999px;
+  background: var(--sp-raised);
+  color: var(--sp-muted);
+  font: 600 11px/1 var(--sp-font-sans);
+  white-space: nowrap;
+  cursor: help;
+}
+.sp-lib-tag .sp-mask-icon {
+  width: 14px;
+  height: 14px;
+}
+.sp-lib-tag--welcome {
+  color: var(--sp-success);
+}
+.sp-lib-tag--reaction-role {
+  color: var(--sp-brand-text);
+}
+
+/* Reaction roles ----------------------------------------------------------- */
+.sp-rr-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sp-rr-lib {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 16px 20px 20px;
+  list-style: none;
+}
+.sp-rr-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+.sp-rr-card__open {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.sp-rr-card__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.sp-rr-card__actions {
+  display: flex;
+  gap: 6px;
+}
+.sp-rr-items-wrap {
+  display: grid;
+  gap: 10px;
+}
+.sp-rr-items {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-rr-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-rr-item[draggable='true'] {
+  cursor: grab;
+}
+.sp-rr-item.is-dragged {
+  opacity: 0.5;
+}
+.sp-rr-item.is-blank {
+  border-style: dashed;
+  background: none;
+}
+.sp-rr-item__grip {
+  color: var(--sp-muted);
+}
+.sp-rr-item__grip.is-hidden {
+  visibility: hidden;
+}
+.sp-rr-item__main {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+}
+.sp-rr-item__main .sp-label {
+  display: none;
+}
+.sp-rr-item__tools {
+  display: flex;
+  gap: 2px;
+}
+.sp-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sp-radius-chip);
+  background: none;
+  color: var(--sp-muted);
+  cursor: pointer;
+}
+.sp-icon-btn:hover:not(:disabled) {
+  background: var(--sp-raised-hover);
+  color: var(--sp-text);
+}
+.sp-icon-btn--danger:hover:not(:disabled) {
+  color: var(--sp-danger);
+}
+.sp-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sp-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-rr-menu-face {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  cursor: pointer;
+}
+.sp-rr-preview {
+  display: grid;
+  gap: 8px;
+  margin-top: -8px;
+  padding: 0 16px 14px 72px;
+  border-radius: 0 0 var(--sp-radius-card) var(--sp-radius-card);
+  background: var(--sp-dc-bg);
+}
+.dc-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dc-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--sp-dc-blurple);
+  border-radius: 8px;
+  background: rgb(88 101 242 / 0.15);
+  color: var(--sp-dc-text);
+  font-size: 14px;
+}
+.dc-select__list {
+  display: grid;
+  margin: 0;
+  padding: 4px;
+  border-radius: 4px;
+  background: var(--sp-dc-embed);
+  list-style: none;
+}
+.dc-select__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  color: var(--sp-dc-text);
+  font-size: 14px;
+}
+.dc-select__option small {
+  display: block;
+  color: var(--sp-dc-muted);
+}
+.sp-rr-response__side {
+  margin: 16px 16px 0;
+  width: auto;
+}
+.sp-rr-item .sp-colour-squares {
+  display: flex;
+  gap: 6px;
+}

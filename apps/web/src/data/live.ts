@@ -161,6 +161,32 @@ export function withBackend(
       if (!(await backend()).live) return sample.reopenTicket(id, n);
       await call('POST', `${server(id)}/tickets/${n}/reopen`);
     },
+    async getReactionRoles(id) {
+      if (!(await backend()).live) return sample.getReactionRoles(id);
+      return getJson(`${server(id)}/reaction-roles`);
+    },
+    async addReactionRole(id, name) {
+      if (!(await backend()).live) return sample.addReactionRole(id, name);
+      return call<{ id: string }>('POST', `${server(id)}/reaction-roles`, {
+        name,
+      });
+    },
+    async saveReactionRole(id, rrId, change) {
+      if (!(await backend()).live)
+        return sample.saveReactionRole(id, rrId, change);
+      await call('PATCH', `${server(id)}/reaction-roles/${rrId}`, change);
+    },
+    async cloneReactionRole(id, rrId) {
+      if (!(await backend()).live) return sample.cloneReactionRole(id, rrId);
+      return call<{ id: string }>(
+        'POST',
+        `${server(id)}/reaction-roles/${rrId}/clone`,
+      );
+    },
+    async deleteReactionRole(id, rrId) {
+      if (!(await backend()).live) return sample.deleteReactionRole(id, rrId);
+      await call('DELETE', `${server(id)}/reaction-roles/${rrId}`);
+    },
     async getStudio(id) {
       if (!(await backend()).live) return sample.getStudio(id);
       return getJson(`${server(id)}/studio`);

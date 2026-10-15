@@ -24,6 +24,7 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
+import { ReactionRolesModule } from './ReactionRolesModule';
 import { StudioModule } from './StudioModule';
 import { TicketsModule } from './TicketsModule';
 import { WelcomeModule } from './WelcomeModule';
@@ -256,6 +257,8 @@ export function ModulePage() {
     return <WelcomeModule module={module} server={server} />;
   if (module.id === 'studio')
     return <StudioModule module={module} server={server} />;
+  if (module.id === 'role-menus')
+    return <ReactionRolesModule module={module} server={server} />;
   if (module.id === 'tickets')
     return <TicketsModule module={module} server={server} />;
   return <GenericModule module={module} server={server} />;

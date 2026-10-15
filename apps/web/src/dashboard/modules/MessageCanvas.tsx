@@ -40,12 +40,14 @@ function PreviewTools({
   onEmoji,
   v2,
   memberVariables,
+  roleVariables,
 }: {
   serverId: string;
   items: PlusItem[];
   onEmoji: (text: string) => void;
   v2: boolean;
   memberVariables: boolean;
+  roleVariables: boolean;
 }) {
   const target = useInsertTarget();
   // Goes where the person was last writing, or at the end of the text.
@@ -56,7 +58,12 @@ function PreviewTools({
   };
   return (
     <div className="sp-preview-tools">
-      <VariablesButton v2={v2} member={memberVariables} onPick={put} />
+      <VariablesButton
+        v2={v2}
+        member={memberVariables}
+        role={roleVariables}
+        onPick={put}
+      />
       <EmojiButton serverId={serverId} onPick={put} />
       <PlusMenu items={items} />
     </div>
@@ -75,7 +82,9 @@ export function MessageCanvas({
   onChange,
   headingId = 'studio-preview',
   above,
+  below,
   memberVariables,
+  roleVariables,
   check = (m) => m,
 }: {
   server: Server;
@@ -86,8 +95,12 @@ export function MessageCanvas({
   headingId?: string;
   /** Shown above the preview's heading. */
   above?: ReactNode;
+  /** Shown under the message, as part of it. */
+  below?: ReactNode;
   /** Lists the variables only welcome, leave and boost messages fill in. */
   memberVariables?: boolean;
+  /** Lists the variables reaction role responses fill in. */
+  roleVariables?: boolean;
   /** Adjusts the message before it's checked. */
   check?: (m: StudioMessage) => StudioMessage;
 }) {
@@ -202,6 +215,7 @@ export function MessageCanvas({
         <PreviewTools
           serverId={server.id}
           memberVariables={!!memberVariables}
+          roleVariables={!!roleVariables}
           items={items}
           v2={v2}
           onEmoji={(text) =>
@@ -235,6 +249,7 @@ export function MessageCanvas({
             focus={focus}
           />
         )}
+        {below}
       </fieldset>
       {tried && problem && (
         <p className="sp-field-error">

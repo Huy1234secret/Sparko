@@ -32,7 +32,15 @@ import {
   type Rest,
   type StoredUser,
   type StudioMessage,
+  greetKinds,
+  greetNames,
+  greetTemplates,
+  isLegacyWelcome,
+  RR_MODULE,
+  type ReactionRole,
+  type WelcomeConfig,
 } from '@sparko/core';
+import { rrUsing, syncRR } from './rr-api.ts';
 import { BadRequest, json, readJson } from './http.ts';
 import type { Media } from './media.ts';
 
@@ -91,6 +99,47 @@ export function studioRoutes({
     return m;
   };
 
+  /** Where each template is used outside Message Studio, for its tags. */
+  const templateUses = (guildId: string) => {
+    const uses = new Map<
+      string,
+      { kind: 'welcome' | 'reaction-role'; where: string }[]
+    >();
+    const add = (
+      id: string,
+      kind: 'welcome' | 'reaction-role',
+      where: string,
+    ) => {
+      if (!id) return;
+      const list = uses.get(id) ?? [];
+      if (!list.some((u) => u.where === where)) list.push({ kind, where });
+      uses.set(id, list);
+    };
+    const welcome = getModule<WelcomeConfig>(db, guildId, 'welcome').config;
+    if (welcome && !isLegacyWelcome(welcome))
+      for (const k of greetKinds) {
+        const t = greetTemplates(welcome[k]);
+        const where = `Welcome messages (${greetNames[k]})`;
+        add(
+          t.channel ||
+            (welcome[k].template && welcome[k].channel
+              ? welcome[k].template
+              : ''),
+          'welcome',
+          where,
+        );
+        add(t.dm, 'welcome', where);
+      }
+    for (const r of listLibrary<ReactionRole>(db, guildId, RR_MODULE)
+      .templates) {
+      const where = `Reaction roles (${r.name})`;
+      add(r.message.message, 'reaction-role', where);
+      add(r.message.response?.claim ?? '', 'reaction-role', where);
+      add(r.message.response?.remove ?? '', 'reaction-role', where);
+    }
+    return uses;
+  };
+
   return async function handle({
     req,
     res,
@@ -121,11 +170,12 @@ export function studioRoutes({
         // Roles "Give or take role" can pick; Discord manages bot roles itself.
         roles: (v?.roles ?? [])
           .filter((r) => !r.managed)
-          .map(({ id, name, color, color2 }) => ({
+          .map(({ id, name, color, color2, assignable }) => ({
             id,
             name,
             color: hex(color),
             color2: color && color2 ? hex(color2) : null,
+            assignable,
           })),
         sendLimit: sendLimit(getGuild(db, guildId)?.plan),
         ...(() => {
@@ -135,6 +185,7 @@ export function studioRoutes({
             'studio',
           );
           const limits = limitsOf(guildId);
+          const uses = templateUses(guildId);
           return {
             templates: templates.map((t) => ({
               id: t.id,
@@ -143,6 +194,7 @@ export function studioRoutes({
               position: t.position,
               meta: savedLine(t.at, now(), t.who === user.name ? 'you' : t.who),
               message: normaliseStudio(t.message),
+              usedIn: uses.get(t.id) ?? [],
             })),
             folders,
             templateLimit: limits.templates,
@@ -431,6 +483,10 @@ export function studioRoutes({
         },
         now(),
       );
+      // Reaction roles posting this template follow the change.
+      if (body?.message !== undefined)
+        for (const r of rrUsing(db, guildId, template[1]!))
+          syncRR(db, guildId, r.id, now());
       res.writeHead(204).end();
       return true;
     }

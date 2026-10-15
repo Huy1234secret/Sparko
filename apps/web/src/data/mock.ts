@@ -10,7 +10,12 @@ import type {
   GreetLogEntry,
   WelcomeState,
 } from './types';
-import { greetKinds, welcomeDefault } from './studio-format';
+import {
+  greetKinds,
+  greetNames,
+  greetTemplates,
+  welcomeDefault,
+} from './studio-format';
 import { createSupportMock } from './mock-support';
 
 /**
@@ -497,5 +502,13 @@ const {
   server: serverById,
   channels: (serverId) => channelsFor(stateOf(serverId)),
   you: () => session.user,
+  welcomeUses: (serverId) => {
+    const { config } = stateOf(serverId).welcome;
+    return greetKinds.flatMap((k) =>
+      Object.values(greetTemplates(config[k]))
+        .filter(Boolean)
+        .map((id) => ({ id, where: `Welcome messages (${greetNames[k]})` })),
+    );
+  },
 });
 export const mockApi: PanelApi = { ...coreApi, ...supportApi };
