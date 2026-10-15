@@ -981,7 +981,12 @@ function GreetLog({
           ))}
         </ol>
       ) : (
-        <EmptyState icon="scroll-text" title="Nothing yet">
+        <EmptyState
+          icon={
+            <RevealIcon anim={animIcons.log} fallback="scroll-text" size={28} />
+          }
+          title="Nothing yet"
+        >
           When Sparko sends a join, leave or boost message, it shows here.
         </EmptyState>
       )}

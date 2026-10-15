@@ -53,6 +53,34 @@ function recolourAll(node: unknown) {
     Object.values(n).forEach(recolourAll);
   }
 }
+/** How thin an outline may be on screen, in pixels. */
+const MIN_STROKE = 1.5;
+/**
+ * Many files are drawn on a large canvas with fine lines that nearly vanish
+ * at icon size; this widens any outline thinner than MIN_STROKE once drawn
+ * at `size`. Files that keep their own look are left alone.
+ */
+function thicken(data: unknown, size: number, keepLook: boolean) {
+  const canvas = (data as { w?: number }).w;
+  if (keepLook || !canvas) return data;
+  const least = (MIN_STROKE * canvas) / size;
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) node.forEach(walk);
+    else if (node && typeof node === 'object') {
+      const n = node as Record<string, unknown>;
+      const w = n.ty === 'st' ? (n.w as { k?: unknown } | undefined) : null;
+      if (w && typeof w.k === 'number') {
+        // Hairlines (under a quarter pixel) are part of a shape's look.
+        if (w.k >= least / 6 && w.k < least) w.k = least;
+      }
+      // Animated widths are effects (a ring growing, say) and stay as drawn.
+      Object.values(n).forEach(walk);
+    }
+  };
+  walk(data);
+  return data;
+}
+
 function loadFile(src: string, keepColours: boolean) {
   const key = `${keepColours ? 'own' : 'themed'}:${src}`;
   let file = files.get(key);
@@ -148,7 +176,7 @@ export function LottieIcon({
           renderer: 'svg',
           loop: false,
           autoplay: false,
-          animationData: structuredClone(data),
+          animationData: thicken(structuredClone(data), size, !!original),
           rendererSettings: { preserveAspectRatio: 'xMidYMid meet' },
         });
         item.goToAndStop(
@@ -167,7 +195,7 @@ export function LottieIcon({
     return () => {
       gone = true;
     };
-  }, [src, original]);
+  }, [src, original, size]);
   useEffect(
     () => () => {
       shown.current?.item.destroy();

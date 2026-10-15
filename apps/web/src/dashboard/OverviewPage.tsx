@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Badge, Button, EmptyState, Icon, PausedBanner } from '../ui';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Icon,
+  PausedBanner,
+  RevealIcon,
+  animIcons,
+} from '../ui';
 import { moduleById, modules } from '../content/modules';
 import {
   api,
@@ -365,13 +373,7 @@ export function OverviewPage() {
           </p>
         </div>
         <div className="sp-page-head__actions">
-          <Link
-            className="sp-btn sp-btn--secondary"
-            to={`/dashboard/${serverId}/audit`}
-          >
-            <Icon name="scroll-text" />
-            Audit log
-          </Link>
+          <AuditLogLink to={`/dashboard/${serverId}/audit`} />
         </div>
       </header>
       {server.paused && (
@@ -472,5 +474,24 @@ export function OverviewPage() {
         </section>
       </div>
     </>
+  );
+}
+
+/** "Audit log", with the log icon that plays on hover. */
+function AuditLogLink({ to }: { to: string }) {
+  const [hoverKey, setHoverKey] = useState(0);
+  return (
+    <Link
+      className="sp-btn sp-btn--secondary"
+      to={to}
+      onPointerEnter={() => setHoverKey((k) => k + 1)}
+    >
+      <RevealIcon
+        anim={animIcons.log}
+        fallback="scroll-text"
+        hoverKey={hoverKey}
+      />
+      Audit log
+    </Link>
   );
 }

@@ -1,5 +1,5 @@
-import { useRef, useState, type CSSProperties } from 'react';
-import { LottieIcon, cx } from '../../ui';
+import { useRef, useState } from 'react';
+import { LottieIcon, cx, menuPlacement, usePlacement } from '../../ui';
 import { useDismiss } from './EditorBits';
 import { animIcons } from '../../ui';
 const plusAnim = animIcons.plusMenu.select;
@@ -17,8 +17,7 @@ export type PlusItem = {
 };
 
 /**
- * The "+" beside the live preview: a list of things to add, which drops down
- * along a line from the button.
+ * The "+" beside the live preview: a menu of things to add.
  */
 export function PlusMenu({
   items,
@@ -36,6 +35,8 @@ export function PlusMenu({
     setTurn((t) => t + 1);
   };
   useDismiss(open, () => toggle(false), wrap);
+  const pop = useRef<HTMLDivElement>(null);
+  usePlacement(open, wrap, pop, menuPlacement);
   return (
     <div ref={wrap} className="sp-pop-anchor">
       <button
@@ -57,15 +58,18 @@ export function PlusMenu({
         />
       </button>
       {open && (
-        <div className="sp-plus-menu" role="menu" aria-label={label}>
-          <span className="sp-plus-menu__line" aria-hidden="true" />
+        <div
+          ref={pop}
+          className="sp-popover sp-plus-menu"
+          role="menu"
+          aria-label={label}
+        >
           {items.map((item, i) => (
             <button
               key={item.label}
               type="button"
               role="menuitem"
-              className="sp-plus-menu__item"
-              style={{ '--i': i } as CSSProperties}
+              className="sp-option sp-plus-menu__item"
               disabled={item.disabled}
               title={item.disabled ? item.note : undefined}
               autoFocus={i === 0}
@@ -89,7 +93,7 @@ export function PlusMenu({
                 }
               }}
             >
-              {item.label}
+              <span className="sp-option__label">{item.label}</span>
             </button>
           ))}
         </div>
