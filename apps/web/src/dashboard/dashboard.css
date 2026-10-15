@@ -1758,6 +1758,7 @@
   display: grid;
   place-items: center;
   padding: 24px 16px;
+  overflow-x: hidden;
   overflow-y: auto;
   animation: sp-fade var(--sp-dur-base) var(--sp-ease-out);
 }
@@ -1946,6 +1947,7 @@ body:has(> .sp-settings-scrim) > #root {
   flex-direction: column;
   gap: 8px;
   max-height: 360px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Room for the drop line and focus rings at the edges. */
