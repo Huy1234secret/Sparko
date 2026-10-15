@@ -7,6 +7,7 @@ import {
   EmptyState,
   Icon,
   Segmented,
+  SearchIcon,
 } from '../ui';
 import {
   freeModuleCount,
@@ -67,7 +68,7 @@ export function FeaturesPage() {
       </header>
       <div className="sw-toolbar">
         <div className="sp-input" style={{ flex: '1 1 260px', maxWidth: 380 }}>
-          <Icon name="search" />
+          <SearchIcon />
           <input
             type="search"
             aria-label="Search features"

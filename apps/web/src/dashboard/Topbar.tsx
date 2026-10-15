@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Avatar, Button, Icon } from '../ui';
+import { Avatar, Button, Icon, SearchIcon } from '../ui';
 import { useSession, useSignOut } from '../data';
 import { useTheme } from '../state/theme';
 import { isMac } from './shared';
@@ -127,7 +127,7 @@ export function Topbar({
               className="sp-cmdk-trigger sp-topbar__desktop-only"
               onClick={onSearch}
             >
-              <Icon name="search" size="sm" />
+              <SearchIcon size={16} />
               <span>Search or jump to…</span>
               <span className="sp-kbd-group" aria-hidden="true">
                 <span className="sp-kbd">{isMac() ? '⌘' : 'Ctrl'}</span>

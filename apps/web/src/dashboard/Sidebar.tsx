@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Badge, Button, Icon, useToast } from '../ui';
+import { Badge, Button, Icon, useToast, SearchIcon } from '../ui';
 import { groups, modules } from '../content/modules';
 import { useOverview, useServers, type Server } from '../data';
 import {
@@ -84,7 +84,7 @@ function ServerSwitcher({ current }: { current: Server }) {
       {open && (
         <div className="sp-popover sp-switcher__pop">
           <label className="sp-popover__search">
-            <Icon name="search" size="sm" />
+            <SearchIcon size={16} />
             <input
               autoFocus
               aria-label="Find a server"
@@ -226,7 +226,7 @@ export function Sidebar({
         </div>
         <ServerSwitcher current={server} />
         <label className="sp-nav-search">
-          <Icon name="search" size="sm" />
+          <SearchIcon size={16} />
           <input
             aria-label="Find a module"
             placeholder="Find a module"

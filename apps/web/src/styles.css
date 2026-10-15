@@ -84,3 +84,17 @@ html {
     scrollbar-color: var(--sp-line-strong) transparent;
   }
 }
+
+/* The animated search icon sits where the plain one did, at its own size. */
+.sp-search-icon {
+  display: inline-grid;
+  flex: none !important;
+  place-items: center;
+}
+.sp-cmdk-trigger > .sp-search-icon + span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

@@ -1,5 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
-import { Badge, Button, EmptyState, Icon } from '../ui';
+import { Badge, Button, EmptyState, Icon, SearchIcon } from '../ui';
 import {
   commandCategories,
   commands,
@@ -39,7 +39,7 @@ export function CommandsPage() {
       </header>
       <div className="sw-toolbar">
         <div className="sp-input" style={{ flex: '1 1 260px', maxWidth: 380 }}>
-          <Icon name="search" />
+          <SearchIcon />
           <input
             type="search"
             aria-label="Search commands"

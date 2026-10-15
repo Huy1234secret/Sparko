@@ -1,3 +1,4 @@
+import { SearchIcon } from './search-icon';
 import {
   useId,
   type ButtonHTMLAttributes,
@@ -174,7 +175,11 @@ export function Input({
           rest.disabled && 'is-disabled',
         )}
       >
-        {icon && <Icon name={icon} />}
+        {icon === 'search' ? (
+          <SearchIcon size={18} />
+        ) : (
+          icon && <Icon name={icon} />
+        )}
         {suffix && <span className="sp-input__suffix">{suffix}</span>}
         <input id={inputId} aria-invalid={error ? true : undefined} {...rest} />
         {(end || loading) && (

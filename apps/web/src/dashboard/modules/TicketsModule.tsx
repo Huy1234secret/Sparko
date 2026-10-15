@@ -15,6 +15,7 @@ import {
   Switch,
   Textarea,
   useToast,
+  SearchIcon,
 } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
 import {
@@ -206,7 +207,7 @@ function Inbox({ server, onSetup }: { server: Server; onSetup: () => void }) {
           }))}
         />
         <div className="sp-input sp-inbox-search">
-          <Icon name="search" />
+          <SearchIcon />
           <input
             type="search"
             aria-label="Search tickets"
