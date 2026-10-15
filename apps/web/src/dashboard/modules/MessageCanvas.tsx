@@ -105,12 +105,10 @@ export function MessageCanvas({
   const addButton = () => {
     const button = newButton();
     onChange({ components: [...message.components, button] });
-    setFocus({ id: button.id });
   };
   const addMenu = () => {
     const menu = newMenu();
     onChange({ components: [...message.components, menu] });
-    setFocus({ id: menu.id });
   };
   const rows = 'Discord shows up to 5 rows of buttons and menus.';
   const items: PlusItem[] = v2

@@ -254,9 +254,13 @@ describe('Welcome messages', () => {
     ).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
 
+    // While Welcome messages are off, the tabs and editor can't be used.
+    const body = document.querySelector('.sp-greet-body');
+    expect(body).toHaveAttribute('inert');
     await userEvent.click(
       screen.getByRole('switch', { name: 'Welcome messages on or off' }),
     );
+    expect(body).not.toHaveAttribute('inert');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
       await screen.findByText('Couldn’t apply', {
@@ -600,6 +604,13 @@ describe('Message Studio', () => {
 
     await userEvent.click(plus);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Add button' }));
+    // A new button's settings open only when it's clicked.
+    expect(
+      screen.queryByRole('dialog', { name: 'Button settings' }),
+    ).toBeNull();
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Edit button Button' }).at(-1)!,
+    );
     const dialog = screen.getByRole('dialog', { name: 'Button settings' });
     await userEvent.click(
       within(dialog).getByRole('radio', { name: 'Link button' }),
@@ -783,6 +794,10 @@ describe('Message Studio', () => {
       screen.getByRole('button', { name: 'Add to the message' }),
     );
     await userEvent.click(screen.getByRole('menuitem', { name: 'Add menu' }));
+    expect(screen.queryByRole('dialog', { name: 'Menu settings' })).toBeNull();
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Edit menu' }).at(-1)!,
+    );
     const menu = screen.getByRole('dialog', { name: 'Menu settings' });
     await userEvent.click(
       within(menu).getByRole('button', { name: 'Add option' }),

@@ -442,168 +442,181 @@ export function WelcomeModule({
         liveLabel="Welcome messages are live"
         error={flow.error}
       />
-      <Tabs
-        label={module.label}
-        value={tab}
-        onChange={setTab}
-        tabs={(['join', 'leave', 'boost', 'logs'] as Tab[]).map((value) => ({
-          value,
-          label: tabLabels[value],
-          icon: tabIcons[value].icon,
-          anim: tabIcons[value].anim,
-          ...(value === 'logs' ? { count: welcome.data.log.length } : {}),
-        }))}
-      />
+      {!current.on && (
+        <p className="sp-edit-banner sp-greet-off-note" role="status">
+          <Icon name="info" size="sm" />
+          <span>
+            Welcome messages are off. Turn them on above to edit them.
+          </span>
+        </p>
+      )}
+      <div
+        className={cx('sp-greet-body', !current.on && 'is-off')}
+        inert={!current.on}
+      >
+        <Tabs
+          label={module.label}
+          value={tab}
+          onChange={setTab}
+          tabs={(['join', 'leave', 'boost', 'logs'] as Tab[]).map((value) => ({
+            value,
+            label: tabLabels[value],
+            icon: tabIcons[value].icon,
+            anim: tabIcons[value].anim,
+            ...(value === 'logs' ? { count: welcome.data.log.length } : {}),
+          }))}
+        />
 
-      {tab === 'logs' ? (
-        <GreetLog entries={welcome.data.log} channels={channels} />
-      ) : (
-        <InsertProvider>
-          <IssueProvider value={issue}>
-            <StudioDataProvider
-              value={{
-                serverId: server.id,
-                templates: data.templates,
-                folders: data.folders,
-                roles: data.roles,
-                sendLimit: data.sendLimit,
-              }}
-            >
-              {channelBlocked && (
-                <Notice
-                  tone="danger"
-                  title={`Sparko can’t post in #${channel.name}`}
-                  actions={
-                    <>
-                      <Button size="sm" onClick={() => setFixOpen(true)}>
-                        Show me how
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        loading={checkChannel.isPending}
-                        onClick={() =>
-                          checkChannel.mutate(channel.id, {
-                            onSuccess: () => void flow.retryApply(),
-                          })
+        {tab === 'logs' ? (
+          <GreetLog entries={welcome.data.log} channels={channels} />
+        ) : (
+          <InsertProvider>
+            <IssueProvider value={issue}>
+              <StudioDataProvider
+                value={{
+                  serverId: server.id,
+                  templates: data.templates,
+                  folders: data.folders,
+                  roles: data.roles,
+                  sendLimit: data.sendLimit,
+                }}
+              >
+                {channelBlocked && (
+                  <Notice
+                    tone="danger"
+                    title={`Sparko can’t post in #${channel.name}`}
+                    actions={
+                      <>
+                        <Button size="sm" onClick={() => setFixOpen(true)}>
+                          Show me how
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          loading={checkChannel.isPending}
+                          onClick={() =>
+                            checkChannel.mutate(channel.id, {
+                              onSuccess: () => void flow.retryApply(),
+                            })
+                          }
+                        >
+                          Check again
+                        </Button>
+                      </>
+                    }
+                  >
+                    It’s missing Send Messages and Embed Links there, so the{' '}
+                    {greetNames[kind]} can’t be sent. Fix it in Discord, or pick
+                    another channel.
+                  </Notice>
+                )}
+                <div className="sp-studio__grid">
+                  {previewing && previewId ? (
+                    <fieldset className="sp-fieldset" disabled={paused}>
+                      <legend className="sp-sr-only">Message</legend>
+                      <MessageCanvas
+                        key={previewId}
+                        server={server}
+                        message={previewing}
+                        tried={tried}
+                        headingId="greet-preview"
+                        memberVariables
+                        check={(m) => ({ ...m, channel: '1' })}
+                        onChange={(patch) => editTemplate(previewId, patch)}
+                        above={
+                          <p className="sp-edit-banner" role="status">
+                            <Icon name="info" size="sm" />
+                            <span>
+                              Editing <b>{previewing.name}</b> from Message
+                              Studio. Changes are saved to the template.
+                            </span>
+                            {twoMessages && settings.template && (
+                              <Segmented
+                                label="Message to preview"
+                                className="sp-greet-side"
+                                value={side}
+                                onChange={setSide}
+                                options={[
+                                  { value: 'channel', label: 'Channel' },
+                                  { value: 'dm', label: 'DM' },
+                                ]}
+                              />
+                            )}
+                          </p>
+                        }
+                      />
+                    </fieldset>
+                  ) : (
+                    <section
+                      className="sp-card sp-greet-empty"
+                      aria-label="Live preview"
+                    >
+                      <EmptyState
+                        icon={<EditingIcon />}
+                        title={`Pick a template for the ${greetNames[kind]}`}
+                        actions={
+                          <div className="sp-greet-start">
+                            <AnimatedIconButton
+                              reveal={plusAnimations.reveal}
+                              hover={plusAnimations.hover}
+                              select={plusAnimations.select}
+                              disabled={paused}
+                              loading={actions.saveTemplate.isPending}
+                              onClick={() => void createTemplate()}
+                            >
+                              Create new template
+                            </AnimatedIconButton>
+                            <SparkleButton
+                              variant="primary"
+                              size="sm"
+                              disabled={paused}
+                              onClick={() => setPresetsOpen(true)}
+                            >
+                              Use a default template
+                            </SparkleButton>
+                          </div>
                         }
                       >
-                        Check again
-                      </Button>
-                    </>
-                  }
-                >
-                  It’s missing Send Messages and Embed Links there, so the{' '}
-                  {greetNames[kind]} can’t be sent. Fix it in Discord, or pick
-                  another channel.
-                </Notice>
-              )}
-              <div className="sp-studio__grid">
-                {previewing && previewId ? (
-                  <fieldset className="sp-fieldset" disabled={paused}>
-                    <legend className="sp-sr-only">Message</legend>
-                    <MessageCanvas
-                      key={previewId}
-                      server={server}
-                      message={previewing}
-                      tried={tried}
-                      headingId="greet-preview"
-                      memberVariables
-                      check={(m) => ({ ...m, channel: '1' })}
-                      onChange={(patch) => editTemplate(previewId, patch)}
-                      above={
-                        <p className="sp-edit-banner" role="status">
-                          <Icon name="info" size="sm" />
-                          <span>
-                            Editing <b>{previewing.name}</b> from Message
-                            Studio. Changes are saved to the template.
-                          </span>
-                          {twoMessages && settings.template && (
-                            <Segmented
-                              label="Message to preview"
-                              className="sp-greet-side"
-                              value={side}
-                              onChange={setSide}
-                              options={[
-                                { value: 'channel', label: 'Channel' },
-                                { value: 'dm', label: 'DM' },
-                              ]}
-                            />
-                          )}
-                        </p>
-                      }
+                        Its live preview shows here, and you can edit it right
+                        in the preview. Templates are made in Message Studio.
+                      </EmptyState>
+                    </section>
+                  )}
+
+                  <fieldset
+                    className="sp-stack sp-studio__side sp-fieldset"
+                    disabled={paused}
+                  >
+                    <legend className="sp-sr-only">
+                      {tabLabels[kind]} settings
+                    </legend>
+                    <GreetSettingsCard
+                      kind={kind}
+                      settings={config[kind]}
+                      join={config.join}
+                      items={items}
+                      channels={channels}
+                      missingTemplate={missingTemplate}
+                      channelBlocked={channelBlocked}
+                      onChange={editSettings}
+                      onPresets={() => setPresetsOpen(true)}
                     />
                   </fieldset>
-                ) : (
-                  <section
-                    className="sp-card sp-greet-empty"
-                    aria-label="Live preview"
-                  >
-                    <EmptyState
-                      icon={<EditingIcon />}
-                      title={`Pick a template for the ${greetNames[kind]}`}
-                      actions={
-                        <div className="sp-greet-start">
-                          <AnimatedIconButton
-                            reveal={plusAnimations.reveal}
-                            hover={plusAnimations.hover}
-                            select={plusAnimations.select}
-                            disabled={paused}
-                            loading={actions.saveTemplate.isPending}
-                            onClick={() => void createTemplate()}
-                          >
-                            Create new template
-                          </AnimatedIconButton>
-                          <SparkleButton
-                            variant="primary"
-                            size="sm"
-                            disabled={paused}
-                            onClick={() => setPresetsOpen(true)}
-                          >
-                            Use a default template
-                          </SparkleButton>
-                        </div>
-                      }
-                    >
-                      Its live preview shows here, and you can edit it right in
-                      the preview. Templates are made in Message Studio.
-                    </EmptyState>
-                  </section>
-                )}
-
-                <fieldset
-                  className="sp-stack sp-studio__side sp-fieldset"
-                  disabled={paused}
-                >
-                  <legend className="sp-sr-only">
-                    {tabLabels[kind]} settings
-                  </legend>
-                  <GreetSettingsCard
-                    kind={kind}
-                    settings={config[kind]}
-                    join={config.join}
-                    items={items}
-                    channels={channels}
-                    missingTemplate={missingTemplate}
-                    channelBlocked={channelBlocked}
-                    onChange={editSettings}
-                    onPresets={() => setPresetsOpen(true)}
-                  />
-                </fieldset>
-              </div>
-              <PresetPicker
-                open={presetsOpen}
-                kind={kind}
-                serverId={server.id}
-                replacing={previewing?.name}
-                busy={actions.saveTemplate.isPending}
-                onClose={() => setPresetsOpen(false)}
-                onPick={(p) => void applyPreset(p)}
-              />
-            </StudioDataProvider>
-          </IssueProvider>
-        </InsertProvider>
-      )}
+                </div>
+                <PresetPicker
+                  open={presetsOpen}
+                  kind={kind}
+                  serverId={server.id}
+                  replacing={previewing?.name}
+                  busy={actions.saveTemplate.isPending}
+                  onClose={() => setPresetsOpen(false)}
+                  onPick={(p) => void applyPreset(p)}
+                />
+              </StudioDataProvider>
+            </IssueProvider>
+          </InsertProvider>
+        )}
+      </div>
 
       <FixPermissionModal
         open={fixOpen}

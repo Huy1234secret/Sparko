@@ -2836,3 +2836,14 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-choice-input:checked + .sp-check__box--anim .sp-lottie {
   opacity: 1;
 }
+/* With Welcome messages off, the tabs and editor below rest, faded. */
+.sp-greet-body {
+  display: grid;
+  gap: 16px;
+  transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-greet-body.is-off {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+  user-select: none;
+}
