@@ -10,7 +10,6 @@ import {
   Modal,
   Notice,
   Segmented,
-  Select,
   Tabs,
   cx,
   preloadAnimations,
@@ -56,6 +55,8 @@ import { ContainerCanvas } from './ContainerCanvas';
 import { EmbedCanvas } from './EmbedCanvas';
 import { StudioDataProvider } from './ComponentsEditor';
 import {
+  AnimatedIconButton,
+  EditingIcon,
   InfoTip,
   InsertProvider,
   IssueProvider,
@@ -64,6 +65,7 @@ import {
 } from './EditorBits';
 import { MessageCanvas, forChecks } from './MessageCanvas';
 import { variablesAnimations } from './VariablesButton';
+import { plusAnimations } from './StudioLibrary';
 
 type Tab = GreetKind | 'logs';
 const tabLabels: Record<Tab, string> = {
@@ -87,6 +89,13 @@ function useTab() {
   };
   return [tab, setTab] as const;
 }
+
+/** Where a new template starts: one line to write over. */
+const blankMessage = (kind: GreetKind): StudioMessage => ({
+  ...greetPresets.find((p) => p.kind === kind && p.id.endsWith('-short'))!
+    .message,
+  name: tabLabels[kind],
+});
 
 const deleteLabels: Record<number, string> = {
   0: 'Never',
@@ -294,6 +303,35 @@ export function WelcomeModule({
     }
   };
 
+  /** A new template for this tab, to write from scratch in the preview. */
+  const createTemplate = async () => {
+    try {
+      const { id } = await actions.saveTemplate.mutateAsync({
+        name: tabLabels[kind],
+        message: {
+          ...blankMessage(kind),
+          channel:
+            settings.channel ||
+            channels.find((c) => c.canPost)?.id ||
+            channels[0]?.id ||
+            '',
+        },
+        folderId: null,
+      });
+      editSettings({ template: id });
+      toast({
+        title: 'Added a new template',
+        body: 'Write it in the preview. It’s in Message Studio too.',
+      });
+    } catch (e) {
+      toast({
+        tone: 'danger',
+        title: 'Couldn’t add the template',
+        body: e instanceof Error ? e.message : 'Try again in a moment.',
+      });
+    }
+  };
+
   /** Puts a ready-made message into the template this tab sends. */
   const applyPreset = async (preset: GreetPreset) => {
     setPresetsOpen(false);
@@ -469,17 +507,30 @@ export function WelcomeModule({
                     aria-label="Live preview"
                   >
                     <EmptyState
-                      icon="message-square-dashed"
+                      icon={<EditingIcon />}
                       title={`Pick a template for the ${greetNames[kind]}`}
                       actions={
-                        <Button
-                          variant="primary"
-                          icon="sparkles"
-                          disabled={paused}
-                          onClick={() => setPresetsOpen(true)}
-                        >
-                          Use a default template
-                        </Button>
+                        <div className="sp-greet-start">
+                          <AnimatedIconButton
+                            reveal={plusAnimations.reveal}
+                            hover={plusAnimations.hover}
+                            select={plusAnimations.select}
+                            disabled={paused}
+                            loading={actions.saveTemplate.isPending}
+                            onClick={() => void createTemplate()}
+                          >
+                            Create new template
+                          </AnimatedIconButton>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon="sparkles"
+                            disabled={paused}
+                            onClick={() => setPresetsOpen(true)}
+                          >
+                            Use a default template
+                          </Button>
+                        </div>
                       }
                     >
                       Its live preview shows here, and you can edit it right in
@@ -691,17 +742,23 @@ function GreetSettingsCard({
             <Checkbox
               checked={settings.ping}
               onChange={(ping) => onChange({ ping })}
-              label="Ping the member"
-              description="{user} sends them a notification. Nobody else is ever pinged."
+              label="Mention user"
+              description="On: mentioning {user} notifies them. Off: mentions show, but nobody is notified."
             />
           )}
         </div>
-        <Select
+        <Combobox
           label="Delete the channel message"
+          searchable={false}
           value={String(settings.deleteAfter)}
           disabled={!settings.channel}
-          onChange={(e) => onChange({ deleteAfter: Number(e.target.value) })}
-          options={deleteAfterChoices.map((s) => ({
+          hint={
+            settings.channel
+              ? undefined
+              : 'Pick a channel first: DMs are never deleted.'
+          }
+          onChange={(v) => onChange({ deleteAfter: Number(v) })}
+          items={deleteAfterChoices.map((s) => ({
             value: String(s),
             label: deleteLabels[s] ?? `${s} seconds`,
           }))}

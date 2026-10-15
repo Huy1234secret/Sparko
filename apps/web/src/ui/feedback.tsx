@@ -214,7 +214,8 @@ export function EmptyState({
   error,
   code,
 }: {
-  icon?: string;
+  /** An icon's name, or an icon itself (an animated one, say). */
+  icon?: string | ReactNode;
   title: ReactNode;
   children?: ReactNode;
   actions?: ReactNode;
@@ -227,7 +228,13 @@ export function EmptyState({
       role={error ? 'alert' : undefined}
     >
       <div className="sp-empty__art">
-        <Icon name={error ? 'cloud-off' : icon} />
+        {error ? (
+          <Icon name="cloud-off" />
+        ) : typeof icon === 'string' ? (
+          <Icon name={icon} />
+        ) : (
+          icon
+        )}
       </div>
       <div className="sp-empty__title">{title}</div>
       {children && <p className="sp-empty__desc">{children}</p>}

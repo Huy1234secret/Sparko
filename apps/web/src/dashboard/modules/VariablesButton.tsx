@@ -2,9 +2,10 @@ import { useRef, useState } from 'react';
 import { LottieIcon, cx, usePlacement } from '../../ui';
 import { studioVariables } from '../../data';
 import { useDismiss } from './EditorBits';
-import bookReveal from '../../../../../design-system/assets/icons/animated-icons/info-book-icon-reveal.json?url';
-import bookHover from '../../../../../design-system/assets/icons/animated-icons/info-book-icon-hover.json?url';
-import bookOpen from '../../../../../design-system/assets/icons/animated-icons/info-book-icon-open.json?url';
+import { animIcons } from '../../ui';
+const bookReveal = animIcons.infoBook.reveal;
+const bookHover = animIcons.infoBook.hover;
+const bookOpen = animIcons.infoBook.open;
 
 export const variablesAnimations = [bookReveal, bookHover, bookOpen];
 

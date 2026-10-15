@@ -9,10 +9,11 @@ import {
   Segmented,
 } from '../../ui';
 import { AnimatedIconButton } from './EditorBits';
-import restoreReveal from '../../../../../design-system/assets/icons/animated-icons/restore-arrow-reveal.json?url';
-import restoreHover from '../../../../../design-system/assets/icons/animated-icons/restore-arrow-hover.json?url';
-import restoreSelect from '../../../../../design-system/assets/icons/animated-icons/restore-arrow-select.json?url';
 import type { Channel, Version } from '../../data';
+import { animIcons } from '../../ui';
+const restoreReveal = animIcons.restore.reveal;
+const restoreHover = animIcons.restore.hover;
+const restoreSelect = animIcons.restore.select;
 
 /**
  * The channel dropdown every module uses: searchable, grouped by category,

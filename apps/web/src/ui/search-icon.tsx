@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { cx } from './core';
 import { LottieIcon, reducedMotion } from './animated';
-import searchReveal from '../../../../design-system/assets/icons/animated-icons/search-icon-reveal.json?url';
-import searchIdle from '../../../../design-system/assets/icons/animated-icons/search-icon-idle.json?url';
-import searchComplete from '../../../../design-system/assets/icons/animated-icons/search-icon-complete.json?url';
+import { animIcons } from './anim-icons';
+const searchReveal = animIcons.search.reveal;
+const searchIdle = animIcons.search.idle;
+const searchComplete = animIcons.search.complete;
 
 export const searchAnimations = [searchReveal, searchIdle, searchComplete];
 

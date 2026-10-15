@@ -45,9 +45,10 @@ import { PlusMenu } from './PlusMenu';
 import { newId } from './parts';
 import dragIcon from '../../../../../design-system/assets/icons/drag.png';
 import linkIcon from '../../../../../design-system/assets/icons/external-link.png';
-import removeAnim from '../../../../../design-system/assets/icons/animated-icons/remove-button-hover.json?url';
-import gearAnim from '../../../../../design-system/assets/icons/animated-icons/setting-icon-hover.json?url';
-import plusAnim from '../../../../../design-system/assets/icons/animated-icons/plus-button-select.json?url';
+import { animIcons } from '../../ui';
+const removeAnim = animIcons.remove.hover;
+const gearAnim = animIcons.setting.hover;
+const plusAnim = animIcons.plus.select;
 
 /**
  * Buttons and menus under a Studio message: shown like Discord shows them,

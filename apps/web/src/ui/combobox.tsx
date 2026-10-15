@@ -12,7 +12,8 @@ import { cx, Icon } from './core';
 import { LottieIcon, preloadAnimations } from './animated';
 import { SearchIcon, searchAnimations } from './search-icon';
 import { usePlacement } from './placement';
-import tickReveal from '../../../../design-system/assets/icons/animated-icons/tick-reveal.json?url';
+import { animIcons } from './anim-icons';
+const tickReveal = animIcons.tick.reveal;
 
 // Loaded the first time someone points at or tabs to a dropdown, or
 // earlier by a page that's about to show some.
@@ -48,6 +49,8 @@ type Props = {
   hint?: ReactNode;
   footer?: ReactNode;
   disabled?: boolean;
+  /** Short lists can leave the search box out. */
+  searchable?: boolean;
 } & (
   | { multiple?: false; value: string; onChange: (value: string) => void }
   | { multiple: true; value: string[]; onChange: (value: string[]) => void }
@@ -106,6 +109,7 @@ export function Combobox(props: Props) {
     hint,
     footer,
     disabled,
+    searchable = true,
   } = props;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -119,6 +123,11 @@ export function Combobox(props: Props) {
   const [picked, setPicked] = useState<string[]>([]);
   const [leaving, setLeaving] = useState<string[]>([]);
 
+  // Without a search box, the list itself takes the keys.
+  useEffect(() => {
+    if (open && !searchable)
+      pop.current?.querySelector<HTMLElement>('[role="listbox"]')?.focus();
+  }, [open, searchable]);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -264,29 +273,41 @@ export function Combobox(props: Props) {
       )}
       {open && (
         <div ref={pop} className="sp-popover sp-combo__pop">
-          <div className="sp-popover__search">
-            <SearchIcon className="sp-combo__search-icon" />
-            <input
-              autoFocus
-              role="combobox"
-              aria-expanded="true"
-              aria-controls={`${id}-list`}
-              aria-activedescendant={active >= 0 ? optionId(active) : undefined}
-              aria-label={searchPlaceholder}
-              placeholder={searchPlaceholder}
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setActive(-1);
-              }}
-              onKeyDown={onKey}
-            />
-          </div>
+          {searchable && (
+            <div className="sp-popover__search">
+              <SearchIcon className="sp-combo__search-icon" />
+              <input
+                autoFocus
+                role="combobox"
+                aria-expanded="true"
+                aria-controls={`${id}-list`}
+                aria-activedescendant={
+                  active >= 0 ? optionId(active) : undefined
+                }
+                aria-label={searchPlaceholder}
+                placeholder={searchPlaceholder}
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setActive(-1);
+                }}
+                onKeyDown={onKey}
+              />
+            </div>
+          )}
           <div
             className="sp-popover__list sp-combo__list"
             id={`${id}-list`}
             role="listbox"
             aria-labelledby={`${id}-label`}
+            {...(searchable
+              ? {}
+              : {
+                  tabIndex: -1,
+                  onKeyDown: onKey,
+                  'aria-activedescendant':
+                    active >= 0 ? optionId(active) : undefined,
+                })}
             aria-multiselectable={props.multiple || undefined}
           >
             {list.map((item, index) => {

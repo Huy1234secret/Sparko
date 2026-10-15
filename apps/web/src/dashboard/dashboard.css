@@ -2802,3 +2802,8 @@ body:has(> .sp-settings-scrim) > #root {
   color: var(--sp-muted);
   font-size: 12px;
 }
+.sp-greet-start {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}

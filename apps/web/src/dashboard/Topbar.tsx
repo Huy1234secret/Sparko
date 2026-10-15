@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Avatar, Button, Icon, LottieIcon, SearchIcon } from '../ui';
-import darkHover from '../../../../design-system/assets/icons/animated-icons/dark-mode-hover.json?url';
-import lightHover from '../../../../design-system/assets/icons/animated-icons/light-mode-hover.json?url';
-import modeSwitch from '../../../../design-system/assets/icons/animated-icons/dark-light-mode-select.json?url';
 
 /**
  * The switch animation turns the moon (dark) into the sun (light) over its
@@ -14,6 +11,10 @@ const MOON_AGAIN = 60;
 import { useSession, useSignOut } from '../data';
 import { useTheme } from '../state/theme';
 import { isMac } from './shared';
+import { animIcons } from '../ui';
+const darkHover = animIcons.theme.darkHover;
+const lightHover = animIcons.theme.lightHover;
+const modeSwitch = animIcons.theme.switch;
 
 export function ThemeButton() {
   const { theme, toggle } = useTheme();

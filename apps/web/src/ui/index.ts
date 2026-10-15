@@ -5,3 +5,4 @@ export * from './combobox';
 export * from './animated';
 export * from './placement';
 export * from './search-icon';
+export * from './anim-icons';

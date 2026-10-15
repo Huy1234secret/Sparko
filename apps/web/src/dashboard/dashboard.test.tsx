@@ -331,6 +331,26 @@ describe('Welcome messages', () => {
     expect(document.querySelector('.dc-embed')).toBeNull();
   });
 
+  it('creates a new template for an empty tab', async () => {
+    open(`${pixel}/welcome?tab=boost`);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Create new template' }),
+    );
+    expect(await screen.findByText(/Editing/)).toHaveTextContent(
+      'Boost message',
+    );
+    // Deleting the channel message is picked from the menu.
+    await userEvent.click(screen.getByRole('button', { name: /^Channel/ }));
+    await userEvent.click(screen.getByRole('option', { name: /arrivals/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /Delete the channel message/ }),
+    );
+    await userEvent.click(screen.getByRole('option', { name: /1 minute/ }));
+    expect(
+      screen.getByRole('button', { name: /Delete the channel message/ }),
+    ).toHaveTextContent('After 1 minute');
+  });
+
   it('logs what was sent and why sends failed', async () => {
     open(`${pixel}/welcome?tab=logs`);
     expect(
@@ -832,7 +852,7 @@ describe('Message Studio', () => {
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }),
     );
     expect(
-      await screen.findByText('Saved “Spring art jam announcement”'),
+      await screen.findByText('Saved “Spring art jam announcement (x2)”'),
     ).toBeInTheDocument();
 
     await userEvent.click(
