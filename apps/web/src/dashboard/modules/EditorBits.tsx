@@ -1,7 +1,9 @@
+import { createPortal } from 'react-dom';
 import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -689,12 +691,46 @@ export function moveItem<T>(list: T[], from: number, to: number) {
  * setting does, straight away.
  */
 export function InfoTip({ text }: { text: string }) {
+  const icon = useRef<HTMLSpanElement>(null);
+  const bubble = useRef<HTMLSpanElement>(null);
+  const [shown, setShown] = useState(false);
+  // Drawn over everything, against the window, so no panel or scrolling
+  // list can hide it; it sits above the (i), or below when there's no room.
+  useLayoutEffect(() => {
+    const i = icon.current;
+    const b = bubble.current;
+    if (!shown || !i || !b) return;
+    const r = i.getBoundingClientRect();
+    const w = b.offsetWidth;
+    const h = b.offsetHeight;
+    const top = r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8;
+    const left = Math.min(
+      Math.max(r.left + r.width / 2 - w / 2, 8),
+      window.innerWidth - w - 8,
+    );
+    b.style.top = `${top}px`;
+    b.style.left = `${left}px`;
+  }, [shown]);
   return (
-    <span className="sp-tip" tabIndex={0} role="img" aria-label={text}>
+    <span
+      ref={icon}
+      className="sp-tip"
+      tabIndex={0}
+      role="img"
+      aria-label={text}
+      onPointerEnter={() => setShown(true)}
+      onPointerLeave={() => setShown(false)}
+      onFocus={() => setShown(true)}
+      onBlur={() => setShown(false)}
+    >
       <Icon name="info" size="sm" />
-      <span className="sp-tip__bubble" aria-hidden="true">
-        {text}
-      </span>
+      {shown &&
+        createPortal(
+          <span ref={bubble} className="sp-tip__bubble" aria-hidden="true">
+            {text}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }

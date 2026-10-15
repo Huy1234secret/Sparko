@@ -320,7 +320,8 @@ export function Modal({
   onClose: () => void;
   title: ReactNode;
   description?: ReactNode;
-  icon?: string;
+  /** An icon's name, or an icon itself (an animated one, say). */
+  icon?: string | ReactNode;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -360,7 +361,7 @@ export function Modal({
         <div className="sp-modal__head">
           {icon && (
             <span className="sp-modal__icon">
-              <Icon name={icon} />
+              {typeof icon === 'string' ? <Icon name={icon} /> : icon}
             </span>
           )}
           <div className="sp-modal__titles">

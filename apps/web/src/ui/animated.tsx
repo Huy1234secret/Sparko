@@ -217,6 +217,26 @@ export function LottieIcon({
   );
 }
 
+/** An icon that plays, waits `delay` milliseconds, and plays again, for as long as it's shown. */
+export function LoopIcon({
+  delay,
+  ...props
+}: Omit<LottieIconProps, 'playKey' | 'onDone' | 'open'> & { delay: number }) {
+  const [playKey, setPlayKey] = useState(1);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return (
+    <LottieIcon
+      {...props}
+      playKey={playKey}
+      onDone={() => {
+        if (reducedMotion()) return;
+        timer.current = setTimeout(() => setPlayKey((k) => k + 1), delay);
+      }}
+    />
+  );
+}
+
 /** A button whose icon plays through once each time the pointer comes over it. */
 export function AnimatedButton({
   anim,

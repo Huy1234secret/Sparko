@@ -6,7 +6,8 @@ import {
   type ReactNode,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Icon, PausedBanner, SaveBar, Switch, Tabs } from '../../ui';
+import { Tabs, PausedBanner, Icon, LoopIcon, SaveBar, Switch } from '../../ui';
+import liveIdle from '../../../../../design-system/assets/icons/animated-icons/live-icon-idle.json?url';
 import type { SparkoModule } from '../../content/modules';
 import { api, type Server } from '../../data';
 
@@ -166,6 +167,8 @@ export function ModuleHeader({
               <span className={`sp-sync sp-sync--${sync}`} role="status">
                 {sync === 'saving' || sync === 'applying' ? (
                   <span className="sp-spinner" />
+                ) : sync === 'live' ? (
+                  <LoopIcon src={liveIdle} delay={1000} size={14} solid />
                 ) : (
                   <span className="sp-dot" />
                 )}

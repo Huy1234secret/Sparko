@@ -67,7 +67,9 @@ function Tool({
       aria-pressed={on}
       onClick={onClick}
     >
-      <MaskIcon src={icon} size={14} />
+      {/* The picture icon has room round it, so it's drawn a little
+          larger to look the same size as the link icon. */}
+      <MaskIcon src={icon} size={icon === addImage ? 17 : 14} />
     </button>
   );
 }
