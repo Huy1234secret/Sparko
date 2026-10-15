@@ -8,6 +8,7 @@ import {
   cx,
   preloadAnimations,
   rememberEmojis,
+  menuPlacement,
   usePlacement,
   renderDiscordText,
 } from '../../ui';
@@ -127,7 +128,7 @@ function EmojiPicker({
   className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
-  usePlacement(true, anchor, box, { gap: 8 });
+  usePlacement(true, anchor, box, menuPlacement);
   const [tab, setTab] = useState<'emoji' | 'server'>('emoji');
   const [query, setQuery] = useState('');
   const [list, setList] = useState<Group[] | null>(null);

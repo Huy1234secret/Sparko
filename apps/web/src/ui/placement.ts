@@ -22,12 +22,20 @@ function visibleArea(from: HTMLElement) {
   return { top, bottom };
 }
 
-type Options = { gap: number; margin: number; fixed: boolean };
+type Options = {
+  gap: number;
+  margin: number;
+  fixed: boolean;
+  /** Fixed popovers are as wide as what opened them unless this is false. */
+  matchWidth: boolean;
+  /** Which edge lines up with what opened it. */
+  align: 'start' | 'end';
+};
 
 function place(
   a: HTMLElement,
   p: HTMLElement,
-  { gap, margin, fixed }: Options,
+  { gap, margin, fixed, matchWidth, align }: Options,
 ) {
   p.style.maxHeight = '';
   if (fixed) {
@@ -43,7 +51,7 @@ function place(
     p.style.bottom = '';
   }
   const box = a.getBoundingClientRect();
-  if (fixed) p.style.width = `${box.width}px`;
+  if (fixed && matchWidth) p.style.width = `${box.width}px`;
   const natural = p.offsetHeight;
   const parent = (p.offsetParent as HTMLElement | null) ?? document.body;
   const area = fixed
@@ -62,7 +70,7 @@ function place(
     const origin = p.getBoundingClientRect();
     const width = p.offsetWidth;
     const left = Math.min(
-      Math.max(box.left, margin),
+      Math.max(align === 'end' ? box.right - width : box.left, margin),
       window.innerWidth - width - margin,
     );
     const top = up ? box.top - gap - height : box.bottom + gap;
@@ -96,13 +104,19 @@ export function usePlacement(
   open: boolean,
   anchor: RefObject<HTMLElement | null>,
   pop: RefObject<HTMLElement | null>,
-  { gap = 6, margin = 8, fixed = false } = {},
+  {
+    gap = 6,
+    margin = 8,
+    fixed = false,
+    matchWidth = true,
+    align = 'start' as 'start' | 'end',
+  } = {},
 ) {
   useLayoutEffect(() => {
     const a = anchor.current;
     const p = pop.current;
     if (!open || !a || !p) return;
-    const opts = { gap, margin, fixed };
+    const opts = { gap, margin, fixed, matchWidth, align };
     const again = () => place(a, p, opts);
     // Scrolling inside the popover itself doesn't move it.
     const onScroll = (e: Event) => {
@@ -115,7 +129,7 @@ export function usePlacement(
       window.removeEventListener('resize', again);
       window.removeEventListener('scroll', onScroll, true);
     };
-  }, [open, anchor, pop, gap, margin, fixed]);
+  }, [open, anchor, pop, gap, margin, fixed, matchWidth, align]);
 }
 
 /**
@@ -150,3 +164,14 @@ function nudge(p: HTMLElement, margin: number) {
   if (r.left + dx < margin) dx = margin - r.left;
   if (dx || dy) p.style.translate = `${dx}px ${dy}px`;
 }
+
+/**
+ * For menus opened from a small button: placed against the window like a
+ * dropdown, as wide as their own content, lined up with the button's right.
+ */
+export const menuPlacement = {
+  gap: 8,
+  fixed: true,
+  matchWidth: false,
+  align: 'end' as const,
+};

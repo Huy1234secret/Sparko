@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { LottieIcon, cx, usePlacement } from '../../ui';
+import { LottieIcon, cx, menuPlacement, usePlacement } from '../../ui';
 import { studioVariables } from '../../data';
 import { useDismiss } from './EditorBits';
 import { animIcons } from '../../ui';
@@ -36,7 +36,7 @@ export function VariablesButton({
   };
   const pop = useRef<HTMLDivElement>(null);
   useDismiss(open, () => toggle(false), wrap);
-  usePlacement(open, wrap, pop, { gap: 8 });
+  usePlacement(open, wrap, pop, menuPlacement);
   const list = [
     ...studioVariables.filter((v) => member || !v.member),
     ...(v2

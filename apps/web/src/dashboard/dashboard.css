@@ -952,73 +952,16 @@
   box-shadow: var(--sp-ring);
 }
 
-/* The plus menu: items drop down along a line from the button */
+/* The plus menu: a short menu list, placed like the dropdowns. */
 .sp-plus-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: var(--sp-z-popover);
-  display: grid;
-  justify-items: end;
-  gap: 8px;
-  /* The line sits 15–17px from the right edge; items stop 8px before it. */
-  padding: 0 25px 12px 0;
-}
-.sp-plus-menu__line {
-  position: absolute;
-  top: -8px;
-  right: 15px;
-  bottom: 0;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--sp-line-strong);
-  transform-origin: top;
-  animation: sp-plus-line var(--sp-dur-base) var(--sp-ease-out) both;
-}
-.sp-plus-menu__line::after {
-  content: '';
-  position: absolute;
-  bottom: -3px;
-  left: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sp-line-strong);
+  gap: 2px;
+  min-width: 180px;
+  max-height: none;
+  overflow-y: auto;
 }
 .sp-plus-menu__item {
-  min-height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--sp-line);
-  border-radius: var(--sp-radius-control);
-  background: var(--sp-surface);
-  box-shadow: var(--sp-shadow-sm);
-  color: var(--sp-text);
-  font: 600 14px/20px var(--sp-font-sans);
+  font-weight: 500;
   white-space: nowrap;
-  cursor: pointer;
-  animation: sp-plus-item var(--sp-dur-base) var(--sp-ease-out) both;
-  animation-delay: calc(var(--i) * 45ms + 60ms);
-}
-.sp-plus-menu__item:hover:not(:disabled),
-.sp-plus-menu__item:focus-visible {
-  outline: none;
-  border-color: var(--sp-line-strong);
-  background: var(--sp-raised);
-}
-.sp-plus-menu__item:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-@keyframes sp-plus-line {
-  from {
-    transform: scaleY(0);
-  }
-}
-@keyframes sp-plus-item {
-  from {
-    opacity: 0;
-    transform: translate(12px, -6px);
-  }
 }
 
 /* Emoji picker */
@@ -2451,18 +2394,21 @@ body:has(> .sp-settings-scrim) > #root {
 }
 .sp-combo__pop,
 .sp-vars-pop,
-.sp-emoji-pop {
+.sp-emoji-pop,
+.sp-plus-menu {
   animation: sp-wipe-down 200ms var(--sp-ease-out) both;
 }
 .sp-combo__pop[data-side='top'],
 .sp-vars-pop[data-side='top'],
-.sp-emoji-pop[data-side='top'] {
+.sp-emoji-pop[data-side='top'],
+.sp-plus-menu[data-side='top'] {
   animation-name: sp-wipe-up;
 }
 @media (prefers-reduced-motion: reduce) {
   .sp-combo__pop,
   .sp-vars-pop,
-  .sp-emoji-pop {
+  .sp-emoji-pop,
+  .sp-plus-menu {
     animation: none;
   }
 }
