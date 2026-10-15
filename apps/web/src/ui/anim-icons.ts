@@ -88,6 +88,7 @@ export const animIcons = {
   reactionRole: pair('reaction-role-icon'),
   settingOutline: pair('setting-icon-outline', true),
   template: pair('template-icon'),
+  shuffle: pair('shuffle-icon'),
   upload: set('upload-button', ['reveal', 'hover', 'select']),
 };
 export type RevealHover = {

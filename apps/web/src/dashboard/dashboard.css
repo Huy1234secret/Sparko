@@ -3006,3 +3006,45 @@ body:has(> .sp-settings-scrim) > #root {
   display: flex;
   gap: 6px;
 }
+
+/* Shuffle colour: a rainbow stands in for the colour it picks each time. */
+.sp-cp__shuffle {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sp-line);
+}
+.sp-cp__shuffle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sp-cp__shuffle.is-on .sp-check__box--anim {
+  border-radius: 6px;
+  background: conic-gradient(
+    #ed4245,
+    #faa61a,
+    #fee75c,
+    #57f287,
+    #5865f2,
+    #eb459e,
+    #ed4245
+  );
+  color: #fff;
+}
+.sp-embed-wrap.is-shuffle .dc-embed,
+.sp-embed-wrap.is-shuffle.sp-v2-wrap > * {
+  border-left-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    #ed4245,
+    #faa61a,
+    #fee75c,
+    #57f287,
+    #5865f2,
+    #eb459e
+  );
+  background-size: 4px 100%;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  background-position: left;
+}

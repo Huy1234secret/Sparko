@@ -19,6 +19,8 @@ export type StudioEmbed = {
   title: string;
   description: string;
   color: string;
+  /** A random colour each time it's sent, instead of `color`. */
+  shuffle?: boolean;
   image: string;
   thumbnail: string;
   footer: string;
@@ -119,6 +121,8 @@ export type V2Place = { id: string; slot: V2Slot };
  */
 export type StudioV2 = {
   accent: string;
+  /** A random accent each time it's sent. */
+  shuffle?: boolean;
   text: string;
   thumbnail: string;
   gallery: GalleryImage[];
@@ -233,15 +237,17 @@ type Legacy = Partial<StudioMessage> & {
 const asEmbed = (
   e: Partial<StudioEmbed> & { thumbnail?: unknown },
   i: number,
-) => {
+): StudioEmbed => {
   const base = embedDefault(typeof e.id === 'string' ? e.id : `e${i + 1}`);
+  const { shuffle, ...rest } = e;
   return {
     ...base,
-    ...e,
+    ...rest,
     id: base.id,
     // Older messages kept a yes/no for "use the server icon" here.
     thumbnail: typeof e.thumbnail === 'string' ? e.thumbnail : '',
     fields: Array.isArray(e.fields) ? e.fields : [],
+    ...(shuffle === true ? { shuffle: true } : {}),
   };
 };
 
@@ -336,6 +342,7 @@ const v2Of = (v: unknown, components: StudioComponent[]): StudioV2 => {
   );
   return {
     accent: typeof merged.accent === 'string' ? merged.accent : base.accent,
+    ...(merged.shuffle === true ? { shuffle: true } : {}),
     text: lines.text,
     thumbnail: typeof merged.thumbnail === 'string' ? merged.thumbnail : '',
     gallery: Array.isArray(merged.gallery) ? merged.gallery : [],
@@ -782,6 +789,15 @@ export function componentsPayload(
 }
 
 const colour = (h: string) => Number.parseInt(h.slice(1), 16);
+/** A bright random colour, for messages set to shuffle theirs. */
+export const shuffledColour = () => {
+  const h = Math.random() * 360;
+  const f = (n: number) => {
+    const k = (n + h / 60) % 6;
+    return Math.round(255 * (1 - 0.85 * Math.max(0, Math.min(k, 4 - k, 1))));
+  };
+  return (f(5) << 16) | (f(3) << 8) | f(1);
+};
 
 /** The text of a Components V2 message, cut where {separator} appears. */
 export const v2Sections = (text: string) => text.split(/\{separator\}/);
@@ -1029,7 +1045,13 @@ export function studioPayload(
       components: [
         ...items({ at: 'above' }),
         ...(inside.length
-          ? [{ type: 17, accent_color: colour(v.accent), components: inside }]
+          ? [
+              {
+                type: 17,
+                accent_color: v.shuffle ? shuffledColour() : colour(v.accent),
+                components: inside,
+              },
+            ]
           : []),
         ...items({ at: 'below' }),
       ],
@@ -1052,7 +1074,7 @@ export function studioPayload(
         : {}),
       ...(e.title.trim() ? { title: fill(e.title) } : {}),
       ...(e.description.trim() ? { description: fill(e.description) } : {}),
-      color: colour(e.color),
+      color: e.shuffle ? shuffledColour() : colour(e.color),
       ...(pic(e.image) ? { image: { url: pic(e.image) } } : {}),
       ...(pic(e.thumbnail) ? { thumbnail: { url: pic(e.thumbnail) } } : {}),
       ...(e.footer.trim()

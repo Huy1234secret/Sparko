@@ -277,6 +277,8 @@ export type StudioV2 = {
   thumbnail: string;
   gallery: GalleryImage[];
   place: V2Place[];
+  /** A random accent each time the message is sent. */
+  shuffle?: boolean;
 };
 
 export type StudioMessage = {
@@ -335,6 +337,8 @@ export type StudioEmbed = {
   title: string;
   description: string;
   color: string;
+  /** A random colour each time the message is sent. */
+  shuffle?: boolean;
   image: string;
   thumbnail: string;
   footer: string;
