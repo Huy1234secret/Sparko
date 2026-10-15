@@ -1942,7 +1942,8 @@ body:has(> .sp-settings-scrim) > #root {
 }
 /* Three or more actions scroll inside their list; the panel stops growing. */
 .sp-actions__list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   max-height: 360px;
   overflow-y: auto;
@@ -1951,6 +1952,10 @@ body:has(> .sp-settings-scrim) > #root {
   margin: -6px;
   padding: 6px;
   list-style: none;
+}
+/* Cards keep their full height; the list scrolls instead of squashing them. */
+.sp-actions__list > * {
+  flex: none;
 }
 .sp-action {
   position: relative;
