@@ -3002,9 +3002,60 @@ body:has(> .sp-settings-scrim) > #root {
   margin: 16px 16px 0;
   width: auto;
 }
-.sp-rr-item .sp-colour-squares {
-  display: flex;
+/* Menu options: emoji and title, the description under them, and copy,
+   remove and the gear stacked on the right. */
+.sp-rr-opt {
+  display: grid;
+  flex: 1;
+  min-width: 0;
   gap: 6px;
+}
+.sp-rr-opt__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sp-rr-opt__row > :last-child {
+  flex: 1;
+  min-width: 0;
+}
+.sp-rr-opt__tools {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sp-rr-opt__tools .sp-icon-btn {
+  width: 28px;
+  height: 24px;
+}
+.sp-rr-opt__tools .sp-rr-opt__gear {
+  width: 32px;
+  height: 30px;
+}
+.sp-rr-item--button,
+.sp-rr-item--menu {
+  gap: 8px;
+  padding: 6px 6px 6px 8px;
+}
+/* Buttons: the name with its four colours beside it, two by two. */
+.sp-rr-item--button .sp-rr-item__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sp-rr-item--button .sp-rr-item__main > .sp-input,
+.sp-rr-item--button .sp-rr-item__main > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.sp-rr-item--button .sp-colour-squares {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 4px;
+}
+.sp-rr-item__grip {
+  display: grid;
+  place-items: center;
 }
 
 /* Shuffle colour: a rainbow stands in for the colour it picks each time. */
