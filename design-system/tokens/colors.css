@@ -85,6 +85,8 @@
   --sp-dc-select-border: #1E1F22;
   --sp-dc-mention-bg: rgb(88 101 242 / 0.3);
   --sp-dc-mention-text: #C9CDFB;
+  --sp-dc-var-bg: rgb(250 204 21 / 0.16);
+  --sp-dc-var-text: #FDE68A;
 }
 
 [data-theme="dark"] {
@@ -148,6 +150,8 @@
   --sp-dc-select-border: #1E1F22;
   --sp-dc-mention-bg: rgb(88 101 242 / 0.3);
   --sp-dc-mention-text: #C9CDFB;
+  --sp-dc-var-bg: rgb(250 204 21 / 0.16);
+  --sp-dc-var-text: #FDE68A;
 }
 
 [data-theme="light"] {
@@ -211,4 +215,6 @@
   --sp-dc-select-border: #E3E5E8;
   --sp-dc-mention-bg: rgb(88 101 242 / 0.15);
   --sp-dc-mention-text: #505CDC;
+  --sp-dc-var-bg: rgb(202 138 4 / 0.14);
+  --sp-dc-var-text: #8A5A00;
 }
