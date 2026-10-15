@@ -1,7 +1,8 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { LottieIcon, cx } from '../../ui';
 import { useDismiss } from './EditorBits';
-import plusAnim from '../../../../../design-system/assets/icons/animated-icons/plus-menu-button-select.json?url';
+import { animIcons } from '../../ui';
+const plusAnim = animIcons.plusMenu.select;
 
 /** The plus turns into a cross over frames 0–35, and back over 85–120. */
 const OPEN = [0, 35] as const;

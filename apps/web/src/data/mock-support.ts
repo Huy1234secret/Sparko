@@ -15,7 +15,14 @@ import type {
   TicketPanel,
   TicketsState,
 } from './types';
-import { applyMove, folderTree, itemsIn, movesIntoItself } from './library';
+import {
+  applyMove,
+  folderTree,
+  itemsIn,
+  movesIntoItself,
+  nameTaken,
+  uniqueTemplateName,
+} from './library';
 import { greetPresets, parseMessageLink } from './studio-format';
 
 type Helpers = {
@@ -773,7 +780,7 @@ export function createSupportMock(h: Helpers) {
         throw new Error('You’ve used every template on this plan.');
       const t = {
         id: id('t'),
-        name,
+        name: uniqueTemplateName(s.studio.templates, name),
         folderId,
         position: -1,
         meta: 'Saved just now by you',
@@ -788,6 +795,10 @@ export function createSupportMock(h: Helpers) {
     },
     async updateTemplate(serverId, templateId, change) {
       const s = of(serverId);
+      if (change.name && nameTaken(s.studio.templates, change.name, templateId))
+        throw new Error(
+          `A template named “${change.name.trim()}” already exists. Pick another name.`,
+        );
       s.studio.templates = s.studio.templates.map((t) =>
         t.id === templateId
           ? {
@@ -809,7 +820,10 @@ export function createSupportMock(h: Helpers) {
       const copy = {
         ...h.copy(t),
         id: id('t'),
-        name: `${t.name} (copy)`.slice(0, 80),
+        name: uniqueTemplateName(
+          s.studio.templates,
+          `${t.name} (copy)`.slice(0, 80),
+        ),
         meta: 'Saved just now by you',
       };
       const index =

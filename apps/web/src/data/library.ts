@@ -88,3 +88,24 @@ export function applyMove(lib: Library, move: LibraryMove): Library {
     }),
   };
 }
+
+const nameKey = (name: string) => name.trim().toLowerCase();
+/** Whether another template already has this name (names ignore case). */
+export const nameTaken = (
+  templates: { id: string; name: string }[],
+  name: string,
+  exceptId?: string,
+) =>
+  templates.some((t) => t.id !== exceptId && nameKey(t.name) === nameKey(name));
+/** The name, or "name (x2)", "name (x3)"… when it's taken, as the server does. */
+export function uniqueTemplateName(
+  templates: { id: string; name: string }[],
+  name: string,
+) {
+  if (!nameTaken(templates, name)) return name;
+  for (let n = 2; ; n++) {
+    const suffix = ` (x${n})`;
+    const next = name.slice(0, 80 - suffix.length) + suffix;
+    if (!nameTaken(templates, next)) return next;
+  }
+}

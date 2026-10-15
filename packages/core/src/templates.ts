@@ -178,6 +178,42 @@ function place(
   renumber(db, items, folderId);
 }
 
+const nameKey = (name: string) => name.trim().toLowerCase();
+function takenNames(
+  db: Db,
+  guildId: string,
+  moduleId: string,
+  exceptId?: string,
+) {
+  return new Set(
+    (
+      db
+        .prepare(
+          'SELECT id, name FROM templates WHERE guild_id = ? AND module_id = ?',
+        )
+        .all(guildId, moduleId) as Row[]
+    )
+      .filter((r) => String(r.id) !== exceptId)
+      .map((r) => nameKey(r.name as string)),
+  );
+}
+
+/** Names are unique: a name already used gets " (x2)", " (x3)" and so on. */
+export function uniqueName(
+  db: Db,
+  guildId: string,
+  moduleId: string,
+  name: string,
+) {
+  const taken = takenNames(db, guildId, moduleId);
+  if (!taken.has(nameKey(name))) return name;
+  for (let n = 2; ; n++) {
+    const suffix = ` (x${n})`;
+    const next = name.slice(0, 80 - suffix.length) + suffix;
+    if (!taken.has(nameKey(next))) return next;
+  }
+}
+
 export function countLibrary(db: Db, guildId: string, moduleId: string) {
   const count = (table: string) =>
     (
@@ -217,7 +253,7 @@ export function addTemplate(
       .run(
         t.guildId,
         t.moduleId,
-        t.name,
+        uniqueName(db, t.guildId, t.moduleId, t.name),
         JSON.stringify(t.message),
         t.who,
         now,
@@ -270,6 +306,13 @@ export function updateTemplate(
   now: number,
 ) {
   const row = getTemplateRow(db, guildId, moduleId, id);
+  if (
+    change.name !== undefined &&
+    takenNames(db, guildId, moduleId, id).has(nameKey(change.name))
+  )
+    throw new Plain(
+      `A template named “${change.name.trim()}” already exists. Pick another name.`,
+    );
   db.prepare(
     'UPDATE templates SET name = ?, json = ?, who_name = ?, created_at = ? WHERE id = ?',
   ).run(
@@ -295,7 +338,12 @@ export function cloneTemplate(
   return transaction(db, () => {
     const row = getTemplateRow(db, guildId, moduleId, id);
     const folderId = idOf(row.folder_id);
-    const name = `${row.name as string} (copy)`.slice(0, 80);
+    const name = uniqueName(
+      db,
+      guildId,
+      moduleId,
+      `${row.name as string} (copy)`.slice(0, 80),
+    );
     const { lastInsertRowid } = db
       .prepare(
         `INSERT INTO templates (guild_id, module_id, name, json, who_name, created_at, folder_id, position)

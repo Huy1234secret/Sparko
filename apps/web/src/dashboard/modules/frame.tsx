@@ -8,9 +8,10 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, PausedBanner, Icon, LoopIcon, SaveBar, Switch } from '../../ui';
 import { ModuleIcon, useIconHover } from '../ModuleIcon';
-import liveIdle from '../../../../../design-system/assets/icons/animated-icons/live-icon-idle.json?url';
 import type { SparkoModule } from '../../content/modules';
 import { api, type Server } from '../../data';
+import { animIcons } from '../../ui';
+const liveIdle = animIcons.live.idle;
 
 /** Modules that are pages rather than features you switch on. */
 const alwaysOn = new Set([

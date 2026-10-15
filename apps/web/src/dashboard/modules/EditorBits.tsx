@@ -17,12 +17,15 @@ import {
   cx,
   renderDiscordText,
   useKeepOnScreen,
+  LoopIcon,
 } from '../../ui';
 import { useStudioActions } from '../../data';
 import closeAnim from '../../../../../design-system/assets/icons/close-button-hover.json?url';
-import uploadReveal from '../../../../../design-system/assets/icons/animated-icons/upload-button-reveal.json?url';
-import uploadHover from '../../../../../design-system/assets/icons/animated-icons/upload-button-hover.json?url';
-import uploadSelect from '../../../../../design-system/assets/icons/animated-icons/upload-button-select.json?url';
+import { animIcons } from '../../ui';
+const uploadReveal = animIcons.upload.reveal;
+const uploadHover = animIcons.upload.hover;
+const uploadSelect = animIcons.upload.select;
+const editIdle = animIcons.editing.idle;
 
 /**
  * Pieces shared by Message Studio's editor: text edited where it's shown,
@@ -796,3 +799,15 @@ const samplePictures: Record<string, string> = {
 };
 /** What a picture link shows in the preview: picture variables get a stand-in. */
 export const previewPicture = (url: string) => samplePictures[url] ?? url;
+
+/** The pencil-on-a-message icon for "pick something to edit" states, drawn every few seconds. */
+export function EditingIcon() {
+  return (
+    <LoopIcon
+      className="sp-module-icon"
+      src={editIdle}
+      delay={2000}
+      size={36}
+    />
+  );
+}

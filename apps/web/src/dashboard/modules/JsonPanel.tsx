@@ -7,11 +7,12 @@ import {
   type StudioMessage,
 } from '../../data';
 import { AnimatedIconButton, InfoTip, uploadAnimations } from './EditorBits';
-import cloneReveal from '../../../../../design-system/assets/icons/animated-icons/clone-button-reveal.json?url';
-import cloneHover from '../../../../../design-system/assets/icons/animated-icons/clone-button-hover.json?url';
-import downloadReveal from '../../../../../design-system/assets/icons/animated-icons/download-button-reveal.json?url';
-import downloadHover from '../../../../../design-system/assets/icons/animated-icons/download-button-hover.json?url';
-import downloadSelect from '../../../../../design-system/assets/icons/animated-icons/download-button-select.json?url';
+import { animIcons } from '../../ui';
+const cloneReveal = animIcons.clone.reveal;
+const cloneHover = animIcons.clone.hover;
+const downloadReveal = animIcons.download.reveal;
+const downloadHover = animIcons.download.hover;
+const downloadSelect = animIcons.download.select;
 
 export const jsonAnimations = [
   downloadReveal,

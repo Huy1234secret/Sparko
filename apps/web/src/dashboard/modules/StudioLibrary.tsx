@@ -22,6 +22,7 @@ import {
   folderPath,
   itemsIn,
   movesIntoItself,
+  uniqueTemplateName,
   useStudioActions,
   type LibraryItem,
   type LibraryMove,
@@ -32,22 +33,16 @@ import {
   type StudioTemplate,
 } from '../../data';
 import { AnimatedIconButton, measure, slideFrom } from './EditorBits';
-import plusReveal from '../../../../../design-system/assets/icons/animated-icons/plus-button-reveal.json?url';
-import plusHover from '../../../../../design-system/assets/icons/animated-icons/plus-button-hover.json?url';
-import plusSelect from '../../../../../design-system/assets/icons/animated-icons/plus-button-select.json?url';
 
-const plusAnimations = {
-  reveal: plusReveal,
-  hover: plusHover,
-  select: plusSelect,
-};
-import editAnim from '../../../../../design-system/assets/icons/animated-icons/edit-button-hover.json?url';
-import cloneAnim from '../../../../../design-system/assets/icons/animated-icons/clone-button-hover.json?url';
-import removeAnim from '../../../../../design-system/assets/icons/animated-icons/remove-button-hover.json?url';
-import folderAnim from '../../../../../design-system/assets/icons/animated-icons/folder-icon-hover.json?url';
 import folderAddAnim from '../../../../../design-system/assets/icons/folder-icon-add.json?url';
 import folderSvg from '../../../../../design-system/assets/icons/folder-icon.svg?url';
 import messageSvg from '../../../../../design-system/assets/icons/message-icon.svg?url';
+import { animIcons } from '../../ui';
+export const plusAnimations = animIcons.plus;
+const editAnim = animIcons.edit.hover;
+const cloneAnim = animIcons.clone.hover;
+const removeAnim = animIcons.remove.hover;
+const folderAnim = animIcons.folder.hover;
 
 /** Where a dragged card would land. */
 type Target =
@@ -470,17 +465,20 @@ export function StudioLibrary({
         { name, parentId: folderId },
         { onSuccess: done, onError: failed('Couldn’t add the folder') },
       );
-    else
+    else {
+      // A name that's taken gets a number, as the server does.
+      const saved = uniqueTemplateName(studio.templates, name);
       actions.saveTemplate.mutate(
         { name, message: current, folderId },
         {
           onSuccess: () => {
             done();
-            toast({ tone: 'success', title: `Saved “${name}”` });
+            toast({ tone: 'success', title: `Saved “${saved}”` });
           },
           onError: failed('Couldn’t save the template'),
         },
       );
+    }
   };
   const namingBusy =
     actions.renameFolder.isPending ||

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { openDb } from './db.ts';
 import { getModule, writeModule } from './store.ts';
-import { getTemplate } from './templates.ts';
+import {
+  addTemplate,
+  cloneTemplate,
+  getTemplate,
+  listLibrary,
+  updateTemplate,
+} from './templates.ts';
 import { studioIssue, studioPayload } from './studio-format.ts';
 import { welcomeOf } from './greet.ts';
 import {
@@ -100,5 +106,38 @@ describe('welcome messages', () => {
     // It's moved once.
     expect(welcomeOf(db, 'g', 3).config).toEqual(config);
     expect(getModule(db, 'g', 'welcome').config).toEqual(config);
+  });
+});
+
+describe('template names', () => {
+  it('numbers a taken name and refuses renaming onto one', () => {
+    const db = openDb(':memory:');
+    const add = (name: string) =>
+      addTemplate(
+        db,
+        { guildId: 'g', moduleId: 'studio', name, who: 'Rhea', message: {} },
+        1,
+      );
+    const first = add('ban');
+    const second = add('Ban');
+    add('ban');
+    expect(getTemplate(db, 'g', 'studio', second)!.name).toBe('Ban (x2)');
+    expect(listLibrary(db, 'g', 'studio').templates.map((t) => t.name)).toEqual(
+      expect.arrayContaining(['ban', 'Ban (x2)', 'ban (x3)']),
+    );
+    expect(() =>
+      updateTemplate(
+        db,
+        'g',
+        'studio',
+        second,
+        { name: 'BAN', who: 'Rhea' },
+        2,
+      ),
+    ).toThrow('A template named “BAN” already exists. Pick another name.');
+    // Keeping its own name is fine.
+    updateTemplate(db, 'g', 'studio', first, { name: 'ban', who: 'Rhea' }, 2);
+    const copy = cloneTemplate(db, 'g', 'studio', first, 'Rhea', 3);
+    expect(getTemplate(db, 'g', 'studio', copy)!.name).toBe('ban (copy)');
   });
 });

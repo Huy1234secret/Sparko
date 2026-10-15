@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Icon, LottieIcon } from '../ui';
-import studioReveal from '../../../../design-system/assets/icons/animated-icons/sidebar-message-studio-reveal.json?url';
-import studioHover from '../../../../design-system/assets/icons/animated-icons/sidebar-message-studio-hover.json?url';
+import { animIcons } from '../ui';
+const studioReveal = animIcons.studio.reveal;
+const studioHover = animIcons.studio.hover;
 
 /** Modules with an animated icon: it draws in, then plays again on hover. */
 const animated: Record<string, { reveal: string; hover: string }> = {

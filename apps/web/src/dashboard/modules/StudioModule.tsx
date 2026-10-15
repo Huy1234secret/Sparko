@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, EmptyState, Icon, Input, Notice, useToast } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
 import {
+  nameTaken,
   parseMessageLink,
   planIssue,
   studioIssue,
@@ -31,6 +32,7 @@ import { MessageCanvas, forChecks } from './MessageCanvas';
 import { StudioDataProvider } from './ComponentsEditor';
 import {
   InfoTip,
+  EditingIcon,
   InsertProvider,
   IssueProvider,
   flashIssue,
@@ -326,6 +328,15 @@ export function StudioModule({
     if (!template || !message) return;
     if (blocked(message, 'save')) return;
     const name = message.name.trim() || template.name;
+    if (nameTaken(studio.data?.templates ?? [], name, template.id)) {
+      setIssue((i) => ({ at: 'name', n: (i?.n ?? 0) + 1 }));
+      toast({
+        tone: 'danger',
+        title: 'Can’t save yet',
+        body: `A template named “${name}” already exists. Pick another name.`,
+      });
+      return;
+    }
     actions.updateTemplate.mutate(
       { id: template.id, name, message: { ...message, name } },
       {
@@ -435,7 +446,7 @@ export function StudioModule({
         ) : (
           <div className="sp-card">
             <EmptyState
-              icon="square-pen"
+              icon={<EditingIcon />}
               title="Select a template to start editing!"
               actions={
                 <Button variant="primary" onClick={() => setTab('items')}>
