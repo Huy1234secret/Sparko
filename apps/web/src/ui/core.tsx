@@ -1,6 +1,9 @@
 import { SearchIcon } from './search-icon';
+import { AnimatedCheck, RevealIcon } from './animated';
+import type { RevealHover } from './anim-icons';
 import {
   useId,
+  useState,
   type ButtonHTMLAttributes,
   type CSSProperties,
   type InputHTMLAttributes,
@@ -357,9 +360,15 @@ export function Checkbox({
         disabled={disabled}
         onChange={(e) => onChange?.(e.target.checked)}
       />
-      <span className="sp-check__box">
-        <Icon name={indeterminate ? 'minus' : 'check'} />
-      </span>
+      {indeterminate ? (
+        <span className="sp-check__box">
+          <Icon name="minus" />
+        </span>
+      ) : (
+        <span className="sp-check__box sp-check__box--anim">
+          <AnimatedCheck checked={checked} />
+        </span>
+      )}
       <span className="sp-check__text">
         <span>{label}</span>
         {description && <span className="sp-check__desc">{description}</span>}
@@ -461,10 +470,14 @@ export function Tabs<T extends string>({
     value: T;
     label: ReactNode;
     icon?: string;
+    /** An icon that draws in and plays on hover; `icon` stands in without it. */
+    anim?: RevealHover | undefined;
     count?: number;
     disabled?: boolean;
   }[];
 }) {
+  // How many times each tab was hovered, to replay its icon.
+  const [hovers, setHovers] = useState<Record<string, number>>({});
   return (
     <div className="sp-tabs" role="tablist" aria-label={label}>
       {tabs.map((t) => (
@@ -476,8 +489,20 @@ export function Tabs<T extends string>({
           aria-selected={value === t.value}
           disabled={t.disabled}
           onClick={() => onChange(t.value)}
+          onPointerEnter={() =>
+            setHovers((h) => ({ ...h, [t.value]: (h[t.value] ?? 0) + 1 }))
+          }
         >
-          {t.icon && <Icon name={t.icon} size="sm" />}
+          {t.anim ? (
+            <RevealIcon
+              anim={t.anim}
+              fallback={t.icon ?? ''}
+              size={20}
+              hoverKey={hovers[t.value] ?? 0}
+            />
+          ) : (
+            t.icon && <Icon name={t.icon} size="sm" />
+          )}
           {t.label}
           {t.count != null && <span className="sp-count">{t.count}</span>}
         </button>

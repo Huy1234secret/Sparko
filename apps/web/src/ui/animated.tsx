@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import type { AnimationItem } from 'lottie-web';
-import { Button, cx } from './core';
+import { Button, Icon, cx } from './core';
+import { animIcons } from './anim-icons';
 
 /**
  * Animated icons drawn from Lottie files in design-system/assets/icons.
@@ -257,5 +258,59 @@ export function AnimatedButton({
       <LottieIcon src={anim} size={20} playKey={playKey} solid={solid} />
       {children}
     </Button>
+  );
+}
+
+/**
+ * An icon that draws in, then plays its hover each time `hoverKey`
+ * changes. Without its animation files it shows the still `fallback`.
+ */
+export function RevealIcon({
+  anim,
+  fallback,
+  size = 20,
+  hoverKey = 0,
+  className,
+}: {
+  anim: { reveal: string; hover: string; solid?: boolean } | undefined;
+  fallback: string;
+  size?: number;
+  hoverKey?: number;
+  className?: string;
+}) {
+  if (!anim) return <Icon name={fallback} className={className} />;
+  return (
+    <LottieIcon
+      className={cx('sp-i sp-module-icon', className)}
+      src={hoverKey ? anim.hover : anim.reveal}
+      size={size}
+      playKey={hoverKey + 1}
+      solid={!!anim.solid}
+    />
+  );
+}
+
+/** The checkbox's box: it fills in when ticked (frames 0–30) and empties when unticked (90–120). */
+export function AnimatedCheck({
+  checked,
+  size = 20,
+}: {
+  checked: boolean;
+  size?: number;
+}) {
+  // Each change of `checked` plays its half once.
+  const [shown, setShown] = useState({ checked, key: 0 });
+  if (shown.checked !== checked) setShown({ checked, key: shown.key + 1 });
+  return (
+    <LottieIcon
+      className="sp-anim-check"
+      src={animIcons.checkbox.select}
+      size={size}
+      solid
+      startAt={checked ? 30 : 0}
+      playKey={shown.key}
+      from={checked ? 0 : 90}
+      to={checked ? 30 : 120}
+    />
   );
 }
