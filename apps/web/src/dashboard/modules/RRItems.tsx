@@ -16,8 +16,10 @@ import {
   type RRItem,
   type RoleOption,
 } from '../../data';
+import { MaskIcon } from './EditorBits';
 import { EmojiField } from './EmojiPicker';
 import { roleItems } from './parts';
+import dragIcon from '../../../../../design-system/assets/icons/drag.png';
 
 const colours = [
   { value: 'blurple', label: 'Blurple' },
@@ -183,6 +185,52 @@ export function RRItems({
     <ul className="sp-rr-items" aria-label={`${rr.kind} list`}>
       {shown.map((i, index) => {
         const real = i.id !== 'next';
+        const emoji = (
+          <EmojiField
+            serverId={serverId}
+            value={i.emoji}
+            label={
+              rr.kind === 'menu'
+                ? `Option ${index + 1} emoji`
+                : `Item ${index + 1} emoji`
+            }
+            onChange={(emoji) => edit(i.id, { emoji })}
+          />
+        );
+        const gearButton = (
+          <button
+            type="button"
+            className={cx(
+              'sp-icon-btn',
+              rr.kind !== 'reaction' && 'sp-rr-opt__gear',
+            )}
+            aria-label={`Settings for ${titleOf(rr, i).replace('Editing ', '')}`}
+            onClick={() => setGear(i.id)}
+          >
+            <Icon name="settings" size={rr.kind === 'reaction' ? 'sm' : 'lg'} />
+          </button>
+        );
+        const copyRemove = (
+          <>
+            <button
+              type="button"
+              className="sp-icon-btn"
+              aria-label={`Copy item ${index + 1}`}
+              disabled={items.length >= limit}
+              onClick={() => clone(i)}
+            >
+              <Icon name="copy" size="sm" />
+            </button>
+            <button
+              type="button"
+              className="sp-icon-btn sp-icon-btn--danger"
+              aria-label={`Remove item ${index + 1}`}
+              onClick={() => remove(i.id)}
+            >
+              <Icon name="trash-2" size="sm" />
+            </button>
+          </>
+        );
         return (
           <li
             key={i.id}
@@ -201,73 +249,24 @@ export function RRItems({
                 aria-hidden="true"
                 title="Drag to move"
               >
-                <Icon name="grip-vertical" size="sm" />
+                <MaskIcon src={dragIcon} size={14} />
               </span>
             )}
-            <EmojiField
-              serverId={serverId}
-              value={i.emoji}
-              label={
-                rr.kind === 'menu'
-                  ? `Option ${index + 1} emoji`
-                  : `Item ${index + 1} emoji`
-              }
-              onChange={(emoji) => edit(i.id, { emoji })}
-            />
-            <div className="sp-rr-item__main">
-              {rr.kind === 'reaction' && (
-                <Combobox
-                  label={`Reaction ${index + 1} role`}
-                  searchPlaceholder="Search roles"
-                  placeholder="Pick a role"
-                  value={i.role}
-                  onChange={(role) => edit(i.id, { role })}
-                  items={roleChoices(i)}
-                />
-              )}
-              {rr.kind === 'button' && (
-                <>
-                  <Input
-                    aria-label={`Button ${index + 1} name`}
-                    placeholder="Button name"
-                    maxLength={80}
-                    value={i.label}
-                    onChange={(e) => edit(i.id, { label: e.target.value })}
-                  />
-                  <div
-                    className="sp-colour-squares"
-                    role="radiogroup"
-                    aria-label={`Button ${index + 1} colour`}
-                  >
-                    {colours.map((c) => (
-                      <button
-                        key={c.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={i.colour === c.value}
-                        aria-label={c.label}
-                        className={cx(
-                          'sp-colour-square',
-                          `sp-colour-square--${c.value}`,
-                          i.colour === c.value && 'is-on',
-                        )}
-                        onClick={() => edit(i.id, { colour: c.value })}
-                      />
-                    ))}
+            {rr.kind === 'menu' ? (
+              <>
+                <div className="sp-rr-opt">
+                  <div className="sp-rr-opt__row">
+                    {emoji}
+                    <Input
+                      aria-label={`Option ${index + 1} title`}
+                      placeholder={
+                        real ? 'Title' : `Option ${index + 1}: type a title`
+                      }
+                      maxLength={100}
+                      value={i.label}
+                      onChange={(e) => edit(i.id, { label: e.target.value })}
+                    />
                   </div>
-                </>
-              )}
-              {rr.kind === 'menu' && (
-                <>
-                  <Input
-                    aria-label={`Option ${index + 1} title`}
-                    placeholder={
-                      real ? 'Title' : `Option ${index + 1}: type a title`
-                    }
-                    maxLength={100}
-                    value={i.label}
-                    onChange={(e) => edit(i.id, { label: e.target.value })}
-                  />
                   {real && (
                     <Input
                       aria-label={`Option ${index + 1} description`}
@@ -279,37 +278,83 @@ export function RRItems({
                       }
                     />
                   )}
-                </>
-              )}
-            </div>
-            {real && (
-              <span className="sp-rr-item__tools">
-                <button
-                  type="button"
-                  className="sp-icon-btn"
-                  aria-label={`Settings for ${titleOf(rr, i).replace('Editing ', '')}`}
-                  onClick={() => setGear(i.id)}
-                >
-                  <Icon name="settings" size="sm" />
-                </button>
-                <button
-                  type="button"
-                  className="sp-icon-btn"
-                  aria-label={`Copy item ${index + 1}`}
-                  disabled={items.length >= limit}
-                  onClick={() => clone(i)}
-                >
-                  <Icon name="copy" size="sm" />
-                </button>
-                <button
-                  type="button"
-                  className="sp-icon-btn sp-icon-btn--danger"
-                  aria-label={`Remove item ${index + 1}`}
-                  onClick={() => remove(i.id)}
-                >
-                  <Icon name="trash-2" size="sm" />
-                </button>
-              </span>
+                </div>
+                {real && (
+                  <span className="sp-rr-opt__tools">
+                    {copyRemove}
+                    {gearButton}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                {emoji}
+                <div className="sp-rr-item__main">
+                  {rr.kind === 'reaction' && (
+                    <Combobox
+                      label={`Reaction ${index + 1} role`}
+                      searchPlaceholder="Search roles"
+                      placeholder="Pick a role"
+                      value={i.role}
+                      onChange={(role) => edit(i.id, { role })}
+                      items={roleChoices(i)}
+                    />
+                  )}
+                  {rr.kind === 'button' && (
+                    <>
+                      <Input
+                        aria-label={`Button ${index + 1} name`}
+                        placeholder="Button name"
+                        maxLength={80}
+                        value={i.label}
+                        onChange={(e) => edit(i.id, { label: e.target.value })}
+                      />
+                      <div
+                        className="sp-colour-squares"
+                        role="radiogroup"
+                        aria-label={`Button ${index + 1} colour`}
+                      >
+                        {colours.map((c) => (
+                          <button
+                            key={c.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={i.colour === c.value}
+                            aria-label={c.label}
+                            className={cx(
+                              'sp-colour-square',
+                              `sp-colour-square--${c.value}`,
+                              i.colour === c.value && 'is-on',
+                            )}
+                            onClick={() => edit(i.id, { colour: c.value })}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {real && (
+                  <span
+                    className={
+                      rr.kind === 'button'
+                        ? 'sp-rr-opt__tools'
+                        : 'sp-rr-item__tools'
+                    }
+                  >
+                    {rr.kind === 'button' ? (
+                      <>
+                        {copyRemove}
+                        {gearButton}
+                      </>
+                    ) : (
+                      <>
+                        {gearButton}
+                        {copyRemove}
+                      </>
+                    )}
+                  </span>
+                )}
+              </>
             )}
           </li>
         );
