@@ -230,37 +230,32 @@ describe('module pages', () => {
       await screen.findByText('Sparko is paused on Study Hall 24/7'),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('switch', { name: 'Welcome on or off' }),
+      screen.getByRole('switch', { name: 'Welcome messages on or off' }),
     ).toBeDisabled();
-    expect(screen.getByRole('textbox', { name: 'Message' })).toBeDisabled();
+    expect(
+      await screen.findByRole('button', { name: /Message template/ }),
+    ).toBeDisabled();
   });
 });
 
-describe('Welcome', () => {
-  it('previews the message live and validates it before saving', async () => {
+describe('Welcome messages', () => {
+  it('edits the join template in the preview, saves, and goes live once the channel is fixed', async () => {
     open(`${pixel}/welcome`);
-    const message = await screen.findByRole('textbox', { name: 'Message' });
-    await userEvent.clear(message);
-    await userEvent.type(message, 'Hi {{user}, enjoy **{{server}**!');
-    const preview = document.querySelector('.dc-embed__desc')!;
-    expect(preview.textContent).toBe('Hi @tomoko, enjoy Pixel Plaza!');
-    expect(preview.querySelector('b')?.textContent).toBe('Pixel Plaza');
-
-    await userEvent.click(
-      screen.getByRole('switch', { name: 'Welcome on or off' }),
+    expect(await screen.findByText(/Editing/)).toHaveTextContent(
+      'Welcome card',
     );
-    await userEvent.clear(message);
-    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
-      screen.getAllByText('Write a message, or turn Welcome off.').length,
-    ).toBeGreaterThan(0);
-    expect(message).toHaveAttribute('aria-invalid', 'true');
-  });
+      screen.getByRole('button', { name: /Message template/ }),
+    ).toHaveTextContent('Welcome card');
+    // Member variables are listed for these messages.
+    await userEvent.click(screen.getByRole('button', { name: /Variables/ }));
+    expect(
+      screen.getByRole('menuitem', { name: /\{user\.avatar\}/ }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
 
-  it('saves, reports that the channel is blocked, and goes live once it is fixed', async () => {
-    open(`${pixel}/welcome`);
     await userEvent.click(
-      await screen.findByRole('switch', { name: 'Welcome on or off' }),
+      screen.getByRole('switch', { name: 'Welcome messages on or off' }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
@@ -275,78 +270,81 @@ describe('Welcome', () => {
     await userEvent.click(
       within(dialog).getByRole('button', { name: 'Check again' }),
     );
-    await waitFor(() =>
-      expect(screen.queryByText('Sparko can’t post in #welcome')).toBeNull(),
-    );
-    // Once fixed, the saved change goes live without saving again.
     expect(
-      await screen.findByText('Live in #welcome', {
+      await screen.findByText('Welcome messages are live', {
         selector: '.sp-pipeline__step',
       }),
     ).toBeInTheDocument();
   });
 
-  it('sends only a DM without needing a channel', async () => {
-    open(`${pixel}/welcome`);
+  it('won’t send in a channel without a template', async () => {
+    const router = open(`${pixel}/welcome`);
     await userEvent.click(
-      await screen.findByRole('radio', { name: /Direct message/ }),
+      await screen.findByRole('tab', { name: 'Boost message' }),
     );
-    expect(screen.getByRole('button', { name: /Channel/ })).toBeDisabled();
+    expect(router.state.location.search).toBe('?tab=boost');
     expect(
-      screen.getByText('Not needed when sending only a direct message.'),
+      screen.getByText('Pick a template for the boost message'),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Sparko can’t post in #welcome')).toBeNull();
-  });
-
-  it('picks a channel with the keyboard and refuses ones Sparko can’t post in', async () => {
-    open(`${pixel}/welcome`);
-    await userEvent.click(
-      await screen.findByRole('button', { name: /Channel/ }),
+    await userEvent.click(screen.getByRole('button', { name: /^Channel/ }));
+    await userEvent.type(
+      screen.getByRole('combobox', { name: 'Search channels' }),
+      'arriv',
     );
-    const search = screen.getByRole('combobox', { name: 'Search channels' });
-    expect(screen.getByRole('option', { name: /rules/ })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    await userEvent.type(search, 'arriv');
     await userEvent.keyboard('{ArrowDown}{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
-      screen.getByRole('button', { name: /Channel arrivals/ }),
+      await screen.findByText('Pick a template for the boost message.'),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('#arrivals', { selector: '.sp-hint' }),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Pick a template to send.')).toBeInTheDocument();
   });
 
-  it('uses a template and restores an earlier version into the editor', async () => {
-    const router = open(`${pixel}/welcome?tab=items`);
+  it('starts a tab from a default template, and puts one into the template in use', async () => {
+    open(`${pixel}/welcome?tab=leave`);
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Use Short and sweet' }),
+      await screen.findByRole('button', { name: 'Use a default template' }),
     );
-    expect(router.state.location.search).toBe('');
-    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
-      'Hi {user} 👋 Glad you’re here.',
-    );
-
-    await userEvent.click(screen.getByRole('tab', { name: /History/ }));
+    let dialog = screen.getByRole('dialog', { name: 'Default templates' });
+    expect(within(dialog).getByText('Embed message')).toBeInTheDocument();
+    expect(within(dialog).getByText('Any kind')).toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Restore “First version”' }),
+      within(dialog).getByRole('button', { name: /Goodbye card/ }),
     );
-    await userEvent.click(
-      within(screen.getByRole('dialog')).getByRole('button', {
-        name: 'Load into editor',
-      }),
-    );
-    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
-      'Welcome to {server}, {user}!',
+    expect(await screen.findByText(/Editing/)).toHaveTextContent(
+      'Goodbye card',
     );
     expect(
-      screen.getByRole('switch', { name: /Send as an embed/ }),
-    ).not.toBeChecked();
-    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
-    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
-      'Hey {user}, welcome to **{server}**! You’re member #{member_count}. Read #rules, then say hi in #introductions.',
+      screen.getByRole('button', { name: /Message template/ }),
+    ).toHaveTextContent('Goodbye card');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Join message' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use default templates' }),
     );
+    dialog = screen.getByRole('dialog', { name: 'Default templates' });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /Short and sweet/ }),
+    );
+    expect(
+      await screen.findByText('“Welcome card” now looks like Short and sweet'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.dc-embed')).toBeNull();
+  });
+
+  it('logs what was sent and why sends failed', async () => {
+    open(`${pixel}/welcome?tab=logs`);
+    expect(
+      await screen.findByText(
+        '[WM] Sent “Welcome card” to #welcome (800000000000000002)',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'BM' }));
+    expect(screen.queryByText(/\[WM\]/)).toBeNull();
+    expect(
+      screen.getByText(
+        /\[BM\] Failed to send “Thank-you card” to #announcements .*reason: Sparko doesn’t have permission/,
+      ),
+    ).toBeInTheDocument();
   });
 });
 
@@ -814,7 +812,7 @@ describe('Message Studio', () => {
   it('keeps templates and folders: add, clone, move, edit and delete', async () => {
     open(`${pixel}/studio?tab=items`);
     expect(
-      await screen.findByText(/You have 4\/100/, {}, { timeout: 4000 }),
+      await screen.findByText(/You have 5\/100/, {}, { timeout: 4000 }),
     ).toBeInTheDocument();
 
     // Deleting asks first.

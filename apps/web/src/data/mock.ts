@@ -7,11 +7,10 @@ import type {
   Server,
   Session,
   SetupStep,
-  Template,
-  Version,
-  WelcomeConfig,
+  GreetLogEntry,
   WelcomeState,
 } from './types';
+import { greetKinds, welcomeDefault } from './studio-format';
 import { createSupportMock } from './mock-support';
 
 /**
@@ -134,19 +133,6 @@ const channels: Channel[] = [
   canPost: canPost as boolean,
 }));
 
-const defaultMessage =
-  'Hey {user}, welcome to **{server}**! You’re member #{member_count}. Read #rules, then say hi in #introductions.';
-const welcomeDefault = (server: Server): WelcomeConfig => ({
-  delivery: 'channel',
-  channel: channels[2]!.id,
-  message: defaultMessage,
-  embed: true,
-  title: `Welcome to ${server.name}`,
-  color: '#FACC15',
-  ping: true,
-  rejoin: false,
-});
-
 type ServerState = {
   on: Record<string, boolean>;
   skipped: Set<string>;
@@ -166,70 +152,44 @@ function stateOf(serverId: string): ServerState {
   const server = serverById(serverId);
   let s = state.get(serverId);
   if (!s) {
-    const config = welcomeDefault(server);
-    const versions: Version<WelcomeConfig>[] = [
+    const config = welcomeDefault(channels[2]!.id);
+    config.join.template = 'tw';
+    config.leave.channel = '';
+    config.boost.channel = '';
+    const now = Date.now();
+    const log: GreetLogEntry[] = [
       {
-        id: 'v4',
-        title: 'Welcome turned off for the server move',
-        who: 'You',
-        whoColor: 2,
-        when: 'Today, 09:12',
-        config,
+        id: 'l3',
+        kind: 'join',
+        ok: true,
+        template: 'Welcome card',
+        channelId: channels[2]!.id,
+        memberId: '7001',
+        memberName: 'tomoko',
+        reason: '',
+        at: now - 4 * 60_000,
       },
       {
-        id: 'v3',
-        title: 'Added #introductions to the message',
-        who: 'Ayo',
-        whoColor: 3,
-        when: '11 Oct, 21:40',
-        config: {
-          ...config,
-          message:
-            'Hey {user}, welcome to **{server}**! Say hi in #introductions.',
-        },
+        id: 'l2',
+        kind: 'join',
+        ok: false,
+        template: 'Welcome card',
+        channelId: null,
+        memberId: '7002',
+        memberName: 'ayo',
+        reason: 'they don’t accept direct messages from this server.',
+        at: now - 3 * 3_600_000,
       },
       {
-        id: 'v2',
-        title: 'Switched to an embed with a yellow bar',
-        who: 'Rhea',
-        whoColor: 5,
-        when: '3 Oct, 16:05',
-        config: {
-          ...config,
-          title: 'Hi there!',
-          message: 'Welcome {user}! Check #rules first.',
-        },
-      },
-      {
-        id: 'v1',
-        title: 'First version',
-        who: 'You',
-        whoColor: 2,
-        when: '28 Sep, 12:30',
-        config: {
-          ...config,
-          embed: false,
-          message: 'Welcome to {server}, {user}!',
-        },
-      },
-    ];
-    const templates: Template[] = [
-      { id: 't1', name: 'Default welcome', message: defaultMessage },
-      {
-        id: 't2',
-        name: 'Weekend art jam',
-        message:
-          'Welcome {user}! Our weekend jam starts Saturday in #art-share.',
-      },
-      {
-        id: 't3',
-        name: 'Lunar New Year',
-        message: 'Happy new year, {user}, and welcome to {server}!',
-      },
-      {
-        id: 't4',
-        name: 'Short and sweet',
-        message: 'Hi {user} 👋 Glad you’re here.',
+        id: 'l1',
+        kind: 'boost',
+        ok: false,
+        template: 'Thank-you card',
+        channelId: channels[4]!.id,
+        memberId: '7003',
+        memberName: 'rhea',
+        reason: 'Sparko doesn’t have permission to send messages there.',
+        at: now - 26 * 3_600_000,
       },
     ];
     const isFirst = serverId === servers[0]!.id;
@@ -248,9 +208,7 @@ function stateOf(serverId: string): ServerState {
         on: isFirst ? false : true,
         config,
         channels,
-        templates,
-        templateLimit: server.plan === 'plus' ? 100 : 10,
-        versions,
+        log,
       },
       // On the first server Sparko can't post in #welcome until it's fixed.
       blockedChannels: new Set(
@@ -346,11 +304,8 @@ function health(s: ServerState): Overview['health'] {
             'Automatic roles and Reward roles can’t give roles until Sparko has it.',
         },
     commandsSynced: 64,
-    templates: {
-      used: s.welcome.templates.length,
-      limit: s.welcome.templateLimit,
-    },
-    storageMb: { used: 4.1, limit: s.welcome.templateLimit === 100 ? 100 : 10 },
+    templates: { used: 5, limit: 100 },
+    storageMb: { used: 4.1, limit: 10 },
   };
 }
 
@@ -370,7 +325,7 @@ const coreApi = {
     const server = serverById(serverId);
     const s = stateOf(serverId);
     const welcome = s.welcome.on
-      ? channelsFor(s).find((c) => c.id === s.welcome.config.channel)
+      ? channelsFor(s).find((c) => c.id === s.welcome.config.join.channel)
       : undefined;
     return wait<Overview>(
       copy({
@@ -489,22 +444,16 @@ const coreApi = {
     s.welcome.on = change.on;
     s.on['welcome'] = change.on;
     s.welcome.config = copy(change.config);
-    s.welcome.versions.unshift({
-      id: `v${Date.now()}`,
-      title: change.on ? 'Updated the welcome message' : 'Turned Welcome off',
-      who: 'You',
-      whoColor: session.user.avatarColor,
-      when: 'Just now',
-      config: copy(change.config),
-    });
     return wait(undefined);
   },
   async waitForApply(serverId, moduleId): Promise<ApplyResult> {
     const s = stateOf(serverId);
     const postsIn =
       moduleId === 'welcome'
-        ? s.welcome.on && s.welcome.config.delivery !== 'dm'
-          ? s.welcome.config.channel
+        ? s.welcome.on
+          ? greetKinds
+              .map((k) => s.welcome.config[k])
+              .find((g) => g.channel && g.template)?.channel
           : undefined
         : postingChannel(serverId, moduleId);
     const blocked =

@@ -430,6 +430,11 @@ const https = (url: unknown) => {
     return false;
   }
 };
+/** Picture links can also be a picture Sparko fills in when it sends. */
+export const pictureVariables = ['{user.avatar}', '{server.icon}'] as const;
+export const isPictureVariable = (url: unknown) =>
+  (pictureVariables as readonly unknown[]).includes(url);
+const picture = (url: unknown) => https(url) || isPictureVariable(url);
 const hex = (c: unknown) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
 const str = (v: unknown, max: number) =>
   typeof v === 'string' && v.length <= max;
@@ -474,12 +479,12 @@ export function studioIssue(input: unknown): StudioIssue | null {
         'Discord allows 4,000 characters of text in a message like this.',
         'text',
       );
-    if (v.thumbnail && !https(v.thumbnail))
+    if (v.thumbnail && !picture(v.thumbnail))
       return issue('The thumbnail link must start with https://.', 'thumbnail');
     if (!Array.isArray(v.gallery) || v.gallery.length > 10)
       return issue('A gallery holds up to 10 images.', 'gallery');
     for (const img of v.gallery)
-      if (!id(img?.id) || !https(img.url) || !str(img.description, 1024))
+      if (!id(img?.id) || !picture(img.url) || !str(img.description, 1024))
         return issue(
           'Gallery images need a link that starts with https://.',
           `image:${img?.id}`,
@@ -515,14 +520,13 @@ export function studioIssue(input: unknown): StudioIssue | null {
       );
     if (!hex(e.color))
       return issue('Use a colour like #FACC15.', `embed:${e.id}`);
-    for (const url of [
-      e.image,
-      e.thumbnail,
-      e.authorIcon,
-      e.authorUrl,
-      e.footerIcon,
-    ])
-      if (typeof url !== 'string' || (url && !https(url)))
+    if (typeof e.authorUrl !== 'string' || (e.authorUrl && !https(e.authorUrl)))
+      return issue(
+        'Links and pictures must start with https://.',
+        `embed:${e.id}`,
+      );
+    for (const url of [e.image, e.thumbnail, e.authorIcon, e.footerIcon])
+      if (typeof url !== 'string' || (url && !picture(url)))
         return issue(
           'Links and pictures must start with https://.',
           `embed:${e.id}`,
@@ -784,14 +788,39 @@ export const v2Sections = (text: string) => text.split(/\{separator\}/);
 
 /** Who and where a message is for, to fill its {variables}. */
 export type StudioVars = {
-  user?: { id: string; name: string } | undefined;
-  server?: { name: string; members: number } | undefined;
+  user?:
+    | {
+        id: string;
+        name: string;
+        /** Their profile picture's link. */
+        avatar?: string | undefined;
+        /** When their account was made, and when they joined the server. */
+        createdAt?: number | undefined;
+        joinedAt?: number | undefined;
+      }
+    | undefined;
+  server?:
+    | {
+        name: string;
+        members: number;
+        icon?: string | undefined;
+        boosts?: number | undefined;
+        level?: number | undefined;
+      }
+    | undefined;
   /** The channel the message goes to. */
   channel?: string | undefined;
 };
 
+export type StudioVariable = {
+  name: string;
+  about: string;
+  /** Filled in only by welcome, leave and boost messages. */
+  member?: true;
+};
+
 /** Variables people can write in Studio messages, in braces. */
-export const studioVariables = [
+export const studioVariables: StudioVariable[] = [
   {
     name: 'user',
     about: 'Mentions the member it’s for, without pinging them.',
@@ -806,7 +835,37 @@ export const studioVariables = [
     name: 'time',
     about: 'The time it was sent, in each reader’s own time zone.',
   },
-] as const;
+  {
+    name: 'user.avatar',
+    about: 'The member’s profile picture. Paste it as a picture link.',
+    member: true,
+  },
+  {
+    name: 'user.created',
+    about: 'How long ago their Discord account was made.',
+    member: true,
+  },
+  {
+    name: 'user.joined',
+    about: 'How long ago they joined the server.',
+    member: true,
+  },
+  {
+    name: 'server.icon',
+    about: 'The server’s picture. Paste it as a picture link.',
+    member: true,
+  },
+  {
+    name: 'server.boosts',
+    about: 'How many boosts the server has.',
+    member: true,
+  },
+  {
+    name: 'server.level',
+    about: 'The server’s boost level, 0 to 3.',
+    member: true,
+  },
+];
 
 /**
  * Fills {variables} in. A variable with nothing to fill it (no member when
@@ -815,12 +874,20 @@ export const studioVariables = [
  */
 export function fillVariables(text: string, ctx: { now: number } & StudioVars) {
   const unix = Math.floor(ctx.now / 1000);
+  const ago = (at: number | undefined) =>
+    at === undefined ? undefined : `<t:${Math.floor(at / 1000)}:R>`;
   const values: Record<string, string | undefined> = {
     user: ctx.user && `<@${ctx.user.id}>`,
     'user.name': ctx.user?.name,
     'user.id': ctx.user?.id,
+    'user.avatar': ctx.user?.avatar,
+    'user.created': ago(ctx.user?.createdAt),
+    'user.joined': ago(ctx.user?.joinedAt),
     server: ctx.server?.name,
     'server.members': ctx.server?.members.toLocaleString('en-US'),
+    'server.icon': ctx.server?.icon,
+    'server.boosts': ctx.server?.boosts?.toLocaleString('en-US'),
+    'server.level': ctx.server?.level?.toString(),
     channel: ctx.channel && `<#${ctx.channel}>`,
     date: `<t:${unix}:D>`,
     time: `<t:${unix}:t>`,
@@ -843,12 +910,21 @@ export function studioPayload(
   // Mentions in Studio messages are shown but never ping anyone by surprise.
   const allowed_mentions = { parse: [] as string[] };
   const fill = (text: string) => (ctx.raw ? text : fillVariables(text, ctx));
+  // A picture variable with nothing to fill it leaves the picture out.
+  const pic = (url: string) => {
+    if (!url || ctx.raw) return url;
+    const out = fillVariables(url, ctx);
+    return https(out) ? out : '';
+  };
   if (m.layout === 'v2') {
     const v = m.v2;
     const byId = new Map(m.components.map((c) => [c.id, c]));
+    const pictures = v.gallery
+      .map((i) => ({ ...i, url: pic(i.url) }))
+      .filter((i) => i.url);
     const gallery = {
       type: 12,
-      items: v.gallery.map((i) => ({
+      items: pictures.map((i) => ({
         media: { url: i.url },
         ...(i.description ? { description: i.description } : {}),
       })),
@@ -864,7 +940,7 @@ export function studioPayload(
       for (const p of placedIn(v.place, slot)) {
         const c = byId.get(p.id);
         if (c) run.push(c);
-        else if (p.id === 'gallery' && v.gallery.length) {
+        else if (p.id === 'gallery' && pictures.length) {
           flushRun();
           out.push(gallery);
         }
@@ -876,7 +952,8 @@ export function studioPayload(
     // where something is placed, with buttons beside the lines they're on.
     const inside: object[] = [...items({ at: 'line', line: -1 })];
     let chunk: string[] = [];
-    let thumbnail = !!v.thumbnail;
+    const thumbUrl = pic(v.thumbnail);
+    let thumbnail = !!thumbUrl;
     const flush = () => {
       const text = chunk.join('\n').replace(/^\n+|\n+$/g, '');
       chunk = [];
@@ -888,7 +965,7 @@ export function studioPayload(
           ? {
               type: 9,
               components: [display],
-              accessory: { type: 11, media: { url: v.thumbnail } },
+              accessory: { type: 11, media: { url: thumbUrl } },
             }
           : display,
       );
@@ -946,7 +1023,7 @@ export function studioPayload(
         ? {
             author: {
               name: fill(e.author),
-              ...(e.authorIcon ? { icon_url: e.authorIcon } : {}),
+              ...(pic(e.authorIcon) ? { icon_url: pic(e.authorIcon) } : {}),
               ...(e.authorUrl ? { url: e.authorUrl } : {}),
             },
           }
@@ -954,13 +1031,13 @@ export function studioPayload(
       ...(e.title.trim() ? { title: fill(e.title) } : {}),
       ...(e.description.trim() ? { description: fill(e.description) } : {}),
       color: colour(e.color),
-      ...(e.image ? { image: { url: e.image } } : {}),
-      ...(e.thumbnail ? { thumbnail: { url: e.thumbnail } } : {}),
+      ...(pic(e.image) ? { image: { url: pic(e.image) } } : {}),
+      ...(pic(e.thumbnail) ? { thumbnail: { url: pic(e.thumbnail) } } : {}),
       ...(e.footer.trim()
         ? {
             footer: {
               text: fill(e.footer),
-              ...(e.footerIcon ? { icon_url: e.footerIcon } : {}),
+              ...(pic(e.footerIcon) ? { icon_url: pic(e.footerIcon) } : {}),
             },
           }
         : {}),

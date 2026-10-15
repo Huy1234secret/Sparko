@@ -12,10 +12,11 @@ import {
   latestJob,
   cleanWelcome,
   listAudit,
-  listVersions,
   welcomeDefault,
   welcomeProblem,
-  welcomeTemplates,
+  welcomeOf,
+  listGreetLog,
+  listLibrary,
   type WelcomeConfig,
   Perm,
   permName,
@@ -226,19 +227,6 @@ export function createApi({
     };
   }
 
-  const colourOf = (id: string | null) =>
-    (((id ? Number(id.slice(-4)) : 0) % 6) + 1) as 1 | 2 | 3 | 4 | 5 | 6;
-  /** Saved versions as the dashboard shows them; the newest is current. */
-  const versionsOf = (guildId: string, mod: string) =>
-    listVersions(db, guildId, mod).map((v) => ({
-      id: v.id,
-      title: v.title,
-      who: v.who,
-      whoColor: colourOf(v.whoId),
-      when: ago(v.at, now()),
-      config: v.config,
-    }));
-
   const studio = studioRoutes({
     db,
     view: (id) => view(id),
@@ -364,26 +352,25 @@ export function createApi({
       const channels = (v?.channels ?? []).map(
         ({ id, name, category, canPost }) => ({ id, name, category, canPost }),
       );
-      const saved = getModule<WelcomeConfig>(db, guildId, 'welcome');
-      const plus = getGuild(db, guildId)?.plan === 'plus';
+      const saved = welcomeOf(db, guildId, now());
       json(res, 200, {
         on: saved.on,
         config:
           saved.config ??
           welcomeDefault(
-            guild.name,
             channels.find((c) => c.canPost)?.id ?? channels[0]?.id ?? '',
           ),
         channels,
-        templates: welcomeTemplates,
-        templateLimit: plus ? 100 : 10,
-        versions: versionsOf(guildId, 'welcome'),
+        log: listGreetLog(db, guildId),
       });
     } else if (method === 'PUT' && rest === '/welcome') {
       const body = await readJson<{ on?: unknown; config?: unknown }>(req);
       if (typeof body?.on !== 'boolean')
         throw new BadRequest('Say whether Welcome is on or off.');
-      const problem = welcomeProblem(body.config);
+      const problem = welcomeProblem(
+        body.config,
+        new Set(listLibrary(db, guildId, 'studio').templates.map((t) => t.id)),
+      );
       if (problem) throw new BadRequest(problem);
       const config = cleanWelcome(body.config as WelcomeConfig);
       const at = now();
@@ -393,7 +380,9 @@ export function createApi({
         {
           guildId,
           moduleId: 'welcome',
-          title: body.on ? 'Updated the welcome message' : 'Turned Welcome off',
+          title: body.on
+            ? 'Updated the welcome messages'
+            : 'Turned Welcome messages off',
           who: user,
           config,
         },
@@ -404,7 +393,9 @@ export function createApi({
         {
           guildId,
           who: user.name,
-          what: body.on ? 'updated Welcome' : 'turned off Welcome',
+          what: body.on
+            ? 'updated Welcome messages'
+            : 'turned off Welcome messages',
           icon: 'hand',
         },
         at,

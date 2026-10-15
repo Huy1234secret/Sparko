@@ -15,8 +15,8 @@ import type {
   StudioState,
   TicketPanel,
   TicketPriority,
-  WelcomeConfig,
 } from './types';
+import type { WelcomeConfig } from './studio-format';
 
 export * from './types';
 export * from './library';

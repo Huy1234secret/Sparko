@@ -163,6 +163,20 @@ const migrations = [
     posted_at INTEGER NOT NULL
   );
   CREATE INDEX studio_posts_by_guild ON studio_posts (guild_id);`,
+  // 7: what welcome, leave and boost messages did, for their log.
+  `CREATE TABLE greet_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    ok INTEGER NOT NULL,
+    template TEXT NOT NULL,
+    channel_id TEXT,
+    member_id TEXT NOT NULL,
+    member_name TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX greet_log_by_guild ON greet_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

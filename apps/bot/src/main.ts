@@ -5,6 +5,7 @@ import {
   Events,
   GatewayIntentBits,
   MessageFlags,
+  Partials,
   type ButtonInteraction,
   type Guild,
 } from 'discord.js';
@@ -13,6 +14,7 @@ import {
   defaultDbPath,
   discordRest,
   editStudioMessage,
+  getModule,
   handleStudioInteraction,
   ticketActions,
   ticketButtonPrefix,
@@ -28,7 +30,12 @@ import {
 } from '@sparko/core';
 import { commands, handleCommand } from './commands.ts';
 import { startJobLoop, type Handlers } from './jobs.ts';
-import { checkWelcome, welcomeMember } from './welcome.ts';
+import {
+  checkWelcome,
+  memberJoined,
+  memberLeft,
+  memberUpdated,
+} from './welcome.ts';
 
 // Exit code 78 means "fix the setup"; pm2 doesn't restart on it.
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -115,6 +122,11 @@ function wire(c: Client) {
     // Remember which servers Sparko is in, for the dashboard.
     for (const guild of ready.guilds.cache.values()) record(guild, true);
     markOnlyInstalled(db, new Set(ready.guilds.cache.keys()), Date.now());
+    // A boost is a change to a member, so Sparko needs to know them first.
+    if (membersIntent)
+      for (const guild of ready.guilds.cache.values())
+        if (getModule(db, guild.id, 'welcome').on)
+          void guild.members.fetch().catch(() => {});
     try {
       // Replaces the old bot's commands with the ones this bot answers.
       await ready.application.commands.set(commands);
@@ -212,12 +224,21 @@ function wire(c: Client) {
       file,
     });
   });
+  const failed = (what: string) => (error: unknown) =>
+    console.error(`${what} failed`, error);
   c.on(Events.GuildMemberAdd, (member) => {
-    welcomeMember(db, member).catch((error: unknown) =>
-      console.error(
-        `Welcoming ${member.id} in ${member.guild.id} failed`,
-        error,
-      ),
+    memberJoined(db, rest, member).catch(
+      failed(`Welcoming ${member.id} in ${member.guild.id}`),
+    );
+  });
+  c.on(Events.GuildMemberUpdate, (before, after) => {
+    memberUpdated(db, rest, before, after).catch(
+      failed(`Updating ${after.id} in ${after.guild.id}`),
+    );
+  });
+  c.on(Events.GuildMemberRemove, (member) => {
+    memberLeft(db, rest, member).catch(
+      failed(`Saying goodbye to ${member.id} in ${member.guild.id}`),
     );
   });
 }
@@ -266,6 +287,8 @@ async function connect(members: boolean, content: boolean) {
       ...(members ? [GatewayIntentBits.GuildMembers] : []),
       ...(content ? [GatewayIntentBits.MessageContent] : []),
     ],
+    // Someone Sparko hasn't seen yet can still leave.
+    partials: [Partials.GuildMember, Partials.User],
   });
   wire(c);
   await c.login(token);

@@ -171,7 +171,11 @@ export function withBackend(
     },
     async saveTemplate(id, template) {
       if (!(await backend()).live) return sample.saveTemplate(id, template);
-      await call('POST', `${server(id)}/studio/templates`, template);
+      return call<{ id: string }>(
+        'POST',
+        `${server(id)}/studio/templates`,
+        template,
+      );
     },
     async updateTemplate(id, templateId, change) {
       if (!(await backend()).live)

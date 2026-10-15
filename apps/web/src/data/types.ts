@@ -1,3 +1,5 @@
+import type { GreetKind, WelcomeConfig } from './studio-format';
+
 /**
  * What the dashboard reads and writes. The sample source (mock.ts) and,
  * later, the real backend both provide this same interface.
@@ -66,17 +68,6 @@ export type Overview = {
   }[];
 };
 
-export type Delivery = 'channel' | 'dm' | 'both';
-export type WelcomeConfig = {
-  delivery: Delivery;
-  channel: string;
-  message: string;
-  embed: boolean;
-  title: string;
-  color: string;
-  ping: boolean;
-  rejoin: boolean;
-};
 export type Channel = {
   id: string;
   name: string;
@@ -92,15 +83,26 @@ export type Version<T> = {
   when: string;
   config: T;
 };
-export type Template = { id: string; name: string; message: string };
+export type GreetLogEntry = {
+  id: string;
+  kind: GreetKind;
+  ok: boolean;
+  /** The template's name when it was sent. */
+  template: string;
+  /** Where it went; null for a direct message. */
+  channelId: string | null;
+  memberId: string;
+  memberName: string;
+  reason: string;
+  at: number;
+};
 
 export type WelcomeState = {
   on: boolean;
   config: WelcomeConfig;
   channels: Channel[];
-  templates: Template[];
-  templateLimit: number;
-  versions: Version<WelcomeConfig>[];
+  /** What was sent, newest first. */
+  log: GreetLogEntry[];
 };
 
 /** A module without its own page yet: just on or off. */
@@ -377,7 +379,7 @@ export interface PanelApi {
   saveTemplate(
     serverId: string,
     template: { name: string; message: StudioMessage; folderId: string | null },
-  ): Promise<void>;
+  ): Promise<{ id: string }>;
   updateTemplate(
     serverId: string,
     id: string,

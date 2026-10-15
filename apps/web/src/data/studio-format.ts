@@ -22,3 +22,22 @@ export {
   fromDiscord,
   jsonErrorLine,
 } from '../../../../packages/core/src/studio-import.ts';
+export {
+  isPictureVariable,
+  pictureVariables,
+} from '../../../../packages/core/src/studio-format.ts';
+// Welcome messages use the same settings checks and ready-made messages.
+export {
+  deleteAfterChoices,
+  greetCodes,
+  greetKinds,
+  greetNames,
+  greetPresets,
+  greetTemplates,
+  welcomeDefault,
+  welcomeProblem,
+  type GreetKind,
+  type GreetPreset,
+  type GreetSettings,
+  type WelcomeConfig,
+} from '../../../../packages/core/src/welcome.ts';

@@ -785,3 +785,14 @@ export function flashIssue(at: string) {
       );
   field?.focus({ preventScroll: true });
 }
+
+const sample = (letter: string, colour: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${colour}"/><text x="32" y="42" font-family="sans-serif" font-size="30" font-weight="700" text-anchor="middle" fill="#fff">${letter}</text></svg>`,
+  )}`;
+const samplePictures: Record<string, string> = {
+  '{user.avatar}': sample('T', '#EB459E'),
+  '{server.icon}': sample('S', '#5865F2'),
+};
+/** What a picture link shows in the preview: picture variables get a stand-in. */
+export const previewPicture = (url: string) => samplePictures[url] ?? url;
