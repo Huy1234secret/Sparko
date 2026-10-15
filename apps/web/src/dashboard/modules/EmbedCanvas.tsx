@@ -8,6 +8,7 @@ import {
   UrlPopover,
   moveItem,
   useReorder,
+  previewPicture,
 } from './EditorBits';
 import { newId } from './parts';
 import { ColourPicker } from './ColourPicker';
@@ -103,7 +104,7 @@ function Picture({
       onClick={onOpen}
     >
       {url && !failed ? (
-        <img src={url} alt="" onError={() => setBroken(url)} />
+        <img src={previewPicture(url)} alt="" onError={() => setBroken(url)} />
       ) : (
         <MaskIcon src={addImage} size={40} />
       )}
@@ -299,7 +300,7 @@ function EmbedBlock({
                     aria-label="Change the author picture"
                     onClick={() => setPop('authorIcon')}
                   >
-                    <img src={embed.authorIcon} alt="" />
+                    <img src={previewPicture(embed.authorIcon)} alt="" />
                   </button>
                 ) : (
                   <Tool
@@ -386,7 +387,7 @@ function EmbedBlock({
                   aria-label="Change the footer picture"
                   onClick={() => setPop('footerIcon')}
                 >
-                  <img src={embed.footerIcon} alt="" />
+                  <img src={previewPicture(embed.footerIcon)} alt="" />
                 </button>
               ) : (
                 <Tool

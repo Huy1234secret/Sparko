@@ -7,6 +7,7 @@ import {
   openDb,
   Perm,
   createTicket,
+  studioDefault,
   setStatus,
   upsertGuild,
   type GuildView,
@@ -228,27 +229,58 @@ describe('server API', () => {
     ).toEqual({ ok: false });
   });
 
-  it('saves Welcome with a version, checks it, and retries after a fix', async () => {
+  it('saves Welcome messages with a template, checks it, and retries after a fix', async () => {
+    type Greet = { template: string; channel: string; dm: string };
     const empty = await body<{
       on: boolean;
-      config: { channel: string; delivery: string };
-      channels: { id: string }[];
-      templates: unknown[];
+      config: { join: Greet; leave: Greet; boost: Greet };
+      log: unknown[];
     }>(await call('/9001/welcome'));
-    expect(empty.config.channel).toBe('501');
-    expect(empty.templates.length).toBeGreaterThan(0);
+    expect(empty.config.join).toMatchObject({ channel: '501', template: '' });
+    expect(empty.log).toEqual([]);
 
+    // A channel without a template to send isn't saved.
     const bad = await call('/9001/welcome', {
+      method: 'PUT',
+      body: JSON.stringify({ on: true, config: empty.config }),
+    });
+    expect(bad.status).toBe(400);
+    expect((await body<{ message: string }>(bad)).message).toBe(
+      'Pick a template for the join message.',
+    );
+
+    // Nor is one that doesn't exist.
+    const missing = await call('/9001/welcome', {
       method: 'PUT',
       body: JSON.stringify({
         on: true,
-        config: { ...empty.config, color: 'red' },
+        config: {
+          ...empty.config,
+          join: { ...empty.config.join, template: '999' },
+          leave: { ...empty.config.leave, channel: '' },
+          boost: { ...empty.config.boost, channel: '' },
+        },
       }),
     });
-    expect(bad.status).toBe(400);
-    expect((await body<{ message: string }>(bad)).message).toContain('colour');
+    expect((await body<{ message: string }>(missing)).message).toContain(
+      'was deleted',
+    );
 
-    const config = { ...empty.config, channel: '502', message: 'Hi {user}' };
+    const made = await call('/9001/studio/templates', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Hello',
+        message: { ...studioDefault('502'), name: 'Hello' },
+        folderId: null,
+      }),
+    });
+    const { id } = await body<{ id: string }>(made);
+    const config = {
+      ...empty.config,
+      join: { ...empty.config.join, template: id, channel: '502', dm: 'same' },
+      leave: { ...empty.config.leave, channel: '' },
+      boost: { ...empty.config.boost, channel: '' },
+    };
     const put = await call('/9001/welcome', {
       method: 'PUT',
       body: JSON.stringify({ on: true, config, extra: 'ignored' }),
@@ -256,14 +288,13 @@ describe('server API', () => {
     expect(put.status).toBe(204);
     const saved = await body<{
       on: boolean;
-      config: { message: string };
-      versions: { title: string; who: string; whoColor: number }[];
+      config: { join: Greet };
     }>(await call('/9001/welcome'));
     expect(saved.on).toBe(true);
-    expect(saved.config.message).toBe('Hi {user}');
-    expect(saved.versions[0]).toMatchObject({
-      title: 'Updated the welcome message',
-      who: 'Quinn',
+    expect(saved.config.join).toMatchObject({
+      template: id,
+      channel: '502',
+      dm: 'same',
     });
 
     // The bot couldn't post there…
@@ -283,6 +314,7 @@ describe('server API', () => {
     expect(again.kind).toBe('welcome');
     finishJob(db, again.id, null, Date.now());
     expect(await body(await retry)).toEqual({ status: 'live' });
+    await call(`/9001/studio/templates/${id}`, { method: 'DELETE' });
   });
 
   it('runs the ticket inbox: panel, list, reply, notes, assign, close, transcript', async () => {
@@ -431,7 +463,7 @@ describe('server API', () => {
           body: JSON.stringify({ name: 'Weekly', message: v2 }),
         })
       ).status,
-    ).toBe(204);
+    ).toBe(200);
     const withTemplate = await body<{
       templates: { id: string; name: string; meta: string }[];
     }>(await call('/9001/studio'));
@@ -462,7 +494,7 @@ describe('server API', () => {
       });
     for (const name of ['One', 'Two'])
       expect((await post('/studio/templates', { name, message })).status).toBe(
-        204,
+        200,
       );
     expect((await post('/studio/folders', { name: 'Recaps' })).status).toBe(
       204,

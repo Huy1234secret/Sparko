@@ -11,6 +11,7 @@ import {
   ServerMark,
   useActiveModuleId,
 } from './shared';
+import { ModuleIcon } from './ModuleIcon';
 
 /** Picks another server; also links to all servers and to adding Sparko. */
 function ServerSwitcher({ current }: { current: Server }) {
@@ -179,6 +180,8 @@ export function Sidebar({
   const overview = useOverview(server.id).data;
   const [query, setQuery] = useState('');
   const [closed, setClosed] = useState<Set<string>>(() => new Set());
+  // How many times each module's item was hovered, to replay its icon.
+  const [hovers, setHovers] = useState<Record<string, number>>({});
   const navigate = useNavigate();
   const needle = query.trim().toLowerCase();
   const current = modules.find((m) => m.id === moduleId);
@@ -280,8 +283,15 @@ export function Sidebar({
                       className="sp-nav-item"
                       aria-current={m.id === moduleId ? 'page' : undefined}
                       onClick={() => goTo(`/dashboard/${server.id}/${m.id}`)}
+                      onPointerEnter={() =>
+                        setHovers((h) => ({ ...h, [m.id]: (h[m.id] ?? 0) + 1 }))
+                      }
                     >
-                      <Icon name={m.icon} />
+                      <ModuleIcon
+                        id={m.id}
+                        icon={m.icon}
+                        hoverKey={hovers[m.id] ?? 0}
+                      />
                       <span>{m.label}</span>
                       <span className="sp-nav-item__end">
                         {m.plus && (

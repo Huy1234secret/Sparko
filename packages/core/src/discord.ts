@@ -16,6 +16,7 @@ export const DiscordCodes = {
   missingAccess: 50001,
   missingPermissions: 50013,
   cannotEditOthers: 50005,
+  cannotMessageUser: 50007,
 } as const;
 
 export type Rest = ReturnType<typeof discordRest>;

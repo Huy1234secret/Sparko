@@ -16,7 +16,7 @@ import type {
   TicketsState,
 } from './types';
 import { applyMove, folderTree, itemsIn, movesIntoItself } from './library';
-import { parseMessageLink } from './studio-format';
+import { greetPresets, parseMessageLink } from './studio-format';
 
 type Helpers = {
   wait: <T>(value: T, slow?: boolean) => Promise<T>;
@@ -525,6 +525,15 @@ export function createSupportMock(h: Helpers) {
             ),
           },
           {
+            // Welcome messages send this one when someone joins.
+            id: 'tw',
+            name: 'Welcome card',
+            folderId: null,
+            position: 1,
+            meta: 'Saved 3 days ago by Rhea',
+            message: { ...greetPresets[0]!.message, channel: base.channel },
+          },
+          {
             id: id('t'),
             name: 'Server rules',
             folderId: null,
@@ -775,7 +784,7 @@ export function createSupportMock(h: Helpers) {
         s.studio,
         applyMove(s.studio, { kind: 'template', id: t.id, folderId, index: 0 }),
       );
-      return h.wait(undefined);
+      return h.wait({ id: t.id });
     },
     async updateTemplate(serverId, templateId, change) {
       const s = of(serverId);

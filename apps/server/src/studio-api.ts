@@ -349,7 +349,7 @@ export function studioRoutes({
         limitsOf(guildId).templates
       )
         throw new BadRequest('You’ve used every template on this plan.');
-      addTemplate(
+      const id = addTemplate(
         db,
         {
           guildId,
@@ -361,7 +361,7 @@ export function studioRoutes({
         },
         now(),
       );
-      res.writeHead(204).end();
+      json(res, 200, { id });
       return true;
     }
     if (path === '/studio/folders' && method === 'POST') {

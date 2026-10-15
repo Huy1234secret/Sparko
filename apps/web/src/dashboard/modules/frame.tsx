@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, PausedBanner, Icon, LoopIcon, SaveBar, Switch } from '../../ui';
+import { ModuleIcon, useIconHover } from '../ModuleIcon';
 import liveIdle from '../../../../../design-system/assets/icons/animated-icons/live-icon-idle.json?url';
 import type { SparkoModule } from '../../content/modules';
 import { api, type Server } from '../../data';
@@ -153,11 +154,20 @@ export function ModuleHeader({
       }
     | undefined;
 }) {
+  const icon = useIconHover();
   return (
     <header className="sp-module-head">
       <div className="sp-module-head__main">
-        <span className="sp-module-head__icon">
-          <Icon name={module.icon} />
+        <span
+          className="sp-module-head__icon"
+          onPointerEnter={icon.onPointerEnter}
+        >
+          <ModuleIcon
+            id={module.id}
+            icon={module.icon}
+            size={30}
+            hoverKey={icon.hoverKey}
+          />
         </span>
         <div className="sp-module-head__text">
           <div className="sp-page-head__eyebrow">{module.group}</div>

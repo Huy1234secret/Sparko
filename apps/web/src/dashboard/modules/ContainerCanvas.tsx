@@ -24,6 +24,7 @@ import {
   moveItem,
   slideFrom,
   useReorder,
+  previewPicture,
 } from './EditorBits';
 import { newId } from './parts';
 import addImage from '../../../../../design-system/assets/icons/add-image-button.png';
@@ -176,7 +177,7 @@ function Gallery({
             onClick={() => setOpen(img.id)}
           >
             {img.url ? (
-              <img src={img.url} alt={img.description} />
+              <img src={previewPicture(img.url)} alt={img.description} />
             ) : (
               <MaskIcon src={addImage} size={44} />
             )}
@@ -647,7 +648,7 @@ export function ContainerCanvas({
         onClick={() => setPop('thumbnail')}
       >
         {v.thumbnail ? (
-          <img src={v.thumbnail} alt="" />
+          <img src={previewPicture(v.thumbnail)} alt="" />
         ) : (
           <MaskIcon src={addImage} size={40} />
         )}

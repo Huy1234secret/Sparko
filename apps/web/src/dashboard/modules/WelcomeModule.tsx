@@ -1,69 +1,118 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
   Button,
-  DiscordMessage,
-  DiscordPreview,
+  Checkbox,
+  Combobox,
   EmptyState,
   Icon,
-  Input,
+  Modal,
   Notice,
-  RadioCards,
-  Switch,
+  Segmented,
+  Select,
+  Tabs,
+  cx,
+  preloadAnimations,
+  preloadCombobox,
   useToast,
+  type ComboItem,
 } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
 import {
+  deleteAfterChoices,
+  greetCodes,
+  greetKinds,
+  greetNames,
+  greetPresets,
+  planIssue,
+  studioIssue,
   useCheckChannel,
   useSaveWelcome,
+  useStudio,
+  useStudioActions,
   useWelcome,
-  type Delivery,
+  welcomeProblem,
+  type Channel,
+  type GreetKind,
+  type GreetLogEntry,
+  type GreetPreset,
+  type GreetSettings,
   type Server,
+  type StudioMessage,
+  type StudioState,
   type WelcomeConfig,
 } from '../../data';
 import { FixPermissionModal, fixes } from '../FixPermissionModal';
-import { formatCount } from '../shared';
 import {
   ModuleHeader,
   ModuleSaveBar,
-  ModuleTabs,
   PausedNotice,
   SavePipeline,
   syncState,
-  useModuleTab,
   useSaveFlow,
 } from './frame';
-import { ChannelPicker, ColourChoice, VersionHistory } from './parts';
+import { ContainerCanvas } from './ContainerCanvas';
+import { EmbedCanvas } from './EmbedCanvas';
+import { StudioDataProvider } from './ComponentsEditor';
+import {
+  InfoTip,
+  InsertProvider,
+  IssueProvider,
+  flashIssue,
+  type ShownIssue,
+} from './EditorBits';
+import { MessageCanvas, forChecks } from './MessageCanvas';
+import { variablesAnimations } from './VariablesButton';
 
-const tokens = ['{user}', '{server}', '{member_count}', '#rules'];
-const maxLength = 2000;
+type Tab = GreetKind | 'logs';
+const tabLabels: Record<Tab, string> = {
+  join: 'Join message',
+  leave: 'Leave message',
+  boost: 'Boost message',
+  logs: 'Logs',
+};
 
-/** Turns a welcome message into what Discord shows: mentions, bold, filled-in names. */
-export function renderMessage(message: string, server: Server): ReactNode[] {
-  return message
-    .split(/(\{user\}|\{server\}|\{member_count\}|\*\*[^*]+\*\*|#[a-z0-9-]+)/gi)
-    .filter(Boolean)
-    .map((part, i) => {
-      if (part === '{user}')
-        return (
-          <span key={i} className="dc-mention">
-            @tomoko
-          </span>
-        );
-      if (part === '{server}') return server.name;
-      if (part === '{member_count}') return formatCount(server.members + 1);
-      if (part.startsWith('**') && part.endsWith('**'))
-        return (
-          <b key={i}>{part.slice(2, -2).replace(/\{server\}/g, server.name)}</b>
-        );
-      if (part.startsWith('#'))
-        return (
-          <span key={i} className="dc-mention">
-            {part}
-          </span>
-        );
-      return part;
-    });
+/** The open tab, kept in the address so links and Back work. */
+function useTab() {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get('tab');
+  const tab: Tab =
+    raw === 'leave' || raw === 'boost' || raw === 'logs' ? raw : 'join';
+  const setTab = (next: Tab) => {
+    const out = new URLSearchParams(params);
+    if (next === 'join') out.delete('tab');
+    else out.set('tab', next);
+    setParams(out, { replace: true });
+  };
+  return [tab, setTab] as const;
+}
+
+const deleteLabels: Record<number, string> = {
+  0: 'Never',
+  30: 'After 30 seconds',
+  60: 'After 1 minute',
+  300: 'After 5 minutes',
+  3600: 'After 1 hour',
+};
+
+/** A template's problems, ignoring its channel: welcome messages pick their own. */
+function templateIssue(m: StudioMessage, server: Server) {
+  return (
+    studioIssue({ ...forChecks(m), channel: '1' }) ??
+    planIssue(m, server.plan === 'plus' ? 'plus' : 'free')
+  );
+}
+
+/** Studio templates as menu items, grouped by their folder. */
+function templateItems(studio: StudioState): ComboItem[] {
+  const folder = new Map(studio.folders.map((f) => [f.id, f.name]));
+  return studio.templates.map((t) => ({
+    value: t.id,
+    label: t.name,
+    icon: 'file-text',
+    group: (t.folderId && folder.get(t.folderId)) || 'Templates',
+  }));
 }
 
 export function WelcomeModule({
@@ -74,20 +123,69 @@ export function WelcomeModule({
   server: Server;
 }) {
   const welcome = useWelcome(server.id);
+  const studio = useStudio(server.id);
   const save = useSaveWelcome(server.id);
+  const actions = useStudioActions(server.id);
   const checkChannel = useCheckChannel(server.id);
   const flow = useSaveFlow(server.id, 'welcome');
-  const [tab, setTab] = useModuleTab();
+  const toast = useToast();
+  const [tab, setTab] = useTab();
   const [draft, setDraft] = useState<{
     on: boolean;
     config: WelcomeConfig;
   } | null>(null);
+  // Unsaved changes to the templates, by template id.
+  const [edits, setEdits] = useState<Record<string, StudioMessage>>({});
   const [tried, setTried] = useState(false);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const [fixOpen, setFixOpen] = useState(false);
-  const message = useRef<HTMLTextAreaElement>(null);
-  const toast = useToast();
+  // Which message the preview shows when the DM sends another template.
+  const [side, setSide] = useState<'channel' | 'dm'>('channel');
+  const [issue, setIssue] = useState<ShownIssue | null>(null);
 
-  if (welcome.isPending)
+  useEffect(() => {
+    preloadAnimations(variablesAnimations, true);
+    preloadCombobox();
+  }, []);
+  useEffect(() => {
+    if (!issue) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => flashIssue(issue.at));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [issue]);
+
+  const saved = welcome.data && {
+    on: welcome.data.on,
+    config: welcome.data.config,
+  };
+  const current = draft ?? saved;
+  const templates = studio.data?.templates ?? [];
+  const savedMessage = (id: string): StudioMessage | undefined => {
+    const t = templates.find((x) => x.id === id);
+    return t && { ...t.message, name: t.name };
+  };
+  const changedEdits = Object.entries(edits).filter(
+    ([id, m]) => JSON.stringify(m) !== JSON.stringify(savedMessage(id)),
+  );
+  const dirty =
+    !!current &&
+    (JSON.stringify(current) !== JSON.stringify(saved) ||
+      changedEdits.length > 0);
+
+  // Leaving the page with unsaved changes asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  if (welcome.isPending || studio.isPending)
     return (
       <div className="sp-stack" aria-busy="true" aria-label="Loading">
         <span className="sp-skel sp-skel--title" />
@@ -97,14 +195,20 @@ export function WelcomeModule({
         </div>
       </div>
     );
-  if (welcome.isError)
+  if (welcome.isError || studio.isError || !current || !studio.data)
     return (
       <div className="sp-card">
         <EmptyState
           error
-          title="Couldn’t load Welcome"
+          title="Couldn’t load Welcome messages"
           actions={
-            <Button icon="refresh-cw" onClick={() => void welcome.refetch()}>
+            <Button
+              icon="refresh-cw"
+              onClick={() => {
+                void welcome.refetch();
+                void studio.refetch();
+              }}
+            >
               Try again
             </Button>
           }
@@ -114,442 +218,313 @@ export function WelcomeModule({
       </div>
     );
 
-  const saved = { on: welcome.data.on, config: welcome.data.config };
-  const current = draft ?? saved;
+  const data = studio.data;
   const { config } = current;
-  const dirty = JSON.stringify(current) !== JSON.stringify(saved);
   const paused = !!server.paused;
   const channels = welcome.data.channels;
-  const channel = channels.find((c) => c.id === config.channel);
-  const postsInChannel = config.delivery !== 'dm';
-  const channelBlocked = postsInChannel && channel && !channel.canPost;
-  const messageMissing = current.on && !config.message.trim();
+  const kind: GreetKind = tab === 'logs' ? 'join' : tab;
+  const settings = config[kind];
+  const channel = channels.find((c) => c.id === settings.channel);
+  const channelBlocked = !!channel && !channel.canPost;
 
-  const edit = (patch: Partial<WelcomeConfig> & { on?: boolean }) => {
-    const { on, ...rest } = patch;
-    setDraft({ on: on ?? current.on, config: { ...config, ...rest } });
+  const messageOf = (id: string) => edits[id] ?? savedMessage(id);
+  const dmTemplate =
+    settings.dm === 'same'
+      ? settings.template
+      : settings.dm === 'none'
+        ? ''
+        : settings.dm;
+  const twoMessages = !!dmTemplate && dmTemplate !== settings.template;
+  const previewId =
+    twoMessages && (side === 'dm' || !settings.template)
+      ? dmTemplate
+      : settings.template || dmTemplate;
+  const previewing = previewId ? messageOf(previewId) : undefined;
+
+  const editSettings = (patch: Partial<WelcomeConfig['join']>) => {
+    setDraft({
+      on: current.on,
+      config: { ...config, [kind]: { ...settings, ...patch } },
+    });
     flow.clear();
   };
-  const insert = (token: string) => {
-    const box = message.current;
-    const at = box ? box.selectionStart : config.message.length;
-    const end = box ? box.selectionEnd : at;
-    const before = config.message.slice(0, at);
-    const spaced = before && !before.endsWith(' ') ? ` ${token}` : token;
-    const next = (before + spaced + config.message.slice(end)).slice(
-      0,
-      maxLength,
-    );
-    edit({ message: next });
-    requestAnimationFrame(() => {
-      box?.focus();
-      box?.setSelectionRange(at + spaced.length, at + spaced.length);
-    });
+  const editTemplate = (id: string, patch: Partial<StudioMessage>) => {
+    const m = messageOf(id);
+    if (!m) return;
+    setEdits((e) => ({ ...e, [id]: { ...m, ...patch } }));
+    flow.clear();
   };
+
   const doSave = async () => {
     setTried(true);
-    if (messageMissing) {
-      message.current?.focus();
+    for (const [id, m] of changedEdits) {
+      const found = templateIssue(m, server);
+      if (!found) continue;
+      // Shows the template with the problem, then points at it.
+      const where = greetKinds.find(
+        (k) => config[k].template === id || config[k].dm === id,
+      );
+      if (where && where !== tab) setTab(where);
+      setSide(config[where ?? kind].template === id ? 'channel' : 'dm');
+      setIssue((i) => ({ at: found.at, n: (i?.n ?? 0) + 1 }));
+      toast({
+        tone: 'danger',
+        title: `Can’t save “${m.name}” yet`,
+        body: found.problem,
+      });
       return;
     }
-    const ok = await flow.run(() => save.mutateAsync(current));
+    const problem = welcomeProblem(config, new Set(templates.map((t) => t.id)));
+    if (problem) {
+      const where = greetKinds.find((k) => problem.includes(greetNames[k]));
+      if (where && where !== tab) setTab(where);
+      setIssue((i) => ({ at: 'greet-template', n: (i?.n ?? 0) + 1 }));
+      toast({ tone: 'danger', title: 'Can’t save yet', body: problem });
+      return;
+    }
+    const ok = await flow.run(async () => {
+      for (const [id, message] of changedEdits)
+        await actions.updateTemplate.mutateAsync({ id, message });
+      await save.mutateAsync(current);
+    });
     if (ok) {
       setDraft(null);
+      setEdits({});
       setTried(false);
     }
   };
-  const where =
-    config.delivery === 'dm'
-      ? 'Direct message'
-      : config.delivery === 'both'
-        ? `#${channel?.name ?? '…'} and DM`
-        : `#${channel?.name ?? '…'}`;
-  const fix = fixes.channel(channel?.name ?? 'the channel');
+
+  /** Puts a ready-made message into the template this tab sends. */
+  const applyPreset = async (preset: GreetPreset) => {
+    setPresetsOpen(false);
+    const into = previewId;
+    const target = into && messageOf(into);
+    if (into && target) {
+      setEdits((e) => ({
+        ...e,
+        [into]: {
+          ...preset.message,
+          name: target.name,
+          channel: target.channel,
+        },
+      }));
+      flow.clear();
+      toast({
+        title: `“${target.name}” now looks like ${preset.name}`,
+        body: 'Change anything in the preview, then save to keep it.',
+      });
+      return;
+    }
+    try {
+      const { id } = await actions.saveTemplate.mutateAsync({
+        name: preset.name,
+        message: {
+          ...preset.message,
+          channel:
+            settings.channel ||
+            channels.find((c) => c.canPost)?.id ||
+            channels[0]?.id ||
+            '',
+        },
+        folderId: null,
+      });
+      editSettings({ template: id });
+      toast({
+        title: `Added “${preset.name}” to your templates`,
+        body: 'It’s in Message Studio too. Save to start sending it.',
+      });
+    } catch (e) {
+      toast({
+        tone: 'danger',
+        title: 'Couldn’t add the template',
+        body: e instanceof Error ? e.message : 'Try again in a moment.',
+      });
+    }
+  };
+
+  const items = templateItems(data);
+  const missingTemplate =
+    tried &&
+    (!!settings.channel || settings.dm === 'same') &&
+    !settings.template;
 
   return (
     <>
       <ModuleHeader
         module={module}
-        sync={syncState({ paused, dirty, phase: flow.phase, on: saved.on })}
+        sync={syncState({ paused, dirty, phase: flow.phase, on: !!saved?.on })}
         power={{
           on: current.on,
-          onChange: (on) => edit({ on }),
+          onChange: (on) => {
+            setDraft({ on, config });
+            flow.clear();
+          },
           disabled: paused || flow.busy,
           hint: paused
             ? 'Locked by Sparko staff'
             : current.on
-              ? 'Greets people after you save'
-              : 'Not greeting anyone',
+              ? 'Sends messages after you save'
+              : 'Not sending anything',
         }}
       />
       <PausedNotice server={server} />
-      {channelBlocked && (
-        <Notice
-          tone="danger"
-          title={`Sparko can’t post in #${channel.name}`}
-          actions={
-            <>
-              <button
-                type="button"
-                className="sp-link-btn"
-                onClick={() => setFixOpen(true)}
-              >
-                Show me how
-              </button>
-              <button
-                type="button"
-                className="sp-link-btn"
-                disabled={checkChannel.isPending}
-                onClick={() =>
-                  checkChannel.mutate(channel.id, {
-                    onSuccess: () => void flow.retryApply(),
-                  })
-                }
-              >
-                {checkChannel.isPending ? 'Checking…' : 'Check again'}
-              </button>
-            </>
-          }
-        >
-          It’s missing Send Messages and Embed Links in that channel, so new
-          members won’t be greeted. This takes about a minute to fix in Discord.
-        </Notice>
-      )}
       <SavePipeline
         phase={flow.phase}
-        liveLabel={
-          config.delivery === 'dm'
-            ? 'Live in DMs'
-            : `Live in #${channel?.name ?? ''}`
-        }
+        liveLabel="Welcome messages are live"
         error={flow.error}
       />
-      <ModuleTabs
-        module={module}
-        tab={tab}
+      <Tabs
+        label={module.label}
+        value={tab}
         onChange={setTab}
-        labels={['Settings', 'Templates', 'History']}
-        counts={[
-          undefined,
-          welcome.data.templates.length,
-          welcome.data.versions.length,
-        ]}
+        tabs={(['join', 'leave', 'boost', 'logs'] as Tab[]).map((value) => ({
+          value,
+          label: tabLabels[value],
+          ...(value === 'logs' ? { count: welcome.data.log.length } : {}),
+        }))}
       />
 
-      {tab === 'settings' && (
-        <div className="sp-split sp-split--lead">
-          {/* While Sparko staff pause the server, settings can be read but not changed. */}
-          <fieldset className="sp-stack sp-fieldset" disabled={paused}>
-            <legend className="sp-sr-only">Welcome settings</legend>
-            <section className="sp-card" aria-labelledby="w1">
-              <div className="sp-card__head">
-                <div className="sp-card__titles">
-                  <h2 className="sp-card__title" id="w1">
-                    Where to greet people
-                  </h2>
-                  <p className="sp-card__sub">
-                    Sparko sends this the moment someone joins.
-                  </p>
-                </div>
-              </div>
-              <div className="sp-card__body">
-                <RadioCards
-                  name="delivery"
-                  legend="Send it to"
-                  value={config.delivery}
-                  onChange={(delivery) =>
-                    edit({ delivery: delivery as Delivery })
-                  }
-                  options={[
-                    {
-                      value: 'channel',
-                      title: 'Channel',
-                      description: 'Everyone sees it',
-                    },
-                    {
-                      value: 'dm',
-                      title: 'Direct message',
-                      description: 'Only they see it',
-                    },
-                    {
-                      value: 'both',
-                      title: 'Both',
-                      description: 'Channel and DM',
-                    },
-                  ]}
-                />
-                <ChannelPicker
-                  channels={channels}
-                  disabled={!postsInChannel}
-                  value={config.channel}
-                  onChange={(id) => edit({ channel: id })}
-                  error={
-                    channelBlocked ? 'Sparko can’t post here yet.' : undefined
-                  }
-                  hint={
-                    postsInChannel
-                      ? undefined
-                      : 'Not needed when sending only a direct message.'
-                  }
-                />
-              </div>
-            </section>
-
-            <section className="sp-card" aria-labelledby="w2">
-              <div className="sp-card__head">
-                <div className="sp-card__titles">
-                  <h2 className="sp-card__title" id="w2">
-                    What it says
-                  </h2>
-                  <p className="sp-card__sub">
-                    The preview updates as you type.
-                  </p>
-                </div>
-              </div>
-              <div className="sp-card__body">
-                <div className="sp-field">
-                  <label className="sp-label" htmlFor="w-msg">
-                    Message
-                  </label>
-                  <div
-                    className={
-                      'sp-input sp-input--multiline' +
-                      (tried && messageMissing ? ' is-error' : '')
-                    }
-                  >
-                    <textarea
-                      ref={message}
-                      id="w-msg"
-                      rows={4}
-                      maxLength={maxLength}
-                      aria-invalid={tried && messageMissing ? true : undefined}
-                      aria-describedby="w-msg-h"
-                      value={config.message}
-                      onChange={(e) => edit({ message: e.target.value })}
-                    />
-                  </div>
-                  {tried && messageMissing ? (
-                    <p className="sp-field-error" id="w-msg-h">
-                      <Icon name="circle-alert" />
-                      Write a message, or turn Welcome off.
-                    </p>
-                  ) : (
-                    <div className="sp-field__row" id="w-msg-h">
-                      <p className="sp-hint">
-                        Bold with **text**. Mention channels with #name.
-                      </p>
-                      <p className="sp-hint sp-tnum">
-                        {config.message.length} / {maxLength}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="sp-field">
-                  <span className="sp-label" id="w-insert">
-                    Insert
-                  </span>
-                  <div
-                    className="sp-insert-row"
-                    role="group"
-                    aria-labelledby="w-insert"
-                  >
-                    {tokens.map((token) => (
-                      <button
-                        key={token}
-                        type="button"
-                        className="sp-chip sp-chip--toggle"
-                        aria-label={`Insert ${token}`}
-                        onClick={() => insert(token)}
-                      >
-                        {token}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="sp-hint">
-                    {'{user}'} becomes a mention of the new member.{' '}
-                    {'{member_count}'} is their join number.
-                  </p>
-                </div>
-                <Switch
-                  checked={config.embed}
-                  onChange={(embed) => edit({ embed })}
-                  label="Send as an embed"
-                  description="A card with a colour bar. Turn off for a plain message."
-                />
-                {config.embed && (
-                  <>
-                    <Input
-                      label={
-                        <>
-                          Embed title{' '}
-                          <span className="sp-label__opt">(optional)</span>
-                        </>
-                      }
-                      value={config.title}
-                      maxLength={256}
-                      placeholder={`Welcome to ${server.name}`}
-                      onChange={(e) => edit({ title: e.target.value })}
-                    />
-                    <div className="sp-field">
-                      <span className="sp-label" id="w-colour">
-                        Colour bar
-                      </span>
-                      <ColourChoice
-                        value={config.color}
-                        onChange={(color) => edit({ color })}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
-
-            <section className="sp-card" aria-labelledby="w3">
-              <div className="sp-card__head">
-                <div className="sp-card__titles">
-                  <h2 className="sp-card__title" id="w3">
-                    Extras
-                  </h2>
-                </div>
-              </div>
-              <div className="sp-card__body sp-switch-list">
-                <Switch
-                  checked={config.ping}
-                  onChange={(ping) => edit({ ping })}
-                  label="Ping the new member"
-                  description="They get a notification, so they actually see it."
-                />
-                <Switch
-                  checked={config.rejoin}
-                  onChange={(rejoin) => edit({ rejoin })}
-                  label="Welcome people who rejoin"
-                  description="Off means someone who leaves and comes back isn’t greeted twice."
-                />
-              </div>
-            </section>
-          </fieldset>
-
-          <section className="sp-stack sp-sticky-lg" aria-labelledby="pv-h">
-            <div className="sp-preview-head">
-              <h2 id="pv-h" className="sp-section-title">
-                Live preview
-              </h2>
-              <span className="sp-hint">{where}</span>
-            </div>
-            <DiscordPreview>
-              <DiscordMessage
-                content={
-                  config.ping || !config.embed ? (
+      {tab === 'logs' ? (
+        <GreetLog entries={welcome.data.log} channels={channels} />
+      ) : (
+        <InsertProvider>
+          <IssueProvider value={issue}>
+            <StudioDataProvider
+              value={{
+                serverId: server.id,
+                templates: data.templates,
+                folders: data.folders,
+                roles: data.roles,
+                sendLimit: data.sendLimit,
+              }}
+            >
+              {channelBlocked && (
+                <Notice
+                  tone="danger"
+                  title={`Sparko can’t post in #${channel.name}`}
+                  actions={
                     <>
-                      {config.ping && (
-                        <span className="dc-mention">@tomoko</span>
-                      )}{' '}
-                      {!config.embed && renderMessage(config.message, server)}
+                      <Button size="sm" onClick={() => setFixOpen(true)}>
+                        Show me how
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        loading={checkChannel.isPending}
+                        onClick={() =>
+                          checkChannel.mutate(channel.id, {
+                            onSuccess: () => void flow.retryApply(),
+                          })
+                        }
+                      >
+                        Check again
+                      </Button>
                     </>
-                  ) : undefined
-                }
-                {...(config.embed
-                  ? {
-                      embed: {
-                        color: config.color,
-                        author: server.name,
-                        ...(config.title
-                          ? {
-                              title: config.title.replace(
-                                /\{server\}/g,
-                                server.name,
-                              ),
-                            }
-                          : {}),
-                        description: renderMessage(config.message, server),
-                        footer: `${server.name} · Today at 18:42`,
-                      },
-                    }
-                  : {})}
-              />
-            </DiscordPreview>
-            <p className="sp-hint">
-              Previewing as tomoko, a new member. Nothing is sent until you save
-              and Welcome is on.
-            </p>
-          </section>
-        </div>
-      )}
-
-      {tab === 'items' && (
-        <section className="sp-card" aria-labelledby="tp-h">
-          <div className="sp-card__head">
-            <div className="sp-card__titles">
-              <h2 className="sp-card__title" id="tp-h">
-                Message templates
-              </h2>
-              <p className="sp-card__sub">
-                {welcome.data.templates.length} of {welcome.data.templateLimit}{' '}
-                used on {server.plan === 'plus' ? 'Plus' : 'Free'}. Templates
-                are shared with Message Studio.
-              </p>
-            </div>
-          </div>
-          <div className="sp-rows">
-            {welcome.data.templates.map((t) => {
-              const inUse = config.message === t.message;
-              return (
-                <div key={t.id} className="sp-row">
-                  <span className="sp-row__icon">
-                    <Icon name="file-text" />
-                  </span>
-                  <span className="sp-row__title">
-                    {t.name}{' '}
-                    {inUse && (
-                      <Badge tone="success" size="sm">
-                        In use
-                      </Badge>
-                    )}
-                  </span>
-                  <span className="sp-row__desc">{t.message}</span>
-                  <span className="sp-row__end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={inUse}
-                      aria-label={`Use ${t.name}`}
-                      onClick={() => {
-                        edit({ message: t.message });
-                        setTab('settings');
-                        toast({
-                          title: `“${t.name}” is in the editor`,
-                          body: 'Save to start using it.',
-                        });
-                      }}
+                  }
+                >
+                  It’s missing Send Messages and Embed Links there, so the{' '}
+                  {greetNames[kind]} can’t be sent. Fix it in Discord, or pick
+                  another channel.
+                </Notice>
+              )}
+              <div className="sp-studio__grid">
+                {previewing && previewId ? (
+                  <fieldset className="sp-fieldset" disabled={paused}>
+                    <legend className="sp-sr-only">Message</legend>
+                    <MessageCanvas
+                      key={previewId}
+                      server={server}
+                      message={previewing}
+                      tried={tried}
+                      headingId="greet-preview"
+                      memberVariables
+                      check={(m) => ({ ...m, channel: '1' })}
+                      onChange={(patch) => editTemplate(previewId, patch)}
+                      above={
+                        <p className="sp-edit-banner" role="status">
+                          <Icon name="info" size="sm" />
+                          <span>
+                            Editing <b>{previewing.name}</b> from Message
+                            Studio. Changes are saved to the template.
+                          </span>
+                          {twoMessages && settings.template && (
+                            <Segmented
+                              label="Message to preview"
+                              className="sp-greet-side"
+                              value={side}
+                              onChange={setSide}
+                              options={[
+                                { value: 'channel', label: 'Channel' },
+                                { value: 'dm', label: 'DM' },
+                              ]}
+                            />
+                          )}
+                        </p>
+                      }
+                    />
+                  </fieldset>
+                ) : (
+                  <section
+                    className="sp-card sp-greet-empty"
+                    aria-label="Live preview"
+                  >
+                    <EmptyState
+                      icon="message-square-dashed"
+                      title={`Pick a template for the ${greetNames[kind]}`}
+                      actions={
+                        <Button
+                          variant="primary"
+                          icon="sparkles"
+                          disabled={paused}
+                          onClick={() => setPresetsOpen(true)}
+                        >
+                          Use a default template
+                        </Button>
+                      }
                     >
-                      Use
-                    </Button>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+                      Its live preview shows here, and you can edit it right in
+                      the preview. Templates are made in Message Studio.
+                    </EmptyState>
+                  </section>
+                )}
 
-      {tab === 'history' && (
-        <VersionHistory
-          versions={welcome.data.versions}
-          onRestore={(config) => {
-            setDraft({ on: current.on, config });
-            flow.clear();
-            setTab('settings');
-            toast({
-              title: 'Version loaded',
-              body: 'Check the preview, then save to use it.',
-            });
-          }}
-        />
+                <fieldset
+                  className="sp-stack sp-studio__side sp-fieldset"
+                  disabled={paused}
+                >
+                  <legend className="sp-sr-only">
+                    {tabLabels[kind]} settings
+                  </legend>
+                  <GreetSettingsCard
+                    kind={kind}
+                    settings={config[kind]}
+                    join={config.join}
+                    items={items}
+                    channels={channels}
+                    missingTemplate={missingTemplate}
+                    channelBlocked={channelBlocked}
+                    onChange={editSettings}
+                    onPresets={() => setPresetsOpen(true)}
+                  />
+                </fieldset>
+              </div>
+              <PresetPicker
+                open={presetsOpen}
+                kind={kind}
+                serverId={server.id}
+                replacing={previewing?.name}
+                busy={actions.saveTemplate.isPending}
+                onClose={() => setPresetsOpen(false)}
+                onPick={(p) => void applyPreset(p)}
+              />
+            </StudioDataProvider>
+          </IssueProvider>
+        </InsertProvider>
       )}
 
       <FixPermissionModal
         open={fixOpen}
-        {...fix}
+        {...fixes.channel(channel?.name ?? 'the channel')}
         checking={checkChannel.isPending}
         onCheck={() =>
           channel &&
@@ -565,17 +540,349 @@ export function WelcomeModule({
       <ModuleSaveBar
         visible={dirty && !paused}
         saving={flow.phase === 'saving'}
-        error={
-          tried && messageMissing
-            ? 'Write a message, or turn Welcome off.'
-            : flow.saveError
-        }
+        error={flow.saveError}
         onReset={() => {
           setDraft(null);
+          setEdits({});
           setTried(false);
         }}
         onSave={() => void doSave()}
       />
     </>
+  );
+}
+
+const NONE = 'none';
+
+function GreetSettingsCard({
+  kind,
+  settings,
+  join,
+  items,
+  channels,
+  missingTemplate,
+  channelBlocked,
+  onChange,
+  onPresets,
+}: {
+  kind: GreetKind;
+  settings: GreetSettings;
+  join: WelcomeConfig['join'];
+  items: ComboItem[];
+  channels: Channel[];
+  missingTemplate: boolean;
+  channelBlocked: boolean;
+  onChange: (patch: Partial<WelcomeConfig['join']>) => void;
+  onPresets: () => void;
+}) {
+  const title = tabLabels[kind];
+  const sends = !!settings.channel || settings.dm !== 'none';
+  return (
+    <section className="sp-card" aria-labelledby={`greet-${kind}`}>
+      <div className="sp-card__head">
+        <div className="sp-card__titles">
+          <h2 className="sp-card__title" id={`greet-${kind}`}>
+            {title}
+          </h2>
+          <p className="sp-card__sub">
+            {kind === 'join'
+              ? 'Sent the moment someone joins.'
+              : kind === 'leave'
+                ? 'Sent when someone leaves the server.'
+                : 'Sent when someone boosts the server.'}
+          </p>
+        </div>
+        {sends ? (
+          <Badge tone="success" size="sm">
+            On
+          </Badge>
+        ) : (
+          <Badge size="sm">Off</Badge>
+        )}
+      </div>
+      <div className="sp-card__body">
+        <div data-issue="greet-template">
+          <Combobox
+            label={
+              <>
+                Message template{' '}
+                <InfoTip text="The Message Studio template Sparko sends. Edit it in the preview, or in Message Studio." />
+              </>
+            }
+            searchPlaceholder="Search templates"
+            placeholder="Pick a template"
+            value={settings.template}
+            onChange={(template) => onChange({ template })}
+            error={missingTemplate ? 'Pick a template to send.' : undefined}
+            footer="Make more templates in Message Studio."
+            items={items}
+          />
+        </div>
+        <div className="sp-greet-row">
+          <Combobox
+            label="Channel"
+            searchPlaceholder="Search channels"
+            value={settings.channel || NONE}
+            onChange={(id) => onChange({ channel: id === NONE ? '' : id })}
+            error={channelBlocked ? 'Sparko can’t post here yet.' : undefined}
+            footer="Locked channels are ones Sparko can’t post in yet."
+            items={[
+              {
+                value: NONE,
+                label: 'No sending in a channel',
+                icon: 'ban',
+                group: 'Options',
+              },
+              ...channels.map((c) => ({
+                value: c.id,
+                label: c.name,
+                icon: 'hash',
+                group: c.category,
+                disabled: !c.canPost && c.id !== settings.channel,
+                ...(c.canPost ? {} : { note: 'Sparko can’t post' }),
+              })),
+            ]}
+          />
+          <Combobox
+            label={
+              <>
+                DM the member{' '}
+                <InfoTip text="Sends a direct message too. People who don’t accept DMs from the server won’t get it; the log says so." />
+              </>
+            }
+            searchPlaceholder="Search templates"
+            value={settings.dm}
+            onChange={(dm) => onChange({ dm })}
+            items={[
+              {
+                value: 'none',
+                label: 'No DM user',
+                icon: 'ban',
+                group: 'Options',
+              },
+              {
+                value: 'same',
+                label: 'Same template sent in channel',
+                icon: 'copy',
+                group: 'Options',
+              },
+              ...items,
+            ]}
+          />
+        </div>
+        <div className="sp-greet-checks">
+          {kind === 'join' && (
+            <>
+              <Checkbox
+                checked={join.rejoin}
+                onChange={(rejoin) => onChange({ rejoin })}
+                label="Welcome again if they rejoin"
+                description="Off means someone who leaves and comes back isn’t greeted twice."
+              />
+              <Checkbox
+                checked={join.waitForRules}
+                onChange={(waitForRules) => onChange({ waitForRules })}
+                label="Wait until they accept the rules"
+                description="For servers with Rules Screening: they’re welcomed once they agree."
+              />
+            </>
+          )}
+          {kind !== 'leave' && (
+            <Checkbox
+              checked={settings.ping}
+              onChange={(ping) => onChange({ ping })}
+              label="Ping the member"
+              description="{user} sends them a notification. Nobody else is ever pinged."
+            />
+          )}
+        </div>
+        <Select
+          label="Delete the channel message"
+          value={String(settings.deleteAfter)}
+          disabled={!settings.channel}
+          onChange={(e) => onChange({ deleteAfter: Number(e.target.value) })}
+          options={deleteAfterChoices.map((s) => ({
+            value: String(s),
+            label: deleteLabels[s] ?? `${s} seconds`,
+          }))}
+        />
+        <Button icon="sparkles" onClick={onPresets}>
+          Use default templates
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/** What kind of message a ready-made one is; plain text works as either. */
+const presetKind = (p: GreetPreset) =>
+  p.message.layout === 'v2'
+    ? 'V2 components'
+    : p.message.embeds.length
+      ? 'Embed message'
+      : 'Any kind';
+
+/** Ready-made messages, shown as they look, to start from. */
+function PresetPicker({
+  open,
+  kind,
+  serverId,
+  replacing,
+  busy,
+  onClose,
+  onPick,
+}: {
+  open: boolean;
+  kind: GreetKind;
+  serverId: string;
+  /** The template a pick goes into, if there is one. */
+  replacing: string | undefined;
+  busy: boolean;
+  onClose: () => void;
+  onPick: (preset: GreetPreset) => void;
+}) {
+  const [shown, setShown] = useState<GreetKind>(kind);
+  // Opening again starts on the tab's own kind.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setShown(kind);
+  }
+  const noop = () => {};
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      icon="sparkles"
+      title="Default templates"
+      description={
+        replacing
+          ? `Picking one puts it into “${replacing}”. Nothing is saved until you save.`
+          : 'Picking one adds it to your Message Studio templates and uses it here.'
+      }
+    >
+      <Segmented
+        label="Kind of message"
+        value={shown}
+        onChange={setShown}
+        options={greetKinds.map((k) => ({
+          value: k,
+          label: tabLabels[k].replace(' message', ''),
+        }))}
+      />
+      <div className="sp-presets">
+        {greetPresets
+          .filter((p) => p.kind === shown)
+          .map((p) => (
+            <div key={p.id} className="sp-preset">
+              <span className="sp-preset__kind">{presetKind(p)}</span>
+              <span className="sp-preset__look" inert>
+                {p.message.layout === 'v2' ? (
+                  <ContainerCanvas
+                    message={p.message}
+                    serverId={serverId}
+                    onChange={noop}
+                    focusId={null}
+                  />
+                ) : (
+                  <EmbedCanvas
+                    message={p.message}
+                    serverId={serverId}
+                    onChange={noop}
+                    focus={null}
+                  />
+                )}
+              </span>
+              <button
+                type="button"
+                className="sp-preset__pick"
+                disabled={busy}
+                onClick={() => onPick(p)}
+              >
+                <span className="sp-preset__name">{p.name}</span>
+                <span className="sp-preset__about">{p.about}</span>
+              </button>
+            </div>
+          ))}
+      </div>
+    </Modal>
+  );
+}
+
+const when = (at: number) =>
+  new Date(at).toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+/** One log line, like "[WM] Sent “Welcome card” to #welcome (8000…)". */
+export function logLine(e: GreetLogEntry, channels: Channel[]) {
+  const name = channels.find((c) => c.id === e.channelId)?.name;
+  const to = e.channelId
+    ? `${name ? `#${name}` : 'a channel'} (${e.channelId})`
+    : `@${e.memberName} by DM`;
+  return e.ok
+    ? `[${greetCodes[e.kind]}] Sent “${e.template}” to ${to}`
+    : `[${greetCodes[e.kind]}] Failed to send “${e.template}” to ${to}, reason: ${e.reason}`;
+}
+
+function GreetLog({
+  entries,
+  channels,
+}: {
+  entries: GreetLogEntry[];
+  channels: Channel[];
+}) {
+  const [filter, setFilter] = useState<GreetKind | 'all'>('all');
+  const shown = entries.filter((e) => filter === 'all' || e.kind === filter);
+  return (
+    <section className="sp-card" aria-labelledby="greet-log">
+      <div className="sp-card__head">
+        <div className="sp-card__titles">
+          <h2 className="sp-card__title" id="greet-log">
+            Logs
+          </h2>
+          <p className="sp-card__sub">
+            Every join, leave and boost message Sparko sent or couldn’t send. WM
+            is a welcome, LM a leave and BM a boost message.
+          </p>
+        </div>
+        <Segmented
+          label="Show"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'All' },
+            ...greetKinds.map((k) => ({ value: k, label: greetCodes[k] })),
+          ]}
+        />
+      </div>
+      {shown.length ? (
+        <ol className="sp-greet-log">
+          {shown.map((e) => (
+            <li
+              key={e.id}
+              className={cx('sp-greet-log__row', !e.ok && 'is-failed')}
+            >
+              <Icon
+                name={e.ok ? 'circle-check' : 'circle-x'}
+                size="sm"
+                className="sp-greet-log__icon"
+              />
+              <span className="sp-greet-log__text">{logLine(e, channels)}</span>
+              <span className="sp-greet-log__meta">
+                for {e.memberName} · {when(e.at)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <EmptyState icon="scroll-text" title="Nothing yet">
+          When Sparko sends a join, leave or boost message, it shows here.
+        </EmptyState>
+      )}
+    </section>
   );
 }
