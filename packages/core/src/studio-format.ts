@@ -329,14 +329,56 @@ const v2Of = (v: unknown, components: StudioComponent[]): StudioV2 => {
   const merged = Array.isArray(x.blocks)
     ? base
     : { ...base, ...x, place: x.place as V2Place[] };
+  const text = typeof merged.text === 'string' ? merged.text : base.text;
+  const lines = splitSeparatorLines(
+    text,
+    placeOf({ ...merged, text }, components),
+  );
   return {
     accent: typeof merged.accent === 'string' ? merged.accent : base.accent,
-    text: typeof merged.text === 'string' ? merged.text : base.text,
+    text: lines.text,
     thumbnail: typeof merged.thumbnail === 'string' ? merged.thumbnail : '',
     gallery: Array.isArray(merged.gallery) ? merged.gallery : [],
-    place: placeOf(merged, components),
+    place: lines.place,
   };
 };
+
+/**
+ * Puts every {separator} on a line of its own, moving what's placed on the
+ * lines along with them, so each line is either text or a divider. A line
+ * that was split keeps its places on its last part, as Discord shows them.
+ */
+export function splitSeparatorLines(text: string, place: V2Place[]) {
+  if (!/.\{separator\}|\{separator\}./.test(text)) return { text, place };
+  const out: string[] = [];
+  const to: number[] = [];
+  for (const line of v2Lines(text)) {
+    if (line === '') out.push('');
+    else
+      line.split('{separator}').forEach((piece, j) => {
+        if (j > 0) out.push('{separator}');
+        if (piece !== '') out.push(piece);
+      });
+    to.push(out.length - 1);
+  }
+  return {
+    text: out.join('\n'),
+    place: place.map((p) =>
+      p.slot.at === 'line' || p.slot.at === 'beside'
+        ? {
+            ...p,
+            slot: {
+              ...p.slot,
+              line:
+                p.slot.line < 0
+                  ? p.slot.line
+                  : (to[p.slot.line] ?? p.slot.line),
+            },
+          }
+        : p,
+    ),
+  };
+}
 
 /** The items placed in a slot, in order. */
 export const placedIn = (place: V2Place[], slot: V2Slot) =>

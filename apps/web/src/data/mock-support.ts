@@ -378,7 +378,7 @@ const studioDefault = (server: Server, channelId: string): StudioMessage => ({
   layout: 'embed',
   v2: {
     accent: '#FACC15',
-    text: '## Spring Art Jam\nDraw anything with the theme **bloom**, {user}.{separator}**Deadline:** Sunday 22:00\n**Prize:** Artist role + 2,000 XP',
+    text: '## Spring Art Jam\nDraw anything with the theme **bloom**, {user}.\n{separator}\n**Deadline:** Sunday 22:00\n**Prize:** Artist role + 2,000 XP',
     thumbnail: '',
     gallery: [],
     place: [],

@@ -2164,6 +2164,9 @@ body:has(> .sp-settings-scrim) > #root {
   line-height: 18px;
   color: var(--sp-dc-text);
 }
+.sp-v2-line.is-dropped {
+  display: none;
+}
 .sp-v2-text.has-side {
   grid-template-columns: minmax(0, 1fr) auto;
 }
@@ -2213,6 +2216,23 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-gallery__cell {
   position: relative;
   min-width: 0;
+}
+.sp-gallery--one {
+  grid-auto-rows: auto;
+}
+.sp-gallery--one .sp-gallery__cell {
+  grid-row: auto !important;
+  justify-self: start;
+}
+.sp-gallery--one .sp-gallery__face {
+  height: auto;
+}
+.sp-gallery--one .sp-gallery__face img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
 }
 .sp-gallery__face {
   display: grid;

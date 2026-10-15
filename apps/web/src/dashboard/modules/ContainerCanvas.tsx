@@ -4,6 +4,7 @@ import {
   componentRows,
   placeOf,
   placedIn,
+  splitSeparatorLines,
   v2Lines,
   type GalleryImage,
   type StudioComponent,
@@ -18,6 +19,7 @@ import {
   EditText,
   MaskIcon,
   UrlPopover,
+  follower,
   measure,
   moveItem,
   slideFrom,
@@ -57,14 +59,33 @@ function renderMarkdown(line: string) {
  * things dragged over the text know which line they're at.
  */
 function renderLines(text: string, first: number) {
-  return text.split('\n').map((line, k) => (
-    <div key={k} className="sp-v2-line" data-line={first + k}>
-      {line.split('{separator}').map((piece, j) => (
-        <Fragment key={j}>
-          {j > 0 && <hr className="dc-separator" />}
-          {(piece || j === 0) && renderMarkdown(piece)}
-        </Fragment>
-      ))}
+  const lines = text.split('\n');
+  // Discord drops empty lines at the start and end of each stretch of text
+  // (at a divider, or where something sits between lines); so does this.
+  const edge = (k: number, step: number) => {
+    for (let i = k + step; i >= 0 && i < lines.length; i += step) {
+      if (lines[i]!.includes('{separator}')) return true;
+      if (lines[i] !== '') return false;
+    }
+    return true;
+  };
+  const dropped = (k: number) => lines[k] === '' && (edge(k, -1) || edge(k, 1));
+  // A stretch of nothing but empty lines still shows, so it can be clicked.
+  const all = lines.every((_, k) => dropped(k));
+  return lines.map((line, k) => (
+    <div
+      key={k}
+      className={cx('sp-v2-line', !all && dropped(k) && 'is-dropped')}
+      data-line={first + k}
+    >
+      {line === ''
+        ? renderMarkdown('')
+        : line.split('{separator}').map((piece, j) => (
+            <Fragment key={j}>
+              {j > 0 && <hr className="dc-separator" />}
+              {piece && renderMarkdown(piece)}
+            </Fragment>
+          ))}
     </div>
   ));
 }
@@ -120,7 +141,15 @@ function Gallery({
   });
   const cells = galleryCells(images.length);
   return (
-    <div ref={list} className="sp-gallery" aria-label="Image gallery">
+    <div
+      ref={list}
+      className={cx(
+        'sp-gallery',
+        // Discord shows one picture whole; several are cropped to the grid.
+        images.length === 1 && images[0]!.url && 'sp-gallery--one',
+      )}
+      aria-label="Image gallery"
+    >
       {images.map((img, i) => (
         <div
           key={img.id}
@@ -368,15 +397,21 @@ function usePlaceDrag({
     let target: Target | null = null;
     setDrag({ id, mark: null });
     Object.assign(el.style, { zIndex: '6', pointerEvents: 'none' });
-    const move = (ev: PointerEvent) => {
-      el.style.transform = `translate(${ev.clientX - x0}px, ${ev.clientY - y0}px)`;
-      target = targetAt(ev.clientX, ev.clientY, id);
+    // Follows the pointer, and keeps up when the page scrolls mid-drag.
+    const follow = follower(el, x0, y0);
+    const update = (x?: number, y?: number) => {
+      follow.to(x, y);
+      const p = follow.pointer();
+      target = targetAt(p.x, p.y, id);
       setDrag({ id, mark: target && markFor(target, id) });
     };
+    const move = (ev: PointerEvent) => update(ev.clientX, ev.clientY);
+    const scroll = () => update();
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
+      window.removeEventListener('scroll', scroll, true);
       setDrag(null);
       const before = measure(els(), keyOf);
       Object.assign(el.style, { zIndex: '', pointerEvents: '', transform: '' });
@@ -386,6 +421,7 @@ function usePlaceDrag({
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
+    window.addEventListener('scroll', scroll, true);
   };
 
   // Every place an item can go, top to bottom, for the arrow keys.
@@ -558,6 +594,9 @@ export function ContainerCanvas({
     placedIn(place, { at: 'beside', line: n })
       .map((p) => byId.get(p.id))
       .find((c) => c?.type === 'button');
+  // A divider ends a stretch too, as it ends a section in Discord: the
+  // thumbnail or a button sits beside the text before it, not after.
+  const divides = (n: number) => !!lines[n]?.includes('{separator}');
   const stretches: { from: number; to: number }[] = [];
   lines.forEach((_, n) => {
     const prev = stretches.at(-1);
@@ -566,6 +605,8 @@ export function ContainerCanvas({
       prev.to === n - 1 &&
       !besideAt(n) &&
       !besideAt(n - 1) &&
+      !divides(n) &&
+      !divides(n - 1) &&
       !placedIn(place, { at: 'line', line: n - 1 }).length;
     if (joins) prev.to = n;
     else stretches.push({ from: n, to: n });
@@ -586,7 +627,14 @@ export function ContainerCanvas({
       ),
     });
   };
-  const thumbAt = stretches.find((s) => !besideAt(s.from))?.from ?? -2;
+  const thumbAt =
+    stretches.find(
+      (s) =>
+        !besideAt(s.from) &&
+        lines
+          .slice(s.from, s.to + 1)
+          .some((l) => l.replace('{separator}', '').trim()),
+    )?.from ?? -2;
   const thumb = (
     <div className="sp-embed__thumb sp-v2-text__thumb" data-issue="thumbnail">
       <button
@@ -691,6 +739,12 @@ export function ContainerCanvas({
                             maxLength={4000}
                             render={(text) => renderLines(text, from)}
                             onChange={(text) => editLines(from, to, text)}
+                            // A divider written mid-line gets a line of its
+                            // own, as Discord starts a new section there.
+                            onDone={() => {
+                              const tidy = splitSeparatorLines(v.text, place);
+                              if (tidy.text !== v.text) edit(tidy);
+                            }}
                           />
                         </div>
                         {side ? (
