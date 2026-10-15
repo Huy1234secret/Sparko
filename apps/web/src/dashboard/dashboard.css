@@ -1758,6 +1758,7 @@
   display: grid;
   place-items: center;
   padding: 24px 16px;
+  overflow-x: hidden;
   overflow-y: auto;
   animation: sp-fade var(--sp-dur-base) var(--sp-ease-out);
 }
@@ -1942,15 +1943,21 @@ body:has(> .sp-settings-scrim) > #root {
 }
 /* Three or more actions scroll inside their list; the panel stops growing. */
 .sp-actions__list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   max-height: 360px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Room for the drop line and focus rings at the edges. */
   margin: -6px;
   padding: 6px;
   list-style: none;
+}
+/* Cards keep their full height; the list scrolls instead of squashing them. */
+.sp-actions__list > * {
+  flex: none;
 }
 .sp-action {
   position: relative;
