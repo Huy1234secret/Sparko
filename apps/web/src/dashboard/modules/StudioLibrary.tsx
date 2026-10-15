@@ -31,7 +31,16 @@ import {
   type StudioState,
   type StudioTemplate,
 } from '../../data';
-import { measure, slideFrom } from './EditorBits';
+import { AnimatedIconButton, measure, slideFrom } from './EditorBits';
+import plusReveal from '../../../../../design-system/assets/icons/animated-icons/plus-button-reveal.json?url';
+import plusHover from '../../../../../design-system/assets/icons/animated-icons/plus-button-hover.json?url';
+import plusSelect from '../../../../../design-system/assets/icons/animated-icons/plus-button-select.json?url';
+
+const plusAnimations = {
+  reveal: plusReveal,
+  hover: plusHover,
+  select: plusSelect,
+};
 import editAnim from '../../../../../design-system/assets/icons/animated-icons/edit-button-hover.json?url';
 import cloneAnim from '../../../../../design-system/assets/icons/animated-icons/clone-button-hover.json?url';
 import removeAnim from '../../../../../design-system/assets/icons/animated-icons/remove-button-hover.json?url';
@@ -551,9 +560,9 @@ export function StudioLibrary({
           <MaskIcon src={folderSvg} label="folders" />
         </p>
         <div className="sp-item-box__row">
-          <Button
+          <AnimatedIconButton
             size="sm"
-            icon="plus"
+            {...plusAnimations}
             disabled={fullTemplates}
             aria-label="New template"
             onClick={() =>
@@ -564,16 +573,16 @@ export function StudioLibrary({
             }
           >
             Template
-          </Button>
-          <Button
+          </AnimatedIconButton>
+          <AnimatedIconButton
             size="sm"
-            icon="plus"
+            {...plusAnimations}
             disabled={fullFolders}
             aria-label="New folder"
             onClick={() => setNaming({ kind: 'folder', name: '' })}
           >
             Folder
-          </Button>
+          </AnimatedIconButton>
         </div>
       </div>
 

@@ -9,11 +9,9 @@ import {
   type ReactNode,
 } from 'react';
 import { cx, Icon } from './core';
-import { LottieIcon, preloadAnimations, reducedMotion } from './animated';
+import { LottieIcon, preloadAnimations } from './animated';
+import { SearchIcon, searchAnimations } from './search-icon';
 import { usePlacement } from './placement';
-import searchReveal from '../../../../design-system/assets/icons/animated-icons/search-icon-reveal.json?url';
-import searchIdle from '../../../../design-system/assets/icons/animated-icons/search-icon-idle.json?url';
-import searchComplete from '../../../../design-system/assets/icons/animated-icons/search-icon-complete.json?url';
 import tickReveal from '../../../../design-system/assets/icons/animated-icons/tick-reveal.json?url';
 
 // Loaded the first time someone points at or tabs to a dropdown, or
@@ -22,7 +20,7 @@ let preloaded = false;
 export const preloadCombobox = () => {
   if (preloaded) return;
   preloaded = true;
-  preloadAnimations([searchReveal, searchIdle, searchComplete, tickReveal]);
+  preloadAnimations([...searchAnimations, tickReveal]);
 };
 
 export type ComboItem = {
@@ -54,48 +52,6 @@ type Props = {
   | { multiple?: false; value: string; onChange: (value: string) => void }
   | { multiple: true; value: string[]; onChange: (value: string[]) => void }
 );
-
-/**
- * The search box's icon: it draws itself in when the list opens, wiggles
- * while someone types, and settles once they've stopped for a second.
- */
-function useSearchIcon() {
-  const [phase, setPhase] = useState<'reveal' | 'idle' | 'complete'>('reveal');
-  const [playKey, setPlayKey] = useState(1);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const onType = () => {
-    clearTimeout(timer.current);
-    setPhase('idle');
-    timer.current = setTimeout(() => setPhase('complete'), 1000);
-  };
-  const icon = (
-    <LottieIcon
-      // A new file plays as soon as it has loaded.
-      src={
-        phase === 'reveal'
-          ? searchReveal
-          : phase === 'idle'
-            ? searchIdle
-            : searchComplete
-      }
-      size={20}
-      solid
-      playKey={playKey}
-      className="sp-combo__search-icon"
-      onDone={() => {
-        // Keeps wiggling for as long as they type.
-        if (phase === 'idle' && !reducedMotion()) setPlayKey((k) => k + 1);
-      }}
-    />
-  );
-  const reset = () => {
-    clearTimeout(timer.current);
-    setPhase('reveal');
-    setPlayKey((k) => k + 1);
-  };
-  return { icon, onType, reset };
-}
 
 /** The fill for a role: its colour, or a gradient between its two. */
 const roleFill = (item: ComboItem) =>
@@ -158,7 +114,6 @@ export function Combobox(props: Props) {
   const pop = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLElement>(null);
   const id = useId();
-  const search = useSearchIcon();
   // Options picked while the list is open draw their tick in; ones just
   // unpicked keep it a moment longer to draw it back out.
   const [picked, setPicked] = useState<string[]>([]);
@@ -209,7 +164,6 @@ export function Combobox(props: Props) {
   const openList = () => {
     setQuery('');
     setPicked([]);
-    search.reset();
     setActive(list.findIndex((i) => isSelected(i.value)));
     setOpen(true);
   };
@@ -311,7 +265,7 @@ export function Combobox(props: Props) {
       {open && (
         <div ref={pop} className="sp-popover sp-combo__pop">
           <div className="sp-popover__search">
-            {search.icon}
+            <SearchIcon className="sp-combo__search-icon" />
             <input
               autoFocus
               role="combobox"
@@ -324,7 +278,6 @@ export function Combobox(props: Props) {
               onChange={(e) => {
                 setQuery(e.target.value);
                 setActive(-1);
-                search.onType();
               }}
               onKeyDown={onKey}
             />

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Icon } from '../ui';
+import { Icon, SearchIcon } from '../ui';
 import { modules } from '../content/modules';
 import { useTheme } from '../state/theme';
 
@@ -104,7 +104,7 @@ export function CommandPalette({
         aria-label="Search Sparko"
       >
         <div className="sp-cmdk__search">
-          <Icon name="search" size="lg" />
+          <SearchIcon size={24} />
           <input
             autoFocus
             role="combobox"

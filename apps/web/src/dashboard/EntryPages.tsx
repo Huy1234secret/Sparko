@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { Badge, Button, EmptyState, Icon, Notice, useToast } from '../ui';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Icon,
+  Notice,
+  useToast,
+  SearchIcon,
+} from '../ui';
 import {
   backend,
   inviteUrl,
@@ -224,7 +232,7 @@ export function ServerPickerPage() {
               </div>
             </header>
             <div className="sp-input" style={{ maxWidth: 420 }}>
-              <Icon name="search" />
+              <SearchIcon />
               <input
                 type="search"
                 aria-label="Search your servers"
