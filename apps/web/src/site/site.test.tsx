@@ -188,6 +188,32 @@ describe('public site', () => {
     expect(screen.queryByRole('heading', { name: 'How it works' })).toBeNull();
   });
 
+  it('shows one docs page at a time and moves between them', async () => {
+    const router = open('/docs');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Get started' }),
+    ).toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Docs' });
+    expect(
+      within(nav).getByRole('link', { name: 'Get started' }),
+    ).toHaveAttribute('aria-current', 'page');
+    await userEvent.click(within(nav).getByRole('link', { name: 'Tickets' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Tickets' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/docs/tickets');
+    expect(
+      screen.queryByRole('heading', { name: 'Get started', level: 1 }),
+    ).toBeNull();
+    expect(screen.getByText('/ticket claim')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('link', { name: /Next.*Message Studio/ }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Message Studio' }),
+    ).toBeInTheDocument();
+  });
+
   it('filters features by group from the address', async () => {
     open('/features?group=Safety');
     expect(

@@ -16,6 +16,10 @@ const page =
 const info = (name: keyof typeof import('./site/InfoPages')) =>
   page(async () => ({ default: (await import('./site/InfoPages'))[name] }));
 
+const docs = page(async () => ({
+  default: (await import('./site/docs')).DocsPage,
+}));
+
 const dashboard = (name: keyof typeof import('./dashboard')) =>
   page(async () => ({ default: (await import('./dashboard'))[name] }));
 
@@ -82,7 +86,8 @@ const pages: RouteObject[] = [
           default: (await import('./site/CommandsPage')).CommandsPage,
         })),
       },
-      { path: 'docs', lazy: info('DocsPage') },
+      { path: 'docs', lazy: docs },
+      { path: 'docs/:page', lazy: docs },
       { path: 'status', lazy: info('StatusPage') },
       { path: 'support', lazy: info('SupportPage') },
       { path: 'privacy', lazy: info('PrivacyPage') },
