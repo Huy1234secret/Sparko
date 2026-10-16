@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Badge,
@@ -13,10 +13,10 @@ import { groupMeta, groups, modules } from '../content/modules';
 import { homeFaq, scenes } from '../content/site';
 import { Faq, PricingTeaser } from './parts';
 import { useAccountActions, usePageTitle } from './SiteLayout';
+import { reducedMotion, Tilt, useOnScreenClass, useTilt } from './motion';
 
-const reducedMotion = () =>
-  typeof matchMedia === 'function' &&
-  matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Staggers a child's entrance: `--i` is its place in the sequence. */
+const order = (i: number) => ({ '--i': i }) as CSSProperties;
 
 /** How long a preview "applies" before it shows as live. */
 const APPLY_MS = 900;
@@ -33,6 +33,7 @@ function HeroStage() {
   const scene = scenes[index] ?? scenes[0]!;
   const [appliedKey, setAppliedKey] = useState(scene.key);
   const live = instant || appliedKey === scene.key;
+  const frame = useTilt<HTMLDivElement>(6);
 
   useEffect(() => {
     if (paused) return;
@@ -71,7 +72,7 @@ function HeroStage() {
           onClick={() => setPaused(!paused)}
         />
       </div>
-      <div className="sw-stage__frame">
+      <div className="sw-stage__frame sw-tilt" ref={frame}>
         <div className="sw-stage__chan">
           <Icon name="hash" />
           {scene.channel}
@@ -210,7 +211,7 @@ function WhyGrid() {
     .replace(/\{user\}/g, '@tomoko');
   return (
     <div className="sw-bento">
-      <article className="sw-card sw-bento__live">
+      <Tilt as="article" max={4} className="sw-card sw-bento__live sw-reveal">
         <div className="sw-bento__copy">
           <h3 className="sw-h3">Live previews</h3>
           <p className="sw-body">
@@ -236,9 +237,9 @@ function WhyGrid() {
             }
           />
         </div>
-      </article>
+      </Tilt>
 
-      <article className="sw-card sw-bento__plain">
+      <Tilt as="article" max={4} className="sw-card sw-bento__plain sw-reveal">
         <h3 className="sw-h3">Plain language</h3>
         <p className="sw-body">
           No jargon, no raw JSON. Every setting says what it does.
@@ -251,9 +252,9 @@ function WhyGrid() {
             description="Off means nobody is greeted twice."
           />
         </div>
-      </article>
+      </Tilt>
 
-      <article className="sw-card sw-bento__safe">
+      <Tilt as="article" max={4} className="sw-card sw-bento__safe sw-reveal">
         <h3 className="sw-h3">Safe by default</h3>
         <p className="sw-body">
           Test rules in a simulator before they’re live. Restore any earlier
@@ -267,9 +268,9 @@ function WhyGrid() {
             Would be removed · Invite links
           </Badge>
         </div>
-      </article>
+      </Tilt>
 
-      <article className="sw-card sw-bento__status">
+      <Tilt as="article" max={4} className="sw-card sw-bento__status sw-reveal">
         <div className="sw-bento__copy">
           <h3 className="sw-h3">Honest status</h3>
           <p className="sw-body">
@@ -277,8 +278,73 @@ function WhyGrid() {
           </p>
         </div>
         <StatusDemo />
-      </article>
+      </Tilt>
     </div>
+  );
+}
+
+/** Module groups orbit the heading: the top arc runs one way, the bottom the other. */
+function ModuleOrbit() {
+  const stage = useOnScreenClass<HTMLDivElement>('is-moving');
+  // Each group goes round twice so both arcs stay full. The second lap is
+  // shifted half a lap, so the top and bottom arcs show different groups.
+  // The copies are hidden from screen readers and the keyboard.
+  const half = Math.floor(groups.length / 2);
+  const ring = [...groups, ...groups.slice(half), ...groups.slice(0, half)];
+  return (
+    <section className="sw-orbit" aria-labelledby="mods-h">
+      <div
+        className="sw-orbit__stage"
+        ref={stage}
+        style={{ '--n': ring.length } as CSSProperties}
+      >
+        <div className="sw-orbit__center">
+          <h2 className="sw-h2" id="mods-h">
+            Everything your server needs, grouped the way you think.
+          </h2>
+          <p className="sw-lede">
+            {modules.length} modules in {groups.length} groups, all in one
+            dashboard.
+          </p>
+          <Link className="sp-btn sp-btn--secondary sw-btn-link" to="/features">
+            Browse every module
+            <Icon name="arrow-right" size="sm" />
+          </Link>
+        </div>
+        <ul className="sw-orbit__ring">
+          {ring.map((group, i) => {
+            const copy = i >= groups.length;
+            const count = modules.filter((m) => m.group === group).length;
+            return (
+              <li
+                key={i}
+                className="sw-orbit__item"
+                style={order(i)}
+                aria-hidden={copy || undefined}
+              >
+                <Link
+                  className="sw-orbit__card"
+                  to={`/features?group=${encodeURIComponent(group)}`}
+                  tabIndex={copy ? -1 : undefined}
+                >
+                  <span className="sw-orbit__icon">
+                    <Icon name={groupMeta[group].icon} />
+                  </span>
+                  <span className="sw-orbit__name">{group}</span>
+                  <span className="sw-orbit__blurb">
+                    {groupMeta[group].blurb}
+                  </span>
+                  <span className="sw-orbit__count">
+                    {count} {count === 1 ? 'module' : 'modules'}
+                    <Icon name="arrow-right" size="sm" />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
   );
 }
 
@@ -287,19 +353,28 @@ export function HomePage() {
   const { addBot } = useAccountActions();
   return (
     <>
+      <div className="sw-progress" aria-hidden="true" />
       <section className="sw-hero" aria-labelledby="hero-h">
         <div className="sw-wrap sw-hero__grid">
           <div className="sw-hero__copy">
             <h1 className="sw-display" id="hero-h">
-              The Discord bot that{' '}
-              <span className="sw-mark">explains itself.</span>
+              {['The', 'Discord', 'bot', 'that'].map((word, i) => (
+                <Fragment key={word}>
+                  <span className="sw-word" style={order(i)}>
+                    {word}
+                  </span>{' '}
+                </Fragment>
+              ))}
+              <span className="sw-word sw-mark" style={order(4)}>
+                explains itself.
+              </span>
             </h1>
-            <p className="sw-lede">
+            <p className="sw-lede sw-enter" style={order(5)}>
               Moderation, tickets, welcome messages, levels and 40 more modules.
               Every setting is written in plain language, and you see every
               message exactly as Discord will show it before you save.
             </p>
-            <div className="sw-hero__ctas">
+            <div className="sw-hero__ctas sw-enter" style={order(6)}>
               <Button variant="primary" size="lg" icon="plus" onClick={addBot}>
                 Add Sparko to Discord
               </Button>
@@ -310,7 +385,7 @@ export function HomePage() {
                 See every feature
               </Link>
             </div>
-            <ul className="sw-hero__proof">
+            <ul className="sw-hero__proof sw-enter" style={order(7)}>
               {[
                 'Nearly every module is free',
                 'Set up in about 5 minutes',
@@ -330,7 +405,7 @@ export function HomePage() {
 
       <section className="sw-section sw-band" aria-labelledby="why-h">
         <div className="sw-wrap">
-          <div className="sw-head">
+          <div className="sw-head sw-reveal">
             <h2 className="sw-h2" id="why-h">
               Other bots make you guess. Sparko shows you.
             </h2>
@@ -339,55 +414,11 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="sw-section" aria-labelledby="mods-h">
-        <div className="sw-wrap sw-mods">
-          <div className="sw-head sw-mods__head">
-            <h2 className="sw-h2" id="mods-h">
-              Everything your server needs, grouped the way you think.
-            </h2>
-            <p className="sw-lede">
-              {modules.length} modules in {groups.length} groups, all in one
-              dashboard.
-            </p>
-            <Link className="sw-more" to="/features">
-              Browse every module
-              <Icon name="arrow-right" size="sm" />
-            </Link>
-          </div>
-          <ul className="sw-index">
-            {groups.map((group) => {
-              const items = modules.filter((m) => m.group === group);
-              return (
-                <li key={group}>
-                  <Link
-                    className="sw-index__row"
-                    to={`/features?group=${encodeURIComponent(group)}`}
-                  >
-                    <span className="sw-index__icon">
-                      <Icon name={groupMeta[group].icon} />
-                    </span>
-                    <span className="sw-index__text">
-                      <span className="sw-index__name">{group}</span>
-                      <span className="sw-index__blurb">
-                        {groupMeta[group].blurb}
-                      </span>
-                    </span>
-                    <span className="sw-index__count">
-                      {items.length}
-                      <span className="sp-sr-only"> modules</span>
-                      <Icon name="arrow-right" size="sm" />
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </section>
+      <ModuleOrbit />
 
       <section className="sw-section sw-band" aria-labelledby="setup-h">
         <div className="sw-wrap">
-          <div className="sw-head">
+          <div className="sw-head sw-reveal">
             <h2 className="sw-h2" id="setup-h">
               From invite to live in about five minutes.
             </h2>
@@ -414,7 +445,11 @@ export function HomePage() {
                 'Save and watch it apply. If a permission is missing, Sparko tells you exactly where to fix it.',
               ],
             ].map(([time, title, body], i) => (
-              <li key={title} className="sw-timeline__step">
+              <li
+                key={title}
+                className="sw-timeline__step sw-reveal"
+                style={order(i)}
+              >
                 <div className="sw-timeline__n">
                   <b>{i + 1}</b>
                   <span className="sw-step__time">{time}</span>

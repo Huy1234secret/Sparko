@@ -4,6 +4,7 @@ import type { SparkoModule } from '../content/modules';
 import { freeModuleCount, modules } from '../content/modules';
 import { type Faq as FaqItem } from '../content/site';
 import { useAccountActions } from './SiteLayout';
+import { Tilt } from './motion';
 
 export function Faq({ items }: { items: FaqItem[] }) {
   return (
@@ -25,7 +26,7 @@ export function PricingTeaser() {
   const { addBot } = useAccountActions();
   return (
     <div className="sw-price-grid">
-      <div className="sp-price">
+      <Tilt max={4} className="sp-price sw-reveal">
         <div className="sp-price__head">
           <div className="sp-price__name">Free</div>
           <p className="sp-price__desc">
@@ -42,8 +43,8 @@ export function PricingTeaser() {
             Add Sparko free
           </Button>
         </div>
-      </div>
-      <div className="sp-price sp-price--featured sp-sparks">
+      </Tilt>
+      <Tilt max={4} className="sp-price sp-price--featured sp-sparks sw-reveal">
         <div className="sp-price__head">
           <div className="sp-price__name">
             Plus<Badge tone="plus">First month US$1.49</Badge>
@@ -61,7 +62,7 @@ export function PricingTeaser() {
             Compare plans
           </Link>
         </div>
-      </div>
+      </Tilt>
     </div>
   );
 }

@@ -358,108 +358,6 @@ a.sp-btn {
   justify-self: start;
 }
 
-/* Home: module groups as an index beside a sticky heading */
-.sw-mods {
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: 56px;
-  align-items: start;
-}
-.sw-mods__head {
-  position: sticky;
-  top: 108px;
-  justify-items: start;
-  margin-bottom: 0;
-}
-.sw-mods__head .sw-more {
-  min-height: 44px;
-  text-decoration: none;
-  border-radius: 8px;
-}
-.sw-mods__head .sw-more:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.sw-mods__head .sw-more:focus-visible {
-  outline: none;
-  box-shadow: var(--sp-ring);
-}
-.sw-index {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--sp-line);
-}
-.sw-index li {
-  border-bottom: 1px solid var(--sp-line);
-}
-.sw-index__row {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  min-height: 80px;
-  padding: 14px 12px;
-  border-radius: var(--sp-radius-control);
-  color: var(--sp-text);
-  text-decoration: none;
-  transition: background-color var(--sp-dur-fast) var(--sp-ease-out);
-}
-.sw-index__row:hover {
-  background: var(--sp-subtle);
-}
-.sw-index__row:focus-visible {
-  outline: none;
-  box-shadow: var(--sp-ring);
-}
-.sw-index__icon {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--sp-radius-control);
-  background: var(--sp-raised);
-  border: 1px solid var(--sp-line);
-  transition:
-    background-color var(--sp-dur-fast) var(--sp-ease-out),
-    border-color var(--sp-dur-fast) var(--sp-ease-out),
-    color var(--sp-dur-fast) var(--sp-ease-out);
-}
-.sw-index__row:hover .sw-index__icon {
-  background: var(--sp-brand-soft);
-  border-color: var(--sp-brand-line);
-  color: var(--sp-brand-text);
-}
-.sw-index__text {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.sw-index__name {
-  font: 600 16px/24px var(--sp-font-sans);
-  letter-spacing: -0.01em;
-}
-.sw-index__blurb {
-  font: 400 14px/20px var(--sp-font-sans);
-  color: var(--sp-muted);
-  text-wrap: pretty;
-}
-.sw-index__count {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font: 600 15px/1 var(--sp-font-sans);
-  font-variant-numeric: tabular-nums;
-  color: var(--sp-muted);
-}
-.sw-index__count .sp-i {
-  color: var(--sp-brand-text);
-  transition: transform var(--sp-dur-fast) var(--sp-ease-out);
-}
-.sw-index__row:hover .sw-index__count .sp-i {
-  transform: translateX(3px);
-}
-
 /* Home: setup as a timeline */
 .sw-timeline {
   display: grid;
@@ -513,13 +411,6 @@ a.sp-btn {
       'live live'
       'plain safe'
       'status status';
-  }
-  .sw-mods {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
-  }
-  .sw-mods__head {
-    position: static;
   }
 }
 @container (max-width: 860px) {
@@ -608,5 +499,459 @@ a.sp-btn {
     top: auto;
     bottom: -80px;
     width: 420px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Home motion. Everything moves with transform, opacity or the
+   individual translate/rotate/scale properties, so it stays on the
+   compositor. Scroll-driven parts are progressive: browsers without
+   scroll timelines simply show the finished state. */
+.sw {
+  --sw-ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Hero entrance: words rise out of a blur, then the rest follows, and the
+   preview swings up from a 3D tilt. */
+.sw-hero__copy {
+  animation: none;
+}
+.sw-hero__grid {
+  perspective: 1600px;
+}
+.sw-word {
+  display: inline-block;
+}
+.sw-mark {
+  background-repeat: no-repeat;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sw-word {
+    animation: sw-word 900ms var(--sw-ease) both;
+    animation-delay: calc(var(--i) * 70ms + 60ms);
+  }
+  .sw-word.sw-mark {
+    animation:
+      sw-word 900ms var(--sw-ease) both,
+      sw-highlight 700ms var(--sw-ease) both;
+    animation-delay: calc(var(--i) * 70ms + 60ms), 800ms;
+  }
+  .sw-enter {
+    animation: sw-enter 800ms var(--sw-ease) both;
+    animation-delay: calc(var(--i) * 70ms + 60ms);
+  }
+  .sw-stage {
+    animation: sw-stage-in 1100ms var(--sw-ease) 250ms both;
+    transform-origin: 50% 100%;
+  }
+  .sw-hero::after {
+    animation: sw-float 16s ease-in-out infinite alternate;
+  }
+  .sw-cta::after {
+    animation: sw-float 12s ease-in-out infinite alternate;
+  }
+}
+@keyframes sw-word {
+  from {
+    opacity: 0;
+    translate: 0 0.45em;
+    filter: blur(10px);
+  }
+}
+@keyframes sw-highlight {
+  from {
+    background-size: 0% 100%;
+  }
+}
+@keyframes sw-enter {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+  }
+}
+@keyframes sw-stage-in {
+  from {
+    opacity: 0;
+    translate: 0 64px;
+    rotate: x 24deg;
+    scale: 0.94;
+  }
+}
+@keyframes sw-float {
+  to {
+    translate: -28px 32px;
+    rotate: -7deg;
+  }
+}
+
+/* Pointer tilt with a soft light that follows the pointer (see motion.tsx). */
+.sw-tilt {
+  position: relative;
+  transform: perspective(1000px) rotateX(var(--tilt-x, 0deg))
+    rotateY(var(--tilt-y, 0deg));
+  transition: transform 700ms var(--sw-ease);
+}
+.sw-tilt.is-tilting {
+  transition-duration: 150ms;
+}
+.sw-tilt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    420px circle at var(--glow-x, 50%) var(--glow-y, 50%),
+    color-mix(in srgb, var(--sp-brand) 9%, transparent),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 400ms var(--sw-ease);
+  pointer-events: none;
+}
+.sw-tilt.is-tilting::after {
+  opacity: 1;
+}
+
+/* Sections rise and flip up a little as they scroll in. */
+.sw-bento,
+.sw-price-grid {
+  perspective: 1400px;
+}
+.sw-bento > :nth-child(2),
+.sw-price-grid > :nth-child(2) {
+  --i: 1;
+}
+.sw-bento > :nth-child(3) {
+  --i: 0;
+}
+.sw-bento > :nth-child(4) {
+  --i: 1;
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sw-reveal {
+      transform-origin: 50% 100%;
+      animation: sw-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry calc(var(--i, 0) * 8%) entry
+        calc(75% + var(--i, 0) * 8%);
+    }
+    .sw-timeline__step:not(:last-child)::before {
+      transform-origin: 0 50%;
+      animation: sw-draw-x linear both;
+      animation-timeline: view();
+      animation-range: entry 60% cover 45%;
+    }
+  }
+}
+@keyframes sw-reveal {
+  from {
+    opacity: 0;
+    translate: 0 48px;
+    rotate: x 14deg;
+    scale: 0.97;
+  }
+}
+@keyframes sw-draw-x {
+  from {
+    scale: 0 1;
+  }
+}
+@keyframes sw-draw-y {
+  from {
+    scale: 1 0;
+  }
+}
+
+/* A thin bar at the top fills as you read down the page. */
+.sw-progress {
+  position: fixed;
+  z-index: calc(var(--sp-z-sticky) + 1);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--sp-brand);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+@supports (animation-timeline: scroll()) {
+  .sw-progress {
+    animation: sw-progress linear both;
+    animation-timeline: scroll(root);
+  }
+}
+@supports not (animation-timeline: scroll()) {
+  .sw-progress {
+    display: none;
+  }
+}
+@keyframes sw-progress {
+  from {
+    scale: 0 1;
+  }
+}
+
+/* FAQ answers slide open instead of snapping. */
+@supports (interpolate-size: allow-keywords) {
+  .sw-faq {
+    interpolate-size: allow-keywords;
+  }
+  .sw-faq details::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height 320ms var(--sw-ease),
+      content-visibility 320ms allow-discrete;
+  }
+  .sw-faq details[open]::details-content {
+    height: auto;
+  }
+}
+
+/* Module orbit: cards travel round a wide, flat ellipse centred on the
+   heading. Only the top and bottom of it are on screen, so the top arc
+   drifts one way and the bottom arc the other. */
+.sw-orbit {
+  position: relative;
+  overflow: hidden;
+  padding: 24px 0;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 10%,
+    #000 90%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 10%,
+    #000 90%,
+    transparent
+  );
+}
+.sw-orbit__stage {
+  --dur: 110s;
+  position: relative;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: max(100%, 1180px);
+  height: 780px;
+  translate: -50% 0;
+}
+.sw-orbit__center {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  max-width: 600px;
+  padding: 0 20px;
+  text-align: center;
+}
+.sw-orbit__center .sw-lede {
+  max-width: 44ch;
+}
+.sw-orbit__ring {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-orbit__item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  offset-path: ellipse(74% 37% at 50% 50%);
+  offset-rotate: 0deg;
+  offset-anchor: center;
+  offset-distance: calc(var(--i) / var(--n) * 100%);
+  animation: sw-orbit var(--dur) linear infinite paused;
+  animation-delay: calc(var(--i) / var(--n) * var(--dur) * -1);
+}
+.sw-orbit__stage.is-moving .sw-orbit__item {
+  animation-play-state: running;
+}
+.sw-orbit__stage.is-moving:hover .sw-orbit__item,
+.sw-orbit__stage.is-moving:focus-within .sw-orbit__item {
+  animation-play-state: paused;
+}
+@keyframes sw-orbit {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+.sw-orbit__card {
+  display: grid;
+  gap: 6px;
+  width: 252px;
+  padding: 18px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-card);
+  background: var(--sp-surface);
+  box-shadow: var(--sp-shadow-card);
+  color: var(--sp-text);
+  text-decoration: none;
+  transition:
+    translate 300ms var(--sw-ease),
+    border-color var(--sp-dur-fast) ease,
+    box-shadow 300ms var(--sw-ease);
+}
+.sw-orbit__card:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sw-orbit__card:hover {
+    translate: 0 -6px;
+    border-color: var(--sp-brand-line);
+    box-shadow:
+      0 18px 40px -18px rgb(0 0 0 / 0.45),
+      var(--sp-shadow-card);
+  }
+  .sw-orbit__card:hover .sw-orbit__icon {
+    background: var(--sp-brand-soft);
+    border-color: var(--sp-brand-line);
+    color: var(--sp-brand-text);
+  }
+}
+.sw-orbit__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+  transition:
+    background-color var(--sp-dur-fast) ease,
+    border-color var(--sp-dur-fast) ease,
+    color var(--sp-dur-fast) ease;
+}
+.sw-orbit__name {
+  font: 600 16px/22px var(--sp-font-sans);
+  letter-spacing: -0.01em;
+}
+.sw-orbit__blurb {
+  display: -webkit-box;
+  overflow: hidden;
+  font: 400 14px/20px var(--sp-font-sans);
+  color: var(--sp-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.sw-orbit__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font: 600 13px/18px var(--sp-font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--sp-brand-text);
+}
+
+/* Without motion paths, or with reduced motion, the groups sit in a grid. */
+@supports not (offset-path: ellipse(10px 10px at 50% 50%)) {
+  .sw-orbit__stage {
+    left: 0;
+    width: 100%;
+    height: auto;
+    gap: 40px;
+    padding: 72px 20px;
+    translate: none;
+  }
+  .sw-orbit__ring {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    width: 100%;
+    max-width: 1136px;
+  }
+  .sw-orbit__item {
+    position: static;
+    animation: none;
+  }
+  .sw-orbit__item[aria-hidden] {
+    display: none;
+  }
+  .sw-orbit__card {
+    width: auto;
+    height: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-orbit {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .sw-orbit__stage {
+    left: 0;
+    width: 100%;
+    height: auto;
+    gap: 40px;
+    padding: 72px 20px;
+    translate: none;
+  }
+  .sw-orbit__ring {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    width: 100%;
+    max-width: 1136px;
+  }
+  .sw-orbit__item {
+    position: static;
+    offset-path: none;
+    animation: none;
+  }
+  .sw-orbit__item[aria-hidden] {
+    display: none;
+  }
+  .sw-orbit__card {
+    width: auto;
+    height: 100%;
+  }
+}
+
+@container (max-width: 640px) {
+  .sw-orbit {
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent,
+      #000 16px,
+      #000 calc(100% - 16px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent,
+      #000 16px,
+      #000 calc(100% - 16px),
+      transparent
+    );
+  }
+  .sw-orbit__stage {
+    height: 860px;
+  }
+  .sw-orbit__card {
+    width: 216px;
+    padding: 16px;
+  }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .sw-timeline__step:not(:last-child)::before {
+        transform-origin: 50% 0;
+        animation-name: sw-draw-y;
+      }
+    }
   }
 }
