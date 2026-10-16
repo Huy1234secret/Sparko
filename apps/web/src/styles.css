@@ -98,3 +98,80 @@ html {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* Skeletons: a soft light sweeps across every placeholder at once, left to
+   right, while a page loads. */
+:root {
+  --sp-skel-shine: #34342c;
+}
+[data-theme='light'] {
+  --sp-skel-shine: #f8f6ef;
+}
+.sp-skel {
+  background: linear-gradient(
+      100deg,
+      var(--sp-skeleton) 40%,
+      var(--sp-skel-shine) 50%,
+      var(--sp-skeleton) 60%
+    )
+    var(--sp-skeleton);
+  background-size: 200vw 100%;
+  background-attachment: fixed;
+  animation: sp-shimmer 1.6s linear infinite;
+}
+@keyframes sp-shimmer {
+  from {
+    background-position: 100vw 0;
+  }
+  to {
+    background-position: -100vw 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-skel {
+    animation: none;
+  }
+}
+.sp-skel--input {
+  height: 44px;
+  border-radius: var(--sp-radius-control);
+}
+.sp-skel--switch {
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+}
+.sp-skel--icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+.sp-skel-field {
+  display: grid;
+  gap: 8px;
+}
+.sp-skel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sp-skel-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.sp-skel-tabs {
+  display: flex;
+  gap: 28px;
+  padding: 12px 4px 14px;
+  border-bottom: 1px solid var(--sp-line);
+}
+.sp-skel-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sp-skel-side {
+  gap: 14px;
+  padding: 8px 12px;
+}

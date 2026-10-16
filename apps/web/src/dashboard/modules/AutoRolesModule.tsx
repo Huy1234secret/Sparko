@@ -36,6 +36,8 @@ import {
   syncState,
   useModuleTab,
   useSaveFlow,
+  ModuleSkeleton,
+  SkelCards,
 } from './frame';
 import { flashIssue, type ShownIssue } from './EditorBits';
 import { ARTriggers } from './ARTriggers';
@@ -104,10 +106,9 @@ export function AutoRolesModule({
 
   if (ar.isPending)
     return (
-      <div className="sp-stack" aria-busy="true" aria-label="Loading">
-        <span className="sp-skel sp-skel--title" />
-        <div className="sp-skel sp-skel--block" style={{ height: 320 }} />
-      </div>
+      <ModuleSkeleton module={module}>
+        <SkelCards />
+      </ModuleSkeleton>
     );
   if (ar.isError || !ar.data || !current)
     return (

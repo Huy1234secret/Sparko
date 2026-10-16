@@ -437,14 +437,13 @@ describe('Automatic roles', () => {
     expect(
       await screen.findByText(/Write how long for timed role 3/),
     ).toBeInTheDocument();
+    const third = screen.getByRole('listitem', { name: 'Timed role 3' });
     await userEvent.type(
-      screen.getByRole('textbox', { name: /Timed role 3/ }),
+      within(third).getByRole('textbox', { name: 'Time in the server' }),
       '90d',
     );
     // Roles Sparko can't give can't be picked.
-    const third = screen
-      .getByRole('textbox', { name: /Timed role 3/ })
-      .closest('li')!;
+
     await userEvent.click(within(third).getByRole('button', { name: /^Role/ }));
     expect(screen.getByRole('option', { name: /Moderator/ })).toHaveAttribute(
       'aria-disabled',

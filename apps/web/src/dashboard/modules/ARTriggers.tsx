@@ -1,5 +1,5 @@
-import { Fragment } from 'react';
-import { Checkbox, Combobox, Icon, Input, cx } from '../../ui';
+import { Fragment, type CSSProperties, type ReactNode } from 'react';
+import { Checkbox, Combobox, Icon, Input, svgIcons } from '../../ui';
 import {
   arBadges,
   arConditionNames,
@@ -12,7 +12,7 @@ import {
   type AutoRoles,
   type RoleOption,
 } from '../../data';
-import { AnimatedIconButton } from './EditorBits';
+import { AnimatedIconButton, InfoTip } from './EditorBits';
 import { PlusMenu } from './PlusMenu';
 import { newId, roleItems } from './parts';
 import { plusAnimations } from './StudioLibrary';
@@ -27,14 +27,23 @@ function durationHint(text: string, range: { min: number; max: number }) {
   return undefined;
 }
 
+/** A label with an (i) beside it that says more on hover. */
+const tipped = (text: string, tip: string): ReactNode => (
+  <>
+    {text} <InfoTip text={tip} />
+  </>
+);
+
 function DurationInput({
   label,
+  tip,
   value,
   onChange,
   range,
   placeholder,
 }: {
   label: string;
+  tip: string;
   value: string;
   onChange: (v: string) => void;
   range: { min: number; max: number; label: string };
@@ -43,17 +52,33 @@ function DurationInput({
   const hint = value.trim() ? durationHint(value, range) : undefined;
   return (
     <Input
-      label={label}
+      label={tipped(label, tip)}
+      aria-label={label}
       value={value}
       placeholder={placeholder}
       maxLength={20}
       onChange={(e) => onChange(e.target.value)}
       {...(hint === null
-        ? { error: `Between ${range.label}.` }
+        ? { error: `Has to be between ${range.label}.` }
         : hint
           ? { error: hint }
-          : { hint: `Between ${range.label}.` })}
+          : {})}
     />
+  );
+}
+
+/** "2/3 ⏳": how many of the plan's slots are used. */
+function Used({ n, max, what }: { n: number; max: number; what: string }) {
+  return (
+    <span className="sp-ar__used" title={`${n} of ${max} ${what} used`}>
+      {n}/{max}
+      <span
+        className="sp-mask-icon"
+        role="img"
+        aria-label="used"
+        style={{ '--sp-mask': `url("${svgIcons.sandClock}")` } as CSSProperties}
+      />
+    </span>
   );
 }
 
@@ -112,7 +137,10 @@ export function ARTriggers({
         </div>
         <div className="sp-card__body sp-ar__pair">
           <Combobox
-            label="Before verified"
+            label={tipped(
+              'Before verified',
+              'Given the moment someone joins, while they still have to accept the server’s rules (Discord’s membership screening). Sparko takes these away and gives the After verified roles once they accept.',
+            )}
             multiple
             placeholder="No roles"
             searchPlaceholder="Search roles"
@@ -121,17 +149,18 @@ export function ARTriggers({
               onChange({ join: { ...config.join, before } })
             }
             items={roleItems(roles, config.join.before)}
-            hint="Given on joining, while they still have to accept the server’s rules. Swapped for the roles on the right once they do."
           />
           <Combobox
-            label="After verified"
+            label={tipped(
+              'After verified',
+              'Given once someone accepts the server’s rules. If the server doesn’t ask new members to accept rules, these are given as soon as they join.',
+            )}
             multiple
             placeholder="No roles"
             searchPlaceholder="Search roles"
             value={config.join.after}
             onChange={(after) => onChange({ join: { ...config.join, after } })}
             items={roleItems(roles, config.join.after)}
-            hint="Given once they’ve accepted the rules, or straight away when the server doesn’t ask them to."
           />
         </div>
       </section>
@@ -147,27 +176,36 @@ export function ARTriggers({
               Timed roles
             </h2>
             <p className="sp-card__sub">
-              Roles members get once they’ve been in the server for a while.{' '}
-              {config.timed.length}/{limits.timed} used.
+              Roles members get once they’ve been in the server for a while.
             </p>
           </div>
-          <AnimatedIconButton
-            size="sm"
-            {...plusAnimations}
-            disabled={config.timed.length >= limits.timed}
-            title={
-              config.timed.length >= limits.timed
-                ? `This plan has up to ${limits.timed} timed roles.`
-                : undefined
-            }
-            onClick={() =>
-              onChange({
-                timed: [...config.timed, { id: newId(), after: '', role: '' }],
-              })
-            }
-          >
-            Timed role
-          </AnimatedIconButton>
+          <div className="sp-ar__head-actions">
+            <Used
+              n={config.timed.length}
+              max={limits.timed}
+              what="timed roles"
+            />
+            <AnimatedIconButton
+              size="sm"
+              {...plusAnimations}
+              disabled={config.timed.length >= limits.timed}
+              title={
+                config.timed.length >= limits.timed
+                  ? `This plan has up to ${limits.timed} timed roles.`
+                  : undefined
+              }
+              onClick={() =>
+                onChange({
+                  timed: [
+                    ...config.timed,
+                    { id: newId(), after: '', role: '' },
+                  ],
+                })
+              }
+            >
+              Timed role
+            </AnimatedIconButton>
+          </div>
         </div>
         <div className="sp-card__body">
           {config.timed.length ? (
@@ -176,12 +214,15 @@ export function ARTriggers({
                 <li
                   key={t.id}
                   className="sp-ar__item sp-ar__timed"
+                  aria-label={`Timed role ${i + 1}`}
                   data-issue={`timed:${t.id}`}
                 >
+                  <h3 className="sp-ar__item-title">Timed role {i + 1}</h3>
                   <DurationInput
-                    label={`Timed role ${i + 1}: time in the server`}
+                    label="Time in the server"
+                    tip="How long a member has to be in the server before they get this role. Write it with m (minutes), h (hours) and d (days), like 30m, 12h, 7d or 1d 12h. From 1 minute up to 2 years (730d)."
                     value={t.after}
-                    placeholder="7d"
+                    placeholder="e.g. 7d"
                     range={arRanges.timed}
                     onChange={(after) => editTimed(t.id, { after })}
                   />
@@ -237,38 +278,40 @@ export function ARTriggers({
               Unique rules
             </h2>
             <p className="sp-card__sub">
-              Roles for members who meet your requirements.{' '}
-              {config.rules.length}/{limits.rules} used.
+              Roles for members who meet your requirements.
             </p>
           </div>
-          <AnimatedIconButton
-            size="sm"
-            {...plusAnimations}
-            disabled={config.rules.length >= limits.rules}
-            title={
-              config.rules.length >= limits.rules
-                ? `This plan has up to ${limits.rules} rules.`
-                : undefined
-            }
-            onClick={() =>
-              onChange({
-                rules: [
-                  ...config.rules,
-                  {
-                    id: newId(),
-                    name: `Rule ${config.rules.length + 1}`,
-                    conditions: [],
-                    links: [],
-                    role: '',
-                    resetOnLeave: false,
-                    removeOnLoss: true,
-                  },
-                ],
-              })
-            }
-          >
-            Rule
-          </AnimatedIconButton>
+          <div className="sp-ar__head-actions">
+            <Used n={config.rules.length} max={limits.rules} what="rules" />
+            <AnimatedIconButton
+              size="sm"
+              {...plusAnimations}
+              disabled={config.rules.length >= limits.rules}
+              title={
+                config.rules.length >= limits.rules
+                  ? `This plan has up to ${limits.rules} rules.`
+                  : undefined
+              }
+              onClick={() =>
+                onChange({
+                  rules: [
+                    ...config.rules,
+                    {
+                      id: newId(),
+                      name: `Rule ${config.rules.length + 1}`,
+                      conditions: [],
+                      links: [],
+                      role: '',
+                      resetOnLeave: false,
+                      removeOnLoss: true,
+                    },
+                  ],
+                })
+              }
+            >
+              Rule
+            </AnimatedIconButton>
+          </div>
         </div>
         <div className="sp-card__body">
           {config.rules.length ? (
@@ -381,10 +424,7 @@ function RuleCard({
                 >
                   <button
                     type="button"
-                    className={cx(
-                      'sp-ar__link-btn',
-                      rule.links[i - 1] === 'or' && 'is-or',
-                    )}
+                    className="sp-ar__link-btn"
                     aria-pressed={rule.links[i - 1] === 'or'}
                     title="Switch between AND and OR"
                     onClick={() =>
@@ -407,15 +447,19 @@ function RuleCard({
                   {c.kind === 'age' && (
                     <DurationInput
                       label="Account at least this old"
+                      tip="How old the member’s Discord account has to be, counted from when it was made. Use h and d, like 12h or 30d. From 1 day up to 2 years (730d)."
                       value={c.min}
-                      placeholder="30d"
+                      placeholder="e.g. 30d"
                       range={arRanges.age}
                       onChange={(min) => editCondition(c.id, { ...c, min })}
                     />
                   )}
                   {c.kind === 'badge' && (
                     <Combobox
-                      label="Has any of these badges"
+                      label={tipped(
+                        'Has any of these badges',
+                        'The member needs at least one of the badges you pick. Only badges on public profiles count; Discord doesn’t let bots see Nitro.',
+                      )}
                       multiple
                       placeholder="Pick badges"
                       searchPlaceholder="Search badges"
@@ -424,13 +468,16 @@ function RuleCard({
                         editCondition(c.id, { ...c, badges })
                       }
                       items={badgeItems}
-                      hint="Only badges shown on public profiles. Discord doesn’t let bots see Nitro."
                     />
                   )}
                   {c.kind === 'booster' && (
                     <div className="sp-ar__pair">
                       <Input
-                        label="Boosts at least"
+                        label={tipped(
+                          'Boosts at least',
+                          'How many times the member has boosted this server, from 1 to 100. Discord doesn’t tell bots this, so Sparko counts the server’s boost messages from when Automatic roles was turned on.',
+                        )}
+                        aria-label="Boosts at least"
                         type="number"
                         min={1}
                         max={100}
@@ -447,12 +494,12 @@ function RuleCard({
                             ),
                           })
                         }
-                        hint="Sparko counts boosts from the server’s boost messages."
                       />
                       <DurationInput
                         label="Boosting for at least"
+                        tip="How long the member has been boosting without stopping. Use h and d, like 12h or 7d. From 1 day up to 365 days."
                         value={c.for}
-                        placeholder="7d"
+                        placeholder="e.g. 7d"
                         range={arRanges.boost}
                         onChange={(v) => editCondition(c.id, { ...c, for: v })}
                       />

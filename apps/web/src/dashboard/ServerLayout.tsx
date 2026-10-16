@@ -1,3 +1,4 @@
+import { ModuleLoading, SkelList } from './modules/frame';
 import { useEffect, useState } from 'react';
 import {
   Link,
@@ -56,13 +57,63 @@ export function ServerLayout() {
   }, [pathname]);
 
   if (session.data === null) return <Navigate to="/signin" replace />;
+  const loadingModule = moduleId ? moduleById(moduleId) : undefined;
   if (servers.isPending)
     return (
       <DashboardFrame>
         <div className="sp-app" aria-busy="true" aria-label="Loading">
+          <nav className="sp-sidebar sp-sidebar--grouped" aria-hidden="true">
+            <div className="sp-sidebar__brand">
+              <span className="sp-brand-link">Sparko</span>
+            </div>
+            <div className="sp-skel-stack sp-skel-side">
+              <span className="sp-skel sp-skel--block" style={{ height: 56 }} />
+              <span className="sp-skel sp-skel--input" style={{ height: 32 }} />
+              {Array.from({ length: 12 }, (_, i) => (
+                <span key={i} className="sp-skel-row">
+                  <span className="sp-skel sp-skel--icon" />
+                  <span
+                    className="sp-skel"
+                    style={{ width: `${50 + ((i * 23) % 35)}%` }}
+                  />
+                </span>
+              ))}
+            </div>
+          </nav>
           <div className="sp-main">
+            <header className="sp-topbar" aria-hidden="true">
+              <div className="sp-topbar__start sp-skel-row">
+                <span className="sp-skel" style={{ width: 110 }} />
+                <span className="sp-skel" style={{ width: 80 }} />
+                <span className="sp-skel" style={{ width: 120 }} />
+              </div>
+              <div className="sp-topbar__end sp-skel-row">
+                <span
+                  className="sp-skel sp-skel--input"
+                  style={{ width: 280, height: 40 }}
+                />
+                <span className="sp-skel sp-skel--circle" />
+              </div>
+            </header>
             <div className="sp-content">
-              <span className="sp-skel sp-skel--title" />
+              {loadingModule ? (
+                <ModuleLoading module={loadingModule} />
+              ) : (
+                <div className="sp-stack">
+                  <div className="sp-skel-stack" style={{ maxWidth: 520 }}>
+                    <span className="sp-skel" style={{ width: 90 }} />
+                    <span
+                      className="sp-skel sp-skel--title"
+                      style={{ width: '60%' }}
+                    />
+                    <span className="sp-skel" />
+                  </div>
+                  <div className="sp-split">
+                    <SkelList rows={4} />
+                    <SkelList rows={4} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

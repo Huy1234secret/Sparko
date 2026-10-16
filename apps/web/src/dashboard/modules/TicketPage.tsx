@@ -29,7 +29,7 @@ import {
   type TicketPriority,
 } from '../../data';
 import { isMac, useCurrentServer, useDashboardTitle } from '../shared';
-import { PausedNotice } from './frame';
+import { PausedNotice, SkelList } from './frame';
 import { priorityInfo, StatusBadge } from './TicketsModule';
 
 const closeReasons = [
@@ -483,8 +483,15 @@ export function TicketPage() {
   if (ticket.isPending)
     return (
       <div className="sp-stack" aria-busy="true" aria-label="Loading">
-        <span className="sp-skel sp-skel--title" />
-        <div className="sp-skel sp-skel--block" style={{ height: 420 }} />
+        {back}
+        <header className="sp-ticket-head sp-skel-stack">
+          <span className="sp-skel sp-skel--title" style={{ width: 260 }} />
+          <span className="sp-skel" style={{ width: 340 }} />
+        </header>
+        <div className="sp-split sp-split--wide">
+          <div className="sp-skel sp-skel--block" style={{ height: 420 }} />
+          <SkelList rows={4} />
+        </div>
       </div>
     );
   if (ticket.isError)

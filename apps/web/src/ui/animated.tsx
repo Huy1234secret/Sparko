@@ -153,7 +153,13 @@ export function LottieIcon({
   original,
 }: LottieIconProps) {
   const box = useRef<HTMLSpanElement>(null);
-  const [anim, setAnim] = useState<AnimationItem | null>(null);
+  const [loaded, setLoaded] = useState<{
+    item: AnimationItem;
+    src: string;
+  } | null>(null);
+  // While a new file loads, the old one isn't played in its place: hovering
+  // an icon swaps to its hover animation, and the reveal shouldn't replay.
+  const anim = loaded?.src === src ? loaded.item : null;
   // Read when the animation loads or finishes, without reloading it.
   const latest = useRef({ open, onDone, startAt });
   useEffect(() => {
@@ -188,7 +194,7 @@ export function LottieIcon({
         shown.current?.item.destroy();
         shown.current?.el.remove();
         shown.current = { item, el };
-        setAnim(item);
+        setLoaded({ item, src });
       })
       // Without the animation the space stays empty; nothing else breaks.
       .catch(() => undefined);

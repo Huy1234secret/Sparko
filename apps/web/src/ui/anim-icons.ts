@@ -112,4 +112,5 @@ const svg = (name: string) =>
 export const svgIcons = {
   reactionRole: svg('reaction-role-icon'),
   welcomeTag: svg('tag-welcome-message'),
+  sandClock: svg('sand-clock-icon'),
 };

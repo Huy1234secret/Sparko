@@ -959,9 +959,11 @@
   display: grid;
   justify-items: end;
   gap: 8px;
-  overflow-y: auto;
   /* The line sits 15–17px from the right edge; items stop 8px before it. */
   padding: 8px 25px 12px 0;
+}
+.sp-plus-menu.is-long {
+  overflow-y: auto;
 }
 .sp-plus-menu[data-side='top'] {
   padding: 12px 25px 8px 0;
@@ -1028,6 +1030,28 @@
     opacity: 0;
     transform: translate(12px, -6px);
   }
+}
+/* Closing: the items go back up the line, last first, then the line. */
+@keyframes sp-plus-item-out {
+  to {
+    opacity: 0;
+    transform: translate(12px, -6px);
+  }
+}
+@keyframes sp-plus-line-out {
+  to {
+    transform: scaleY(0);
+  }
+}
+.sp-plus-menu.is-closing {
+  pointer-events: none;
+}
+.sp-plus-menu.is-closing .sp-plus-menu__item {
+  animation: sp-plus-item-out 110ms var(--sp-ease-in, ease-in) both;
+  animation-delay: calc((4 - min(var(--i), 4)) * 12ms);
+}
+.sp-plus-menu.is-closing .sp-plus-menu__line {
+  animation: sp-plus-line-out 140ms var(--sp-ease-in, ease-in) 20ms both;
 }
 
 /* Emoji picker */
@@ -2424,11 +2448,11 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-combo-chip--role {
   border-color: transparent;
   background: var(--role-fill);
-  color: #fff;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+  color: var(--role-ink, #fff);
+  text-shadow: var(--role-glow, 0 1px 2px rgb(0 0 0 / 0.45));
 }
 .sp-combo-chip--role .sp-chip__remove {
-  color: #fff;
+  color: inherit;
 }
 .sp-combo-chip--role .sp-chip__remove:hover {
   background: rgb(0 0 0 / 0.25);
@@ -2467,6 +2491,34 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-vars-pop[data-side='top'],
 .sp-emoji-pop[data-side='top'] {
   animation-name: sp-wipe-up;
+}
+/* Closing plays the same wipe backwards. */
+@keyframes sp-wipe-down-out {
+  from {
+    clip-path: inset(0 0 0 0 round var(--sp-radius-card));
+  }
+  to {
+    clip-path: inset(0 0 100% 0 round var(--sp-radius-card));
+  }
+}
+@keyframes sp-wipe-up-out {
+  from {
+    clip-path: inset(0 0 0 0 round var(--sp-radius-card));
+  }
+  to {
+    clip-path: inset(100% 0 0 0 round var(--sp-radius-card));
+  }
+}
+.sp-combo__pop.is-closing,
+.sp-vars-pop.is-closing,
+.sp-emoji-pop.is-closing {
+  animation: sp-wipe-down-out 160ms var(--sp-ease-in, ease-in) both;
+  pointer-events: none;
+}
+.sp-combo__pop.is-closing[data-side='top'],
+.sp-vars-pop.is-closing[data-side='top'],
+.sp-emoji-pop.is-closing[data-side='top'] {
+  animation-name: sp-wipe-up-out;
 }
 @media (prefers-reduced-motion: reduce) {
   .sp-combo__pop,
@@ -2554,6 +2606,9 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-combo-option--role[data-active='true'],
 .sp-combo-option--role[aria-selected='true'] {
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.55);
+  /* On its full colour: dark text on light roles, white on the rest. */
+  color: var(--role-ink, #fff);
+  text-shadow: var(--role-glow, 0 1px 2px rgb(0 0 0 / 0.45));
 }
 .sp-combo-option--role[data-active='true']::before,
 .sp-combo-option--role[aria-selected='true']::before {
@@ -2846,6 +2901,15 @@ body:has(> .sp-settings-scrim) > #root {
 }
 .sp-choice-input:checked + .sp-check__box--anim .sp-lottie {
   opacity: 1;
+}
+/* The animation is the feedback; the box itself doesn't shrink on press. */
+.sp-check:active .sp-check__box--anim,
+.sp-check.is-active .sp-check__box--anim {
+  transform: none;
+}
+.sp-check__box--anim .sp-lottie {
+  transform: none;
+  transition: none;
 }
 /* With Welcome messages off, the tabs and editor below rest, faded. */
 .sp-greet-body {
@@ -3211,8 +3275,27 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-ar__timed {
   display: grid;
   grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 10px 12px;
   align-items: start;
+}
+.sp-ar__item-title {
+  grid-column: 1 / -1;
+  margin: 0;
+  font: 600 14px/20px var(--sp-font-sans);
+}
+.sp-ar__head-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+.sp-ar__used {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--sp-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 .sp-ar__timed > .sp-icon-btn,
 .sp-ar__rule-head > .sp-icon-btn {
@@ -3246,6 +3329,10 @@ body:has(> .sp-settings-scrim) > #root {
   margin: 0;
   padding: 0 0 0 28px;
   list-style: none;
+}
+/* A single requirement has nothing to join, so no room for the line. */
+.sp-ar__conds:has(> .sp-ar__cond:only-child) {
+  padding-left: 0;
 }
 .sp-ar__cond {
   position: relative;
@@ -3292,7 +3379,7 @@ body:has(> .sp-settings-scrim) > #root {
 }
 .sp-ar__link {
   position: relative;
-  height: 36px;
+  height: 22px;
 }
 .sp-ar__cond::before {
   content: '';
@@ -3321,8 +3408,8 @@ body:has(> .sp-settings-scrim) > #root {
   top: 50%;
   left: -38px;
   z-index: 1;
-  min-width: 44px;
-  height: 24px;
+  min-width: 40px;
+  height: 20px;
   padding: 0 6px;
   border: 1px solid var(--sp-line-strong);
   border-radius: 6px;
@@ -3332,10 +3419,6 @@ body:has(> .sp-settings-scrim) > #root {
   letter-spacing: 0.04em;
   transform: translateY(-50%);
   cursor: pointer;
-}
-.sp-ar__link-btn.is-or {
-  border-color: var(--sp-brand);
-  color: var(--sp-brand);
 }
 .sp-ar__link-btn:hover,
 .sp-ar__link-btn:focus-visible {

@@ -1,5 +1,11 @@
 import { useRef, useState, type CSSProperties } from 'react';
-import { LottieIcon, cx, menuPlacement, usePlacement } from '../../ui';
+import {
+  LottieIcon,
+  cx,
+  menuPlacement,
+  usePlacement,
+  usePresence,
+} from '../../ui';
 import { useDismiss } from './EditorBits';
 import { animIcons } from '../../ui';
 const plusAnim = animIcons.plusMenu.select;
@@ -38,7 +44,8 @@ export function PlusMenu({
   useDismiss(open, () => toggle(false), wrap);
   const pop = useRef<HTMLDivElement>(null);
   // The line starts at the button itself.
-  usePlacement(open, wrap, pop, { ...menuPlacement, gap: 0 });
+  const presence = usePresence(open);
+  usePlacement(presence.mounted, wrap, pop, { ...menuPlacement, gap: 0 });
   return (
     <div ref={wrap} className="sp-pop-anchor">
       <button
@@ -59,8 +66,18 @@ export function PlusMenu({
           to={open ? OPEN[1] : CLOSE[1]}
         />
       </button>
-      {open && (
-        <div ref={pop} className="sp-plus-menu" role="menu" aria-label={label}>
+      {presence.mounted && (
+        <div
+          ref={pop}
+          // Up to 5 items show in full; longer lists scroll.
+          className={cx(
+            'sp-plus-menu',
+            items.length > 5 && 'is-long',
+            presence.closing && 'is-closing',
+          )}
+          role="menu"
+          aria-label={label}
+        >
           <span className="sp-plus-menu__line" aria-hidden="true" />
           {items.map((item, i) => (
             <button

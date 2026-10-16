@@ -1,4 +1,4 @@
-import { useLayoutEffect, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 
 /** Popovers stay below the dashboard's top bar, which stays on screen. */
 const topLimit = () =>
@@ -175,3 +175,24 @@ export const menuPlacement = {
   matchWidth: false,
   align: 'end' as const,
 };
+
+/** How long a menu takes to close: its opening animation, played back. */
+export const CLOSE_MS = 160;
+
+/**
+ * Keeps a menu on screen a moment after it's closed, so it can play its
+ * opening animation in reverse. `closing` is true during that moment.
+ */
+export function usePresence(open: boolean, ms = CLOSE_MS) {
+  const [shown, setShown] = useState(open);
+  if (open && !shown) setShown(true);
+  useEffect(() => {
+    if (open || !shown) return;
+    const quick = window.matchMedia?.(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
+    const t = setTimeout(() => setShown(false), quick ? 0 : ms);
+    return () => clearTimeout(t);
+  }, [open, shown, ms]);
+  return { mounted: open || shown, closing: !open && shown };
+}
