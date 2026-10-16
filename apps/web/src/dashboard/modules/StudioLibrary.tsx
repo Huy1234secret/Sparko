@@ -711,7 +711,7 @@ export function StudioLibrary({
                 <div className="sp-lib-card__actions">
                   <AnimatedButton
                     anim={editAnim}
-                    variant="primary"
+                    variant="ghost"
                     size="sm"
                     aria-label={`Edit ${x.item.name}`}
                     onClick={() =>
@@ -730,6 +730,7 @@ export function StudioLibrary({
                     <AnimatedButton
                       anim={cloneAnim}
                       solid
+                      variant="ghost"
                       size="sm"
                       disabled={
                         fullTemplates || actions.cloneTemplate.isPending
@@ -747,7 +748,7 @@ export function StudioLibrary({
                   <AnimatedButton
                     anim={removeAnim}
                     solid
-                    variant="danger"
+                    variant="ghost"
                     size="sm"
                     aria-label={`Delete ${x.item.name}`}
                     onClick={() =>
