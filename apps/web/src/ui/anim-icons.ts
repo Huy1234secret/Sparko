@@ -89,6 +89,8 @@ export const animIcons = {
   settingOutline: pair('setting-icon-outline', true),
   template: pair('template-icon'),
   shuffle: pair('shuffle-icon'),
+  /** Automatic roles. */
+  autoRole: pair('automatic-role-icon'),
   upload: set('upload-button', ['reveal', 'hover', 'select']),
 };
 export type RevealHover = {

@@ -7,6 +7,7 @@ export * from './store.ts';
 export * from './welcome.ts';
 export * from './greet.ts';
 export * from './rr-store.ts';
+export * from './ar-store.ts';
 export * from './tickets.ts';
 export * from './ticket-actions.ts';
 export * from './studio.ts';

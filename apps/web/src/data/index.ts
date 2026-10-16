@@ -16,7 +16,7 @@ import type {
   TicketPanel,
   TicketPriority,
 } from './types';
-import type { ReactionRole, WelcomeConfig } from './studio-format';
+import type { AutoRoles, ReactionRole, WelcomeConfig } from './studio-format';
 
 export * from './types';
 export * from './library';
@@ -46,6 +46,8 @@ export const keys = {
   ticketsConfig: (id: string) => ['tickets', id, 'config'] as const,
   studio: (id: string) => ['studio', id] as const,
   rr: (id: string) => ['rr', id] as const,
+  ar: (id: string) => ['ar', id] as const,
+  arMembers: (id: string, q: string) => ['ar', id, 'members', q] as const,
 };
 
 export const useSession = () =>
@@ -86,6 +88,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: ['tickets', serverId] }),
       client.invalidateQueries({ queryKey: keys.studio(serverId) }),
       client.invalidateQueries({ queryKey: keys.rr(serverId) }),
+      client.invalidateQueries({ queryKey: keys.ar(serverId) }),
     ]);
 }
 
@@ -279,6 +282,48 @@ export function useStudioActions(serverId: string) {
           client.setQueryData(keys.studio(serverId), context.before);
       },
       onSettled: refresh,
+    }),
+  };
+}
+export const useAutoRoles = (serverId: string) =>
+  useQuery({
+    queryKey: keys.ar(serverId),
+    queryFn: () => api.getAutoRoles(serverId),
+  });
+export function useSaveAutoRoles(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return useMutation({
+    mutationFn: (change: { on: boolean; config: AutoRoles }) =>
+      api.saveAutoRoles(serverId, change),
+    onSuccess: refresh,
+  });
+}
+/** Members in Storage; nothing is listed until something is searched. */
+export const useARMembers = (serverId: string, query: string) =>
+  useQuery({
+    queryKey: keys.arMembers(serverId, query.trim()),
+    queryFn: () => api.searchARMembers(serverId, query.trim()),
+    enabled: query.trim().length > 0,
+  });
+export function useARMemberActions(serverId: string) {
+  const client = useQueryClient();
+  const refresh = () =>
+    client.invalidateQueries({ queryKey: keys.ar(serverId) });
+  return {
+    edit: useMutation({
+      mutationFn: ({
+        userId,
+        ...edit
+      }: {
+        userId: string;
+        servedMs?: number;
+        boosts?: number;
+      }) => api.editARMember(serverId, userId, edit),
+      onSuccess: refresh,
+    }),
+    wipe: useMutation({
+      mutationFn: (userId: string) => api.wipeARMember(serverId, userId),
+      onSuccess: refresh,
     }),
   };
 }

@@ -1,4 +1,10 @@
-import type { GreetKind, ReactionRole, WelcomeConfig } from './studio-format';
+import type {
+  ARLogEntry,
+  AutoRoles,
+  GreetKind,
+  ReactionRole,
+  WelcomeConfig,
+} from './studio-format';
 
 /**
  * What the dashboard reads and writes. The sample source (mock.ts) and,
@@ -147,7 +153,43 @@ export type RRState = {
   log: RRLogEntry[];
 };
 
+export type ARState = {
+  on: boolean;
+  config: AutoRoles;
+  limits: {
+    timed: number;
+    rules: number;
+    conditions: number;
+    joinRoles: number;
+  };
+  roles: RoleOption[];
+  log: ARLogEntry[];
+};
+/** One member's saved automatic role data, as Storage shows it. */
+export type ARMemberView = {
+  userId: string;
+  name: string;
+  inServer: boolean;
+  servedMs: number;
+  boosts: number;
+  boostingSince: number | null;
+  given: string[];
+  updatedAt: number;
+};
+
 export interface PanelApi {
+  getAutoRoles(serverId: string): Promise<ARState>;
+  saveAutoRoles(
+    serverId: string,
+    change: { on: boolean; config: AutoRoles },
+  ): Promise<void>;
+  searchARMembers(serverId: string, query: string): Promise<ARMemberView[]>;
+  editARMember(
+    serverId: string,
+    userId: string,
+    edit: { servedMs?: number; boosts?: number },
+  ): Promise<ARMemberView>;
+  wipeARMember(serverId: string, userId: string): Promise<ARMemberView | null>;
   getReactionRoles(serverId: string): Promise<RRState>;
   addReactionRole(serverId: string, name: string): Promise<{ id: string }>;
   saveReactionRole(

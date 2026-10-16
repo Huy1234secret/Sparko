@@ -3184,3 +3184,201 @@ body:has(> .sp-settings-scrim) > #root {
     animation-duration: 20s;
   }
 }
+
+/* Automatic roles */
+.sp-ar__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.sp-ar__list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-ar__item {
+  padding: 12px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-ar__item .sp-field {
+  margin: 0;
+}
+.sp-ar__timed {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+.sp-ar__timed > .sp-icon-btn,
+.sp-ar__rule-head > .sp-icon-btn {
+  margin-top: 26px;
+}
+.sp-ar__checks {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+.sp-ar__rule {
+  display: grid;
+  gap: 12px;
+}
+.sp-ar__rule-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+.sp-ar__conds-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+/* Requirements hang off a line on the left; the square on it says how
+   each one joins the one before. */
+.sp-ar__conds {
+  position: relative;
+  display: grid;
+  margin: 0;
+  padding: 0 0 0 28px;
+  list-style: none;
+}
+.sp-ar__cond {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-surface);
+}
+.sp-ar__cond-name {
+  grid-row: 1;
+  grid-column: 1;
+  align-self: center;
+  color: var(--sp-muted);
+  font: 600 12px/16px var(--sp-font-sans);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.sp-ar__cond > .sp-icon-btn {
+  grid-row: 1;
+  grid-column: 2;
+  margin: -4px -4px 0 0;
+}
+.sp-ar__cond-body {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+/* One line runs down the left from the first requirement to the last. */
+.sp-ar__conds::before {
+  content: '';
+  position: absolute;
+  top: 28px;
+  bottom: 0;
+  left: 11px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--sp-line-strong);
+}
+.sp-ar__conds:has(> .sp-ar__cond:only-child)::before {
+  display: none;
+}
+.sp-ar__link {
+  position: relative;
+  height: 36px;
+}
+.sp-ar__cond::before {
+  content: '';
+  position: absolute;
+  top: 28px;
+  left: -17px;
+  width: 17px;
+  height: 2px;
+  background: var(--sp-line-strong);
+}
+.sp-ar__conds > .sp-ar__cond:only-child::before {
+  display: none;
+}
+/* The line stops at the last requirement's joint. */
+.sp-ar__conds > .sp-ar__cond:last-child::after {
+  content: '';
+  position: absolute;
+  top: 30px;
+  bottom: -1px;
+  left: -18px;
+  width: 4px;
+  background: var(--sp-raised);
+}
+.sp-ar__link-btn {
+  position: absolute;
+  top: 50%;
+  left: -38px;
+  z-index: 1;
+  min-width: 44px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--sp-line-strong);
+  border-radius: 6px;
+  background: var(--sp-surface);
+  color: var(--sp-text);
+  font: 700 11px/1 var(--sp-font-sans);
+  letter-spacing: 0.04em;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.sp-ar__link-btn.is-or {
+  border-color: var(--sp-brand);
+  color: var(--sp-brand);
+}
+.sp-ar__link-btn:hover,
+.sp-ar__link-btn:focus-visible {
+  outline: none;
+  background: var(--sp-raised);
+  box-shadow: var(--sp-ring);
+}
+.sp-ar-members {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-ar-member {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.sp-ar-member__open {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sp-ar-member__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .sp-ar__timed {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sp-ar__timed > :nth-child(2) {
+    grid-column: 1 / 2;
+  }
+}

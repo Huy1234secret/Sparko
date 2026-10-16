@@ -57,3 +57,24 @@ export {
   type RRKind,
   type RRMode,
 } from '../../../../packages/core/src/reaction-roles.ts';
+// Automatic roles share their checks, durations and rules with the bot.
+export {
+  AR_MODULE,
+  arBadges,
+  arConditionNames,
+  arDefault,
+  arIssue,
+  arLimits,
+  arLogText,
+  arRanges,
+  formatDuration,
+  parseDuration,
+  type ARCondition,
+  type ARConditionKind,
+  type ARIssue,
+  type ARLink,
+  type ARLogEntry,
+  type ARRule,
+  type ARTimed,
+  type AutoRoles,
+} from '../../../../packages/core/src/auto-roles.ts';

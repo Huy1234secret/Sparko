@@ -1,4 +1,10 @@
-import type { AvatarColor, PanelApi, Server, Session } from './types';
+import type {
+  ARMemberView,
+  AvatarColor,
+  PanelApi,
+  Server,
+  Session,
+} from './types';
 
 /**
  * The real backend, where there is one. On the server, sign-in and the
@@ -160,6 +166,38 @@ export function withBackend(
     async reopenTicket(id, n) {
       if (!(await backend()).live) return sample.reopenTicket(id, n);
       await call('POST', `${server(id)}/tickets/${n}/reopen`);
+    },
+    async getAutoRoles(id) {
+      if (!(await backend()).live) return sample.getAutoRoles(id);
+      return getJson(`${server(id)}/autoroles`);
+    },
+    async saveAutoRoles(id, change) {
+      if (!(await backend()).live) return sample.saveAutoRoles(id, change);
+      await call('PUT', `${server(id)}/autoroles`, change);
+    },
+    async searchARMembers(id, query) {
+      if (!(await backend()).live) return sample.searchARMembers(id, query);
+      const r = await getJson<{ members: ARMemberView[] }>(
+        `${server(id)}/autoroles/members?q=${encodeURIComponent(query)}`,
+      );
+      return r.members;
+    },
+    async editARMember(id, userId, edit) {
+      if (!(await backend()).live) return sample.editARMember(id, userId, edit);
+      const r = await call<{ member: ARMemberView }>(
+        'PATCH',
+        `${server(id)}/autoroles/members/${userId}`,
+        edit,
+      );
+      return r.member;
+    },
+    async wipeARMember(id, userId) {
+      if (!(await backend()).live) return sample.wipeARMember(id, userId);
+      const r = await call<{ member: ARMemberView | null }>(
+        'DELETE',
+        `${server(id)}/autoroles/members/${userId}`,
+      );
+      return r.member;
     },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);

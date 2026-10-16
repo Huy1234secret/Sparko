@@ -1032,9 +1032,9 @@ function RRLog({ entries }: { entries: RRLogEntry[] }) {
               <Icon
                 name={
                   e.action === 'added'
-                    ? 'circle-plus'
+                    ? 'circle-check'
                     : e.action === 'removed'
-                      ? 'circle-minus'
+                      ? 'minus'
                       : 'circle-x'
                 }
                 size="sm"

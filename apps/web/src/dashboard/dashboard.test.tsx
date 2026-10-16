@@ -426,6 +426,70 @@ describe('Reaction roles', () => {
   });
 });
 
+describe('Automatic roles', () => {
+  it('adds a timed role, checks it before saving, and goes live', async () => {
+    open(`${pixel}/autoroles`);
+    expect(
+      await screen.findByText('Join roles', {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Timed role$/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Write how long for timed role 3/),
+    ).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /Timed role 3/ }),
+      '90d',
+    );
+    // Roles Sparko can't give can't be picked.
+    const third = screen
+      .getByRole('textbox', { name: /Timed role 3/ })
+      .closest('li')!;
+    await userEvent.click(within(third).getByRole('button', { name: /^Role/ }));
+    expect(screen.getByRole('option', { name: /Moderator/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await userEvent.click(screen.getByRole('option', { name: /Member/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(
+      await screen.findByText(/Automatic roles are live/, {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('links requirements with AND or OR', async () => {
+    open(`${pixel}/autoroles`);
+    const link = await screen.findByRole(
+      'button',
+      { name: 'OR', pressed: true },
+      { timeout: 4000 },
+    );
+    await userEvent.click(link);
+    expect(link).toHaveTextContent('AND');
+  });
+
+  it('shows saved member data only after a search, and wipes it', async () => {
+    open(`${pixel}/autoroles?tab=history`);
+    expect(await screen.findByText('Search for a member')).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Search members' }),
+      'rhea',
+    );
+    expect(await screen.findByText(/45d in the server/)).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: /Wipe rhea’s data/ }),
+    );
+    const dialog = screen.getByRole('dialog', { name: /Wipe rhea/ });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Wipe data' }),
+    );
+    expect(await screen.findByText(/0m in the server/)).toBeInTheDocument();
+  }, 20_000);
+});
+
 describe('Tickets', () => {
   it('lists tickets needing a reply, longest waits first, and searches them', async () => {
     open(`${pixel}/tickets`);
