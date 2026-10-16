@@ -482,9 +482,40 @@ export function createApi({
     return true;
   }
 
-  /** Handles /api/v1/servers/… Returns false for anything else. */
+  /**
+   * Whether Sparko is up, for the public Status page: no sign-in needed and
+   * nothing private. The bot counts as online if it checked in within two
+   * minutes (it does every 30 seconds).
+   */
+  function publicStatus() {
+    const beat = getStatus<{ ping: number; guilds?: number }>(db, 'heartbeat');
+    const commands = getStatus<{ count: number }>(db, 'commands');
+    const online = !!beat && now() - beat.at < 120_000;
+    return {
+      status: online ? 'operational' : 'degraded',
+      checkedAt: new Date(now()).toISOString(),
+      website: { online: true },
+      bot: {
+        online,
+        latencyMs: online ? Math.max(0, beat.value.ping) : null,
+        servers: beat?.value.guilds ?? null,
+        lastSeen: beat ? new Date(beat.at).toISOString() : null,
+      },
+      commands: commands?.value.count ?? 0,
+    };
+  }
+
+  /** Handles /api/v1/servers/… and the public status. False for the rest. */
   return async function handle(req: IncomingMessage, res: ServerResponse) {
     const url = new URL(req.url ?? '/', origin);
+    if (url.pathname === '/api/v1/public/status') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        json(res, 405, { error: 'method_not_allowed' });
+        return true;
+      }
+      json(res, 200, publicStatus());
+      return true;
+    }
     try {
       return await route(req, res, url);
     } catch (e) {

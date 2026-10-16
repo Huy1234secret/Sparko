@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, EmptyState, Icon, Notice, Spinner } from '../ui';
+import { Badge, Button, EmptyState, Icon, Notice, Spinner } from '../ui';
 import { legal } from '../content/legal';
 import { groups, groupMeta, modules } from '../content/modules';
 import { featureDetails } from '../content/features';
@@ -232,24 +232,64 @@ export function DocsPage() {
   );
 }
 
-type Status = 'loading' | 'operational' | 'degraded' | 'unreachable';
+type Live = {
+  status: 'operational' | 'degraded';
+  checkedAt: string;
+  bot: {
+    online: boolean;
+    latencyMs: number | null;
+    servers: number | null;
+    lastSeen: string | null;
+  };
+  commands: number;
+};
+type Status =
+  | { state: 'loading' }
+  | { state: 'unreachable' }
+  | { state: 'ok'; live: Live };
+
+const timeOf = (iso: string) =>
+  new Date(iso).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
 export function StatusPage() {
   usePageTitle('Status');
-  const [status, setStatus] = useState<Status>('loading');
+  const [status, setStatus] = useState<Status>({ state: 'loading' });
+  const [checking, setChecking] = useState(false);
+  const [round, setRound] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/v1/public/status', { signal: controller.signal })
+    fetch('/api/v1/public/status', {
+      signal: controller.signal,
+      headers: { accept: 'application/json' },
+    })
       .then(async (response) => {
-        if (!response.ok) throw new Error(String(response.status));
-        const body = (await response.json()) as { status?: unknown };
-        setStatus(body.status === 'operational' ? 'operational' : 'degraded');
+        const json = response.headers.get('content-type')?.includes('json');
+        if (!response.ok || !json) throw new Error(String(response.status));
+        setStatus({ state: 'ok', live: (await response.json()) as Live });
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setStatus('unreachable');
+        if (!controller.signal.aborted) setStatus({ state: 'unreachable' });
         return error;
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setChecking(false);
       });
-    return () => controller.abort();
-  }, []);
+    // Checks again on its own every 30 seconds while the page is open.
+    const timer = setTimeout(() => setRound((r) => r + 1), 30_000);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [round]);
+  const recheck = () => {
+    setChecking(true);
+    setRound((r) => r + 1);
+  };
+  const live = status.state === 'ok' ? status.live : null;
   return (
     <div className="sw-wrap" style={{ paddingBottom: 96, maxWidth: 880 }}>
       <PageHero
@@ -257,49 +297,123 @@ export function StatusPage() {
         title="Is Sparko working?"
         lede="This page checks the Sparko service directly. Planned work and incidents are also announced in the support server."
       />
-      <div className="sp-card" aria-live="polite">
-        {status === 'loading' && (
-          <div className="sw-status-row">
-            <Spinner />
-            Checking the service…
+      {status.state === 'loading' && (
+        <div className="sp-card sw-status-row" aria-live="polite">
+          <Spinner />
+          Checking the service…
+        </div>
+      )}
+      {live && (
+        <div className="sw-uptime" aria-live="polite">
+          <div
+            className={
+              'sw-uptime__head ' +
+              (live.status === 'operational' ? 'is-up' : 'is-down')
+            }
+          >
+            <span className="sw-uptime__pulse" aria-hidden="true" />
+            <div>
+              <h2>
+                {live.status === 'operational'
+                  ? 'Everything is working'
+                  : 'The bot is offline right now'}
+              </h2>
+              <p>
+                {live.status === 'operational'
+                  ? 'The website, dashboard and bot are running normally.'
+                  : 'The website and dashboard work, but Sparko isn’t answering in Discord. Changes you save are kept and applied when it’s back.'}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              icon="refresh-cw"
+              loading={checking}
+              loadingLabel="Checking…"
+              onClick={recheck}
+            >
+              Check again
+            </Button>
           </div>
-        )}
-        {status === 'operational' && (
-          <div className="sw-status-row">
-            <Badge tone="success" dot>
-              Operational
-            </Badge>
-            The bot and the dashboard are working normally.
-          </div>
-        )}
-        {status === 'degraded' && (
-          <div className="sw-status-row">
-            <Badge tone="warning" dot>
-              Some problems
-            </Badge>
-            Parts of Sparko are slow or unavailable. We’re on it.
-          </div>
-        )}
-        {status === 'unreachable' && (
+          <ul className="sw-uptime__list">
+            <li>
+              <Icon name="globe" />
+              <span className="sw-uptime__name">Website and dashboard</span>
+              <span className="sw-uptime__detail">Reachable</span>
+              <Badge tone="success" dot>
+                Online
+              </Badge>
+            </li>
+            <li>
+              <Icon name="bot" />
+              <span className="sw-uptime__name">Sparko bot</span>
+              <span className="sw-uptime__detail">
+                {live.bot.online
+                  ? [
+                      live.bot.latencyMs !== null &&
+                        `Responds in ${live.bot.latencyMs} ms`,
+                      live.bot.servers !== null &&
+                        `in ${live.bot.servers.toLocaleString()} servers`,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')
+                  : live.bot.lastSeen
+                    ? `Last seen at ${timeOf(live.bot.lastSeen)}`
+                    : 'Hasn’t checked in yet'}
+              </span>
+              <Badge tone={live.bot.online ? 'success' : 'danger'} dot>
+                {live.bot.online ? 'Online' : 'Offline'}
+              </Badge>
+            </li>
+            <li>
+              <Icon name="terminal" />
+              <span className="sw-uptime__name">Slash commands</span>
+              <span className="sw-uptime__detail">
+                {live.commands
+                  ? `${live.commands} commands registered with Discord`
+                  : 'Not registered yet'}
+              </span>
+              <Badge tone={live.commands ? 'success' : 'warning'} dot>
+                {live.commands ? 'Ready' : 'Waiting'}
+              </Badge>
+            </li>
+          </ul>
+          <p className="sw-uptime__foot">
+            Checked at {timeOf(live.checkedAt)}. This page checks again every 30
+            seconds.
+          </p>
+        </div>
+      )}
+      {status.state === 'unreachable' && (
+        <div className="sp-card" aria-live="polite">
           <EmptyState
             error
             title="We couldn’t reach the status service"
             actions={
-              <a
-                className="sp-btn sp-btn--secondary"
-                href={supportServer}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open the support server
-              </a>
+              <>
+                <Button
+                  icon="refresh-cw"
+                  loading={checking}
+                  loadingLabel="Checking…"
+                  onClick={recheck}
+                >
+                  Try again
+                </Button>
+                <a
+                  className="sp-btn sp-btn--ghost"
+                  href={supportServer}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open the support server
+                </a>
+              </>
             }
           >
             Either your connection dropped or Sparko is down. Updates are posted
             in the support server.
           </EmptyState>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

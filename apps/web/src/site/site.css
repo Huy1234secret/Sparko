@@ -1659,3 +1659,112 @@ a.sw-open-dash {
   font: 400 12px/16px var(--sp-font-sans);
   color: var(--sp-muted);
 }
+
+/* Status page */
+.sw-uptime {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-card);
+  background: var(--sp-surface);
+}
+.sw-uptime__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--sp-line);
+}
+.sw-uptime__head.is-up {
+  background: var(--sp-success-soft);
+}
+.sw-uptime__head.is-down {
+  background: var(--sp-danger-soft);
+}
+.sw-uptime__head h2 {
+  margin: 0;
+  font: 600 18px/26px var(--sp-font-sans);
+}
+.sw-uptime__head p {
+  margin: 2px 0 0;
+  font: 400 14px/20px var(--sp-font-sans);
+  color: var(--sp-muted);
+}
+.sw-uptime__pulse {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sp-success);
+}
+.is-down .sw-uptime__pulse {
+  background: var(--sp-danger);
+}
+.sw-uptime__pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sw-uptime__pulse::after {
+    animation: sw-pulse 2s ease-out infinite;
+  }
+}
+@keyframes sw-pulse {
+  to {
+    opacity: 0;
+    scale: 2.6;
+  }
+}
+.sw-uptime__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-uptime__list li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 60px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--sp-line);
+}
+.sw-uptime__list .sp-i {
+  color: var(--sp-muted);
+}
+.sw-uptime__name {
+  font: 500 15px/22px var(--sp-font-sans);
+}
+.sw-uptime__detail {
+  font: 400 13px/18px var(--sp-font-sans);
+  color: var(--sp-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.sw-uptime__foot {
+  margin: 0;
+  padding: 12px 20px;
+  font: 400 13px/18px var(--sp-font-sans);
+  color: var(--sp-muted);
+}
+@container (max-width: 640px) {
+  .sw-uptime__head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .sw-uptime__head .sp-btn {
+    grid-column: 1 / -1;
+  }
+  .sw-uptime__list li {
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+  }
+  .sw-uptime__detail {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    text-align: left;
+  }
+}

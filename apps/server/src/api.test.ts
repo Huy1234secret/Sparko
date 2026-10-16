@@ -147,6 +147,24 @@ const call = (path: string, init: RequestInit = {}) =>
 const body = async <T>(res: Response) => (await res.json()) as T;
 
 describe('server API', () => {
+  it('reports public status without signing in, from the bot’s heartbeat', async () => {
+    const url = base.replace('/servers', '/public/status');
+    setStatus(db, 'heartbeat', { ping: 37, guilds: 12 }, Date.now());
+    const up = await fetch(url);
+    expect(up.status).toBe(200);
+    expect(await up.json()).toMatchObject({
+      status: 'operational',
+      website: { online: true },
+      bot: { online: true, latencyMs: 37, servers: 12 },
+    });
+    setStatus(db, 'heartbeat', { ping: 37 }, Date.now() - 5 * 60_000);
+    expect(await (await fetch(url)).json()).toMatchObject({
+      status: 'degraded',
+      bot: { online: false, latencyMs: null },
+    });
+    setStatus(db, 'heartbeat', { ping: 42 }, Date.now());
+  });
+
   it('keeps out people who are signed out or can’t manage the server', async () => {
     expect((await fetch(`${base}/9001/overview`)).status).toBe(401);
     expect((await call('/9002/overview')).status).toBe(403);
