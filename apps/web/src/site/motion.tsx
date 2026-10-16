@@ -273,27 +273,41 @@ export function useOrbitControl(stageRef: RefObject<HTMLElement | null>) {
       target = to;
       if (!rateFrame) rateFrame = requestAnimationFrame(stepRate);
     };
-    // Whether the pointer is over the orbit is worked out from its box, not
-    // from hover events, so the gaps between cards and the heading count in
-    // every browser, whatever it decides is under the pointer.
+    // Hovering any card stops both arcs; the gaps and the heading don't.
+    // Whether the pointer is on a card is worked out from the cards' boxes,
+    // not from hover events, so it behaves the same in every browser.
     let px = -1;
     let py = -1;
     let over = false;
     let checkFrame = 0;
     const focusedInside = () => !!stage.querySelector(':focus-visible');
     const settle = () => ease(over || focusedInside() ? 0 : 1);
+    const inside = (r: DOMRect, pad: number) =>
+      px >= r.left - pad &&
+      px <= r.right + pad &&
+      py >= r.top - pad &&
+      py <= r.bottom + pad;
     const check = () => {
       checkFrame = 0;
-      const r = stage.getBoundingClientRect();
+      const inStage =
+        px >= 0 &&
+        px <= window.innerWidth &&
+        inside(stage.getBoundingClientRect(), 0);
+      // A little slack once stopped, so the last bit of glide can't slide the
+      // card out from under the pointer and start it again.
+      const pad = over ? 12 : 0;
       const now =
-        px >= Math.max(r.left, 0) &&
-        px <= Math.min(r.right, window.innerWidth) &&
-        py >= r.top &&
-        py <= r.bottom;
+        inStage &&
+        Array.from(stage.querySelectorAll<HTMLElement>('.sw-orbit__card')).some(
+          (card) => inside(card.getBoundingClientRect(), pad),
+        );
       if (now !== over) {
         over = now;
         settle();
       }
+      // Cards keep moving under a still pointer, so keep looking while it's
+      // in the orbit but not on a card yet.
+      if (inStage && !now) recheck();
     };
     const recheck = () => {
       if (!checkFrame) checkFrame = requestAnimationFrame(check);
