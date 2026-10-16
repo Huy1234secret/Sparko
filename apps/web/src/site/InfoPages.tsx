@@ -1,10 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, EmptyState, Icon, Notice, Spinner } from '../ui';
+import { Badge, Button, EmptyState, Icon, Notice, Spinner } from '../ui';
 import { legal } from '../content/legal';
-import { groups, groupMeta, modules } from '../content/modules';
-import { featureDetails } from '../content/features';
-import { studioVariables } from '../data/studio-format';
 import { supportServer } from './links';
 import { usePageTitle } from './SiteLayout';
 
@@ -26,230 +23,64 @@ function PageHero({
   );
 }
 
-const guides: { id: string; title: string; body: ReactNode }[] = [
-  {
-    id: 'start',
-    title: 'Get started',
-    body: (
-      <ol>
-        <li>Choose Add to Discord, pick your server and approve.</li>
-        <li>
-          Sign in to the dashboard with Discord. You see every server where you
-          have Manage Server.
-        </li>
-        <li>
-          Follow the setup checklist on the server’s overview. Each step shows a
-          preview before anything is posted.
-        </li>
-      </ol>
-    ),
-  },
-  {
-    id: 'permissions',
-    title: 'Permissions Sparko asks for',
-    body: (
-      <p>
-        Sparko never asks for Administrator. It asks only for what the modules
-        you turn on need, such as Manage Roles for automatic roles or Moderate
-        Members for timeouts. If one is missing, the dashboard says which module
-        needs it and where to switch it on in Discord.
-      </p>
-    ),
-  },
-  {
-    id: 'saving',
-    title: 'Saving, applying and undoing',
-    body: (
-      <p>
-        When you save, the dashboard shows each stage: saved, applying to
-        Discord, then live. Every save is kept as a version you can restore, and
-        Configuration backups snapshot your whole setup so you can compare and
-        roll back.
-      </p>
-    ),
-  },
-  {
-    id: 'access',
-    title: 'Who can manage Sparko',
-    body: (
-      <p>
-        Server owners and members with Manage Server can manage everything.
-        Dashboard access lets you give other roles specific modules, like
-        Tickets for your support team, without giving them the rest.
-      </p>
-    ),
-  },
-  {
-    id: 'plans',
-    title: 'Free and Plus',
-    body: (
-      <p>
-        Every module except multi-server tools is free. Plus raises limits and
-        is paid through PayPal; see <Link to="/pricing">Pricing</Link>.
-      </p>
-    ),
-  },
-  {
-    id: 'data',
-    title: 'Your data',
-    body: (
-      <p>
-        The <Link to="/privacy">Privacy Policy</Link> explains what Sparko
-        stores and for how long. When Sparko is removed from a server, that
-        server’s data is deleted {legal.removalGraceDays} days later.
-      </p>
-    ),
-  },
-];
+type Live = {
+  status: 'operational' | 'degraded';
+  checkedAt: string;
+  bot: {
+    online: boolean;
+    latencyMs: number | null;
+    servers: number | null;
+    lastSeen: string | null;
+  };
+  commands: number;
+};
+type Status =
+  | { state: 'loading' }
+  | { state: 'unreachable' }
+  | { state: 'ok'; live: Live };
 
-const readyModules = modules.filter((m) => m.id in featureDetails);
+const timeOf = (iso: string) =>
+  new Date(iso).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 
-/** Everything the table of contents lists, in page order. */
-const docsToc = [
-  ...guides.map((g) => ({ id: g.id, title: g.title })),
-  { id: 'ready', title: 'Modules ready today' },
-  ...readyModules.map((m) => ({ id: `m-${m.id}`, title: m.label, sub: true })),
-  { id: 'variables', title: 'Message variables' },
-  { id: 'modules', title: 'Modules by group' },
-];
-
-export function DocsPage() {
-  usePageTitle('Docs');
-  return (
-    <div className="sw-wrap" style={{ paddingBottom: 96 }}>
-      <PageHero
-        eyebrow="Docs"
-        title="How Sparko works"
-        lede="Short guides for setting up Sparko and understanding what it does in your server."
-      />
-      <div className="sw-docs">
-        <nav className="sw-docs__toc" aria-label="On this page">
-          <ul>
-            {docsToc.map((g) => (
-              <li key={g.id} className={'sub' in g ? 'is-sub' : undefined}>
-                <a href={`#${g.id}`}>{g.title}</a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="sw-prose">
-          {guides.map((g) => (
-            <section key={g.id} id={g.id}>
-              <h2>{g.title}</h2>
-              {g.body}
-            </section>
-          ))}
-          <section id="ready">
-            <h2>Modules ready today</h2>
-            <p>
-              These modules are finished in the dashboard. The others on the{' '}
-              <Link to="/features">Features</Link> page are still being built
-              and show as coming soon.
-            </p>
-          </section>
-          {readyModules.map((m) => {
-            const detail = featureDetails[m.id]!;
-            return (
-              <section key={m.id} id={`m-${m.id}`} className="sw-docs__module">
-                <h3>
-                  <Icon name={m.icon} size="sm" />
-                  {m.label}
-                </h3>
-                <p>{m.description}</p>
-                <ul>
-                  {detail.how.map((h) => (
-                    <li key={h.title}>
-                      <b>{h.title}.</b> {h.body}
-                    </li>
-                  ))}
-                </ul>
-                <p>
-                  <b>To set it up:</b>
-                </p>
-                <ol>
-                  {detail.steps.map((step) => (
-                    <li key={step}>{step}</li>
-                  ))}
-                </ol>
-                {detail.commands && (
-                  <p>
-                    Commands:{' '}
-                    {detail.commands.map((c, i) => (
-                      <span key={c}>
-                        {i > 0 && ', '}
-                        <code className="sp-mono">{c}</code>
-                      </span>
-                    ))}
-                    .
-                  </p>
-                )}
-                <p>
-                  <Link to={`/features/${m.id}`}>More about {m.label}</Link>
-                </p>
-              </section>
-            );
-          })}
-          <section id="variables">
-            <h2>Message variables</h2>
-            <p>
-              Write these in braces in any message, like{' '}
-              <code className="sp-mono">{'{user}'}</code>, and Sparko fills them
-              in when it sends. The {'{ }'} button beside every live preview
-              lists them too.
-            </p>
-            <dl className="sw-vars">
-              {studioVariables.map((v) => (
-                <div key={v.name}>
-                  <dt>
-                    <code className="sp-mono">{`{${v.name}}`}</code>
-                  </dt>
-                  <dd>
-                    {v.about}
-                    {v.member && ' Welcome, leave and boost messages only.'}
-                    {v.role && ' Reaction role responses only.'}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-          <section id="modules">
-            <h2>Modules by group</h2>
-            <ul className="sw-docs__groups">
-              {groups.map((g) => (
-                <li key={g}>
-                  <Icon name={groupMeta[g].icon} size="sm" />
-                  <Link to={`/features?group=${encodeURIComponent(g)}`}>
-                    {g}
-                  </Link>
-                  <span className="sw-body">{groupMeta[g].blurb}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type Status = 'loading' | 'operational' | 'degraded' | 'unreachable';
 export function StatusPage() {
   usePageTitle('Status');
-  const [status, setStatus] = useState<Status>('loading');
+  const [status, setStatus] = useState<Status>({ state: 'loading' });
+  const [checking, setChecking] = useState(false);
+  const [round, setRound] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/v1/public/status', { signal: controller.signal })
+    fetch('/api/v1/public/status', {
+      signal: controller.signal,
+      headers: { accept: 'application/json' },
+    })
       .then(async (response) => {
-        if (!response.ok) throw new Error(String(response.status));
-        const body = (await response.json()) as { status?: unknown };
-        setStatus(body.status === 'operational' ? 'operational' : 'degraded');
+        const json = response.headers.get('content-type')?.includes('json');
+        if (!response.ok || !json) throw new Error(String(response.status));
+        setStatus({ state: 'ok', live: (await response.json()) as Live });
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setStatus('unreachable');
+        if (!controller.signal.aborted) setStatus({ state: 'unreachable' });
         return error;
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setChecking(false);
       });
-    return () => controller.abort();
-  }, []);
+    // Checks again on its own every 30 seconds while the page is open.
+    const timer = setTimeout(() => setRound((r) => r + 1), 30_000);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [round]);
+  const recheck = () => {
+    setChecking(true);
+    setRound((r) => r + 1);
+  };
+  const live = status.state === 'ok' ? status.live : null;
   return (
     <div className="sw-wrap" style={{ paddingBottom: 96, maxWidth: 880 }}>
       <PageHero
@@ -257,49 +88,123 @@ export function StatusPage() {
         title="Is Sparko working?"
         lede="This page checks the Sparko service directly. Planned work and incidents are also announced in the support server."
       />
-      <div className="sp-card" aria-live="polite">
-        {status === 'loading' && (
-          <div className="sw-status-row">
-            <Spinner />
-            Checking the service…
+      {status.state === 'loading' && (
+        <div className="sp-card sw-status-row" aria-live="polite">
+          <Spinner />
+          Checking the service…
+        </div>
+      )}
+      {live && (
+        <div className="sw-uptime" aria-live="polite">
+          <div
+            className={
+              'sw-uptime__head ' +
+              (live.status === 'operational' ? 'is-up' : 'is-down')
+            }
+          >
+            <span className="sw-uptime__pulse" aria-hidden="true" />
+            <div>
+              <h2>
+                {live.status === 'operational'
+                  ? 'Everything is working'
+                  : 'The bot is offline right now'}
+              </h2>
+              <p>
+                {live.status === 'operational'
+                  ? 'The website, dashboard and bot are running normally.'
+                  : 'The website and dashboard work, but Sparko isn’t answering in Discord. Changes you save are kept and applied when it’s back.'}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              icon="refresh-cw"
+              loading={checking}
+              loadingLabel="Checking…"
+              onClick={recheck}
+            >
+              Check again
+            </Button>
           </div>
-        )}
-        {status === 'operational' && (
-          <div className="sw-status-row">
-            <Badge tone="success" dot>
-              Operational
-            </Badge>
-            The bot and the dashboard are working normally.
-          </div>
-        )}
-        {status === 'degraded' && (
-          <div className="sw-status-row">
-            <Badge tone="warning" dot>
-              Some problems
-            </Badge>
-            Parts of Sparko are slow or unavailable. We’re on it.
-          </div>
-        )}
-        {status === 'unreachable' && (
+          <ul className="sw-uptime__list">
+            <li>
+              <Icon name="globe" />
+              <span className="sw-uptime__name">Website and dashboard</span>
+              <span className="sw-uptime__detail">Reachable</span>
+              <Badge tone="success" dot>
+                Online
+              </Badge>
+            </li>
+            <li>
+              <Icon name="bot" />
+              <span className="sw-uptime__name">Sparko bot</span>
+              <span className="sw-uptime__detail">
+                {live.bot.online
+                  ? [
+                      live.bot.latencyMs !== null &&
+                        `Responds in ${live.bot.latencyMs} ms`,
+                      live.bot.servers !== null &&
+                        `in ${live.bot.servers.toLocaleString()} servers`,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')
+                  : live.bot.lastSeen
+                    ? `Last seen at ${timeOf(live.bot.lastSeen)}`
+                    : 'Hasn’t checked in yet'}
+              </span>
+              <Badge tone={live.bot.online ? 'success' : 'danger'} dot>
+                {live.bot.online ? 'Online' : 'Offline'}
+              </Badge>
+            </li>
+            <li>
+              <Icon name="terminal" />
+              <span className="sw-uptime__name">Slash commands</span>
+              <span className="sw-uptime__detail">
+                {live.commands
+                  ? `${live.commands} commands registered with Discord`
+                  : 'Not registered yet'}
+              </span>
+              <Badge tone={live.commands ? 'success' : 'warning'} dot>
+                {live.commands ? 'Ready' : 'Waiting'}
+              </Badge>
+            </li>
+          </ul>
+          <p className="sw-uptime__foot">
+            Checked at {timeOf(live.checkedAt)}. This page checks again every 30
+            seconds.
+          </p>
+        </div>
+      )}
+      {status.state === 'unreachable' && (
+        <div className="sp-card" aria-live="polite">
           <EmptyState
             error
             title="We couldn’t reach the status service"
             actions={
-              <a
-                className="sp-btn sp-btn--secondary"
-                href={supportServer}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open the support server
-              </a>
+              <>
+                <Button
+                  icon="refresh-cw"
+                  loading={checking}
+                  loadingLabel="Checking…"
+                  onClick={recheck}
+                >
+                  Try again
+                </Button>
+                <a
+                  className="sp-btn sp-btn--ghost"
+                  href={supportServer}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open the support server
+                </a>
+              </>
             }
           >
             Either your connection dropped or Sparko is down. Updates are posted
             in the support server.
           </EmptyState>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -14,6 +14,13 @@ import { useAccountActions, usePageTitle } from './SiteLayout';
 
 const order = (i: number) => ({ '--i': i }) as CSSProperties;
 
+/** Room for the longest Plus price, so switching periods rolls in place. */
+const priceSlots = Math.max(
+  ...Object.values(periods).map(
+    (p) => p.price.replace(/^\D*/, '').split('.')[0]?.length ?? 0,
+  ),
+);
+
 function Features({ items }: { items: string[] }) {
   return (
     <ul className="sp-price__features">
@@ -137,7 +144,7 @@ export function PricingPage() {
                 </p>
               </div>
               <div className="sp-price__amount" aria-live="polite">
-                <RollingPrice value={plan.price} />
+                <RollingPrice value={plan.price} slots={priceSlots} />
                 <span key={plan.unit} className="sp-price__unit sw-pop">
                   {plan.unit}
                 </span>

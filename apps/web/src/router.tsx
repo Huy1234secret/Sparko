@@ -1,8 +1,10 @@
 import {
   createBrowserRouter,
+  Outlet,
   useRouteError,
   type RouteObject,
 } from 'react-router-dom';
+import { RouteLoader } from './RouteLoader';
 import { SiteLayout } from './site/SiteLayout';
 import { HomePage } from './site/HomePage';
 
@@ -13,6 +15,10 @@ const page =
   });
 const info = (name: keyof typeof import('./site/InfoPages')) =>
   page(async () => ({ default: (await import('./site/InfoPages'))[name] }));
+
+const docs = page(async () => ({
+  default: (await import('./site/docs')).DocsPage,
+}));
 
 const dashboard = (name: keyof typeof import('./dashboard')) =>
   page(async () => ({ default: (await import('./dashboard'))[name] }));
@@ -80,7 +86,8 @@ const pages: RouteObject[] = [
           default: (await import('./site/CommandsPage')).CommandsPage,
         })),
       },
-      { path: 'docs', lazy: info('DocsPage') },
+      { path: 'docs', lazy: docs },
+      { path: 'docs/:page', lazy: docs },
       { path: 'status', lazy: info('StatusPage') },
       { path: 'support', lazy: info('SupportPage') },
       { path: 'privacy', lazy: info('PrivacyPage') },
@@ -89,7 +96,17 @@ const pages: RouteObject[] = [
     ],
   },
 ];
+/** Every page, with the loading screen that covers page changes. */
+function Root() {
+  return (
+    <>
+      <Outlet />
+      <RouteLoader />
+    </>
+  );
+}
+
 export const routes: RouteObject[] = [
-  { errorElement: <CrashPage />, children: pages },
+  { element: <Root />, errorElement: <CrashPage />, children: pages },
 ];
 export const createRouter = () => createBrowserRouter(routes);

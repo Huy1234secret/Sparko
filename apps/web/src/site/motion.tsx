@@ -273,17 +273,48 @@ export function useOrbitControl(stageRef: RefObject<HTMLElement | null>) {
       target = to;
       if (!rateFrame) rateFrame = requestAnimationFrame(stepRate);
     };
+    // Whether the pointer is over the orbit is worked out from its box, not
+    // from hover events, so the gaps between cards and the heading count in
+    // every browser, whatever it decides is under the pointer.
+    let px = -1;
+    let py = -1;
+    let over = false;
+    let checkFrame = 0;
+    const focusedInside = () => !!stage.querySelector(':focus-visible');
+    const settle = () => ease(over || focusedInside() ? 0 : 1);
+    const check = () => {
+      checkFrame = 0;
+      const r = stage.getBoundingClientRect();
+      const now =
+        px >= Math.max(r.left, 0) &&
+        px <= Math.min(r.right, window.innerWidth) &&
+        py >= r.top &&
+        py <= r.bottom;
+      if (now !== over) {
+        over = now;
+        settle();
+      }
+    };
+    const recheck = () => {
+      if (!checkFrame) checkFrame = requestAnimationFrame(check);
+    };
+    const track = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      px = e.clientX;
+      py = e.clientY;
+      recheck();
+    };
+    const away = () => {
+      px = py = -1;
+      recheck();
+    };
     const hold = () => ease(0);
     const release = (e: Event) => {
-      // Stay stopped while the pointer is still over it, or while keyboard
-      // focus is still inside (a mouse click's focus doesn't count).
-      if (e.type === 'focusout') {
-        const next = (e as FocusEvent).relatedTarget as Element | null;
-        if (next && stage.contains(next) && next.matches(':focus-visible'))
-          return;
-        if (stage.matches(':hover')) return;
-      } else if (stage.querySelector(':focus-visible')) return;
-      ease(1);
+      // Keyboard focus moving to another card keeps it stopped.
+      const next = (e as FocusEvent).relatedTarget as Element | null;
+      if (next && stage.contains(next) && next.matches(':focus-visible'))
+        return;
+      requestAnimationFrame(settle);
     };
 
     let drag: {
@@ -386,8 +417,9 @@ export function useOrbitControl(stageRef: RefObject<HTMLElement | null>) {
       });
     };
 
-    stage.addEventListener('pointerenter', hold);
-    stage.addEventListener('pointerleave', release);
+    document.addEventListener('pointermove', track, { passive: true });
+    document.documentElement.addEventListener('pointerleave', away);
+    window.addEventListener('scroll', recheck, { passive: true });
     stage.addEventListener('focusin', hold);
     stage.addEventListener('focusout', release);
     stage.addEventListener('pointerdown', down);
@@ -400,8 +432,10 @@ export function useOrbitControl(stageRef: RefObject<HTMLElement | null>) {
       cancelAnimationFrame(fling);
       cancelAnimationFrame(scrollFrame);
       cancelAnimationFrame(rateFrame);
-      stage.removeEventListener('pointerenter', hold);
-      stage.removeEventListener('pointerleave', release);
+      cancelAnimationFrame(checkFrame);
+      document.removeEventListener('pointermove', track);
+      document.documentElement.removeEventListener('pointerleave', away);
+      window.removeEventListener('scroll', recheck);
       stage.removeEventListener('focusin', hold);
       stage.removeEventListener('focusout', release);
       stage.removeEventListener('pointerdown', down);
