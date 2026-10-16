@@ -124,38 +124,77 @@ describe('public site', () => {
     }
   });
 
-  it('counts down instead of Open dashboard for someone not let in yet', async () => {
+  describe('before launch', () => {
     const json = (body: unknown) =>
       new Response(JSON.stringify(body), {
         headers: { 'content-type': 'application/json' },
       });
-    resetBackend();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) =>
-        url === '/api/v1/health'
-          ? json({
-              signIn: true,
-              dashboard: { open: false, opensAt: '2099-10-31T15:00:00Z' },
-            })
-          : url === '/api/v1/session'
+    const backendWith = (session: unknown) => {
+      resetBackend();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) =>
+          url === '/api/v1/health'
             ? json({
-                user: { id: '200000000000000001', name: 'quinn.dev' },
-                allowed: false,
+                signIn: true,
+                dashboard: { open: false, opensAt: '2099-10-31T15:00:00Z' },
               })
-            : json({}),
-      ),
-    );
-    try {
-      open('/');
-      expect(
-        await screen.findByRole('link', { name: /dashboard opens in/i }),
-      ).toHaveAttribute('href', '/dashboard');
-      expect(screen.queryByRole('link', { name: 'Open dashboard' })).toBeNull();
-    } finally {
+            : url === '/api/v1/session'
+              ? json(session)
+              : json({}),
+        ),
+      );
+    };
+    afterEach(() => {
       vi.unstubAllGlobals();
       resetBackend();
-    }
+    });
+
+    it('hides the whole site behind the countdown, with sign-in', async () => {
+      backendWith({ user: null, allowed: false });
+      open('/');
+      expect(
+        await screen.findByRole('heading', { name: 'Sparko is almost here.' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('timer')).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: /Sign in with Discord/ }),
+      ).toHaveAttribute('href', '/api/v1/auth/discord');
+      expect(
+        screen.queryByRole('heading', { name: /explains itself/ }),
+      ).toBeNull();
+    });
+
+    it('keeps people off the list out, and the legal pages open', async () => {
+      backendWith({
+        user: { id: '3', name: 'someone' },
+        allowed: false,
+      });
+      open('/');
+      expect(
+        await screen.findByText(/Signed in as someone/),
+      ).toBeInTheDocument();
+      cleanup();
+      open('/privacy');
+      expect(
+        await screen.findByRole('heading', { level: 1, name: /Privacy/ }),
+      ).toBeInTheDocument();
+    });
+
+    it('unlocks the site for people on the list', async () => {
+      backendWith({
+        user: { id: '902736357766594611', name: 'owner' },
+        allowed: true,
+      });
+      open('/');
+      expect(
+        await screen.findByRole('heading', {
+          level: 1,
+          name: /explains itself/,
+        }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('timer')).toBeNull();
+    });
   });
 
   it('explains Add to Discord instead of leaving the site', async () => {
