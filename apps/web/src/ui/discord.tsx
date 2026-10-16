@@ -13,6 +13,9 @@ export type DiscordEmbed = {
   /** The large image under the embed, as a placeholder or an <img>. */
   image?: ReactNode;
 };
+/** Sparko's own profile picture, as Discord shows it. */
+export const sparkoAvatar = '/brand/sparko-avatar.png';
+
 export type DiscordButton = {
   label: string;
   style?: 'primary' | 'secondary' | 'success' | 'danger' | 'link';
@@ -47,6 +50,7 @@ export function DiscordMessage({
   /** Extra content under the message, like an attachment. */
   children?: ReactNode;
 }) {
+  const isSparko = bot && author === 'Sparko' && !avatarColor;
   return (
     <div className={cx('dc-msg', className)}>
       <div
@@ -55,7 +59,11 @@ export function DiscordMessage({
           !!avatarColor && `dc-avatar--person sp-avatar--${avatarColor}`,
         )}
       >
-        {avatar ? <img src={avatar} alt="" /> : author[0]?.toUpperCase()}
+        {avatar || isSparko ? (
+          <img src={avatar ?? sparkoAvatar} alt="" />
+        ) : (
+          author[0]?.toUpperCase()
+        )}
       </div>
       <div className="dc-head">
         <span className="dc-name">{author}</span>

@@ -35,7 +35,13 @@ export function useAccountActions() {
 export function Logo() {
   return (
     <Link to="/" className="sw-logo" aria-label="Sparko home">
-      <span className="sw-logo__mark" />
+      <img
+        className="sw-logo__img"
+        src="/brand/sparko-icon-64.png"
+        width={32}
+        height={32}
+        alt=""
+      />
       Sparko
     </Link>
   );
