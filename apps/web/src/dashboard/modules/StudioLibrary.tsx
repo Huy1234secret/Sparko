@@ -32,7 +32,7 @@ import {
   type StudioState,
   type StudioTemplate,
 } from '../../data';
-import { AnimatedIconButton, measure, slideFrom } from './EditorBits';
+import { AnimatedIconButton, HoverTip, measure, slideFrom } from './EditorBits';
 import { svgIcons } from '../../ui';
 
 import folderAddAnim from '../../../../../design-system/assets/icons/folder-icon-add.json?url';
@@ -81,14 +81,14 @@ function UsedTags({ uses }: { uses: NonNullable<StudioTemplate['usedIn']> }) {
       {kinds.map((kind) => {
         const where = uses.filter((u) => u.kind === kind).map((u) => u.where);
         return (
-          <span
+          <HoverTip
             key={kind}
             className={`sp-lib-tag sp-lib-tag--${kind}`}
-            title={`This message template is currently being used in ${where.join(', ')}.`}
+            text={`This message template is currently being used in ${where.join(', ')}.`}
           >
             <MaskIcon src={tagLook[kind].icon} label="" />
             {tagLook[kind].label}
-          </span>
+          </HoverTip>
         );
       })}
     </span>
