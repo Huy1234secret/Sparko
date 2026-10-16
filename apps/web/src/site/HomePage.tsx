@@ -13,7 +13,15 @@ import { groupMeta, groups, modules } from '../content/modules';
 import { homeFaq, scenes } from '../content/site';
 import { Faq, PricingTeaser } from './parts';
 import { useAccountActions, usePageTitle } from './SiteLayout';
-import { reducedMotion, Tilt, useOnScreenClass, useTilt } from './motion';
+import {
+  reducedMotion,
+  Tilt,
+  useOnScreenClass,
+  useOrbitControl,
+  usePointerGlow,
+  useTilt,
+} from './motion';
+import { commands } from '../content/commands';
 
 /** Staggers a child's entrance: `--i` is its place in the sequence. */
 const order = (i: number) => ({ '--i': i }) as CSSProperties;
@@ -286,6 +294,7 @@ function WhyGrid() {
 /** Module groups orbit the heading: the top arc runs one way, the bottom the other. */
 function ModuleOrbit() {
   const stage = useOnScreenClass<HTMLDivElement>('is-moving');
+  useOrbitControl(stage);
   // Each group goes round twice so both arcs stay full. The second lap is
   // shifted half a lap, so the top and bottom arcs show different groups.
   // The copies are hidden from screen readers and the keyboard.
@@ -326,6 +335,7 @@ function ModuleOrbit() {
                   className="sw-orbit__card"
                   to={`/features?group=${encodeURIComponent(group)}`}
                   tabIndex={copy ? -1 : undefined}
+                  draggable={false}
                 >
                   <span className="sw-orbit__icon">
                     <Icon name={groupMeta[group].icon} />
@@ -348,6 +358,35 @@ function ModuleOrbit() {
   );
 }
 
+/** A soft yellow light that trails the pointer across the hero. */
+function HeroGlow() {
+  const glow = usePointerGlow<HTMLDivElement>();
+  return <div className="sw-hero__glow" ref={glow} aria-hidden="true" />;
+}
+
+/** Every slash command, on two ribbons that cross at an angle. */
+function CommandRibbons() {
+  const ribbons = useOnScreenClass<HTMLDivElement>('is-moving');
+  const names = commands.map((c) => c.name);
+  const lanes = [names, [...names].reverse()];
+  return (
+    <div className="sw-ribbons" ref={ribbons} aria-hidden="true">
+      {lanes.map((lane, l) => (
+        <div key={l} className={`sw-ribbon sw-ribbon--${l ? 'ink' : 'brand'}`}>
+          <div className="sw-ribbon__track">
+            {[...lane, ...lane].map((name, i) => (
+              <span key={i} className="sw-ribbon__item">
+                {name}
+                <i className="sw-ribbon__spark" />
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function HomePage() {
   usePageTitle('');
   const { addBot } = useAccountActions();
@@ -355,6 +394,7 @@ export function HomePage() {
     <>
       <div className="sw-progress" aria-hidden="true" />
       <section className="sw-hero" aria-labelledby="hero-h">
+        <HeroGlow />
         <div className="sw-wrap sw-hero__grid">
           <div className="sw-hero__copy">
             <h1 className="sw-display" id="hero-h">
@@ -403,6 +443,8 @@ export function HomePage() {
         </div>
       </section>
 
+      <CommandRibbons />
+
       <section className="sw-section sw-band" aria-labelledby="why-h">
         <div className="sw-wrap">
           <div className="sw-head sw-reveal">
@@ -427,38 +469,43 @@ export function HomePage() {
               anything, come back later.
             </p>
           </div>
-          <ol className="sw-timeline">
-            {[
-              [
-                '~30 sec',
-                'Add Sparko',
-                'Sign in with Discord and pick a server. Sparko only asks for the permissions your modules use.',
-              ],
-              [
-                '~3 min',
-                'Follow the checklist',
-                'Pick a log channel, switch on Auto moderation and write a welcome. Each step shows a preview first.',
-              ],
-              [
-                'instant',
-                'Go live',
-                'Save and watch it apply. If a permission is missing, Sparko tells you exactly where to fix it.',
-              ],
-            ].map(([time, title, body], i) => (
-              <li
-                key={title}
-                className="sw-timeline__step sw-reveal"
-                style={order(i)}
-              >
-                <div className="sw-timeline__n">
-                  <b>{i + 1}</b>
-                  <span className="sw-step__time">{time}</span>
-                </div>
-                <h3 className="sw-h3">{title}</h3>
-                <p className="sw-body">{body}</p>
-              </li>
-            ))}
-          </ol>
+          <div className="sw-timeline-wrap">
+            <span className="sw-timeline__rider" aria-hidden="true">
+              <i />
+            </span>
+            <ol className="sw-timeline">
+              {[
+                [
+                  '~30 sec',
+                  'Add Sparko',
+                  'Sign in with Discord and pick a server. Sparko only asks for the permissions your modules use.',
+                ],
+                [
+                  '~3 min',
+                  'Follow the checklist',
+                  'Pick a log channel, switch on Auto moderation and write a welcome. Each step shows a preview first.',
+                ],
+                [
+                  'instant',
+                  'Go live',
+                  'Save and watch it apply. If a permission is missing, Sparko tells you exactly where to fix it.',
+                ],
+              ].map(([time, title, body], i) => (
+                <li
+                  key={title}
+                  className="sw-timeline__step sw-reveal"
+                  style={order(i)}
+                >
+                  <div className="sw-timeline__n">
+                    <b>{i + 1}</b>
+                    <span className="sw-step__time">{time}</span>
+                  </div>
+                  <h3 className="sw-h3">{title}</h3>
+                  <p className="sw-body">{body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </section>
 

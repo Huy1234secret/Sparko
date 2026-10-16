@@ -747,7 +747,8 @@ a.sp-btn {
   display: grid;
   gap: 16px;
   justify-items: center;
-  max-width: 600px;
+  /* The stage is wider than a phone; keep the heading inside the screen. */
+  max-width: min(600px, 100cqw);
   padding: 0 20px;
   text-align: center;
 }
@@ -953,5 +954,252 @@ a.sp-btn {
         animation-name: sw-draw-y;
       }
     }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Sparks: the diamond from Sparko's logo, everywhere it can play. */
+
+/* Bursts from primary buttons and the logo (motion.tsx useSparkBursts). */
+.sw-sparks-layer {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sw-spark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 2px;
+  background: var(--sp-brand);
+}
+.sw-spark--edge {
+  background: var(--sp-brand-edge);
+}
+.sw-spark--ink {
+  background: var(--sp-text);
+}
+
+/* The logo turns once in 3D on hover. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .sw-logo {
+    perspective: 240px;
+  }
+  .sw-logo__img {
+    transition: rotate 900ms var(--sw-ease);
+  }
+  .sw-logo:hover .sw-logo__img {
+    rotate: y 360deg;
+  }
+}
+
+/* A light that trails the pointer across the hero. */
+.sw-hero__glow {
+  position: absolute;
+  z-index: -1;
+  top: -280px;
+  left: -280px;
+  width: 560px;
+  height: 560px;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--sp-brand) 13%, transparent),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 500ms var(--sw-ease);
+  pointer-events: none;
+  will-change: transform;
+}
+[data-theme='light'] .sw-hero__glow {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--sp-brand) 30%, transparent),
+    transparent
+  );
+}
+.sw-hero__glow.is-on {
+  opacity: 1;
+}
+
+/* Two ribbons of slash commands cross at an angle and run opposite ways. */
+.sw-ribbons {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  height: 150px;
+  overflow-x: clip;
+}
+.sw-ribbon {
+  grid-area: 1 / 1;
+  align-self: center;
+  width: 116%;
+  margin-left: -8%;
+  padding: 16px 0;
+  overflow: hidden;
+}
+.sw-ribbon--brand {
+  z-index: 1;
+  rotate: -3deg;
+  background: var(--sp-brand);
+  color: var(--sp-on-brand);
+  box-shadow: 0 18px 40px -20px rgb(0 0 0 / 0.5);
+}
+.sw-ribbon--ink {
+  rotate: 2.5deg;
+  border-block: 1px solid var(--sp-line);
+  background: var(--sp-ink);
+  color: #fafaf5;
+}
+.sw-ribbon__track {
+  display: flex;
+  width: max-content;
+  animation: sw-ribbon 70s linear infinite paused;
+}
+.sw-ribbon--ink .sw-ribbon__track {
+  animation-direction: reverse;
+}
+.sw-ribbons.is-moving .sw-ribbon__track {
+  animation-play-state: running;
+}
+@keyframes sw-ribbon {
+  to {
+    translate: -50% 0;
+  }
+}
+.sw-ribbon__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  padding-right: 28px;
+  font: 600 22px/1 var(--sp-font-mono);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.sw-ribbon__spark {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.55;
+  rotate: 45deg;
+}
+.sw-ribbon--ink .sw-ribbon__spark {
+  background: var(--sp-brand);
+  opacity: 1;
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sw-ribbon {
+      animation: sw-ribbon-drift linear both;
+      animation-timeline: view();
+    }
+    .sw-ribbon--ink {
+      animation-direction: reverse;
+    }
+  }
+}
+@keyframes sw-ribbon-drift {
+  from {
+    translate: 6% 0;
+  }
+  to {
+    translate: -6% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-ribbon__track {
+    animation: none;
+  }
+}
+
+/* A spark rides the setup timeline as it scrolls past. */
+.sw-timeline-wrap {
+  position: relative;
+  overflow-x: clip;
+}
+.sw-timeline__n {
+  z-index: 1;
+}
+.sw-timeline__rider {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  /* From the first step's number to the third's: two columns and two gaps. */
+  width: calc((200% + 64px) / 3);
+  height: 10px;
+  pointer-events: none;
+  opacity: 0;
+}
+.sw-timeline__rider i {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--sp-brand);
+  box-shadow: 0 0 16px 2px color-mix(in srgb, var(--sp-brand) 70%, transparent);
+  rotate: 45deg;
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sw-timeline__rider {
+      opacity: 1;
+      animation: sw-ride linear both;
+      animation-timeline: view();
+      animation-range: cover 30% cover 70%;
+    }
+  }
+}
+@keyframes sw-ride {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 100% 0;
+  }
+}
+
+/* The orbit can be grabbed and flung. */
+.sw-orbit__stage {
+  touch-action: pan-y;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sw-orbit__ring {
+    cursor: grab;
+  }
+  .sw-orbit__stage.is-dragging,
+  .sw-orbit__stage.is-dragging .sw-orbit__card {
+    cursor: grabbing;
+    user-select: none;
+  }
+}
+
+@container (max-width: 640px) {
+  .sw-ribbons {
+    height: 132px;
+  }
+  .sw-ribbon--brand {
+    align-self: end;
+    margin-bottom: 10px;
+  }
+  .sw-ribbon--ink {
+    align-self: start;
+    margin-top: 10px;
+  }
+  .sw-ribbon {
+    padding: 12px 0;
+  }
+  .sw-ribbon__item {
+    gap: 20px;
+    padding-right: 20px;
+    font-size: 16px;
+  }
+  .sw-timeline__rider {
+    display: none;
   }
 }

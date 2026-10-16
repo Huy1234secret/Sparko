@@ -9,6 +9,7 @@ import {
 import { Button, useToast } from '../ui';
 import { useTheme } from '../state/theme';
 import { panelHost, supportServer } from './links';
+import { useSparkBursts } from './motion';
 
 const navLinks = [
   ['/features', 'Features'],
@@ -51,6 +52,7 @@ export function SiteLayout() {
   const { theme, toggle } = useTheme();
   const { addBot, signIn } = useAccountActions();
   const { pathname } = useLocation();
+  useSparkBursts();
   // The menu belongs to the page it was opened on, so navigating closes it.
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const menu = menuPath === pathname;
