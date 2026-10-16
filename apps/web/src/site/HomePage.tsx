@@ -9,7 +9,7 @@ import {
   Spinner,
   Switch,
 } from '../ui';
-import { groupMeta, groups, modules } from '../content/modules';
+import { groups, modules } from '../content/modules';
 import { homeFaq, scenes } from '../content/site';
 import { Faq, PricingTeaser } from './parts';
 import { useAccountActions, usePageTitle } from './SiteLayout';
@@ -22,6 +22,7 @@ import {
   useTilt,
 } from './motion';
 import { commands } from '../content/commands';
+import { isReady } from '../content/features';
 
 /** Staggers a child's entrance: `--i` is its place in the sequence. */
 const order = (i: number) => ({ '--i': i }) as CSSProperties;
@@ -292,28 +293,45 @@ function WhyGrid() {
 }
 
 /** Module groups orbit the heading: the top arc runs one way, the bottom the other. */
+/** The modules on the orbit: every finished one, spread among some on the way. */
+const orbitModules = [
+  'tickets',
+  'automod',
+  'levels',
+  'welcome',
+  'polls',
+  'workflows',
+  'studio',
+  'giveaways',
+  'verification',
+  'role-menus',
+  'starboard',
+  'economy',
+  'autoroles',
+  'schedules',
+  'analytics',
+  'backups',
+].flatMap((id) => modules.filter((m) => m.id === id));
+
+/** Modules orbit the heading: the top arc runs one way, the bottom the other. */
 function ModuleOrbit() {
   const stage = useOnScreenClass<HTMLDivElement>('is-moving');
   useOrbitControl(stage);
-  // Each group goes round twice so both arcs stay full. The second lap is
-  // shifted half a lap, so the top and bottom arcs show different groups.
-  // The copies are hidden from screen readers and the keyboard.
-  const half = Math.floor(groups.length / 2);
-  const ring = [...groups, ...groups.slice(half), ...groups.slice(0, half)];
+  const ready = modules.filter((m) => isReady(m.id)).length;
   return (
     <section className="sw-orbit" aria-labelledby="mods-h">
       <div
         className="sw-orbit__stage"
         ref={stage}
-        style={{ '--n': ring.length } as CSSProperties}
+        style={{ '--n': orbitModules.length } as CSSProperties}
       >
         <div className="sw-orbit__center">
           <h2 className="sw-h2" id="mods-h">
             Everything your server needs, grouped the way you think.
           </h2>
           <p className="sw-lede">
-            {modules.length} modules in {groups.length} groups, all in one
-            dashboard.
+            {modules.length} modules in {groups.length} groups. {ready} are
+            ready today, and the rest are on the way.
           </p>
           <Link className="sp-btn sp-btn--secondary sw-btn-link" to="/features">
             Browse every module
@@ -321,34 +339,40 @@ function ModuleOrbit() {
           </Link>
         </div>
         <ul className="sw-orbit__ring">
-          {ring.map((group, i) => {
-            const copy = i >= groups.length;
-            const count = modules.filter((m) => m.group === group).length;
-            return (
-              <li
-                key={i}
-                className="sw-orbit__item"
-                style={order(i)}
-                aria-hidden={copy || undefined}
-              >
-                <Link
-                  className="sw-orbit__card"
-                  to={`/features?group=${encodeURIComponent(group)}`}
-                  tabIndex={copy ? -1 : undefined}
-                  draggable={false}
-                >
-                  <span className="sw-orbit__icon">
-                    <Icon name={groupMeta[group].icon} />
-                  </span>
-                  <span className="sw-orbit__name">{group}</span>
-                  <span className="sw-orbit__blurb">
-                    {groupMeta[group].blurb}
-                  </span>
+          {orbitModules.map((m, i) => {
+            const body = (
+              <>
+                <span className="sw-orbit__icon">
+                  <Icon name={m.icon} />
+                </span>
+                <span className="sw-orbit__name">{m.label}</span>
+                <span className="sw-orbit__blurb">{m.description}</span>
+                {isReady(m.id) ? (
                   <span className="sw-orbit__count">
-                    {count} {count === 1 ? 'module' : 'modules'}
+                    Ready · see how it works
                     <Icon name="arrow-right" size="sm" />
                   </span>
-                </Link>
+                ) : (
+                  <span className="sw-orbit__count sw-orbit__count--soon">
+                    <Icon name="clock" size="sm" />
+                    Coming soon
+                  </span>
+                )}
+              </>
+            );
+            return (
+              <li key={m.id} className="sw-orbit__item" style={order(i)}>
+                {isReady(m.id) ? (
+                  <Link
+                    className="sw-orbit__card is-ready"
+                    to={`/features/${m.id}`}
+                    draggable={false}
+                  >
+                    {body}
+                  </Link>
+                ) : (
+                  <div className="sw-orbit__card is-soon">{body}</div>
+                )}
               </li>
             );
           })}

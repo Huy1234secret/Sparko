@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Button, Icon } from '../ui';
 import type { SparkoModule } from '../content/modules';
 import { freeModuleCount, modules } from '../content/modules';
+import { isReady } from '../content/features';
 import { type Faq as FaqItem } from '../content/site';
 import { useAccountActions } from './SiteLayout';
 import { Tilt, useOnScreenClass } from './motion';
@@ -114,11 +115,8 @@ export function PricingTeaser() {
 }
 
 export function ModuleCard({ module }: { module: SparkoModule }) {
-  return (
-    <Link
-      className="sw-card sw-card--link sw-mod"
-      to={`/features/${module.id}`}
-    >
+  const body = (
+    <>
       <span className="sw-card__icon sw-card__icon--plain">
         <Icon name={module.icon} />
       </span>
@@ -129,8 +127,30 @@ export function ModuleCard({ module }: { module: SparkoModule }) {
             Plus
           </Badge>
         )}
+        {isReady(module.id) ? (
+          <Badge tone="success" size="sm" icon="circle-check">
+            Ready
+          </Badge>
+        ) : (
+          <Badge size="sm">Coming soon</Badge>
+        )}
       </span>
       <span className="sw-mod__desc">{module.description}</span>
+    </>
+  );
+  // Only finished modules open a page; the rest show what's on the way.
+  if (!isReady(module.id))
+    return (
+      <div className="sw-card sw-mod sw-mod--soon" aria-disabled="true">
+        {body}
+      </div>
+    );
+  return (
+    <Link
+      className="sw-card sw-card--link sw-mod"
+      to={`/features/${module.id}`}
+    >
+      {body}
     </Link>
   );
 }

@@ -71,6 +71,26 @@ const server = (id: string) => `/api/v1/servers/${id}`;
 const colourOf = (id: string) =>
   ((Number(id.slice(-4)) % 6) + 1) as AvatarColor;
 
+/**
+ * The person signed in to the real backend, or null when they're signed out
+ * or there's no backend. The public site uses this on its own, so it never
+ * mistakes the dashboard's sample account for a real one.
+ */
+export async function liveSession(): Promise<Session | null> {
+  if (!(await backend()).live) return null;
+  const { user } = await getJson<{
+    user: { id: string; name: string; avatarUrl: string } | null;
+  }>('/api/v1/session');
+  return user
+    ? ({ user: { ...user, avatarColor: colourOf(user.id) } } as Session)
+    : null;
+}
+
+/** Signs out of the real backend. */
+export async function liveSignOut() {
+  await fetch('/api/v1/auth/logout', { method: 'POST' });
+}
+
 export function withBackend(
   sample: PanelApi,
   adoptServers: (servers: Server[]) => void,
@@ -79,12 +99,7 @@ export function withBackend(
     ...sample,
     async getSession() {
       if (!(await backend()).live) return sample.getSession();
-      const { user } = await getJson<{
-        user: { id: string; name: string; avatarUrl: string } | null;
-      }>('/api/v1/session');
-      return user
-        ? ({ user: { ...user, avatarColor: colourOf(user.id) } } as Session)
-        : null;
+      return liveSession();
     },
     async listServers() {
       if (!(await backend()).live) return sample.listServers();
@@ -95,7 +110,7 @@ export function withBackend(
     },
     async signOut() {
       if (!(await backend()).live) return sample.signOut();
-      await fetch('/api/v1/auth/logout', { method: 'POST' });
+      await liveSignOut();
     },
     async getOverview(id) {
       if (!(await backend()).live) return sample.getOverview(id);

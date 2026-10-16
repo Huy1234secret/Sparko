@@ -805,14 +805,14 @@ a.sp-btn {
   box-shadow: var(--sp-ring);
 }
 @media (hover: hover) and (pointer: fine) {
-  .sw-orbit__card:hover {
+  .sw-orbit__card.is-ready:hover {
     translate: 0 -6px;
     border-color: var(--sp-brand-line);
     box-shadow:
       0 18px 40px -18px rgb(0 0 0 / 0.45),
       var(--sp-shadow-card);
   }
-  .sw-orbit__card:hover .sw-orbit__icon {
+  .sw-orbit__card.is-ready:hover .sw-orbit__icon {
     background: var(--sp-brand-soft);
     border-color: var(--sp-brand-line);
     color: var(--sp-brand-text);
@@ -1446,4 +1446,206 @@ a.sp-btn {
 }
 .sw-compare th:nth-child(3) {
   color: var(--sp-brand-text);
+}
+
+/* Orbit: modules that aren't finished yet are quieter and don't open. */
+.sw-orbit__card.is-soon {
+  cursor: inherit;
+}
+.sw-orbit__card.is-soon .sw-orbit__icon {
+  color: var(--sp-muted);
+}
+.sw-orbit__count--soon {
+  color: var(--sp-muted);
+  font-weight: 500;
+}
+.sw-orbit__card.is-ready {
+  border-color: var(--sp-brand-line);
+}
+
+/* Features: cards for modules that are on the way can't be opened. */
+.sw-mod--soon {
+  background: var(--sp-subtle);
+  box-shadow: none;
+}
+.sw-mod--soon .sw-card__icon,
+.sw-mod--soon .sw-mod__name {
+  color: var(--sp-muted);
+}
+.sw-mod__name {
+  flex-wrap: wrap;
+}
+.sw-toolbar .sp-chip .sp-i {
+  color: var(--sp-success);
+}
+
+/* Feature pages: how it works, setup steps and commands. */
+.sw-how {
+  margin-top: 24px;
+}
+.sw-setup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-setup li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-card);
+  background: var(--sp-surface);
+  font: 400 15px/22px var(--sp-font-sans);
+}
+.sw-setup b {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--sp-brand);
+  color: var(--sp-on-brand);
+  font: 700 14px/1 var(--sp-font-sans);
+}
+.sw-cmds {
+  margin-top: 24px;
+}
+.sw-cmd__row {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-height: 60px;
+  padding: 10px 16px;
+}
+@container (max-width: 640px) {
+  .sw-setup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sw-cmd__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
+/* Docs: module guides, sub-entries in the contents and the variables list. */
+.sw-docs__toc li.is-sub a {
+  min-height: 36px;
+  padding-left: 28px;
+  font-size: 14px;
+}
+.sw-docs__module {
+  padding: 20px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-card);
+  background: var(--sp-surface);
+}
+.sw-docs__module h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.sw-docs__module h3 .sp-i {
+  color: var(--sp-brand-text);
+}
+.sw-vars {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--sp-line);
+}
+.sw-vars > div {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+  gap: 4px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--sp-line);
+}
+.sw-vars dd {
+  margin: 0;
+  color: var(--sp-muted);
+}
+@container (max-width: 640px) {
+  .sw-vars > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+a.sw-mod {
+  text-decoration: none;
+}
+
+/* Signed in: Open dashboard and the account menu replace the sign-in buttons. */
+a.sw-open-dash {
+  gap: 8px;
+}
+.sw-account__button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.sw-account__button .sp-avatar {
+  box-shadow:
+    0 0 0 2px var(--sp-canvas),
+    0 0 0 3px var(--sp-line-strong);
+  transition: box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sw-account__button:hover .sp-avatar,
+.sw-account__button[aria-expanded='true'] .sp-avatar {
+  box-shadow:
+    0 0 0 2px var(--sp-canvas),
+    0 0 0 3px var(--sp-brand-edge);
+}
+.sw-account__button:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sw-account__menu {
+  z-index: var(--sp-z-popover, 50);
+  min-width: 240px;
+  transform-origin: top right;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sw-account__menu {
+    animation: sw-menu-in 160ms var(--sw-ease) both;
+  }
+}
+@keyframes sw-menu-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+    translate: 0 -4px;
+  }
+}
+.sw-account__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--sp-line);
+}
+.sw-account__who > span {
+  display: grid;
+  min-width: 0;
+}
+.sw-account__who b {
+  overflow: hidden;
+  font: 600 14px/20px var(--sp-font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sw-account__who span span {
+  font: 400 12px/16px var(--sp-font-sans);
+  color: var(--sp-muted);
 }

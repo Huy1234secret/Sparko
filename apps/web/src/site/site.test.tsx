@@ -10,7 +10,10 @@ import {
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../ui';
+import { createQueryClient } from '../data';
+import { resetBackend } from '../data/live';
 import { routes } from '../router';
 import { modules } from '../content/modules';
 import { commands } from '../content/commands';
@@ -32,9 +35,11 @@ afterEach(cleanup);
 function open(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   render(
-    <ToastProvider>
-      <RouterProvider router={router} />
-    </ToastProvider>,
+    <QueryClientProvider client={createQueryClient()}>
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
+    </QueryClientProvider>,
   );
   return router;
 }
@@ -81,6 +86,44 @@ describe('public site', () => {
     expect(router.state.location.pathname).toBe('/pricing');
   });
 
+  it('shows Open dashboard and an account menu once signed in', async () => {
+    const json = (body: unknown) =>
+      new Response(JSON.stringify(body), {
+        headers: { 'content-type': 'application/json' },
+      });
+    resetBackend();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url === '/api/v1/health'
+          ? json({ signIn: true })
+          : url === '/api/v1/session'
+            ? json({
+                user: { id: '200000000000000001', name: 'quinn.dev' },
+              })
+            : json({}),
+      ),
+    );
+    try {
+      open('/');
+      expect(
+        await screen.findByRole('link', { name: 'Open dashboard' }),
+      ).toHaveAttribute('href', '/dashboard');
+      expect(
+        screen.queryByRole('button', { name: 'Sign in with Discord' }),
+      ).toBeNull();
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Account: quinn.dev' }),
+      );
+      expect(
+        screen.getByRole('menuitem', { name: /Sign out/ }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+      resetBackend();
+    }
+  });
+
   it('explains Add to Discord instead of leaving the site', async () => {
     open('/');
     await userEvent.click(
@@ -95,7 +138,10 @@ describe('public site', () => {
       name: 'Search features',
     });
     await userEvent.type(search, 'giveaway');
-    expect(screen.getByRole('link', { name: /Giveaways/ })).toBeInTheDocument();
+    // Giveaways isn't finished yet: it's listed, but can't be opened.
+    expect(screen.getByText('Giveaways')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Giveaways/ })).toBeNull();
+    expect(screen.getByText('Coming soon')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Tickets/ })).toBeNull();
     expect(router.state.location.search).toBe('?q=giveaway');
     await userEvent.clear(search);
@@ -106,6 +152,40 @@ describe('public site', () => {
     expect(
       screen.getAllByRole('link', { name: /Tickets/ }).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('shows only finished modules with Ready now, each with its own page', async () => {
+    const router = open('/features');
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Ready now/ }),
+    );
+    expect(router.state.location.search).toBe('?ready=1');
+    const links = screen.getAllByRole('link', { name: /Ready/ });
+    expect(links.map((l) => l.getAttribute('href')).sort()).toEqual([
+      '/features/autoroles',
+      '/features/role-menus',
+      '/features/studio',
+      '/features/tickets',
+      '/features/welcome',
+    ]);
+    expect(screen.queryByText('Coming soon')).toBeNull();
+  });
+
+  it('explains a finished module and marks one that is on the way', async () => {
+    open('/features/tickets');
+    expect(
+      await screen.findByRole('heading', { name: 'How it works' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('/ticket claim')).toBeInTheDocument();
+    cleanup();
+    open('/features/giveaways');
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Giveaways is on the way.',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'How it works' })).toBeNull();
   });
 
   it('filters features by group from the address', async () => {

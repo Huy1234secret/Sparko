@@ -2,7 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, EmptyState, Icon, Notice, Spinner } from '../ui';
 import { legal } from '../content/legal';
-import { groups, groupMeta } from '../content/modules';
+import { groups, groupMeta, modules } from '../content/modules';
+import { featureDetails } from '../content/features';
+import { studioVariables } from '../data/studio-format';
 import { supportServer } from './links';
 import { usePageTitle } from './SiteLayout';
 
@@ -100,6 +102,17 @@ const guides: { id: string; title: string; body: ReactNode }[] = [
   },
 ];
 
+const readyModules = modules.filter((m) => m.id in featureDetails);
+
+/** Everything the table of contents lists, in page order. */
+const docsToc = [
+  ...guides.map((g) => ({ id: g.id, title: g.title })),
+  { id: 'ready', title: 'Modules ready today' },
+  ...readyModules.map((m) => ({ id: `m-${m.id}`, title: m.label, sub: true })),
+  { id: 'variables', title: 'Message variables' },
+  { id: 'modules', title: 'Modules by group' },
+];
+
 export function DocsPage() {
   usePageTitle('Docs');
   return (
@@ -112,8 +125,8 @@ export function DocsPage() {
       <div className="sw-docs">
         <nav className="sw-docs__toc" aria-label="On this page">
           <ul>
-            {guides.map((g) => (
-              <li key={g.id}>
+            {docsToc.map((g) => (
+              <li key={g.id} className={'sub' in g ? 'is-sub' : undefined}>
                 <a href={`#${g.id}`}>{g.title}</a>
               </li>
             ))}
@@ -126,6 +139,79 @@ export function DocsPage() {
               {g.body}
             </section>
           ))}
+          <section id="ready">
+            <h2>Modules ready today</h2>
+            <p>
+              These modules are finished in the dashboard. The others on the{' '}
+              <Link to="/features">Features</Link> page are still being built
+              and show as coming soon.
+            </p>
+          </section>
+          {readyModules.map((m) => {
+            const detail = featureDetails[m.id]!;
+            return (
+              <section key={m.id} id={`m-${m.id}`} className="sw-docs__module">
+                <h3>
+                  <Icon name={m.icon} size="sm" />
+                  {m.label}
+                </h3>
+                <p>{m.description}</p>
+                <ul>
+                  {detail.how.map((h) => (
+                    <li key={h.title}>
+                      <b>{h.title}.</b> {h.body}
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  <b>To set it up:</b>
+                </p>
+                <ol>
+                  {detail.steps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+                {detail.commands && (
+                  <p>
+                    Commands:{' '}
+                    {detail.commands.map((c, i) => (
+                      <span key={c}>
+                        {i > 0 && ', '}
+                        <code className="sp-mono">{c}</code>
+                      </span>
+                    ))}
+                    .
+                  </p>
+                )}
+                <p>
+                  <Link to={`/features/${m.id}`}>More about {m.label}</Link>
+                </p>
+              </section>
+            );
+          })}
+          <section id="variables">
+            <h2>Message variables</h2>
+            <p>
+              Write these in braces in any message, like{' '}
+              <code className="sp-mono">{'{user}'}</code>, and Sparko fills them
+              in when it sends. The {'{ }'} button beside every live preview
+              lists them too.
+            </p>
+            <dl className="sw-vars">
+              {studioVariables.map((v) => (
+                <div key={v.name}>
+                  <dt>
+                    <code className="sp-mono">{`{${v.name}}`}</code>
+                  </dt>
+                  <dd>
+                    {v.about}
+                    {v.member && ' Welcome, leave and boost messages only.'}
+                    {v.role && ' Reaction role responses only.'}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
           <section id="modules">
             <h2>Modules by group</h2>
             <ul className="sw-docs__groups">
