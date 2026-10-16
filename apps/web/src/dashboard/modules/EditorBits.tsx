@@ -690,17 +690,28 @@ export function moveItem<T>(list: T[], from: number, to: number) {
 }
 
 /**
- * The little (i) beside a setting: hovering or focusing it shows what the
- * setting does, straight away.
+ * Shows `text` in the dark tip bubble while what it wraps is hovered or
+ * focused, straight away.
  */
-export function InfoTip({ text }: { text: string }) {
-  const icon = useRef<HTMLSpanElement>(null);
+export function HoverTip({
+  text,
+  className,
+  label,
+  children,
+}: {
+  text: string;
+  className?: string;
+  /** Set when what it wraps has no words of its own, like an icon. */
+  label?: boolean;
+  children: ReactNode;
+}) {
+  const anchor = useRef<HTMLSpanElement>(null);
   const bubble = useRef<HTMLSpanElement>(null);
   const [shown, setShown] = useState(false);
   // Drawn over everything, against the window, so no panel or scrolling
-  // list can hide it; it sits above the (i), or below when there's no room.
+  // list can hide it; it sits above, or below when there's no room.
   useLayoutEffect(() => {
-    const i = icon.current;
+    const i = anchor.current;
     const b = bubble.current;
     if (!shown || !i || !b) return;
     const r = i.getBoundingClientRect();
@@ -716,25 +727,41 @@ export function InfoTip({ text }: { text: string }) {
   }, [shown]);
   return (
     <span
-      ref={icon}
-      className="sp-tip"
+      ref={anchor}
+      className={className}
       tabIndex={0}
-      role="img"
-      aria-label={text}
+      {...(label ? { role: 'img', 'aria-label': text } : {})}
       onPointerEnter={() => setShown(true)}
       onPointerLeave={() => setShown(false)}
       onFocus={() => setShown(true)}
       onBlur={() => setShown(false)}
     >
-      <Icon name="info" size="sm" />
+      {children}
       {shown &&
         createPortal(
-          <span ref={bubble} className="sp-tip__bubble" aria-hidden="true">
+          <span
+            ref={bubble}
+            className="sp-tip__bubble"
+            aria-hidden={label ? true : undefined}
+            role={label ? undefined : 'tooltip'}
+          >
             {text}
           </span>,
           document.body,
         )}
     </span>
+  );
+}
+
+/**
+ * The little (i) beside a setting: hovering or focusing it shows what the
+ * setting does, straight away.
+ */
+export function InfoTip({ text }: { text: string }) {
+  return (
+    <HoverTip text={text} className="sp-tip" label>
+      <Icon name="info" size="sm" />
+    </HoverTip>
   );
 }
 
