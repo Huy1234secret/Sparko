@@ -5,6 +5,7 @@ import {
   Events,
   GatewayIntentBits,
   MessageFlags,
+  MessageType,
   Partials,
   type ButtonInteraction,
   type Guild,
@@ -16,6 +17,10 @@ import {
 } from 'discord.js';
 import {
   addAudit,
+  arBoosted,
+  arJoined,
+  arLeft,
+  arUpdated,
   defaultDbPath,
   discordRest,
   editStudioMessage,
@@ -40,6 +45,13 @@ import {
 } from '@sparko/core';
 import { commands, handleCommand } from './commands.ts';
 import { startJobLoop, type Handlers } from './jobs.ts';
+import {
+  applyAutoRoles,
+  checkOne,
+  factsOf,
+  pendingBefore,
+  startAutoRoleSweep,
+} from './auto-roles.ts';
 import {
   checkWelcome,
   memberJoined,
@@ -74,6 +86,15 @@ const handlers: Handlers = {
   welcome: async (job) =>
     checkWelcome(db, client.guilds.cache.get(job.guildId), membersIntent),
   tickets: (job) => tickets.applyPanel(job.guildId),
+  autoroles: (job) =>
+    applyAutoRoles(
+      db,
+      rest,
+      client.guilds.cache.get(job.guildId),
+      membersIntent,
+    ),
+  'autoroles-check': (job) =>
+    checkOne(db, rest, job.guildId, (job.payload as { userId: string }).userId),
   studio: (job) => {
     const by = job.payload as { userId?: string; userName?: string };
     return publishStudio(
@@ -235,6 +256,26 @@ function wire(c: Client) {
   });
   c.on(Events.Error, (error) => console.error(error));
   c.on(Events.MessageCreate, (message) => {
+    // Discord's "just boosted" notices, for automatic roles' boost count.
+    if (
+      message.guildId &&
+      message.member &&
+      [
+        MessageType.GuildBoost,
+        MessageType.GuildBoostTier1,
+        MessageType.GuildBoostTier2,
+        MessageType.GuildBoostTier3,
+      ].includes(message.type)
+    ) {
+      arBoosted(
+        db,
+        message.guildId,
+        factsOf(message.member),
+        Math.max(1, Math.min(100, Number(message.content) || 1)),
+        Date.now(),
+      );
+      return;
+    }
     if (message.author.bot || !message.channel.isThread()) return;
     const file = message.attachments.first()?.name ?? null;
     tickets.recordMessage({
@@ -257,11 +298,24 @@ function wire(c: Client) {
     memberJoined(db, rest, member).catch(
       failed(`Welcoming ${member.id} in ${member.guild.id}`),
     );
+    if (!member.user.bot)
+      arJoined(db, rest, member.guild.id, factsOf(member), Date.now()).catch(
+        failed(`Automatic roles for ${member.id} in ${member.guild.id}`),
+      );
   });
   c.on(Events.GuildMemberUpdate, (before, after) => {
     memberUpdated(db, rest, before, after).catch(
       failed(`Updating ${after.id} in ${after.guild.id}`),
     );
+    if (!after.user.bot)
+      arUpdated(
+        db,
+        rest,
+        after.guild.id,
+        pendingBefore(before),
+        factsOf(after),
+        Date.now(),
+      ).catch(failed(`Automatic roles for ${after.id} in ${after.guild.id}`));
   });
   c.on(Events.MessageReactionAdd, (reaction, user) => {
     void reactionRoleReaction(reaction, user, 'react');
@@ -270,6 +324,7 @@ function wire(c: Client) {
     void reactionRoleReaction(reaction, user, 'unreact');
   });
   c.on(Events.GuildMemberRemove, (member) => {
+    if (!member.user?.bot) arLeft(db, member.guild.id, member.id, Date.now());
     memberLeft(db, rest, member).catch(
       failed(`Saying goodbye to ${member.id} in ${member.guild.id}`),
     );
@@ -490,6 +545,8 @@ if (!membersIntent || !contentIntent)
   );
 // Auto-close quiet tickets.
 setInterval(() => void tickets.sweep(), 5 * 60_000).unref();
+// Timed roles and rules.
+startAutoRoleSweep(db, rest, (id) => client.guilds.cache.has(id));
 setStatus(
   db,
   'intents',

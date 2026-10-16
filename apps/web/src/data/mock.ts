@@ -16,6 +16,7 @@ import {
   greetTemplates,
   welcomeDefault,
 } from './studio-format';
+import { createAutoRolesMock } from './mock-autoroles';
 import { createSupportMock } from './mock-support';
 
 /**
@@ -489,12 +490,14 @@ export function resetMock() {
   state.clear();
   servers = sampleServers;
   resetSupport();
+  resetAutoRoles();
 }
 
 const {
   api: supportApi,
   reset: resetSupport,
   postingChannel,
+  rolesOf,
 } = createSupportMock({
   wait: <T>(value: T, slow?: boolean) =>
     wait(value, slow ? delayMs * 2 : delayMs),
@@ -511,4 +514,18 @@ const {
     );
   },
 });
-export const mockApi: PanelApi = { ...coreApi, ...supportApi };
+const { api: autoRolesApi, reset: resetAutoRoles } = createAutoRolesMock({
+  wait: <T>(value: T) => wait(value),
+  copy,
+  server: serverById,
+  roles: (serverId) => rolesOf(serverId),
+  isOn: (serverId) => !!stateOf(serverId).on['autoroles'],
+  setOn: (serverId, on) => {
+    stateOf(serverId).on['autoroles'] = on;
+  },
+});
+export const mockApi: PanelApi = {
+  ...coreApi,
+  ...supportApi,
+  ...autoRolesApi,
+};

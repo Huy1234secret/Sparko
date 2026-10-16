@@ -31,6 +31,7 @@ import {
 import type { createAuth, DiscordGuild } from './auth.ts';
 import { BadRequest, json, readJson } from './http.ts';
 import type { Media } from './media.ts';
+import { arRoutes } from './ar-api.ts';
 import { rrRoutes } from './rr-api.ts';
 import { studioRoutes } from './studio-api.ts';
 import { ticketRoutes } from './tickets-api.ts';
@@ -236,6 +237,7 @@ export function createApi({
     media,
   });
   const reactionRoles = rrRoutes({ db, view: (id) => view(id), now });
+  const autoRoles = arRoutes({ db, view: (id) => view(id), now });
   const tickets = ticketRoutes({
     db,
     rest: discord,
@@ -343,6 +345,17 @@ export function createApi({
       const handled = await reactionRoles({
         req,
         res,
+        method,
+        path: rest,
+        guildId,
+        user,
+      });
+      if (!handled) json(res, 404, { error: 'not_found' });
+    } else if (rest.startsWith('/autoroles')) {
+      const handled = await autoRoles({
+        req,
+        res,
+        url,
         method,
         path: rest,
         guildId,

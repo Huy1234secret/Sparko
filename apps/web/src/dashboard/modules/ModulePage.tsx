@@ -24,6 +24,7 @@ import {
   useModuleTab,
   useSaveFlow,
 } from './frame';
+import { AutoRolesModule } from './AutoRolesModule';
 import { ReactionRolesModule } from './ReactionRolesModule';
 import { StudioModule } from './StudioModule';
 import { TicketsModule } from './TicketsModule';
@@ -261,5 +262,7 @@ export function ModulePage() {
     return <ReactionRolesModule module={module} server={server} />;
   if (module.id === 'tickets')
     return <TicketsModule module={module} server={server} />;
+  if (module.id === 'autoroles')
+    return <AutoRolesModule module={module} server={server} />;
   return <GenericModule module={module} server={server} />;
 }

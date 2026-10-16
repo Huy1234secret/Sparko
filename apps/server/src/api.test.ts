@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
+  arTrack,
   claimJob,
   finishJob,
   listVersions,
@@ -553,6 +554,86 @@ describe('server API', () => {
     await call(`/9001/studio/templates/${rr.config.message}`, {
       method: 'DELETE',
     });
+  });
+
+  it('saves automatic roles, checks them, and lets staff edit member data', async () => {
+    type AR = {
+      on: boolean;
+      config: { timed: unknown[] };
+      limits: { timed: number; rules: number };
+      roles: { id: string; assignable: boolean }[];
+    };
+    const state = await body<AR>(await call('/9001/autoroles'));
+    expect(state.on).toBe(false);
+    expect(state.limits).toMatchObject({ timed: 3, rules: 10 });
+    const config = {
+      join: { before: [], after: ['301'] },
+      timed: [{ id: 't1', after: '7d', role: '301' }],
+      restartOnLeave: true,
+      stack: true,
+      rules: [],
+    };
+    // A role Sparko can't give is refused.
+    const bad = await call('/9001/autoroles', {
+      method: 'PUT',
+      body: JSON.stringify({
+        on: true,
+        config: { ...config, timed: [{ id: 't1', after: '7d', role: '302' }] },
+      }),
+    });
+    expect((await body<{ message: string }>(bad)).message).toContain(
+      'can’t give the role',
+    );
+    const ok = await call('/9001/autoroles', {
+      method: 'PUT',
+      body: JSON.stringify({ on: true, config }),
+    });
+    expect(ok.status).toBe(204);
+    let job = claimJob(db)!;
+    while (job.kind !== 'autoroles') {
+      finishJob(db, job.id, null, Date.now());
+      job = claimJob(db)!;
+    }
+    finishJob(db, job.id, null, Date.now());
+    expect((await body<AR>(await call('/9001/autoroles'))).on).toBe(true);
+
+    // Storage: nothing until searched, then edit and wipe.
+    arTrack(
+      db,
+      '9001',
+      [
+        {
+          userId: '555',
+          name: 'mia',
+          flags: 0,
+          pending: false,
+          boostingSince: null,
+          joinedAt: Date.now() - 3_600_000,
+        },
+      ],
+      Date.now(),
+    );
+    type Found = { members: { userId: string; servedMs: number }[] };
+    expect(
+      (await body<Found>(await call('/9001/autoroles/members?q='))).members,
+    ).toEqual([]);
+    expect(
+      (await body<Found>(await call('/9001/autoroles/members?q=mi'))).members,
+    ).toHaveLength(1);
+    const edited = await body<{ member: { servedMs: number } }>(
+      await call('/9001/autoroles/members/555', {
+        method: 'PATCH',
+        body: JSON.stringify({ servedMs: 86_400_000, boosts: 2 }),
+      }),
+    );
+    expect(edited.member.servedMs).toBeGreaterThanOrEqual(86_400_000);
+    const wiped = await body<{ member: { servedMs: number } }>(
+      await call('/9001/autoroles/members/555', { method: 'DELETE' }),
+    );
+    expect(wiped.member.servedMs).toBeLessThan(60_000);
+    expect(
+      (await call('/9001/autoroles/members/777', { method: 'DELETE' })).status,
+    ).toBe(404);
   });
 
   it('keeps templates in folders, in the order people put them', async () => {

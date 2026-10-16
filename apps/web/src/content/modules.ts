@@ -54,7 +54,7 @@ const table: [ModuleGroup, string[]][] = [
     [
       'welcome|Welcome messages|user-plus|Send a message when someone joins, leaves or boosts the server.|Write a welcome',
       'role-menus|Reaction roles|smile|Members give themselves roles with reactions, buttons or a menu.|Make a reaction role',
-      'autoroles|Automatic roles|users|Give roles when someone joins, after a delay, or once they verify.|Add a rule',
+      'autoroles|Automatic roles|users|Give roles when members join, once they’ve stayed a while, or when they meet your rules.|Add a rule',
       'suggestions|Suggestions|message-square|Members suggest ideas, everyone votes, and staff mark them done.|Pick a suggestions channel',
       'questions|Questions & answers|circle-help|Answer common questions automatically with saved replies.|Add a question',
       'starboard|Starboard|star|Messages that get enough stars are reposted to a highlights channel.|Pick a highlights channel',

@@ -198,6 +198,33 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX rr_log_by_guild ON rr_log (guild_id, id DESC);`,
+  // 9: what automatic roles knows about each member, and what it did.
+  `CREATE TABLE ar_members (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    joined_at INTEGER,
+    served_ms INTEGER NOT NULL DEFAULT 0,
+    boosts INTEGER NOT NULL DEFAULT 0,
+    boosting_since INTEGER,
+    flags INTEGER NOT NULL DEFAULT 0,
+    given TEXT NOT NULL DEFAULT '[]',
+    blocked TEXT NOT NULL DEFAULT '[]',
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );
+  CREATE TABLE ar_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    role_id TEXT NOT NULL DEFAULT '',
+    trigger TEXT NOT NULL DEFAULT '',
+    reason TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX ar_log_by_guild ON ar_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

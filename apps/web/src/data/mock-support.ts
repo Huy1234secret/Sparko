@@ -1074,6 +1074,8 @@ export function createSupportMock(h: Helpers) {
   return {
     api,
     reset: () => state.clear(),
+    /** The server's roles, shared with other sample modules. */
+    rolesOf: (serverId: string) => of(serverId).studio.roles,
     /** The channel a module posts in, for the apply check. */
     postingChannel: (serverId: string, moduleId: string) => {
       if (moduleId === 'tickets') {
