@@ -18,7 +18,7 @@ import {
   Tilt,
   useOnScreenClass,
   useOrbitControl,
-  usePointerGlow,
+  PointerGlow,
   useTilt,
 } from './motion';
 import { commands } from '../content/commands';
@@ -358,12 +358,6 @@ function ModuleOrbit() {
   );
 }
 
-/** A soft yellow light that trails the pointer across the hero. */
-function HeroGlow() {
-  const glow = usePointerGlow<HTMLDivElement>();
-  return <div className="sw-hero__glow" ref={glow} aria-hidden="true" />;
-}
-
 /** Every slash command, on two ribbons that cross at an angle. */
 function CommandRibbons() {
   const ribbons = useOnScreenClass<HTMLDivElement>('is-moving');
@@ -394,7 +388,7 @@ export function HomePage() {
     <>
       <div className="sw-progress" aria-hidden="true" />
       <section className="sw-hero" aria-labelledby="hero-h">
-        <HeroGlow />
+        <PointerGlow />
         <div className="sw-wrap sw-hero__grid">
           <div className="sw-hero__copy">
             <h1 className="sw-display" id="hero-h">

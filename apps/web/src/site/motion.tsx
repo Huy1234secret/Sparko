@@ -227,6 +227,12 @@ export function usePointerGlow<T extends HTMLElement>() {
   return ref;
 }
 
+/** A soft yellow light that trails the pointer across its parent. */
+export function PointerGlow() {
+  const glow = usePointerGlow<HTMLDivElement>();
+  return <div className="sw-hero__glow" ref={glow} aria-hidden="true" />;
+}
+
 /**
  * Lets people grab the module orbit and fling it, and nudges it along as the
  * page scrolls. It moves the orbit's own CSS animations forward or back, so
@@ -251,6 +257,34 @@ export function useOrbitControl(stageRef: RefObject<HTMLElement | null>) {
     // the start of an animation. Positions don't change: a lap is a lap.
     const lap = (orbiting()[0]?.effect?.getTiming().duration as number) || 0;
     if (lap) nudge(lap * 20);
+
+    // Hovering anywhere on the orbit, or moving keyboard focus into it, eases
+    // both arcs to a stop together; leaving eases them back up to speed.
+    let rate = 1;
+    let target = 1;
+    let rateFrame = 0;
+    const stepRate = () => {
+      rate += (target - rate) * 0.14;
+      if (Math.abs(target - rate) < 0.01) rate = target;
+      for (const a of orbiting()) a.playbackRate = rate;
+      rateFrame = rate === target ? 0 : requestAnimationFrame(stepRate);
+    };
+    const ease = (to: number) => {
+      target = to;
+      if (!rateFrame) rateFrame = requestAnimationFrame(stepRate);
+    };
+    const hold = () => ease(0);
+    const release = (e: Event) => {
+      // Stay stopped while the pointer is still over it, or while keyboard
+      // focus is still inside (a mouse click's focus doesn't count).
+      if (e.type === 'focusout') {
+        const next = (e as FocusEvent).relatedTarget as Element | null;
+        if (next && stage.contains(next) && next.matches(':focus-visible'))
+          return;
+        if (stage.matches(':hover')) return;
+      } else if (stage.querySelector(':focus-visible')) return;
+      ease(1);
+    };
 
     let drag: {
       id: number;
@@ -352,6 +386,10 @@ export function useOrbitControl(stageRef: RefObject<HTMLElement | null>) {
       });
     };
 
+    stage.addEventListener('pointerenter', hold);
+    stage.addEventListener('pointerleave', release);
+    stage.addEventListener('focusin', hold);
+    stage.addEventListener('focusout', release);
     stage.addEventListener('pointerdown', down);
     stage.addEventListener('pointermove', move);
     stage.addEventListener('pointerup', up);
@@ -361,6 +399,11 @@ export function useOrbitControl(stageRef: RefObject<HTMLElement | null>) {
     return () => {
       cancelAnimationFrame(fling);
       cancelAnimationFrame(scrollFrame);
+      cancelAnimationFrame(rateFrame);
+      stage.removeEventListener('pointerenter', hold);
+      stage.removeEventListener('pointerleave', release);
+      stage.removeEventListener('focusin', hold);
+      stage.removeEventListener('focusout', release);
       stage.removeEventListener('pointerdown', down);
       stage.removeEventListener('pointermove', move);
       stage.removeEventListener('pointerup', up);

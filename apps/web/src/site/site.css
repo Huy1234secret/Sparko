@@ -715,7 +715,7 @@ a.sp-btn {
 .sw-orbit {
   position: relative;
   overflow: hidden;
-  padding: 24px 0;
+  padding: 8px 0;
   -webkit-mask-image: linear-gradient(
     90deg,
     transparent,
@@ -738,7 +738,7 @@ a.sp-btn {
   display: grid;
   place-items: center;
   width: max(100%, 1180px);
-  height: 780px;
+  height: 650px;
   translate: -50% 0;
 }
 .sw-orbit__center {
@@ -766,7 +766,7 @@ a.sp-btn {
   position: absolute;
   top: 0;
   left: 0;
-  offset-path: ellipse(74% 37% at 50% 50%);
+  offset-path: ellipse(74% 35% at 50% 50%);
   offset-rotate: 0deg;
   offset-anchor: center;
   offset-distance: calc(var(--i) / var(--n) * 100%);
@@ -775,10 +775,6 @@ a.sp-btn {
 }
 .sw-orbit__stage.is-moving .sw-orbit__item {
   animation-play-state: running;
-}
-.sw-orbit__stage.is-moving:hover .sw-orbit__item,
-.sw-orbit__stage.is-moving:focus-within .sw-orbit__item {
-  animation-play-state: paused;
 }
 @keyframes sw-orbit {
   from {
@@ -941,7 +937,7 @@ a.sp-btn {
     );
   }
   .sw-orbit__stage {
-    height: 860px;
+    height: 680px;
   }
   .sw-orbit__card {
     width: 216px;
@@ -1202,4 +1198,252 @@ a.sp-btn {
   .sw-timeline__rider {
     display: none;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Pricing: the Plus card gets a light that runs round its border, prices
+   spin in like a slot machine, and the badge and button catch a shine. */
+.sw-beam {
+  position: absolute;
+  inset: -1px;
+  padding: 2px;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+.sw-beam i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: conic-gradient(
+    transparent 0 22%,
+    var(--sp-brand) 34%,
+    #fffbe6 37%,
+    transparent 44% 72%,
+    var(--sp-brand) 84%,
+    transparent 92%
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sw-beam i {
+    animation: sw-beam 5s linear infinite;
+  }
+  .sw-plus.sp-sparks::before {
+    animation: sw-twinkle 2.6s ease-in-out infinite alternate;
+  }
+  .sw-shine {
+    position: relative;
+    overflow: hidden;
+  }
+  .sw-shine::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 30%,
+      rgb(255 255 255 / 0.55) 50%,
+      transparent 70%
+    );
+    translate: -110% 0;
+    animation: sw-shine 4.5s var(--sw-ease) infinite;
+    pointer-events: none;
+  }
+  .sp-btn.sw-shine::before {
+    animation-delay: 0.6s;
+  }
+}
+@keyframes sw-beam {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes sw-twinkle {
+  from {
+    opacity: 0.45;
+  }
+}
+@keyframes sw-shine {
+  0%,
+  55% {
+    translate: -110% 0;
+  }
+  80%,
+  100% {
+    translate: 110% 0;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .sw-plus {
+    transition:
+      transform 700ms var(--sw-ease),
+      box-shadow 400ms var(--sw-ease);
+  }
+  .sw-plus:hover {
+    box-shadow:
+      inset 0 0 0 1px var(--sp-brand-edge),
+      0 24px 60px -24px color-mix(in srgb, var(--sp-brand) 45%, transparent);
+  }
+}
+
+.sw-roll {
+  display: inline-flex;
+}
+.sw-roll__col {
+  display: inline-block;
+  height: 44px;
+  overflow: hidden;
+}
+.sw-roll__strip {
+  display: flex;
+  flex-direction: column;
+}
+.sw-roll__strip > span {
+  height: 44px;
+}
+.sw-price-grid.is-rolled .sw-roll__strip {
+  translate: 0 calc((10 + var(--d)) * -5%);
+  transition: translate 1400ms var(--sw-ease);
+  transition-delay: calc(var(--i) * 120ms + 150ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-roll__strip {
+    translate: 0 calc((10 + var(--d)) * -5%);
+  }
+}
+
+/* Pricing page: a drifting aurora, a dot field and the pointer light behind
+   the plans. The blobs are plain radial gradients moved with transform, so
+   nothing is blurred or repainted per frame. */
+.sw-pricing-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding-bottom: 72px;
+}
+.sw-pricing-hero::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: radial-gradient(
+    circle,
+    var(--sp-brand-line) 1px,
+    transparent 1.6px
+  );
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(60% 55% at 50% 0%, #000, transparent 75%);
+  mask-image: radial-gradient(60% 55% at 50% 0%, #000, transparent 75%);
+  pointer-events: none;
+}
+.sw-aurora {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  pointer-events: none;
+}
+.sw-aurora i {
+  position: absolute;
+  will-change: translate;
+  width: 720px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--sp-brand) 16%, transparent),
+    transparent
+  );
+}
+.sw-aurora i:nth-child(1) {
+  top: -360px;
+  left: calc(50% - 640px);
+}
+.sw-aurora i:nth-child(2) {
+  top: -300px;
+  left: calc(50% - 40px);
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, #f59e0b 14%, transparent),
+    transparent
+  );
+}
+[data-theme='light'] .sw-aurora i {
+  opacity: 1;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--sp-brand) 26%, transparent),
+    transparent
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sw-aurora i:nth-child(1) {
+    animation: sw-drift-a 22s ease-in-out infinite alternate;
+  }
+  .sw-aurora i:nth-child(2) {
+    animation: sw-drift-b 26s ease-in-out infinite alternate;
+  }
+  .sw-pop {
+    animation: sw-pop 320ms var(--sw-ease) both;
+  }
+}
+@keyframes sw-drift-a {
+  to {
+    translate: 180px 90px;
+  }
+}
+@keyframes sw-drift-b {
+  to {
+    translate: -200px 120px;
+  }
+}
+@keyframes sw-pop {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+    scale: 0.94;
+  }
+}
+
+/* Lighter reveal for list items and table rows: they slide in from the side. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sw-reveal--line {
+      animation-name: sw-reveal-line;
+      animation-range: entry calc(var(--i, 0) * 6%) entry
+        calc(60% + var(--i, 0) * 6%);
+    }
+  }
+}
+@keyframes sw-reveal-line {
+  from {
+    opacity: 0;
+    translate: -14px 0;
+  }
+}
+
+/* New price digits (switching to a longer price) spin in too. */
+@starting-style {
+  .sw-price-grid.is-rolled .sw-roll__strip {
+    translate: 0 0;
+  }
+}
+
+/* The compare table gives the Plus column a light yellow wash. */
+.sw-compare td:nth-child(3),
+.sw-compare th:nth-child(3) {
+  background: color-mix(in srgb, var(--sp-brand) 6%, transparent);
+  font-weight: 600;
+}
+.sw-compare th:nth-child(3) {
+  color: var(--sp-brand-text);
 }
