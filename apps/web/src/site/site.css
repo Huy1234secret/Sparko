@@ -1023,11 +1023,14 @@ a.sp-btn {
 
 /* Two ribbons of slash commands cross at an angle and run opposite ways. */
 .sw-ribbons {
+  /* No height of its own: the ribbons lie across the seam between the hero
+     and the next section, over both, with no strip of page behind them. */
   position: relative;
   z-index: 1;
   display: grid;
-  height: 150px;
+  height: 0;
   overflow-x: clip;
+  overflow-y: visible;
 }
 .sw-ribbon {
   grid-area: 1 / 1;
@@ -1176,16 +1179,19 @@ a.sp-btn {
 }
 
 @container (max-width: 640px) {
-  .sw-ribbons {
-    height: 132px;
-  }
+  /* Narrow screens barely show the crossing, so pull the ribbons apart,
+     and give the sections either side room for them. */
   .sw-ribbon--brand {
-    align-self: end;
-    margin-bottom: 10px;
+    margin-top: 40px;
   }
   .sw-ribbon--ink {
-    align-self: start;
-    margin-top: 10px;
+    margin-top: -40px;
+  }
+  .sw-hero {
+    padding-bottom: 104px;
+  }
+  .sw-ribbons + .sw-section {
+    padding-top: 120px;
   }
   .sw-ribbon {
     padding: 12px 0;
@@ -1299,8 +1305,18 @@ a.sp-btn {
 .sw-roll {
   display: inline-flex;
 }
+/* Each digit is a window onto a strip: a blank, then 0–9 twice. A digit
+   that appears or goes opens or closes its column as it rolls. */
 .sw-roll__col {
-  display: inline-block;
+  display: inline-grid;
+  grid-template-columns: 1fr;
+  transition: grid-template-columns 500ms var(--sw-ease);
+}
+.sw-roll__col.is-empty {
+  grid-template-columns: 0fr;
+}
+.sw-roll__win {
+  min-width: 0;
   height: 44px;
   overflow: hidden;
 }
@@ -1310,15 +1326,16 @@ a.sp-btn {
 }
 .sw-roll__strip > span {
   height: 44px;
+  white-space: pre;
 }
 .sw-price-grid.is-rolled .sw-roll__strip {
-  translate: 0 calc((10 + var(--d)) * -5%);
-  transition: translate 1400ms var(--sw-ease);
-  transition-delay: calc(var(--i) * 120ms + 150ms);
+  translate: 0 calc(var(--t) * -100% / 21);
+  transition: translate 1200ms var(--sw-ease);
+  transition-delay: calc(var(--i) * 90ms + 100ms);
 }
 @media (prefers-reduced-motion: reduce) {
   .sw-roll__strip {
-    translate: 0 calc((10 + var(--d)) * -5%);
+    translate: 0 calc(var(--t) * -100% / 21);
   }
 }
 
@@ -1428,13 +1445,6 @@ a.sp-btn {
   from {
     opacity: 0;
     translate: -14px 0;
-  }
-}
-
-/* New price digits (switching to a longer price) spin in too. */
-@starting-style {
-  .sw-price-grid.is-rolled .sw-roll__strip {
-    translate: 0 0;
   }
 }
 

@@ -24,33 +24,61 @@ export function Faq({ items }: { items: FaqItem[] }) {
   );
 }
 
+/** A blank, then 0–9 twice, so every digit can spin a full turn. */
+const rollCells = [' ', ...'01234567890123456789'];
+
 /**
  * A price whose digits spin in like a slot machine when it scrolls into
- * view. Screen readers get the plain price.
+ * view, and roll like an odometer when it changes. Digits line up on the
+ * decimal point; `slots` keeps room for the longest price, so a digit that
+ * appears rolls up from blank and slides in, and one that goes rolls away
+ * and slides out. Screen readers get the plain price.
  */
-export function RollingPrice({ value }: { value: string }) {
-  let digit = 0;
+export function RollingPrice({
+  value,
+  slots = 0,
+}: {
+  value: string;
+  slots?: number;
+}) {
+  const match = /^(\D*)(\d+)(?:\.(\d+))?(.*)$/.exec(value);
+  if (!match) return <span className="sp-price__value">{value}</span>;
+  const [, prefix = '', int = '', dec = '', suffix = ''] = match;
+  const width = Math.max(slots, int.length);
+  const intSlots = Array.from(
+    { length: width },
+    (_, i) => int[i - (width - int.length)],
+  );
+  let place = 0;
+  const column = (digit: string | undefined, key: string) => (
+    <span
+      key={key}
+      className={'sw-roll__col' + (digit ? '' : ' is-empty')}
+      style={
+        {
+          '--t': digit ? 11 + Number(digit) : 0,
+          '--i': place++,
+        } as CSSProperties
+      }
+    >
+      <span className="sw-roll__win">
+        <span className="sw-roll__strip">
+          {rollCells.map((n, j) => (
+            <span key={j}>{n}</span>
+          ))}
+        </span>
+      </span>
+    </span>
+  );
   return (
     <span className="sp-price__value">
       <span className="sp-sr-only">{value}</span>
       <span className="sw-roll" aria-hidden="true">
-        {[...value].map((char, i) =>
-          /\d/.test(char) ? (
-            <span
-              key={i}
-              className="sw-roll__col"
-              style={{ '--d': char, '--i': digit++ } as CSSProperties}
-            >
-              <span className="sw-roll__strip">
-                {[...'01234567890123456789'].map((n, j) => (
-                  <span key={j}>{n}</span>
-                ))}
-              </span>
-            </span>
-          ) : (
-            <span key={i}>{char}</span>
-          ),
-        )}
+        {prefix}
+        {intSlots.map((digit, i) => column(digit, `i${i}`))}
+        {dec && '.'}
+        {[...dec].map((digit, i) => column(digit, `d${i}`))}
+        {suffix}
       </span>
     </span>
   );
