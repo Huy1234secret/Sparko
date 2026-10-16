@@ -38,6 +38,8 @@ const set = <K extends string>(name: string, states: K[]) =>
 export const animIcons = {
   authorLinkAdd: { hover: file('author-link-add-button-hover') },
   checkbox: { select: file('checkbox-button-select') },
+  /** Sparko's S as a turning golden crystal, for the loading screen. */
+  crystal: { loop: file('crystal-logo-loop') },
   clone: set('clone-button', ['reveal', 'hover']),
   close: set('close-button', ['reveal', 'hover']),
   download: set('download-button', ['reveal', 'hover', 'select']),

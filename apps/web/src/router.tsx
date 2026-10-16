@@ -1,8 +1,10 @@
 import {
   createBrowserRouter,
+  Outlet,
   useRouteError,
   type RouteObject,
 } from 'react-router-dom';
+import { RouteLoader } from './RouteLoader';
 import { SiteLayout } from './site/SiteLayout';
 import { HomePage } from './site/HomePage';
 
@@ -89,7 +91,17 @@ const pages: RouteObject[] = [
     ],
   },
 ];
+/** Every page, with the loading screen that covers page changes. */
+function Root() {
+  return (
+    <>
+      <Outlet />
+      <RouteLoader />
+    </>
+  );
+}
+
 export const routes: RouteObject[] = [
-  { errorElement: <CrashPage />, children: pages },
+  { element: <Root />, errorElement: <CrashPage />, children: pages },
 ];
 export const createRouter = () => createBrowserRouter(routes);
