@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigation } from 'react-router-dom';
-import { animIcons, LottieIcon, preloadAnimations, reducedMotion } from './ui';
+import { Crystal, preloadCrystal } from './ui';
 import { freeModuleCount, modules } from './content/modules';
 
-const crystal = animIcons.crystal.loop;
 // Get the player and the crystal ready early, so the loader never waits on
 // its own animation.
-preloadAnimations([crystal], true);
+preloadCrystal();
 
 const facts = [
   'Sparko never asks for Administrator, only the permissions your modules use.',
@@ -36,7 +35,6 @@ export function RouteLoader() {
   const [ready, setReady] = useState<{ key: string; fact: string } | null>(
     null,
   );
-  const [loop, setLoop] = useState(1);
   useEffect(() => {
     if (!key) return;
     const timer = setTimeout(
@@ -60,13 +58,7 @@ export function RouteLoader() {
       {on && (
         <div className="sp-route-loader__card">
           <span className="sp-route-loader__icon">
-            <LottieIcon
-              src={crystal}
-              size={112}
-              playKey={reducedMotion() ? undefined : loop}
-              onDone={() => setLoop((n) => n + 1)}
-              original
-            />
+            <Crystal />
           </span>
           <p className="sp-route-loader__title">
             Loading

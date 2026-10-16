@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Avatar, Icon } from '../ui';
-import { liveSession, liveSignOut } from '../data/live';
+import { backend, liveSession, liveSignOut } from '../data/live';
 import type { Session } from '../data/types';
 
 const siteSession = ['site-session'] as const;
@@ -18,6 +18,71 @@ export function useSiteSession() {
     staleTime: 0,
     retry: false,
   }).data;
+}
+
+/** 31 October 2026, 10:00 pm in UTC+7, unless the server says otherwise. */
+const fallbackOpensAt = '2026-10-31T15:00:00Z';
+
+/** "14d 05:12:33" until the time, ticking every second. */
+function useCountdown(at: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const left = Math.max(0, Math.floor((at - now) / 1000));
+  const two = (n: number) => String(n).padStart(2, '0');
+  const d = Math.floor(left / 86_400);
+  const h = Math.floor((left % 86_400) / 3600);
+  const m = Math.floor((left % 3600) / 60);
+  return {
+    done: left === 0,
+    short: `${d ? `${d}d ` : ''}${two(h)}:${two(m)}:${two(left % 60)}`,
+    spoken: `${d} days, ${h} hours and ${m} minutes`,
+  };
+}
+
+/**
+ * Open dashboard for people who may use it. For someone signed in before
+ * the dashboard opens to them, it counts down to the opening instead.
+ */
+export function DashboardButton({
+  session,
+  block,
+}: {
+  session: Session;
+  block?: boolean;
+}) {
+  const status = useQuery({
+    queryKey: ['backend'],
+    queryFn: backend,
+    staleTime: Infinity,
+  }).data;
+  const at = Date.parse(status?.dashboardOpensAt ?? fallbackOpensAt);
+  const count = useCountdown(at);
+  const cls = block ? ' sp-btn--block' : ' sw-desk';
+  if (session.allowed === false && !count.done)
+    return (
+      <Link
+        className={'sp-btn sp-btn--secondary sw-countdown' + cls}
+        to="/dashboard"
+        aria-label={`The dashboard opens in ${count.spoken}`}
+        title="The dashboard opens on 31 October 2026, 10:00 pm (UTC+7)"
+      >
+        <Icon name="timer" />
+        <span className="sw-countdown__label">Opens in</span>
+        <span className="sw-countdown__time">{count.short}</span>
+      </Link>
+    );
+  return (
+    <Link
+      className={'sp-btn sp-btn--primary sw-open-dash' + cls}
+      to="/dashboard"
+    >
+      <Icon name="layout-dashboard" />
+      Open dashboard
+    </Link>
+  );
 }
 
 /** The signed-in person's picture, with a menu for the dashboard and signing out. */

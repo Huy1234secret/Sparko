@@ -11,10 +11,22 @@ import type {
  * server list come from Discord; everything else is still sample data.
  * Without a backend (local development, tests) it's all sample data.
  */
-export type Backend = { live: boolean; signIn: boolean };
+export type Backend = {
+  live: boolean;
+  signIn: boolean;
+  /** Whether the dashboard is open to everyone yet. */
+  dashboardOpen: boolean;
+  /** When it opens to everyone, if a date is set. */
+  dashboardOpensAt: string | null;
+};
 
 let probe: Promise<Backend> | undefined;
-const offline: Backend = { live: false, signIn: false };
+const offline: Backend = {
+  live: false,
+  signIn: false,
+  dashboardOpen: true,
+  dashboardOpensAt: null,
+};
 
 export function backend(): Promise<Backend> {
   probe ??= fetch('/api/v1/health', { headers: { accept: 'application/json' } })
@@ -22,8 +34,20 @@ export function backend(): Promise<Backend> {
       // Without a backend the address serves the app's HTML instead.
       if (!res.ok || !res.headers.get('content-type')?.includes('json'))
         return offline;
-      const body = (await res.json()) as { signIn?: unknown };
-      return { live: true, signIn: body.signIn === true };
+      const body = (await res.json()) as {
+        signIn?: unknown;
+        dashboard?: { open?: unknown; opensAt?: unknown };
+      };
+      return {
+        live: true,
+        signIn: body.signIn === true,
+        // An older server without the field has an open dashboard.
+        dashboardOpen: body.dashboard?.open !== false,
+        dashboardOpensAt:
+          typeof body.dashboard?.opensAt === 'string'
+            ? body.dashboard.opensAt
+            : null,
+      };
     })
     .catch(() => offline);
   return probe;
@@ -78,11 +102,15 @@ const colourOf = (id: string) =>
  */
 export async function liveSession(): Promise<Session | null> {
   if (!(await backend()).live) return null;
-  const { user } = await getJson<{
+  const { user, allowed } = await getJson<{
     user: { id: string; name: string; avatarUrl: string } | null;
+    allowed?: boolean;
   }>('/api/v1/session');
   return user
-    ? ({ user: { ...user, avatarColor: colourOf(user.id) } } as Session)
+    ? ({
+        user: { ...user, avatarColor: colourOf(user.id) },
+        allowed: allowed !== false,
+      } as Session)
     : null;
 }
 

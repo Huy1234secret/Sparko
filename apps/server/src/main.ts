@@ -39,12 +39,29 @@ const media = createMedia({
 const botToken = process.env.DISCORD_BOT_TOKEN;
 const discord = botToken ? discordRest({ token: botToken }) : undefined;
 const views = discord ? guildViews(discord) : undefined;
+// Until the dashboard opens, only these Discord users can use it.
+// DASHBOARD_USERS is a comma-separated list of user IDs, or * for everyone.
+const dashboardUsers =
+  process.env.DASHBOARD_USERS?.trim() === '*'
+    ? undefined
+    : (process.env.DASHBOARD_USERS ?? '902736357766594611,1416183744515276943')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+// 31 October 2026, 10:00 pm in UTC+7.
+const dashboardOpensAt = Date.parse(
+  process.env.DASHBOARD_OPENS_AT ?? '2026-10-31T15:00:00Z',
+);
 const auth = createAuth({
   db,
   clientId: process.env.DISCORD_CLIENT_ID,
   clientSecret: process.env.DISCORD_CLIENT_SECRET,
   botToken,
   publicUrl,
+  dashboardUsers,
+  dashboardOpensAt: Number.isNaN(dashboardOpensAt)
+    ? undefined
+    : dashboardOpensAt,
 });
 const api = createApi({ db, auth, views, discord, publicUrl, media });
 // Expired sign-ins are cleared once an hour.

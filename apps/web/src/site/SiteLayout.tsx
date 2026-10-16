@@ -6,11 +6,11 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import { Button, Icon, useToast } from '../ui';
+import { Button, useToast } from '../ui';
 import { useTheme } from '../state/theme';
 import { panelHost, supportServer } from './links';
 import { useSparkBursts } from './motion';
-import { AccountMenu, useSiteSession } from './Account';
+import { AccountMenu, DashboardButton, useSiteSession } from './Account';
 
 const navLinks = [
   ['/features', 'Features'],
@@ -101,13 +101,7 @@ export function SiteLayout() {
               />
               {session ? (
                 <>
-                  <Link
-                    className="sp-btn sp-btn--primary sw-desk sw-open-dash"
-                    to="/dashboard"
-                  >
-                    <Icon name="layout-dashboard" />
-                    Open dashboard
-                  </Link>
+                  <DashboardButton session={session} />
                   <AccountMenu session={session} onAddBot={addBot} />
                 </>
               ) : (
@@ -145,13 +139,7 @@ export function SiteLayout() {
             <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
               {session ? (
                 <>
-                  <Link
-                    className="sp-btn sp-btn--primary sp-btn--block"
-                    to="/dashboard"
-                  >
-                    <Icon name="layout-dashboard" />
-                    Open dashboard
-                  </Link>
+                  <DashboardButton session={session} block />
                   <Button block icon="plus" onClick={addBot}>
                     Add Sparko to a server
                   </Button>
