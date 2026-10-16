@@ -5,6 +5,7 @@ import {
   type RouteObject,
 } from 'react-router-dom';
 import { RouteLoader } from './RouteLoader';
+import { SiteGate } from './SiteGate';
 import { SiteLayout } from './site/SiteLayout';
 import { HomePage } from './site/HomePage';
 
@@ -48,20 +49,14 @@ function CrashPage() {
 
 const pages: RouteObject[] = [
   { path: 'signin', lazy: dashboard('SignInPage') },
+  { path: 'dashboard', lazy: dashboard('ServerPickerPage') },
   {
-    // Until the dashboard opens, only allowed people get past this.
-    lazy: dashboard('DashboardGate'),
+    path: 'dashboard/:serverId',
+    lazy: dashboard('ServerLayout'),
     children: [
-      { path: 'dashboard', lazy: dashboard('ServerPickerPage') },
-      {
-        path: 'dashboard/:serverId',
-        lazy: dashboard('ServerLayout'),
-        children: [
-          { index: true, lazy: dashboard('OverviewPage') },
-          { path: 'tickets/:ticketNumber', lazy: dashboard('TicketPage') },
-          { path: ':moduleId', lazy: dashboard('ModulePage') },
-        ],
-      },
+      { index: true, lazy: dashboard('OverviewPage') },
+      { path: 'tickets/:ticketNumber', lazy: dashboard('TicketPage') },
+      { path: ':moduleId', lazy: dashboard('ModulePage') },
     ],
   },
   {
@@ -102,11 +97,16 @@ const pages: RouteObject[] = [
     ],
   },
 ];
-/** Every page, with the loading screen that covers page changes. */
+/**
+ * Every page, behind the coming-soon gate until launch, with the loading
+ * screen that covers page changes.
+ */
 function Root() {
   return (
     <>
-      <Outlet />
+      <SiteGate>
+        <Outlet />
+      </SiteGate>
       <RouteLoader />
     </>
   );

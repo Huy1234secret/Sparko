@@ -101,7 +101,7 @@ export function SiteLayout() {
               />
               {session ? (
                 <>
-                  <DashboardButton session={session} />
+                  <DashboardButton />
                   <AccountMenu session={session} onAddBot={addBot} />
                 </>
               ) : (
@@ -139,7 +139,7 @@ export function SiteLayout() {
             <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
               {session ? (
                 <>
-                  <DashboardButton session={session} block />
+                  <DashboardButton block />
                   <Button block icon="plus" onClick={addBot}>
                     Add Sparko to a server
                   </Button>
