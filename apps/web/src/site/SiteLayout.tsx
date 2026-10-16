@@ -35,7 +35,13 @@ export function useAccountActions() {
 export function Logo() {
   return (
     <Link to="/" className="sw-logo" aria-label="Sparko home">
-      <span className="sw-logo__mark" />
+      <img
+        className="sw-logo__img"
+        src="/brand/sparko-icon-64.png"
+        width={32}
+        height={32}
+        alt=""
+      />
       Sparko
     </Link>
   );
@@ -128,7 +134,7 @@ export function SiteLayout() {
       <main id="main" tabIndex={-1}>
         <Outlet />
         <div className="sw-wrap" style={{ paddingBottom: 96 }}>
-          <div className="sw-cta">
+          <div className="sw-cta sw-reveal">
             <h2 className="sw-h2">Be live before your coffee cools.</h2>
             <p>
               Add Sparko, follow the checklist, and see every message before

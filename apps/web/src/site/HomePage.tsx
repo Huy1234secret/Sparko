@@ -1,19 +1,40 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Badge, Button, DiscordMessage, Icon, Segmented, Switch } from '../ui';
+import { Fragment, useEffect, useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  Badge,
+  Button,
+  DiscordMessage,
+  Icon,
+  Segmented,
+  Spinner,
+  Switch,
+} from '../ui';
 import { groupMeta, groups, modules } from '../content/modules';
 import { homeFaq, scenes } from '../content/site';
 import { Faq, PricingTeaser } from './parts';
 import { useAccountActions, usePageTitle } from './SiteLayout';
+import { reducedMotion, Tilt, useOnScreenClass, useTilt } from './motion';
 
-const reducedMotion = () =>
-  typeof matchMedia === 'function' &&
-  matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Staggers a child's entrance: `--i` is its place in the sequence. */
+const order = (i: number) => ({ '--i': i }) as CSSProperties;
 
-/** The hero preview cycles through modules every 5 s until someone picks one. */
+/** How long a preview "applies" before it shows as live. */
+const APPLY_MS = 900;
+
+/**
+ * The hero preview cycles through modules every 5 s until someone picks one.
+ * Each switch plays out like a real save: Sparko types, then the message
+ * lands and the status turns live.
+ */
 function HeroStage() {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(reducedMotion);
+  const [instant] = useState(reducedMotion);
+  const scene = scenes[index] ?? scenes[0]!;
+  const [appliedKey, setAppliedKey] = useState(scene.key);
+  const live = instant || appliedKey === scene.key;
+  const frame = useTilt<HTMLDivElement>(6);
+
   useEffect(() => {
     if (paused) return;
     const timer = setInterval(() => {
@@ -21,7 +42,11 @@ function HeroStage() {
     }, 5000);
     return () => clearInterval(timer);
   }, [paused]);
-  const scene = scenes[index] ?? scenes[0]!;
+  useEffect(() => {
+    const timer = setTimeout(() => setAppliedKey(scene.key), APPLY_MS);
+    return () => clearTimeout(timer);
+  }, [scene.key]);
+
   return (
     <div className="sw-stage">
       <div className="sw-stage__bar">
@@ -47,7 +72,7 @@ function HeroStage() {
           onClick={() => setPaused(!paused)}
         />
       </div>
-      <div className="sw-stage__frame">
+      <div className="sw-stage__frame sw-tilt" ref={frame}>
         <div className="sw-stage__chan">
           <Icon name="hash" />
           {scene.channel}
@@ -68,50 +93,153 @@ function HeroStage() {
               <div className="dc-content">{scene.userText}</div>
             </div>
           )}
-          <DiscordMessage
-            key={scene.key}
-            className="sw-swap"
-            content={
-              scene.content && (
-                <>
-                  <span className="dc-mention">{scene.mention}</span>{' '}
-                  {scene.content}
-                </>
-              )
-            }
-            embed={{
-              color: scene.color,
-              author: 'Pixel Plaza',
-              title: scene.title,
-              description: scene.description,
-              fields: scene.fields.map(([name, value]) => ({
-                name,
-                value,
-                inline: true,
-              })),
-              footer: scene.footer,
-            }}
-            components={[scene.buttons]}
-          />
+          {live ? (
+            <DiscordMessage
+              key={scene.key}
+              className="sw-swap"
+              content={
+                scene.content && (
+                  <>
+                    <span className="dc-mention">{scene.mention}</span>{' '}
+                    {scene.content}
+                  </>
+                )
+              }
+              embed={{
+                color: scene.color,
+                author: 'Pixel Plaza',
+                title: scene.title,
+                description: scene.description,
+                fields: scene.fields.map(([name, value]) => ({
+                  name,
+                  value,
+                  inline: true,
+                })),
+                footer: scene.footer,
+              }}
+              components={[scene.buttons]}
+            />
+          ) : (
+            <p className="sw-typing">
+              <span className="sw-typing__dots" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span>
+                <b>Sparko</b> is typing…
+              </span>
+            </p>
+          )}
         </div>
       </div>
-      <p className="sw-stage__note">{scene.note}</p>
+      <div className="sw-stage__foot">
+        <span
+          className={'sp-sync sp-sync--' + (live ? 'live' : 'applying')}
+          role="status"
+        >
+          {live ? <Icon name="circle-check" size="sm" /> : <Spinner />}
+          {live ? `Live in #${scene.channel}` : 'Applying to Discord…'}
+        </span>
+        <p className="sw-stage__note">{scene.note}</p>
+      </div>
     </div>
   );
 }
 
-function WhyCards() {
+const pipeline = ['Saved', 'Applied to Discord', 'Live in #welcome'];
+
+/** Press save and watch the same three steps the dashboard shows. */
+function StatusDemo() {
+  // How many steps are done: from -1 (not saved yet) to the last step.
+  const last = pipeline.length - 1;
+  const [done, setDone] = useState(last);
+  const running = done < last;
+  useEffect(() => {
+    if (!running) return;
+    const timer = setTimeout(() => setDone((d) => d + 1), 650);
+    return () => clearTimeout(timer);
+  }, [running, done]);
+  const run = () => setDone(reducedMotion() ? last : -1);
+  return (
+    <div className="sw-status">
+      <ol className="sw-status__steps" aria-live="polite">
+        {pipeline.map((step, i) => {
+          const state =
+            i <= done
+              ? 'is-done'
+              : i === done + 1 && running
+                ? 'is-current'
+                : '';
+          return (
+            <li key={step} className={'sw-status__step ' + state}>
+              <span className="sw-status__dot" aria-hidden="true">
+                {i <= done ? (
+                  <Icon name="check" size="sm" />
+                ) : i === done + 1 && running ? (
+                  <Spinner />
+                ) : null}
+              </span>
+              <span>
+                {step}
+                <span className="sp-sr-only">
+                  {i <= done ? ', done' : running ? ', waiting' : ''}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <Button
+        size="sm"
+        icon="save"
+        onClick={run}
+        disabled={running}
+        className="sw-status__btn"
+      >
+        {running ? 'Saving…' : 'Save again'}
+      </Button>
+    </div>
+  );
+}
+
+function WhyGrid() {
   const [rejoin, setRejoin] = useState(false);
   const [message, setMessage] = useState('welcome to {server}!');
   const preview = message
     .replace(/\{server\}/g, 'Pixel Plaza')
     .replace(/\{user\}/g, '@tomoko');
   return (
-    <div className="sw-grid sw-grid--4">
-      <article className="sw-card">
-        <span className="sw-card__icon">
-          <Icon name="message-square-text" />
-        </span>
+    <div className="sw-bento">
+      <Tilt as="article" max={4} className="sw-card sw-bento__live sw-reveal">
+        <div className="sw-bento__copy">
+          <h3 className="sw-h3">Live previews</h3>
+          <p className="sw-body">
+            Messages look exactly like they will in Discord, before you save.
+            Try it: <code className="sp-mono">{'{server}'}</code> and{' '}
+            <code className="sp-mono">{'{user}'}</code> fill themselves in.
+          </p>
+          <div className="sp-input">
+            <input
+              aria-label="Try a welcome message"
+              value={message}
+              maxLength={120}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="dc-chat sw-bento__dc" aria-label="Discord preview">
+          <DiscordMessage
+            content={
+              <>
+                <span className="dc-mention">@tomoko</span> {preview}
+              </>
+            }
+          />
+        </div>
+      </Tilt>
+
+      <Tilt as="article" max={4} className="sw-card sw-bento__plain sw-reveal">
         <h3 className="sw-h3">Plain language</h3>
         <p className="sw-body">
           No jargon, no raw JSON. Every setting says what it does.
@@ -124,104 +252,129 @@ function WhyCards() {
             description="Off means nobody is greeted twice."
           />
         </div>
-      </article>
-      <article className="sw-card">
-        <span className="sw-card__icon">
-          <Icon name="eye" />
-        </span>
-        <h3 className="sw-h3">Live previews</h3>
-        <p className="sw-body">
-          Messages look exactly like they will in Discord, before you save.
-        </p>
-        <div className="sw-card__demo">
-          <div className="sp-input" style={{ minHeight: 36, fontSize: 13 }}>
-            <input
-              aria-label="Try a welcome message"
-              value={message}
-              maxLength={120}
-              onChange={(e) => setMessage(e.target.value)}
-              style={{ height: 34 }}
-            />
-          </div>
-          <div className="sw-demo-dc">
-            <span className="dc-mention">@tomoko</span> {preview}
-          </div>
-        </div>
-      </article>
-      <article className="sw-card">
-        <span className="sw-card__icon">
-          <Icon name="shield-check" />
-        </span>
+      </Tilt>
+
+      <Tilt as="article" max={4} className="sw-card sw-bento__safe sw-reveal">
         <h3 className="sw-h3">Safe by default</h3>
         <p className="sw-body">
           Test rules in a simulator before they’re live. Restore any earlier
           setup.
         </p>
         <div className="sw-card__demo">
-          <code
-            className="sp-mono"
-            style={{ fontSize: 12, color: 'var(--sp-muted)' }}
-          >
+          <code className="sp-mono sw-sim__msg">
             “free nitro → discord.gg/x7f”
           </code>
           <Badge tone="danger" icon="ban" style={{ justifySelf: 'start' }}>
             Would be removed · Invite links
           </Badge>
         </div>
-      </article>
-      <article className="sw-card">
-        <span className="sw-card__icon">
-          <Icon name="activity" />
-        </span>
-        <h3 className="sw-h3">Honest status</h3>
-        <p className="sw-body">
-          You always know if it’s saved, applying, live, or what to fix.
-        </p>
-        <div className="sw-card__demo sw-status-demo">
-          {['Saved', 'Applied to Discord', 'Live in #welcome'].map((step) => (
-            <span key={step}>
-              <Icon name="circle-check" size="sm" />
-              {step}
-            </span>
-          ))}
+      </Tilt>
+
+      <Tilt as="article" max={4} className="sw-card sw-bento__status sw-reveal">
+        <div className="sw-bento__copy">
+          <h3 className="sw-h3">Honest status</h3>
+          <p className="sw-body">
+            You always know if it’s saved, applying, live, or what to fix.
+          </p>
         </div>
-      </article>
+        <StatusDemo />
+      </Tilt>
     </div>
+  );
+}
+
+/** Module groups orbit the heading: the top arc runs one way, the bottom the other. */
+function ModuleOrbit() {
+  const stage = useOnScreenClass<HTMLDivElement>('is-moving');
+  // Each group goes round twice so both arcs stay full. The second lap is
+  // shifted half a lap, so the top and bottom arcs show different groups.
+  // The copies are hidden from screen readers and the keyboard.
+  const half = Math.floor(groups.length / 2);
+  const ring = [...groups, ...groups.slice(half), ...groups.slice(0, half)];
+  return (
+    <section className="sw-orbit" aria-labelledby="mods-h">
+      <div
+        className="sw-orbit__stage"
+        ref={stage}
+        style={{ '--n': ring.length } as CSSProperties}
+      >
+        <div className="sw-orbit__center">
+          <h2 className="sw-h2" id="mods-h">
+            Everything your server needs, grouped the way you think.
+          </h2>
+          <p className="sw-lede">
+            {modules.length} modules in {groups.length} groups, all in one
+            dashboard.
+          </p>
+          <Link className="sp-btn sp-btn--secondary sw-btn-link" to="/features">
+            Browse every module
+            <Icon name="arrow-right" size="sm" />
+          </Link>
+        </div>
+        <ul className="sw-orbit__ring">
+          {ring.map((group, i) => {
+            const copy = i >= groups.length;
+            const count = modules.filter((m) => m.group === group).length;
+            return (
+              <li
+                key={i}
+                className="sw-orbit__item"
+                style={order(i)}
+                aria-hidden={copy || undefined}
+              >
+                <Link
+                  className="sw-orbit__card"
+                  to={`/features?group=${encodeURIComponent(group)}`}
+                  tabIndex={copy ? -1 : undefined}
+                >
+                  <span className="sw-orbit__icon">
+                    <Icon name={groupMeta[group].icon} />
+                  </span>
+                  <span className="sw-orbit__name">{group}</span>
+                  <span className="sw-orbit__blurb">
+                    {groupMeta[group].blurb}
+                  </span>
+                  <span className="sw-orbit__count">
+                    {count} {count === 1 ? 'module' : 'modules'}
+                    <Icon name="arrow-right" size="sm" />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
   );
 }
 
 export function HomePage() {
   usePageTitle('');
   const { addBot } = useAccountActions();
-  const navigate = useNavigate();
   return (
     <>
+      <div className="sw-progress" aria-hidden="true" />
       <section className="sw-hero" aria-labelledby="hero-h">
         <div className="sw-wrap sw-hero__grid">
           <div className="sw-hero__copy">
-            <Badge
-              tone="brand"
-              pill
-              icon="sparkles"
-              style={{
-                justifySelf: 'start',
-                height: 30,
-                padding: '0 12px 0 10px',
-                fontSize: 13,
-              }}
-            >
-              Nearly every module is free
-            </Badge>
             <h1 className="sw-display" id="hero-h">
-              The Discord bot that{' '}
-              <span className="sw-mark">explains itself.</span>
+              {['The', 'Discord', 'bot', 'that'].map((word, i) => (
+                <Fragment key={word}>
+                  <span className="sw-word" style={order(i)}>
+                    {word}
+                  </span>{' '}
+                </Fragment>
+              ))}
+              <span className="sw-word sw-mark" style={order(4)}>
+                explains itself.
+              </span>
             </h1>
-            <p className="sw-lede">
+            <p className="sw-lede sw-enter" style={order(5)}>
               Moderation, tickets, welcome messages, levels and 40 more modules.
               Every setting is written in plain language, and you see every
               message exactly as Discord will show it before you save.
             </p>
-            <div className="sw-hero__ctas">
+            <div className="sw-hero__ctas sw-enter" style={order(6)}>
               <Button variant="primary" size="lg" icon="plus" onClick={addBot}>
                 Add Sparko to Discord
               </Button>
@@ -232,18 +385,19 @@ export function HomePage() {
                 See every feature
               </Link>
             </div>
-            <div className="sw-hero__proof">
+            <ul className="sw-hero__proof sw-enter" style={order(7)}>
               {[
+                'Nearly every module is free',
                 'Set up in about 5 minutes',
                 'Never asks for Administrator',
                 'Undo any change',
               ].map((proof) => (
-                <span key={proof}>
+                <li key={proof}>
                   <Icon name="circle-check" size="sm" />
                   {proof}
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
           <HeroStage />
         </div>
@@ -251,71 +405,20 @@ export function HomePage() {
 
       <section className="sw-section sw-band" aria-labelledby="why-h">
         <div className="sw-wrap">
-          <div className="sw-head">
-            <span className="sw-eyebrow">Why servers switch</span>
+          <div className="sw-head sw-reveal">
             <h2 className="sw-h2" id="why-h">
               Other bots make you guess. Sparko shows you.
             </h2>
           </div>
-          <WhyCards />
+          <WhyGrid />
         </div>
       </section>
 
-      <section className="sw-section" aria-labelledby="mods-h">
-        <div className="sw-wrap">
-          <div className="sw-head">
-            <span className="sw-eyebrow">
-              {modules.length} modules, one dashboard
-            </span>
-            <h2 className="sw-h2" id="mods-h">
-              Everything your server needs, grouped the way you think.
-            </h2>
-          </div>
-          <div className="sw-grid sw-grid--4">
-            {groups.map((group) => {
-              const items = modules.filter((m) => m.group === group);
-              return (
-                <button
-                  key={group}
-                  type="button"
-                  className="sw-card sw-card--link"
-                  onClick={() =>
-                    navigate(`/features?group=${encodeURIComponent(group)}`)
-                  }
-                >
-                  <span className="sw-card__icon sw-card__icon--plain">
-                    <Icon name={groupMeta[group].icon} />
-                  </span>
-                  <span style={{ display: 'grid', gap: 4 }}>
-                    <span className="sw-h3">{group}</span>
-                    <span className="sw-body" style={{ fontSize: 14 }}>
-                      {groupMeta[group].blurb}
-                    </span>
-                  </span>
-                  <span className="sw-chips">
-                    {items.slice(0, 3).map((m) => (
-                      <span key={m.id} className="sp-badge">
-                        {m.label}
-                      </span>
-                    ))}
-                  </span>
-                  <span className="sw-more">
-                    {items.length > 3
-                      ? `All ${items.length} modules`
-                      : 'See details'}
-                    <Icon name="arrow-right" size="sm" />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      <ModuleOrbit />
 
       <section className="sw-section sw-band" aria-labelledby="setup-h">
         <div className="sw-wrap">
-          <div className="sw-head">
-            <span className="sw-eyebrow">Setup in minutes</span>
+          <div className="sw-head sw-reveal">
             <h2 className="sw-h2" id="setup-h">
               From invite to live in about five minutes.
             </h2>
@@ -324,7 +427,7 @@ export function HomePage() {
               anything, come back later.
             </p>
           </div>
-          <ol className="sw-steps">
+          <ol className="sw-timeline">
             {[
               [
                 '~30 sec',
@@ -342,8 +445,12 @@ export function HomePage() {
                 'Save and watch it apply. If a permission is missing, Sparko tells you exactly where to fix it.',
               ],
             ].map(([time, title, body], i) => (
-              <li key={title} className="sw-step">
-                <div className="sw-step__n">
+              <li
+                key={title}
+                className="sw-timeline__step sw-reveal"
+                style={order(i)}
+              >
+                <div className="sw-timeline__n">
                   <b>{i + 1}</b>
                   <span className="sw-step__time">{time}</span>
                 </div>
@@ -358,7 +465,6 @@ export function HomePage() {
       <section className="sw-section" aria-labelledby="pt-h">
         <div className="sw-wrap">
           <div className="sw-head sw-head--center">
-            <span className="sw-eyebrow">Pricing</span>
             <h2 className="sw-h2" id="pt-h">
               Free for nearly everything.
             </h2>
