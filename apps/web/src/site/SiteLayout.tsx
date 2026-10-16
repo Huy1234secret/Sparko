@@ -6,9 +6,11 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom';
-import { Button, useToast } from '../ui';
+import { Button, Icon, useToast } from '../ui';
 import { useTheme } from '../state/theme';
 import { panelHost, supportServer } from './links';
+import { useSparkBursts } from './motion';
+import { AccountMenu, useSiteSession } from './Account';
 
 const navLinks = [
   ['/features', 'Features'],
@@ -51,6 +53,8 @@ export function SiteLayout() {
   const { theme, toggle } = useTheme();
   const { addBot, signIn } = useAccountActions();
   const { pathname } = useLocation();
+  useSparkBursts();
+  const session = useSiteSession();
   // The menu belongs to the page it was opened on, so navigating closes it.
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const menu = menuPath === pathname;
@@ -95,12 +99,31 @@ export function SiteLayout() {
                 }
                 onClick={toggle}
               />
-              <Button variant="ghost" className="sw-desk" onClick={signIn}>
-                Sign in with Discord
-              </Button>
-              <Button variant="primary" className="sw-desk" onClick={addBot}>
-                Add to Discord
-              </Button>
+              {session ? (
+                <>
+                  <Link
+                    className="sp-btn sp-btn--primary sw-desk sw-open-dash"
+                    to="/dashboard"
+                  >
+                    <Icon name="layout-dashboard" />
+                    Open dashboard
+                  </Link>
+                  <AccountMenu session={session} onAddBot={addBot} />
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" className="sw-desk" onClick={signIn}>
+                    Sign in with Discord
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="sw-desk"
+                    onClick={addBot}
+                  >
+                    Add to Discord
+                  </Button>
+                </>
+              )}
               <Button
                 className="sw-menu-btn"
                 iconOnly
@@ -120,12 +143,29 @@ export function SiteLayout() {
           >
             {links}
             <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-              <Button variant="primary" block onClick={addBot}>
-                Add to Discord
-              </Button>
-              <Button block onClick={signIn}>
-                Sign in with Discord
-              </Button>
+              {session ? (
+                <>
+                  <Link
+                    className="sp-btn sp-btn--primary sp-btn--block"
+                    to="/dashboard"
+                  >
+                    <Icon name="layout-dashboard" />
+                    Open dashboard
+                  </Link>
+                  <Button block icon="plus" onClick={addBot}>
+                    Add Sparko to a server
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="primary" block onClick={addBot}>
+                    Add to Discord
+                  </Button>
+                  <Button block onClick={signIn}>
+                    Sign in with Discord
+                  </Button>
+                </>
+              )}
             </div>
           </nav>
         </div>

@@ -715,7 +715,7 @@ a.sp-btn {
 .sw-orbit {
   position: relative;
   overflow: hidden;
-  padding: 24px 0;
+  padding: 8px 0;
   -webkit-mask-image: linear-gradient(
     90deg,
     transparent,
@@ -738,7 +738,7 @@ a.sp-btn {
   display: grid;
   place-items: center;
   width: max(100%, 1180px);
-  height: 780px;
+  height: 650px;
   translate: -50% 0;
 }
 .sw-orbit__center {
@@ -747,7 +747,8 @@ a.sp-btn {
   display: grid;
   gap: 16px;
   justify-items: center;
-  max-width: 600px;
+  /* The stage is wider than a phone; keep the heading inside the screen. */
+  max-width: min(600px, 100cqw);
   padding: 0 20px;
   text-align: center;
 }
@@ -765,7 +766,7 @@ a.sp-btn {
   position: absolute;
   top: 0;
   left: 0;
-  offset-path: ellipse(74% 37% at 50% 50%);
+  offset-path: ellipse(74% 35% at 50% 50%);
   offset-rotate: 0deg;
   offset-anchor: center;
   offset-distance: calc(var(--i) / var(--n) * 100%);
@@ -774,10 +775,6 @@ a.sp-btn {
 }
 .sw-orbit__stage.is-moving .sw-orbit__item {
   animation-play-state: running;
-}
-.sw-orbit__stage.is-moving:hover .sw-orbit__item,
-.sw-orbit__stage.is-moving:focus-within .sw-orbit__item {
-  animation-play-state: paused;
 }
 @keyframes sw-orbit {
   from {
@@ -808,14 +805,14 @@ a.sp-btn {
   box-shadow: var(--sp-ring);
 }
 @media (hover: hover) and (pointer: fine) {
-  .sw-orbit__card:hover {
+  .sw-orbit__card.is-ready:hover {
     translate: 0 -6px;
     border-color: var(--sp-brand-line);
     box-shadow:
       0 18px 40px -18px rgb(0 0 0 / 0.45),
       var(--sp-shadow-card);
   }
-  .sw-orbit__card:hover .sw-orbit__icon {
+  .sw-orbit__card.is-ready:hover .sw-orbit__icon {
     background: var(--sp-brand-soft);
     border-color: var(--sp-brand-line);
     color: var(--sp-brand-text);
@@ -940,7 +937,7 @@ a.sp-btn {
     );
   }
   .sw-orbit__stage {
-    height: 860px;
+    height: 680px;
   }
   .sw-orbit__card {
     width: 216px;
@@ -954,4 +951,701 @@ a.sp-btn {
       }
     }
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Sparks: the diamond from Sparko's logo, everywhere it can play. */
+
+/* Bursts from primary buttons and the logo (motion.tsx useSparkBursts). */
+.sw-sparks-layer {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sw-spark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 2px;
+  background: var(--sp-brand);
+}
+.sw-spark--edge {
+  background: var(--sp-brand-edge);
+}
+.sw-spark--ink {
+  background: var(--sp-text);
+}
+
+/* The logo turns once in 3D on hover. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .sw-logo {
+    perspective: 240px;
+  }
+  .sw-logo__img {
+    transition: rotate 900ms var(--sw-ease);
+  }
+  .sw-logo:hover .sw-logo__img {
+    rotate: y 360deg;
+  }
+}
+
+/* A light that trails the pointer across the hero. */
+.sw-hero__glow {
+  position: absolute;
+  z-index: -1;
+  top: -280px;
+  left: -280px;
+  width: 560px;
+  height: 560px;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--sp-brand) 13%, transparent),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 500ms var(--sw-ease);
+  pointer-events: none;
+  will-change: transform;
+}
+[data-theme='light'] .sw-hero__glow {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--sp-brand) 30%, transparent),
+    transparent
+  );
+}
+.sw-hero__glow.is-on {
+  opacity: 1;
+}
+
+/* Two ribbons of slash commands cross at an angle and run opposite ways. */
+.sw-ribbons {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  height: 150px;
+  overflow-x: clip;
+}
+.sw-ribbon {
+  grid-area: 1 / 1;
+  align-self: center;
+  width: 116%;
+  margin-left: -8%;
+  padding: 16px 0;
+  overflow: hidden;
+}
+.sw-ribbon--brand {
+  z-index: 1;
+  rotate: -3deg;
+  background: var(--sp-brand);
+  color: var(--sp-on-brand);
+  box-shadow: 0 18px 40px -20px rgb(0 0 0 / 0.5);
+}
+.sw-ribbon--ink {
+  rotate: 2.5deg;
+  border-block: 1px solid var(--sp-line);
+  background: var(--sp-ink);
+  color: #fafaf5;
+}
+.sw-ribbon__track {
+  display: flex;
+  width: max-content;
+  animation: sw-ribbon 70s linear infinite paused;
+}
+.sw-ribbon--ink .sw-ribbon__track {
+  animation-direction: reverse;
+}
+.sw-ribbons.is-moving .sw-ribbon__track {
+  animation-play-state: running;
+}
+@keyframes sw-ribbon {
+  to {
+    translate: -50% 0;
+  }
+}
+.sw-ribbon__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  padding-right: 28px;
+  font: 600 22px/1 var(--sp-font-mono);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.sw-ribbon__spark {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.55;
+  rotate: 45deg;
+}
+.sw-ribbon--ink .sw-ribbon__spark {
+  background: var(--sp-brand);
+  opacity: 1;
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sw-ribbon {
+      animation: sw-ribbon-drift linear both;
+      animation-timeline: view();
+    }
+    .sw-ribbon--ink {
+      animation-direction: reverse;
+    }
+  }
+}
+@keyframes sw-ribbon-drift {
+  from {
+    translate: 6% 0;
+  }
+  to {
+    translate: -6% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-ribbon__track {
+    animation: none;
+  }
+}
+
+/* A spark rides the setup timeline as it scrolls past. */
+.sw-timeline-wrap {
+  position: relative;
+  overflow-x: clip;
+}
+.sw-timeline__n {
+  z-index: 1;
+}
+.sw-timeline__rider {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  /* From the first step's number to the third's: two columns and two gaps. */
+  width: calc((200% + 64px) / 3);
+  height: 10px;
+  pointer-events: none;
+  opacity: 0;
+}
+.sw-timeline__rider i {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--sp-brand);
+  box-shadow: 0 0 16px 2px color-mix(in srgb, var(--sp-brand) 70%, transparent);
+  rotate: 45deg;
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sw-timeline__rider {
+      opacity: 1;
+      animation: sw-ride linear both;
+      animation-timeline: view();
+      animation-range: cover 30% cover 70%;
+    }
+  }
+}
+@keyframes sw-ride {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 100% 0;
+  }
+}
+
+/* The orbit can be grabbed and flung. */
+.sw-orbit__stage {
+  touch-action: pan-y;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sw-orbit__ring {
+    cursor: grab;
+  }
+  .sw-orbit__stage.is-dragging,
+  .sw-orbit__stage.is-dragging .sw-orbit__card {
+    cursor: grabbing;
+    user-select: none;
+  }
+}
+
+@container (max-width: 640px) {
+  .sw-ribbons {
+    height: 132px;
+  }
+  .sw-ribbon--brand {
+    align-self: end;
+    margin-bottom: 10px;
+  }
+  .sw-ribbon--ink {
+    align-self: start;
+    margin-top: 10px;
+  }
+  .sw-ribbon {
+    padding: 12px 0;
+  }
+  .sw-ribbon__item {
+    gap: 20px;
+    padding-right: 20px;
+    font-size: 16px;
+  }
+  .sw-timeline__rider {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Pricing: the Plus card gets a light that runs round its border, prices
+   spin in like a slot machine, and the badge and button catch a shine. */
+.sw-beam {
+  position: absolute;
+  inset: -1px;
+  padding: 2px;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+.sw-beam i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: conic-gradient(
+    transparent 0 22%,
+    var(--sp-brand) 34%,
+    #fffbe6 37%,
+    transparent 44% 72%,
+    var(--sp-brand) 84%,
+    transparent 92%
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sw-beam i {
+    animation: sw-beam 5s linear infinite;
+  }
+  .sw-plus.sp-sparks::before {
+    animation: sw-twinkle 2.6s ease-in-out infinite alternate;
+  }
+  .sw-shine {
+    position: relative;
+    overflow: hidden;
+  }
+  .sw-shine::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 30%,
+      rgb(255 255 255 / 0.55) 50%,
+      transparent 70%
+    );
+    translate: -110% 0;
+    animation: sw-shine 4.5s var(--sw-ease) infinite;
+    pointer-events: none;
+  }
+  .sp-btn.sw-shine::before {
+    animation-delay: 0.6s;
+  }
+}
+@keyframes sw-beam {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes sw-twinkle {
+  from {
+    opacity: 0.45;
+  }
+}
+@keyframes sw-shine {
+  0%,
+  55% {
+    translate: -110% 0;
+  }
+  80%,
+  100% {
+    translate: 110% 0;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .sw-plus {
+    transition:
+      transform 700ms var(--sw-ease),
+      box-shadow 400ms var(--sw-ease);
+  }
+  .sw-plus:hover {
+    box-shadow:
+      inset 0 0 0 1px var(--sp-brand-edge),
+      0 24px 60px -24px color-mix(in srgb, var(--sp-brand) 45%, transparent);
+  }
+}
+
+.sw-roll {
+  display: inline-flex;
+}
+.sw-roll__col {
+  display: inline-block;
+  height: 44px;
+  overflow: hidden;
+}
+.sw-roll__strip {
+  display: flex;
+  flex-direction: column;
+}
+.sw-roll__strip > span {
+  height: 44px;
+}
+.sw-price-grid.is-rolled .sw-roll__strip {
+  translate: 0 calc((10 + var(--d)) * -5%);
+  transition: translate 1400ms var(--sw-ease);
+  transition-delay: calc(var(--i) * 120ms + 150ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-roll__strip {
+    translate: 0 calc((10 + var(--d)) * -5%);
+  }
+}
+
+/* Pricing page: a drifting aurora, a dot field and the pointer light behind
+   the plans. The blobs are plain radial gradients moved with transform, so
+   nothing is blurred or repainted per frame. */
+.sw-pricing-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding-bottom: 72px;
+}
+.sw-pricing-hero::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: radial-gradient(
+    circle,
+    var(--sp-brand-line) 1px,
+    transparent 1.6px
+  );
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(60% 55% at 50% 0%, #000, transparent 75%);
+  mask-image: radial-gradient(60% 55% at 50% 0%, #000, transparent 75%);
+  pointer-events: none;
+}
+.sw-aurora {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  pointer-events: none;
+}
+.sw-aurora i {
+  position: absolute;
+  will-change: translate;
+  width: 720px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--sp-brand) 16%, transparent),
+    transparent
+  );
+}
+.sw-aurora i:nth-child(1) {
+  top: -360px;
+  left: calc(50% - 640px);
+}
+.sw-aurora i:nth-child(2) {
+  top: -300px;
+  left: calc(50% - 40px);
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, #f59e0b 14%, transparent),
+    transparent
+  );
+}
+[data-theme='light'] .sw-aurora i {
+  opacity: 1;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--sp-brand) 26%, transparent),
+    transparent
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sw-aurora i:nth-child(1) {
+    animation: sw-drift-a 22s ease-in-out infinite alternate;
+  }
+  .sw-aurora i:nth-child(2) {
+    animation: sw-drift-b 26s ease-in-out infinite alternate;
+  }
+  .sw-pop {
+    animation: sw-pop 320ms var(--sw-ease) both;
+  }
+}
+@keyframes sw-drift-a {
+  to {
+    translate: 180px 90px;
+  }
+}
+@keyframes sw-drift-b {
+  to {
+    translate: -200px 120px;
+  }
+}
+@keyframes sw-pop {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+    scale: 0.94;
+  }
+}
+
+/* Lighter reveal for list items and table rows: they slide in from the side. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .sw-reveal--line {
+      animation-name: sw-reveal-line;
+      animation-range: entry calc(var(--i, 0) * 6%) entry
+        calc(60% + var(--i, 0) * 6%);
+    }
+  }
+}
+@keyframes sw-reveal-line {
+  from {
+    opacity: 0;
+    translate: -14px 0;
+  }
+}
+
+/* New price digits (switching to a longer price) spin in too. */
+@starting-style {
+  .sw-price-grid.is-rolled .sw-roll__strip {
+    translate: 0 0;
+  }
+}
+
+/* The compare table gives the Plus column a light yellow wash. */
+.sw-compare td:nth-child(3),
+.sw-compare th:nth-child(3) {
+  background: color-mix(in srgb, var(--sp-brand) 6%, transparent);
+  font-weight: 600;
+}
+.sw-compare th:nth-child(3) {
+  color: var(--sp-brand-text);
+}
+
+/* Orbit: modules that aren't finished yet are quieter and don't open. */
+.sw-orbit__card.is-soon {
+  cursor: inherit;
+}
+.sw-orbit__card.is-soon .sw-orbit__icon {
+  color: var(--sp-muted);
+}
+.sw-orbit__count--soon {
+  color: var(--sp-muted);
+  font-weight: 500;
+}
+.sw-orbit__card.is-ready {
+  border-color: var(--sp-brand-line);
+}
+
+/* Features: cards for modules that are on the way can't be opened. */
+.sw-mod--soon {
+  background: var(--sp-subtle);
+  box-shadow: none;
+}
+.sw-mod--soon .sw-card__icon,
+.sw-mod--soon .sw-mod__name {
+  color: var(--sp-muted);
+}
+.sw-mod__name {
+  flex-wrap: wrap;
+}
+.sw-toolbar .sp-chip .sp-i {
+  color: var(--sp-success);
+}
+
+/* Feature pages: how it works, setup steps and commands. */
+.sw-how {
+  margin-top: 24px;
+}
+.sw-setup {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-setup li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-card);
+  background: var(--sp-surface);
+  font: 400 15px/22px var(--sp-font-sans);
+}
+.sw-setup b {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--sp-brand);
+  color: var(--sp-on-brand);
+  font: 700 14px/1 var(--sp-font-sans);
+}
+.sw-cmds {
+  margin-top: 24px;
+}
+.sw-cmd__row {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-height: 60px;
+  padding: 10px 16px;
+}
+@container (max-width: 640px) {
+  .sw-setup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sw-cmd__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
+/* Docs: module guides, sub-entries in the contents and the variables list. */
+.sw-docs__toc li.is-sub a {
+  min-height: 36px;
+  padding-left: 28px;
+  font-size: 14px;
+}
+.sw-docs__module {
+  padding: 20px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-card);
+  background: var(--sp-surface);
+}
+.sw-docs__module h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.sw-docs__module h3 .sp-i {
+  color: var(--sp-brand-text);
+}
+.sw-vars {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--sp-line);
+}
+.sw-vars > div {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+  gap: 4px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--sp-line);
+}
+.sw-vars dd {
+  margin: 0;
+  color: var(--sp-muted);
+}
+@container (max-width: 640px) {
+  .sw-vars > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+a.sw-mod {
+  text-decoration: none;
+}
+
+/* Signed in: Open dashboard and the account menu replace the sign-in buttons. */
+a.sw-open-dash {
+  gap: 8px;
+}
+.sw-account__button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.sw-account__button .sp-avatar {
+  box-shadow:
+    0 0 0 2px var(--sp-canvas),
+    0 0 0 3px var(--sp-line-strong);
+  transition: box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sw-account__button:hover .sp-avatar,
+.sw-account__button[aria-expanded='true'] .sp-avatar {
+  box-shadow:
+    0 0 0 2px var(--sp-canvas),
+    0 0 0 3px var(--sp-brand-edge);
+}
+.sw-account__button:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sw-account__menu {
+  z-index: var(--sp-z-popover, 50);
+  min-width: 240px;
+  transform-origin: top right;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sw-account__menu {
+    animation: sw-menu-in 160ms var(--sw-ease) both;
+  }
+}
+@keyframes sw-menu-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+    translate: 0 -4px;
+  }
+}
+.sw-account__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--sp-line);
+}
+.sw-account__who > span {
+  display: grid;
+  min-width: 0;
+}
+.sw-account__who b {
+  overflow: hidden;
+  font: 600 14px/20px var(--sp-font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sw-account__who span span {
+  font: 400 12px/16px var(--sp-font-sans);
+  color: var(--sp-muted);
 }

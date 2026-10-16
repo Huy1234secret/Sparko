@@ -9,11 +9,20 @@ import {
   Spinner,
   Switch,
 } from '../ui';
-import { groupMeta, groups, modules } from '../content/modules';
+import { groups, modules } from '../content/modules';
 import { homeFaq, scenes } from '../content/site';
 import { Faq, PricingTeaser } from './parts';
 import { useAccountActions, usePageTitle } from './SiteLayout';
-import { reducedMotion, Tilt, useOnScreenClass, useTilt } from './motion';
+import {
+  reducedMotion,
+  Tilt,
+  useOnScreenClass,
+  useOrbitControl,
+  PointerGlow,
+  useTilt,
+} from './motion';
+import { commands } from '../content/commands';
+import { isReady } from '../content/features';
 
 /** Staggers a child's entrance: `--i` is its place in the sequence. */
 const order = (i: number) => ({ '--i': i }) as CSSProperties;
@@ -284,27 +293,45 @@ function WhyGrid() {
 }
 
 /** Module groups orbit the heading: the top arc runs one way, the bottom the other. */
+/** The modules on the orbit: every finished one, spread among some on the way. */
+const orbitModules = [
+  'tickets',
+  'automod',
+  'levels',
+  'welcome',
+  'polls',
+  'workflows',
+  'studio',
+  'giveaways',
+  'verification',
+  'role-menus',
+  'starboard',
+  'economy',
+  'autoroles',
+  'schedules',
+  'analytics',
+  'backups',
+].flatMap((id) => modules.filter((m) => m.id === id));
+
+/** Modules orbit the heading: the top arc runs one way, the bottom the other. */
 function ModuleOrbit() {
   const stage = useOnScreenClass<HTMLDivElement>('is-moving');
-  // Each group goes round twice so both arcs stay full. The second lap is
-  // shifted half a lap, so the top and bottom arcs show different groups.
-  // The copies are hidden from screen readers and the keyboard.
-  const half = Math.floor(groups.length / 2);
-  const ring = [...groups, ...groups.slice(half), ...groups.slice(0, half)];
+  useOrbitControl(stage);
+  const ready = modules.filter((m) => isReady(m.id)).length;
   return (
     <section className="sw-orbit" aria-labelledby="mods-h">
       <div
         className="sw-orbit__stage"
         ref={stage}
-        style={{ '--n': ring.length } as CSSProperties}
+        style={{ '--n': orbitModules.length } as CSSProperties}
       >
         <div className="sw-orbit__center">
           <h2 className="sw-h2" id="mods-h">
             Everything your server needs, grouped the way you think.
           </h2>
           <p className="sw-lede">
-            {modules.length} modules in {groups.length} groups, all in one
-            dashboard.
+            {modules.length} modules in {groups.length} groups. {ready} are
+            ready today, and the rest are on the way.
           </p>
           <Link className="sp-btn sp-btn--secondary sw-btn-link" to="/features">
             Browse every module
@@ -312,39 +339,69 @@ function ModuleOrbit() {
           </Link>
         </div>
         <ul className="sw-orbit__ring">
-          {ring.map((group, i) => {
-            const copy = i >= groups.length;
-            const count = modules.filter((m) => m.group === group).length;
-            return (
-              <li
-                key={i}
-                className="sw-orbit__item"
-                style={order(i)}
-                aria-hidden={copy || undefined}
-              >
-                <Link
-                  className="sw-orbit__card"
-                  to={`/features?group=${encodeURIComponent(group)}`}
-                  tabIndex={copy ? -1 : undefined}
-                >
-                  <span className="sw-orbit__icon">
-                    <Icon name={groupMeta[group].icon} />
-                  </span>
-                  <span className="sw-orbit__name">{group}</span>
-                  <span className="sw-orbit__blurb">
-                    {groupMeta[group].blurb}
-                  </span>
+          {orbitModules.map((m, i) => {
+            const body = (
+              <>
+                <span className="sw-orbit__icon">
+                  <Icon name={m.icon} />
+                </span>
+                <span className="sw-orbit__name">{m.label}</span>
+                <span className="sw-orbit__blurb">{m.description}</span>
+                {isReady(m.id) ? (
                   <span className="sw-orbit__count">
-                    {count} {count === 1 ? 'module' : 'modules'}
+                    Ready · see how it works
                     <Icon name="arrow-right" size="sm" />
                   </span>
-                </Link>
+                ) : (
+                  <span className="sw-orbit__count sw-orbit__count--soon">
+                    <Icon name="clock" size="sm" />
+                    Coming soon
+                  </span>
+                )}
+              </>
+            );
+            return (
+              <li key={m.id} className="sw-orbit__item" style={order(i)}>
+                {isReady(m.id) ? (
+                  <Link
+                    className="sw-orbit__card is-ready"
+                    to={`/features/${m.id}`}
+                    draggable={false}
+                  >
+                    {body}
+                  </Link>
+                ) : (
+                  <div className="sw-orbit__card is-soon">{body}</div>
+                )}
               </li>
             );
           })}
         </ul>
       </div>
     </section>
+  );
+}
+
+/** Every slash command, on two ribbons that cross at an angle. */
+function CommandRibbons() {
+  const ribbons = useOnScreenClass<HTMLDivElement>('is-moving');
+  const names = commands.map((c) => c.name);
+  const lanes = [names, [...names].reverse()];
+  return (
+    <div className="sw-ribbons" ref={ribbons} aria-hidden="true">
+      {lanes.map((lane, l) => (
+        <div key={l} className={`sw-ribbon sw-ribbon--${l ? 'ink' : 'brand'}`}>
+          <div className="sw-ribbon__track">
+            {[...lane, ...lane].map((name, i) => (
+              <span key={i} className="sw-ribbon__item">
+                {name}
+                <i className="sw-ribbon__spark" />
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -355,6 +412,7 @@ export function HomePage() {
     <>
       <div className="sw-progress" aria-hidden="true" />
       <section className="sw-hero" aria-labelledby="hero-h">
+        <PointerGlow />
         <div className="sw-wrap sw-hero__grid">
           <div className="sw-hero__copy">
             <h1 className="sw-display" id="hero-h">
@@ -403,6 +461,8 @@ export function HomePage() {
         </div>
       </section>
 
+      <CommandRibbons />
+
       <section className="sw-section sw-band" aria-labelledby="why-h">
         <div className="sw-wrap">
           <div className="sw-head sw-reveal">
@@ -427,38 +487,43 @@ export function HomePage() {
               anything, come back later.
             </p>
           </div>
-          <ol className="sw-timeline">
-            {[
-              [
-                '~30 sec',
-                'Add Sparko',
-                'Sign in with Discord and pick a server. Sparko only asks for the permissions your modules use.',
-              ],
-              [
-                '~3 min',
-                'Follow the checklist',
-                'Pick a log channel, switch on Auto moderation and write a welcome. Each step shows a preview first.',
-              ],
-              [
-                'instant',
-                'Go live',
-                'Save and watch it apply. If a permission is missing, Sparko tells you exactly where to fix it.',
-              ],
-            ].map(([time, title, body], i) => (
-              <li
-                key={title}
-                className="sw-timeline__step sw-reveal"
-                style={order(i)}
-              >
-                <div className="sw-timeline__n">
-                  <b>{i + 1}</b>
-                  <span className="sw-step__time">{time}</span>
-                </div>
-                <h3 className="sw-h3">{title}</h3>
-                <p className="sw-body">{body}</p>
-              </li>
-            ))}
-          </ol>
+          <div className="sw-timeline-wrap">
+            <span className="sw-timeline__rider" aria-hidden="true">
+              <i />
+            </span>
+            <ol className="sw-timeline">
+              {[
+                [
+                  '~30 sec',
+                  'Add Sparko',
+                  'Sign in with Discord and pick a server. Sparko only asks for the permissions your modules use.',
+                ],
+                [
+                  '~3 min',
+                  'Follow the checklist',
+                  'Pick a log channel, switch on Auto moderation and write a welcome. Each step shows a preview first.',
+                ],
+                [
+                  'instant',
+                  'Go live',
+                  'Save and watch it apply. If a permission is missing, Sparko tells you exactly where to fix it.',
+                ],
+              ].map(([time, title, body], i) => (
+                <li
+                  key={title}
+                  className="sw-timeline__step sw-reveal"
+                  style={order(i)}
+                >
+                  <div className="sw-timeline__n">
+                    <b>{i + 1}</b>
+                    <span className="sw-step__time">{time}</span>
+                  </div>
+                  <h3 className="sw-h3">{title}</h3>
+                  <p className="sw-body">{body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </section>
 

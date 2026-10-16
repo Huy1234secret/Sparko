@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   Badge,
@@ -6,6 +6,7 @@ import {
   DiscordMessage,
   EmptyState,
   Icon,
+  Notice,
   Segmented,
   SearchIcon,
 } from '../ui';
@@ -16,8 +17,11 @@ import {
   modules,
   type ModuleGroup,
 } from '../content/modules';
+import { featureDetails, isReady } from '../content/features';
 import { ModuleCard } from './parts';
 import { NotFoundPage } from './InfoPages';
+import { Tilt } from './motion';
+import { commands } from '../content/commands';
 import { useAccountActions, usePageTitle } from './SiteLayout';
 
 export function FeaturesPage() {
@@ -25,10 +29,15 @@ export function FeaturesPage() {
   const [params, setParams] = useSearchParams();
   const query = params.get('q') ?? '';
   const groupParam = params.get('group');
+  const readyOnly = params.get('ready') === '1';
   const group = groups.includes(groupParam as ModuleGroup)
     ? (groupParam as ModuleGroup)
     : null;
-  const update = (next: { q?: string; group?: string | null }) => {
+  const update = (next: {
+    q?: string;
+    group?: string | null;
+    ready?: boolean;
+  }) => {
     const out = new URLSearchParams(params);
     if (next.q !== undefined) {
       if (next.q) out.set('q', next.q);
@@ -38,6 +47,10 @@ export function FeaturesPage() {
       if (next.group) out.set('group', next.group);
       else out.delete('group');
     }
+    if (next.ready !== undefined) {
+      if (next.ready) out.set('ready', '1');
+      else out.delete('ready');
+    }
     setParams(out, { replace: true });
   };
   const needle = query.trim().toLowerCase();
@@ -45,25 +58,29 @@ export function FeaturesPage() {
     .filter((g) => !group || g === group)
     .map((g) => ({
       group: g,
-      items: modules.filter(
-        (m) =>
-          m.group === g &&
-          (!needle ||
-            `${m.label} ${m.description}`.toLowerCase().includes(needle)),
-      ),
+      items: modules
+        .filter(
+          (m) =>
+            m.group === g &&
+            (!readyOnly || isReady(m.id)) &&
+            (!needle ||
+              `${m.label} ${m.description}`.toLowerCase().includes(needle)),
+        )
+        // Finished modules first, then the ones on the way.
+        .sort((a, b) => Number(isReady(b.id)) - Number(isReady(a.id))),
     }))
     .filter((g) => g.items.length);
 
   return (
     <div className="sw-wrap">
       <header className="sw-page-hero">
-        <span className="sw-eyebrow">Features</span>
         <h1 className="sw-h1">
           {modules.length} modules. {freeModuleCount} of them free.
         </h1>
         <p className="sw-lede">
           Turn on only what you need. Each module has plain-language settings, a
-          live preview and full history.
+          live preview and full history. {readyCount} are ready in the dashboard
+          today; the rest are being built and show as coming soon.
         </p>
       </header>
       <div className="sw-toolbar">
@@ -83,6 +100,15 @@ export function FeaturesPage() {
           role="group"
           aria-label="Filter by group"
         >
+          <button
+            type="button"
+            className="sp-chip sp-chip--toggle"
+            aria-pressed={readyOnly}
+            onClick={() => update({ ready: !readyOnly })}
+          >
+            <Icon name="circle-check" size="sm" />
+            Ready now · {readyCount}
+          </button>
           {[null, ...groups].map((g) => (
             <button
               key={g ?? 'all'}
@@ -103,6 +129,11 @@ export function FeaturesPage() {
               {g}
             </h2>
             <span className="sp-count">{items.length}</span>
+            {items.some((m) => isReady(m.id)) && (
+              <Badge tone="success" size="sm">
+                {items.filter((m) => isReady(m.id)).length} ready
+              </Badge>
+            )}
           </div>
           <div className="sw-grid sw-grid--3">
             {items.map((m) => (
@@ -117,7 +148,9 @@ export function FeaturesPage() {
             icon="search"
             title={`No features match “${query}”`}
             actions={
-              <Button onClick={() => update({ q: '', group: null })}>
+              <Button
+                onClick={() => update({ q: '', group: null, ready: false })}
+              >
                 Show all features
               </Button>
             }
@@ -131,6 +164,8 @@ export function FeaturesPage() {
     </div>
   );
 }
+
+const readyCount = modules.filter((m) => isReady(m.id)).length;
 
 const colours = [
   ['Yellow', '#FACC15'],
@@ -257,33 +292,22 @@ function StudioDemo() {
   );
 }
 
-const extras: Record<string, { headline: string; points: string[] }> = {
-  studio: {
-    headline: 'Build Discord messages you can see before you send.',
-    points: [
-      'Drag-free visual editor for text, embeds, buttons and menus',
-      'Exactly the preview Discord shows, in dark and light',
-      'Templates, saved versions and edit-after-publish',
-    ],
-  },
-};
-
 export function FeaturePage() {
   const { id = '' } = useParams();
   const feature = moduleById(id);
   usePageTitle(feature?.label ?? 'Not found');
   const { addBot } = useAccountActions();
   if (!feature) return <NotFoundPage />;
-  const extra = extras[feature.id];
+  const detail = featureDetails[feature.id];
   const studio = feature.id === 'studio';
-  const related = [
-    ...modules.filter((m) => m.group === feature.group && m.id !== feature.id),
-    ...(studio
-      ? modules.filter((m) =>
-          ['welcome', 'schedules', 'tickets'].includes(m.id),
+  const related = (
+    detail?.pairs
+      ? modules.filter((m) => detail.pairs?.includes(m.id))
+      : [...modules.filter((m) => isReady(m.id) && m.id !== feature.id)].slice(
+          0,
+          3,
         )
-      : []),
-  ].slice(0, 3);
+  ).slice(0, 3);
   return (
     <div className="sw-wrap">
       <nav aria-label="Breadcrumb" style={{ paddingTop: 24 }}>
@@ -316,32 +340,41 @@ export function FeaturePage() {
             <Icon name={feature.icon} size="xl" />
           </span>
           <h1 className="sw-h1">
-            {extra?.headline ?? `${feature.label}, without the guesswork.`}
+            {detail?.headline ?? `${feature.label} is on the way.`}
           </h1>
           <p className="sw-lede">{feature.description}</p>
-          <ul className="sw-checks">
-            {(
-              extra?.points ?? [
-                'Plain-language settings with a short explanation',
-                'Live preview of anything Sparko posts',
-                'Every change saved as a version you can restore',
-              ]
-            ).map((point) => (
-              <li key={point}>
-                <Icon name="check" />
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
+          {detail ? (
+            <ul className="sw-checks">
+              {detail.points.map((point) => (
+                <li key={point}>
+                  <Icon name="check" />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Notice tone="info" title="Coming soon">
+              {feature.label} is still being built, so it isn’t in the dashboard
+              yet. It’ll show up there as soon as it’s ready.
+            </Notice>
+          )}
           <div className="sw-hero__ctas">
-            <Button variant="primary" size="lg" onClick={addBot}>
+            <Button
+              variant={detail ? 'primary' : 'secondary'}
+              size="lg"
+              onClick={addBot}
+            >
               Add Sparko to Discord
             </Button>
             <Badge
-              tone={feature.plus ? 'plus' : 'success'}
+              {...(detail && { tone: feature.plus ? 'plus' : 'success' })}
               style={{ alignSelf: 'center' }}
             >
-              {feature.plus ? 'Included in Plus' : 'Free on every server'}
+              {!detail
+                ? 'Coming soon'
+                : feature.plus
+                  ? 'Ready · included in Plus'
+                  : 'Ready · free on every server'}
             </Badge>
           </div>
         </div>
@@ -354,11 +387,84 @@ export function FeaturePage() {
             </span>
             <b className="sw-h3">{feature.label}</b>
             <p className="sw-body" style={{ maxWidth: '36ch' }}>
-              First step: {feature.firstStep.toLowerCase()}.
+              {detail
+                ? `First step: ${feature.firstStep.toLowerCase()}.`
+                : `When it’s ready, you’ll start here: ${feature.firstStep.toLowerCase()}.`}
             </p>
           </div>
         )}
       </section>
+
+      {detail && (
+        <>
+          <section style={{ padding: '0 0 72px' }} aria-labelledby="how-h">
+            <h2 className="sw-h2 sw-reveal" id="how-h">
+              How it works
+            </h2>
+            <div className="sw-grid sw-grid--2 sw-how">
+              {detail.how.map((item) => (
+                <Tilt
+                  as="article"
+                  max={3}
+                  key={item.title}
+                  className="sw-card sw-reveal"
+                >
+                  <span className="sw-card__icon">
+                    <Icon name={item.icon} />
+                  </span>
+                  <h3 className="sw-h3">{item.title}</h3>
+                  <p className="sw-body">{item.body}</p>
+                </Tilt>
+              ))}
+            </div>
+          </section>
+
+          <section style={{ padding: '0 0 72px' }} aria-labelledby="setup-h">
+            <h2 className="sw-h2 sw-reveal" id="setup-h">
+              Set it up in {detail.steps.length} steps
+            </h2>
+            <ol className="sw-setup">
+              {detail.steps.map((step, i) => (
+                <li
+                  key={step}
+                  className="sw-reveal sw-reveal--line"
+                  style={{ '--i': i } as CSSProperties}
+                >
+                  <b>{i + 1}</b>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          {detail.commands && (
+            <section style={{ padding: '0 0 72px' }} aria-labelledby="cmds-h">
+              <h2 className="sw-h2 sw-reveal" id="cmds-h">
+                Commands
+              </h2>
+              <div className="sw-cmds">
+                {detail.commands.flatMap((name) =>
+                  commands
+                    .filter((c) => c.name === name)
+                    .map((c) => (
+                      <div key={c.name} className="sw-cmd sw-reveal">
+                        <div className="sw-cmd__row">
+                          <span className="sw-cmd__name">{c.name}</span>
+                          <span className="sw-cmd__desc">{c.description}</span>
+                          <Badge size="sm">{c.who}</Badge>
+                        </div>
+                      </div>
+                    )),
+                )}
+              </div>
+              <p className="sw-body" style={{ marginTop: 16 }}>
+                <Link to="/commands">See every command</Link>
+              </p>
+            </section>
+          )}
+        </>
+      )}
+
       {studio && (
         <>
           <section
@@ -366,18 +472,17 @@ export function FeaturePage() {
             style={{ padding: '0 0 72px' }}
           >
             <div style={{ display: 'grid', gap: 14 }}>
-              <span className="sw-eyebrow">Templates</span>
               <h2 className="sw-h2">Save it once, reuse it everywhere.</h2>
               <p className="sw-body">
-                Templates work in Welcome, Scheduled messages, Tickets and more.
-                Free includes 10; Plus includes 100.
+                Templates work in Welcome, Tickets and Reaction roles. Free
+                includes 10; Plus includes 100.
               </p>
             </div>
             <div className="sp-card">
               <div className="sp-rows">
                 {[
-                  ['Weekend art jam', 'Used in Scheduled messages · Sat 19:00'],
                   ['Default welcome', 'Used in Welcome'],
+                  ['Pick your colour', 'Used in Reaction roles'],
                   ['Ticket closed', 'Used in Tickets'],
                 ].map(([name, use]) => (
                   <div key={name} className="sp-row">
@@ -405,7 +510,6 @@ export function FeaturePage() {
           </section>
           <section className="sw-split" style={{ padding: '0 0 72px' }}>
             <div style={{ display: 'grid', gap: 14 }}>
-              <span className="sw-eyebrow">Versions &amp; publishing</span>
               <h2 className="sw-h2">
                 Edit published messages without reposting.
               </h2>
@@ -440,10 +544,11 @@ export function FeaturePage() {
           </section>
         </>
       )}
+
       <section style={{ padding: '0 0 96px' }} aria-labelledby="related-h">
         <div className="sw-group-h">
           <h2 className="sw-h3" id="related-h" style={{ fontSize: 20 }}>
-            More in {feature.group}
+            {detail ? 'Works well with' : 'Ready today'}
           </h2>
         </div>
         <div className="sw-grid sw-grid--3">
