@@ -20,6 +20,8 @@ export type Session = {
     /** The Discord avatar, when signed in for real. */
     avatarUrl?: string;
   };
+  /** Whether they may use the dashboard yet (before it opens to everyone). */
+  allowed?: boolean;
 };
 
 export type Server = {

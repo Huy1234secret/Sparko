@@ -25,6 +25,13 @@ export type AuthConfig = {
   botToken?: string | undefined;
   /** The site's public origin, e.g. https://panel.coin-sprite.com */
   publicUrl: string;
+  /**
+   * Before the dashboard opens, only these Discord users may use it. Leave
+   * it out to let everyone in.
+   */
+  dashboardUsers?: string[] | undefined;
+  /** When the dashboard opens to everyone (ms since 1970). */
+  dashboardOpensAt?: number | undefined;
   fetch?: typeof fetch;
   now?: () => number;
 };
@@ -86,6 +93,18 @@ export function createAuth(config: AuthConfig) {
   const vault = sealer(config.clientSecret ?? 'sparko-dev');
   const guildCache = new Map<string, { at: number; list: DiscordGuild[] }>();
   let botGuilds: { at: number; ids: Set<string> } | undefined;
+
+  /** Whether the dashboard is open to everyone yet. */
+  const isOpen = () =>
+    !config.dashboardUsers ||
+    (config.dashboardOpensAt !== undefined && now() >= config.dashboardOpensAt);
+  /** Whether this person may use the dashboard now. */
+  const mayUse = (user: User) =>
+    isOpen() || !!config.dashboardUsers?.includes(user.id);
+  const opensAt = () =>
+    config.dashboardOpensAt === undefined
+      ? null
+      : new Date(config.dashboardOpensAt).toISOString();
 
   const cookie = (name: string, value: string, maxAge: number) =>
     `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
@@ -156,6 +175,7 @@ export function createAuth(config: AuthConfig) {
   async function access(req: IncomingMessage, guildId: string) {
     const session = current(req);
     if (!session) return { status: 401 as const };
+    if (!mayUse(session.user)) return { status: 403 as const };
     const guild = (await userGuilds(session)).find((g) => g.id === guildId);
     if (!guild || !canManage(guild)) return { status: 403 as const };
     return { status: 200 as const, user: session.user, guild };
@@ -235,10 +255,15 @@ export function createAuth(config: AuthConfig) {
     const route = `${req.method} ${url.pathname}`;
 
     if (route === 'GET /api/v1/health')
-      json(res, 200, { ok: true, signIn: configured });
-    else if (route === 'GET /api/v1/session')
-      json(res, 200, { user: current(req)?.user ?? null });
-    else if (route === 'GET /api/v1/auth/discord') {
+      json(res, 200, {
+        ok: true,
+        signIn: configured,
+        dashboard: { open: isOpen(), opensAt: opensAt() },
+      });
+    else if (route === 'GET /api/v1/session') {
+      const user = current(req)?.user ?? null;
+      json(res, 200, { user, allowed: !!user && mayUse(user) });
+    } else if (route === 'GET /api/v1/auth/discord') {
       if (!configured) {
         redirect(res, '/signin?error=not_configured');
         return true;
@@ -272,6 +297,10 @@ export function createAuth(config: AuthConfig) {
       const found = current(req);
       if (!found) {
         json(res, 401, { error: 'signed_out' });
+        return true;
+      }
+      if (!mayUse(found.user)) {
+        json(res, 403, { error: 'not_open_yet' });
         return true;
       }
       try {

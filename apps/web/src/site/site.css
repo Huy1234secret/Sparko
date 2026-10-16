@@ -2037,3 +2037,20 @@ a.sw-open-dash {
     width: 100%;
   }
 }
+
+/* Signed in before the dashboard opens: the button counts down instead. */
+a.sw-countdown {
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.sw-countdown .sp-i {
+  color: var(--sp-brand-text);
+}
+.sw-countdown__label {
+  color: var(--sp-muted);
+  font-weight: 500;
+}
+.sw-countdown__time {
+  min-width: 11ch;
+  text-align: left;
+}

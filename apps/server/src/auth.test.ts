@@ -160,6 +160,7 @@ describe('Discord sign-in', () => {
     expect((await get('/api/v1/servers')).status).toBe(401);
     expect(await (await get('/api/v1/session')).json()).toEqual({
       user: null,
+      allowed: false,
     });
   });
 
@@ -188,5 +189,82 @@ describe('Discord sign-in', () => {
     expect(to.searchParams.get('scope')).toBe('bot applications.commands');
     expect(BigInt(to.searchParams.get('permissions')!) & 0x8n).toBe(0n);
     expect(botPermissions & 0x8n).toBe(0n);
+  });
+});
+
+describe('dashboard before it opens', () => {
+  /** A site whose dashboard opens at `opensAt`, for the users listed. */
+  async function site(users: string[], clock: { now: number }) {
+    const auth = createAuth({
+      db: openDb(':memory:'),
+      clientId: 'client-1',
+      clientSecret: 'secret-1',
+      botToken: 'bot-token',
+      publicUrl: 'https://panel.example',
+      fetch: discord as typeof fetch,
+      dashboardUsers: users,
+      dashboardOpensAt: Date.parse('2026-10-31T15:00:00Z'),
+      now: () => clock.now,
+    });
+    const s = createServer((req, res) => {
+      void auth.handle(req, res).then((handled) => {
+        if (!handled) res.writeHead(418).end();
+      });
+    });
+    await new Promise<void>((done) => s.listen(0, '127.0.0.1', done));
+    const at = `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+    const call = (path: string, cookie = '') =>
+      fetch(at + path, { redirect: 'manual', headers: { cookie } });
+    const start = await call('/api/v1/auth/discord');
+    const state = new URL(start.headers.get('location')!).searchParams.get(
+      'state',
+    )!;
+    const back = await call(
+      `/api/v1/auth/discord/callback?code=good&state=${state}`,
+      cookieOf(start, 'sparko_oauth_state')!,
+    );
+    const session = cookieOf(back, 'sparko_session')!;
+    return { s, call, session };
+  }
+
+  it('lets only listed users in until it opens, then everyone', async () => {
+    const clock = { now: Date.parse('2026-10-31T14:58:00Z') };
+    const { s, call, session } = await site(['222'], clock);
+    try {
+      const health = (await (await call('/api/v1/health')).json()) as {
+        dashboard: unknown;
+      };
+      expect(health.dashboard).toEqual({
+        open: false,
+        opensAt: '2026-10-31T15:00:00.000Z',
+      });
+      expect(
+        await (await call('/api/v1/session', session)).json(),
+      ).toMatchObject({ allowed: false });
+      const refused = await call('/api/v1/servers', session);
+      expect(refused.status).toBe(403);
+      expect(await refused.json()).toEqual({ error: 'not_open_yet' });
+
+      clock.now = Date.parse('2026-10-31T15:00:01Z');
+      expect(
+        await (await call('/api/v1/session', session)).json(),
+      ).toMatchObject({ allowed: true });
+      expect((await call('/api/v1/servers', session)).status).toBe(200);
+    } finally {
+      s.close();
+    }
+  });
+
+  it('lets listed users in before it opens', async () => {
+    const clock = { now: Date.parse('2026-10-20T00:00:00Z') };
+    const { s, call, session } = await site(['111111111111111111'], clock);
+    try {
+      expect(
+        await (await call('/api/v1/session', session)).json(),
+      ).toMatchObject({ allowed: true });
+      expect((await call('/api/v1/servers', session)).status).toBe(200);
+    } finally {
+      s.close();
+    }
   });
 });

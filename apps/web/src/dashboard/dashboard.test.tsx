@@ -1218,7 +1218,7 @@ describe('real sign-in', () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Add Sparko to Needs Sparko' }),
+      await screen.findByRole('button', { name: 'Add Sparko to Needs Sparko' }),
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('link', { name: /Real Server/ }));
     expect(router.state.location.pathname).toBe('/dashboard/1234');

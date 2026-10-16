@@ -48,14 +48,20 @@ function CrashPage() {
 
 const pages: RouteObject[] = [
   { path: 'signin', lazy: dashboard('SignInPage') },
-  { path: 'dashboard', lazy: dashboard('ServerPickerPage') },
   {
-    path: 'dashboard/:serverId',
-    lazy: dashboard('ServerLayout'),
+    // Until the dashboard opens, only allowed people get past this.
+    lazy: dashboard('DashboardGate'),
     children: [
-      { index: true, lazy: dashboard('OverviewPage') },
-      { path: 'tickets/:ticketNumber', lazy: dashboard('TicketPage') },
-      { path: ':moduleId', lazy: dashboard('ModulePage') },
+      { path: 'dashboard', lazy: dashboard('ServerPickerPage') },
+      {
+        path: 'dashboard/:serverId',
+        lazy: dashboard('ServerLayout'),
+        children: [
+          { index: true, lazy: dashboard('OverviewPage') },
+          { path: 'tickets/:ticketNumber', lazy: dashboard('TicketPage') },
+          { path: ':moduleId', lazy: dashboard('ModulePage') },
+        ],
+      },
     ],
   },
   {

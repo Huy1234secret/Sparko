@@ -124,6 +124,40 @@ describe('public site', () => {
     }
   });
 
+  it('counts down instead of Open dashboard for someone not let in yet', async () => {
+    const json = (body: unknown) =>
+      new Response(JSON.stringify(body), {
+        headers: { 'content-type': 'application/json' },
+      });
+    resetBackend();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url === '/api/v1/health'
+          ? json({
+              signIn: true,
+              dashboard: { open: false, opensAt: '2099-10-31T15:00:00Z' },
+            })
+          : url === '/api/v1/session'
+            ? json({
+                user: { id: '200000000000000001', name: 'quinn.dev' },
+                allowed: false,
+              })
+            : json({}),
+      ),
+    );
+    try {
+      open('/');
+      expect(
+        await screen.findByRole('link', { name: /dashboard opens in/i }),
+      ).toHaveAttribute('href', '/dashboard');
+      expect(screen.queryByRole('link', { name: 'Open dashboard' })).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+      resetBackend();
+    }
+  });
+
   it('explains Add to Discord instead of leaving the site', async () => {
     open('/');
     await userEvent.click(

@@ -15,6 +15,8 @@ Both read settings from `/opt/sparko/shared/.env.production` (set `SPARKO_ENV_FI
 - `WEB_PORT` / `WEB_HOST`: where the website listens (default `8080` on `127.0.0.1`).
 - `DATABASE_PATH`: the database file (default `.data/sparko.db` in the app folder). See `docs/backend.md`.
 - `MEDIA_DIR`: where pictures uploaded in Message Studio are kept (default: a `media` folder next to the database). Back it up with the database.
+- `DASHBOARD_USERS`: until the dashboard opens, only these Discord user IDs can use it, comma-separated (default `902736357766594611,1416183744515276943`). Set it to `*` to let everyone in now. Anyone else who signs in sees a countdown instead.
+- `DASHBOARD_OPENS_AT`: when the dashboard opens to everyone, as a UTC date and time (default `2026-10-31T15:00:00Z`, which is 31 October 2026, 10:00 pm in UTC+7).
 
 If the website hasn't been built or the token is missing, that process stops with a message in `pm2 logs` instead of restarting over and over.
 
