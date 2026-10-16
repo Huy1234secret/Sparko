@@ -11,7 +11,7 @@ import {
 import { cx, Icon } from './core';
 import { LottieIcon, preloadAnimations } from './animated';
 import { SearchIcon, searchAnimations } from './search-icon';
-import { usePlacement } from './placement';
+import { usePlacement, usePresence } from './placement';
 import { animIcons } from './anim-icons';
 const tickReveal = animIcons.tick.reveal;
 
@@ -57,14 +57,30 @@ type Props = {
 );
 
 /** The fill for a role: its colour, or a gradient between its two. */
-const roleFill = (item: ComboItem) =>
-  item.color
-    ? ({
-        '--role-fill': item.color2
-          ? `linear-gradient(90deg, ${item.color}, ${item.color2})`
-          : item.color,
-      } as CSSProperties)
-    : undefined;
+/** How bright a #rrggbb colour looks, from 0 (black) to 1 (white). */
+function brightness(hex: string) {
+  const n = parseInt(hex.replace('#', '').slice(0, 6), 16);
+  if (Number.isNaN(n)) return 0;
+  const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255].map((c) => {
+    const x = c / 255;
+    return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+/** A role's fill, and text that stays readable on it: dark on light roles. */
+const roleFill = (item: ComboItem) => {
+  if (!item.color) return undefined;
+  const stops = item.color2 ? [item.color, item.color2] : [item.color];
+  const light =
+    stops.reduce((sum, c) => sum + brightness(c), 0) / stops.length > 0.45;
+  return {
+    '--role-fill': item.color2
+      ? `linear-gradient(90deg, ${item.color}, ${item.color2})`
+      : item.color,
+    ...(light ? { '--role-ink': '#16160f', '--role-glow': 'none' } : {}),
+  } as CSSProperties;
+};
 
 const glyph = (item: ComboItem) =>
   item.icon ? <Icon name={item.icon} className="sp-channel-glyph" /> : null;
@@ -137,7 +153,8 @@ export function Combobox(props: Props) {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  usePlacement(open, trigger, pop, { fixed: true });
+  const presence = usePresence(open);
+  usePlacement(presence.mounted, trigger, pop, { fixed: true });
 
   const selected = props.multiple ? props.value : [props.value];
   const isSelected = (value: string) => selected.includes(value);
@@ -271,8 +288,14 @@ export function Combobox(props: Props) {
           <Icon name="chevron-down" className="sp-input__chev" />
         </button>
       )}
-      {open && (
-        <div ref={pop} className="sp-popover sp-combo__pop">
+      {presence.mounted && (
+        <div
+          ref={pop}
+          className={cx(
+            'sp-popover sp-combo__pop',
+            presence.closing && 'is-closing',
+          )}
+        >
           {searchable && (
             <div className="sp-popover__search">
               <SearchIcon className="sp-combo__search-icon" />

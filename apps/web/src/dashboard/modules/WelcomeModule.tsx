@@ -53,6 +53,8 @@ import {
   SavePipeline,
   syncState,
   useSaveFlow,
+  ModuleSkeleton,
+  SkelEditor,
 } from './frame';
 import { ContainerCanvas } from './ContainerCanvas';
 import { EmbedCanvas } from './EmbedCanvas';
@@ -227,13 +229,9 @@ export function WelcomeModule({
 
   if (welcome.isPending || studio.isPending)
     return (
-      <div className="sp-stack" aria-busy="true" aria-label="Loading">
-        <span className="sp-skel sp-skel--title" />
-        <div className="sp-split">
-          <div className="sp-skel sp-skel--block" style={{ height: 320 }} />
-          <div className="sp-skel sp-skel--block" style={{ height: 320 }} />
-        </div>
-      </div>
+      <ModuleSkeleton module={module} tabs={4}>
+        <SkelEditor />
+      </ModuleSkeleton>
     );
   if (welcome.isError || studio.isError || !current || !studio.data)
     return (

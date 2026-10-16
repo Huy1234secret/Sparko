@@ -1,5 +1,11 @@
 import { useRef, useState } from 'react';
-import { LottieIcon, cx, menuPlacement, usePlacement } from '../../ui';
+import {
+  LottieIcon,
+  cx,
+  menuPlacement,
+  usePlacement,
+  usePresence,
+} from '../../ui';
 import { studioVariables } from '../../data';
 import { useDismiss } from './EditorBits';
 import { animIcons } from '../../ui';
@@ -39,7 +45,8 @@ export function VariablesButton({
   };
   const pop = useRef<HTMLDivElement>(null);
   useDismiss(open, () => toggle(false), wrap);
-  usePlacement(open, wrap, pop, menuPlacement);
+  const presence = usePresence(open);
+  usePlacement(presence.mounted, wrap, pop, menuPlacement);
   const list = [
     ...studioVariables.filter(
       (v) => (member || !v.member) && (role || !v.role),
@@ -85,10 +92,10 @@ export function VariablesButton({
           startAt={0}
         />
       </button>
-      {open && (
+      {presence.mounted && (
         <div
           ref={pop}
-          className="sp-vars-pop"
+          className={cx('sp-vars-pop', presence.closing && 'is-closing')}
           role="menu"
           aria-label="Variables"
         >

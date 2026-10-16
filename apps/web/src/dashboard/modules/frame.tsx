@@ -151,9 +151,12 @@ export function ModuleHeader({
   module,
   sync,
   power,
+  loading,
 }: {
   module: SparkoModule;
   sync: Sync | null;
+  /** While the page loads: a placeholder where the on/off switch goes. */
+  loading?: boolean;
   power?:
     | {
         on: boolean;
@@ -198,6 +201,15 @@ export function ModuleHeader({
           <p className="sp-page-head__desc">{module.description}</p>
         </div>
       </div>
+      {loading && (
+        <div className="sp-module-head__power" aria-hidden="true">
+          <span className="sp-skel-stack" style={{ width: 150 }}>
+            <span className="sp-skel" style={{ width: '40%' }} />
+            <span className="sp-skel" />
+          </span>
+          <span className="sp-skel sp-skel--switch" />
+        </div>
+      )}
       {power && (
         <div className="sp-module-head__power">
           <span style={{ display: 'grid' }}>
@@ -369,5 +381,150 @@ export function ModuleSaveBar({
       onSave={onSave}
       onReset={onReset}
     />
+  );
+}
+
+// Loading ---------------------------------------------------------------------
+
+const Bar = ({ w, h }: { w?: number | string; h?: number }) => (
+  <span
+    className="sp-skel"
+    style={{
+      ...(w !== undefined ? { width: w } : {}),
+      ...(h ? { height: h } : {}),
+    }}
+  />
+);
+/** A label above an input. */
+const SkelField = ({ label = '35%' }: { label?: string }) => (
+  <span className="sp-skel-field">
+    <Bar w={label} />
+    <span className="sp-skel sp-skel--input" />
+  </span>
+);
+/** A card's title and sub line. */
+const SkelCardHead = () => (
+  <div className="sp-card__head">
+    <div className="sp-card__titles sp-skel-stack">
+      <Bar w={160} h={16} />
+      <Bar w={280} />
+    </div>
+  </div>
+);
+
+/** The tab bar, with `count` tabs. */
+export function SkelTabs({ count = 3 }: { count?: number }) {
+  return (
+    <div className="sp-skel-tabs" aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <span key={i} className="sp-skel-tab">
+          <span className="sp-skel sp-skel--icon" />
+          <Bar w={64 + ((i * 17) % 30)} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The live preview on the left and a settings card on the right. */
+export function SkelEditor({ fields = 4 }: { fields?: number }) {
+  return (
+    <div className="sp-studio__grid" aria-hidden="true">
+      <div className="sp-stack">
+        <span className="sp-skel sp-skel--input" />
+        <div className="sp-skel-row">
+          <Bar w={110} h={16} />
+          <span className="sp-skel-row" style={{ marginLeft: 'auto' }}>
+            <span className="sp-skel sp-skel--btn" style={{ width: 110 }} />
+            <span className="sp-skel sp-skel--circle" />
+            <span className="sp-skel sp-skel--circle" />
+          </span>
+        </div>
+        <div className="sp-skel sp-skel--block" style={{ height: 360 }} />
+      </div>
+      <section className="sp-card sp-studio__side">
+        <SkelCardHead />
+        <div className="sp-card__body sp-stack">
+          {Array.from({ length: fields }, (_, i) => (
+            <SkelField key={i} label={['30%', '45%', '25%', '40%'][i % 4]!} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/** Stacked settings cards. */
+export function SkelCards({ count = 3 }: { count?: number }) {
+  return (
+    <div className="sp-stack" aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <section key={i} className="sp-card">
+          <SkelCardHead />
+          <div className="sp-card__body sp-skel-pair">
+            <SkelField />
+            <SkelField label="45%" />
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** A card holding a list of rows, like tickets or logs. */
+export function SkelList({ rows = 5 }: { rows?: number }) {
+  return (
+    <section className="sp-card" aria-hidden="true">
+      <SkelCardHead />
+      <div className="sp-card__body sp-stack">
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="sp-skel-row">
+            <span className="sp-skel sp-skel--circle" />
+            <span className="sp-skel-stack" style={{ flex: 1 }}>
+              <Bar w={`${55 - ((i * 13) % 25)}%`} />
+              <Bar w="30%" />
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * What a module page looks like while it loads: its real header, the tab
+ * bar, and placeholders in the shape of what's coming.
+ */
+export function ModuleSkeleton({
+  module,
+  tabs = 3,
+  children,
+}: {
+  module: SparkoModule;
+  tabs?: number;
+  children: ReactNode;
+}) {
+  return (
+    <div className="sp-stack" aria-busy="true" aria-label="Loading">
+      <ModuleHeader module={module} sync={null} loading />
+      {tabs > 0 && <SkelTabs count={tabs} />}
+      {children}
+    </div>
+  );
+}
+
+/** The loading shape for a module, by what its page shows first. */
+export function ModuleLoading({ module }: { module: SparkoModule }) {
+  const editor = ['welcome', 'studio', 'role-menus'].includes(module.id);
+  return (
+    <ModuleSkeleton module={module} tabs={module.id === 'welcome' ? 4 : 3}>
+      {editor ? (
+        <SkelEditor />
+      ) : module.id === 'tickets' ? (
+        <SkelList />
+      ) : (
+        <SkelCards />
+      )}
+    </ModuleSkeleton>
   );
 }

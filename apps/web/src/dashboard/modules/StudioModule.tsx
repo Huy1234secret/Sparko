@@ -24,6 +24,8 @@ import {
   editorTabIcons,
   useModuleTab,
   useSaveFlow,
+  ModuleSkeleton,
+  SkelEditor,
 } from './frame';
 import { variablesAnimations } from './VariablesButton';
 import { JsonPanel, jsonAnimations } from './JsonPanel';
@@ -280,10 +282,9 @@ export function StudioModule({
 
   if (studio.isPending)
     return (
-      <div className="sp-stack" aria-busy="true" aria-label="Loading">
-        <span className="sp-skel sp-skel--title" />
-        <div className="sp-skel sp-skel--block" style={{ height: 320 }} />
-      </div>
+      <ModuleSkeleton module={module}>
+        <SkelEditor />
+      </ModuleSkeleton>
     );
   if (studio.isError)
     return (

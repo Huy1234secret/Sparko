@@ -10,6 +10,7 @@ import {
   rememberEmojis,
   menuPlacement,
   usePlacement,
+  usePresence,
   renderDiscordText,
 } from '../../ui';
 import { useServerEmojis, type ServerEmoji } from '../../data';
@@ -86,6 +87,7 @@ export function EmojiButton({
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), wrap);
+  const presence = usePresence(open);
   return (
     <div ref={wrap} className="sp-pop-anchor">
       <button
@@ -101,8 +103,9 @@ export function EmojiButton({
           <LottieIcon src={play.src} size={24} playKey={play.key} original />
         )}
       </button>
-      {open && (
+      {presence.mounted && (
         <EmojiPicker
+          closing={presence.closing}
           serverId={serverId}
           anchor={wrap}
           onPick={(text) => {
@@ -120,8 +123,11 @@ function EmojiPicker({
   anchor,
   onPick,
   className,
+  closing,
 }: {
   serverId: string;
+  /** Playing its opening animation backwards, about to go. */
+  closing?: boolean;
   /** What opened it: the picker opens below it, or above if there's more room. */
   anchor: RefObject<HTMLElement | null>;
   onPick: (text: string) => void;
@@ -175,7 +181,7 @@ function EmojiPicker({
   return (
     <div
       ref={box}
-      className={cx('sp-emoji-pop', className)}
+      className={cx('sp-emoji-pop', className, closing && 'is-closing')}
       role="dialog"
       aria-label="Emoji"
     >
@@ -307,6 +313,7 @@ export function EmojiField({
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   useDismiss(open, () => setOpen(false), wrap);
+  const presence = usePresence(open);
   return (
     <div ref={wrap} className="sp-pop-anchor sp-emoji-field">
       <button
@@ -341,8 +348,9 @@ export function EmojiField({
           ×
         </button>
       )}
-      {open && (
+      {presence.mounted && (
         <EmojiPicker
+          closing={presence.closing}
           serverId={serverId}
           anchor={wrap}
           className="sp-emoji-pop--start"

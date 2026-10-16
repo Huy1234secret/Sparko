@@ -51,6 +51,8 @@ import {
   syncState,
   useModuleTab,
   useSaveFlow,
+  ModuleSkeleton,
+  SkelEditor,
 } from './frame';
 import { StudioDataProvider } from './ComponentsEditor';
 import {
@@ -186,10 +188,9 @@ export function ReactionRolesModule({
 
   if (rr.isPending || studio.isPending)
     return (
-      <div className="sp-stack" aria-busy="true" aria-label="Loading">
-        <span className="sp-skel sp-skel--title" />
-        <div className="sp-skel sp-skel--block" style={{ height: 320 }} />
-      </div>
+      <ModuleSkeleton module={module}>
+        <SkelEditor fields={5} />
+      </ModuleSkeleton>
     );
   if (rr.isError || studio.isError || !rr.data || !studio.data)
     return (

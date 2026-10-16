@@ -1,3 +1,4 @@
+import { SkelList } from './modules/frame';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -319,11 +320,23 @@ export function OverviewPage() {
   if (overview.isPending)
     return (
       <div className="sp-stack" aria-busy="true" aria-label="Loading">
-        <span className="sp-skel sp-skel--title" />
-        <span className="sp-skel" style={{ width: '52%' }} />
+        <header className="sp-page-head">
+          <div className="sp-page-head__text sp-skel-stack">
+            <span className="sp-skel" style={{ width: 90 }} />
+            <span className="sp-skel sp-skel--title" style={{ width: 280 }} />
+            <span
+              className="sp-skel"
+              style={{ width: 420, maxWidth: '100%' }}
+            />
+          </div>
+        </header>
+        <div className="sp-split sp-split--wide">
+          <SkelList rows={4} />
+          <SkelList rows={3} />
+        </div>
         <div className="sp-split">
-          <div className="sp-skel sp-skel--block" style={{ height: 320 }} />
-          <div className="sp-skel sp-skel--block" style={{ height: 320 }} />
+          <SkelList rows={5} />
+          <SkelList rows={5} />
         </div>
       </div>
     );

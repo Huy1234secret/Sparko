@@ -40,6 +40,8 @@ import {
   syncState,
   useModuleTab,
   useSaveFlow,
+  ModuleSkeleton,
+  SkelList,
 } from './frame';
 import { ChannelPicker, ColourChoice, newId, VersionHistory } from './parts';
 
@@ -124,11 +126,9 @@ function Inbox({ server, onSetup }: { server: Server; onSetup: () => void }) {
   const [query, setQuery] = useState('');
   if (list.isPending)
     return (
-      <div
-        className="sp-skel sp-skel--block"
-        style={{ height: 320 }}
-        aria-busy="true"
-      />
+      <div aria-busy="true" aria-label="Loading">
+        <SkelList />
+      </div>
     );
   if (list.isError)
     return (
@@ -361,10 +361,9 @@ export function TicketsModule({
 
   if (config.isPending)
     return (
-      <div className="sp-stack" aria-busy="true" aria-label="Loading">
-        <span className="sp-skel sp-skel--title" />
-        <div className="sp-skel sp-skel--block" style={{ height: 320 }} />
-      </div>
+      <ModuleSkeleton module={module}>
+        <SkelList />
+      </ModuleSkeleton>
     );
   if (config.isError)
     return (
