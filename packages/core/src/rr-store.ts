@@ -10,8 +10,11 @@ import {
 import { getTemplate } from './templates.ts';
 import { Plain } from './ticket-actions.ts';
 import {
+  RR_SPARKO,
   emojiKey,
   reactionPath,
+  rrChangedLists,
+  rrSparkoMessage,
   rrComponents,
   rrDecide,
   rrRoleList,
@@ -354,20 +357,24 @@ export async function applyReactionRole(
   // The response message, if one is set for what happened.
   const res = r.response;
   const pick = given.length ? res.claim : taken.length ? res.remove : '';
-  const studio =
-    res.on && pick
-      ? getTemplate<StudioMessage>(db, guildId, 'studio', pick)
-      : undefined;
+  const message: StudioMessage | undefined = !res.on
+    ? undefined
+    : pick === RR_SPARKO
+      ? rrSparkoMessage(given.length ? 'claim' : 'remove')
+      : pick
+        ? getTemplate<StudioMessage>(db, guildId, 'studio', pick)?.message
+        : undefined;
   const guild = getGuild(db, guildId);
   const role = given[0] ?? taken[0];
-  const response = studio
-    ? studioPayload(normaliseStudio(studio.message), {
+  const response = message
+    ? studioPayload(normaliseStudio(message), {
         now,
         user: u.user,
         role: role ? { id: role, name: u.roleName?.(role) ?? role } : undefined,
         roleList: rrRoleList(r),
         server: guild && { name: guild.name, members: guild.memberCount },
         channel: post.channelId,
+        extra: rrChangedLists(given, taken),
       })
     : null;
   return {

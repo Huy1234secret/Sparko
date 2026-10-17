@@ -830,6 +830,8 @@ export type StudioVars = {
   role?: { id: string; name: string } | undefined;
   /** A reaction role's roles, one line each, for {role-list}. */
   roleList?: string | undefined;
+  /** More variables a module fills in, like a suggestion's {status}. */
+  extra?: Record<string, string> | undefined;
 };
 
 export type StudioVariable = {
@@ -839,6 +841,8 @@ export type StudioVariable = {
   member?: true;
   /** Filled in only by reaction role responses. */
   role?: true;
+  /** Filled in only by suggestion messages. */
+  suggestion?: true;
 };
 
 /** Variables people can write in Studio messages, in braces. */
@@ -899,6 +903,55 @@ export const studioVariables: StudioVariable[] = [
     about: 'Lists every role on the message, with its emoji, one per line.',
     role: true,
   },
+  {
+    name: 'role.selected.list',
+    about: 'Mentions every role the member just got, without pinging them.',
+    role: true,
+  },
+  {
+    name: 'role.removed.list',
+    about: 'Mentions every role just taken from the member.',
+    role: true,
+  },
+  {
+    name: 'user.suggestion',
+    about:
+      'What the member suggested. Long suggestions carry on in another embed or container.',
+    suggestion: true,
+  },
+  {
+    name: 'suggestion.title',
+    about: 'The suggestion’s title.',
+    suggestion: true,
+  },
+  {
+    name: 'suggestion.id',
+    about: 'The suggestion’s number, like #12.',
+    suggestion: true,
+  },
+  {
+    name: 'status',
+    about: 'Its status, like Pending, Approved or Denied.',
+    suggestion: true,
+  },
+  {
+    name: 'vote.ratio.amount',
+    about: 'Upvotes | downvotes and the difference, like `100 | 120 - -20`.',
+    suggestion: true,
+  },
+  {
+    name: 'vote.ratio.percent',
+    about: 'The same as percentages adding up to 100, like `35% | 65% - -15%`.',
+    suggestion: true,
+  },
+  { name: 'upvotes', about: 'How many upvotes it has.', suggestion: true },
+  { name: 'downvotes', about: 'How many downvotes it has.', suggestion: true },
+  {
+    name: 'files',
+    about:
+      'The files the member added. Pictures and videos are shown in the message.',
+    suggestion: true,
+  },
 ];
 
 /**
@@ -930,6 +983,7 @@ export function fillVariables(text: string, ctx: { now: number } & StudioVars) {
     date: `<t:${unix}:D>`,
     time: `<t:${unix}:t>`,
     separator: '',
+    ...ctx.extra,
   };
   return text.replace(
     /\{([a-z.-]+)\}/g,

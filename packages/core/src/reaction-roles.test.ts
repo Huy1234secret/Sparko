@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { openDb } from './db.ts';
 import { DiscordError } from './discord.ts';
 import { writeModule } from './store.ts';
-import { addTemplate, deleteTemplate } from './templates.ts';
+import { addTemplate, deleteTemplate, updateTemplate } from './templates.ts';
 import { studioDefault } from './studio-format.ts';
 import {
+  RR_SPARKO,
   rrDecide,
   rrDefault,
   rrIssue,
@@ -197,6 +198,56 @@ describe('reaction roles', () => {
         action: 'button',
         item: 'a',
       }),
+    ).toBeNull();
+
+    // Sparko's own responses list the roles given and taken.
+    updateTemplate(
+      db,
+      'g',
+      RR_MODULE,
+      id,
+      {
+        who: 'Rhea',
+        message: rr({
+          message,
+          items: items.slice(0, 2),
+          response: {
+            on: true,
+            delivery: 'dm',
+            claim: RR_SPARKO,
+            remove: RR_SPARKO,
+          },
+        }),
+      },
+      2,
+    );
+    const claimed = await applyReactionRole(rest, db, {
+      messageId: 'm1',
+      user: { id: '7', name: 'tomoko' },
+      roles: [],
+      action: 'react',
+      emoji: '🎮',
+    });
+    expect(claimed?.off === false && claimed.response).toMatchObject({
+      content: 'Added <@&11>',
+    });
+    const removed = await applyReactionRole(rest, db, {
+      messageId: 'm1',
+      user: { id: '7', name: 'tomoko' },
+      roles: ['11'],
+      action: 'unreact',
+      emoji: '🎮',
+    });
+    expect(removed?.off === false && removed.response).toMatchObject({
+      content: 'Removed <@&11>',
+    });
+    expect(
+      rrIssue(
+        rr({
+          response: { on: true, delivery: 'dm', claim: RR_SPARKO, remove: '' },
+        }),
+        { templates: new Set(['7']) },
+      ),
     ).toBeNull();
 
     // Deleting the reaction role takes its message down.

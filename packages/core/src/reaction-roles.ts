@@ -4,7 +4,39 @@
  * template. Nothing here touches the database or the network, so the
  * dashboard imports this file too.
  */
-import { emojiPayload, type ButtonColour } from './studio-format.ts';
+import {
+  emojiPayload,
+  v2Default,
+  type ButtonColour,
+  type StudioMessage,
+} from './studio-format.ts';
+
+/**
+ * A response set to Sparko's own message instead of a Studio template. It
+ * isn't one of the server's templates, so it doesn't count toward them.
+ */
+export const RR_SPARKO = 'sparko';
+
+/** Sparko's own claim and remove messages. */
+export const rrSparkoMessage = (which: 'claim' | 'remove'): StudioMessage => ({
+  name:
+    which === 'claim' ? 'Sparko’s claim message' : 'Sparko’s remove message',
+  channel: '',
+  layout: 'embed',
+  content:
+    which === 'claim'
+      ? 'Added {role.selected.list}'
+      : 'Removed {role.removed.list}',
+  embeds: [],
+  components: [],
+  v2: v2Default(),
+});
+
+/** The roles just given and taken, for {role.selected.list} and {role.removed.list}. */
+export const rrChangedLists = (given: string[], taken: string[]) => ({
+  'role.selected.list': given.map((id) => `<@&${id}>`).join(', '),
+  'role.removed.list': taken.map((id) => `<@&${id}>`).join(', '),
+});
 
 export type RRKind = 'reaction' | 'button' | 'menu';
 /**
@@ -195,7 +227,7 @@ export function rrIssue(
   if (res.on && !res.claim && !res.remove)
     return at('Pick a response message, or turn the response off.', 'response');
   for (const t of [res.claim, res.remove])
-    if (t && known?.templates && !known.templates.has(t))
+    if (t && t !== RR_SPARKO && known?.templates && !known.templates.has(t))
       return at('A response template was deleted. Pick another.', 'response');
   return null;
 }

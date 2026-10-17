@@ -2959,6 +2959,9 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-lib-tag--reaction-role {
   color: var(--sp-brand-text);
 }
+.sp-lib-tag--suggestion {
+  color: var(--sp-info);
+}
 
 /* Reaction roles ----------------------------------------------------------- */
 .sp-rr-count {
@@ -3229,13 +3232,9 @@ body:has(> .sp-settings-scrim) > #root {
     border-left-color: #5865f2;
   }
 }
+/* Ticked like every other checkbox, with the colour drifting. */
 .sp-cp__shuffle.is-on .sp-check__box--anim {
   animation: sp-shuffle-ink 4s linear infinite;
-  --sp-anim-fill: transparent;
-}
-/* Only the outline takes the colour; the box stays unfilled. */
-.sp-cp__shuffle.is-on .sp-check__box--anim [fill='rgb(255,255,255)'] {
-  fill: transparent;
 }
 .sp-embed-wrap.is-shuffle .dc-embed,
 .sp-embed-wrap.is-shuffle.sp-v2-wrap > * {
@@ -3464,4 +3463,238 @@ body:has(> .sp-settings-scrim) > #root {
   .sp-ar__timed > :nth-child(2) {
     grid-column: 1 / 2;
   }
+}
+
+/* Suggestions -------------------------------------------------------------- */
+.sp-sg-age {
+  display: grid;
+  gap: 10px;
+}
+/* The upvote and downvote: always two, labelled so they can't be mixed up. */
+.sp-sg-vote {
+  position: relative;
+  padding-top: 22px;
+}
+.sp-sg-vote__tag {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  color: var(--sp-muted);
+  font: 600 11px/14px var(--sp-font-sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sp-sg-vote--up .sp-sg-vote__tag {
+  color: var(--sp-success);
+}
+.sp-sg-vote--down .sp-sg-vote__tag {
+  color: var(--sp-danger);
+}
+.sp-sg-vote.sp-rr-item--menu {
+  align-items: stretch;
+}
+.sp-sg-vote .sp-rr-opt {
+  flex: 1;
+}
+.sp-sg-edit-vote {
+  cursor: pointer;
+  font: inherit;
+}
+button.dc-reaction.sp-sg-edit-vote,
+button.dc-select.sp-sg-edit-vote {
+  border-width: 1px;
+  border-style: solid;
+}
+.sp-sg-edit-vote:hover {
+  outline: 2px solid var(--sp-brand-line);
+  outline-offset: 2px;
+}
+/* Statuses: a colour, a name, the gear for its actions. */
+.sp-sg-statuses {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-sg-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-sg-status__colour {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid var(--sp-line-strong);
+  border-radius: 50%;
+  background: var(--sg-colour);
+  cursor: pointer;
+}
+.sp-sg-status__colour:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-sg-status .sp-cp {
+  top: 38px;
+  left: 0;
+}
+.sp-sg-status__main {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.sp-sg-status__main .sp-field {
+  margin: 0;
+}
+.sp-sg-fixed {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: var(--sp-muted);
+  cursor: help;
+}
+/* Storage: each card's edge goes red, yellow or green with its votes. */
+.sp-sg-usage {
+  display: grid;
+  gap: 6px;
+}
+.sp-sg-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  gap: 10px;
+  align-items: end;
+}
+.sp-sg-filters .sp-field {
+  margin: 0;
+}
+.sp-sg-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-sg-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--sg-ratio);
+}
+.sp-sg-card__open {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+a.sp-sg-card__open:hover .sp-sg-card__title {
+  text-decoration: underline;
+}
+a.sp-sg-card__open:focus-visible {
+  border-radius: var(--sp-radius-chip);
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-sg-card__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sp-sg-card__avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--sp-skeleton);
+  object-fit: cover;
+}
+.sp-sg-card__name {
+  font-weight: 600;
+}
+.sp-sg-card__title {
+  font: 600 15px/20px var(--sp-font-sans);
+  overflow-wrap: anywhere;
+}
+.sp-sg-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sp-sg-badge {
+  border-color: color-mix(in srgb, var(--sg-status) 55%, transparent);
+  background: color-mix(in srgb, var(--sg-status) 16%, transparent);
+  color: var(--sp-text);
+}
+.sp-sg-card__ratio {
+  padding: 1px 6px;
+  border-radius: var(--sp-radius-chip);
+  background: color-mix(in srgb, var(--sg-ratio) 18%, transparent);
+  font-size: 12px;
+}
+.sp-sg-card__reason {
+  display: grid;
+  gap: 2px;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sp-line);
+  overflow-wrap: anywhere;
+}
+/* Commands */
+.sp-sg-commands {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-sg-command {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-sg-command.is-off .sp-ar__pair {
+  opacity: 0.55;
+}
+.sp-sg-command .sp-field {
+  margin: 0;
+}
+.sp-sg-command__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sp-sg-command__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 14px/20px var(--sp-font-sans);
+}
+@media (max-width: 640px) {
+  .sp-sg-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-sg-card {
+    flex-wrap: wrap;
+  }
+}
+/* Reaction roles: Sparko's own response shows as sent, but rests. */
+.sp-rr-sparko .sp-studio__type,
+.sp-rr-sparko .sp-preview-tools {
+  opacity: 0.5;
 }

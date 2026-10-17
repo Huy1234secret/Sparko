@@ -37,7 +37,9 @@ import {
   greetTemplates,
   isLegacyWelcome,
   RR_MODULE,
+  SG_MODULE,
   type ReactionRole,
+  type Suggestions,
   type WelcomeConfig,
 } from '@sparko/core';
 import { rrUsing, syncRR } from './rr-api.ts';
@@ -103,11 +105,11 @@ export function studioRoutes({
   const templateUses = (guildId: string) => {
     const uses = new Map<
       string,
-      { kind: 'welcome' | 'reaction-role'; where: string }[]
+      { kind: 'welcome' | 'reaction-role' | 'suggestion'; where: string }[]
     >();
     const add = (
       id: string,
-      kind: 'welcome' | 'reaction-role',
+      kind: 'welcome' | 'reaction-role' | 'suggestion',
       where: string,
     ) => {
       if (!id) return;
@@ -136,6 +138,14 @@ export function studioRoutes({
       add(r.message.message, 'reaction-role', where);
       add(r.message.response?.claim ?? '', 'reaction-role', where);
       add(r.message.response?.remove ?? '', 'reaction-role', where);
+    }
+    const sg = getModule<Suggestions>(db, guildId, SG_MODULE).config;
+    if (sg) {
+      add(sg.message, 'suggestion', 'Suggestions (the suggestion message)');
+      for (const st of sg.statuses ?? [])
+        for (const a of st.actions)
+          if (a.type === 'dm')
+            add(a.template, 'suggestion', `Suggestions (${st.name} DM)`);
     }
     return uses;
   };

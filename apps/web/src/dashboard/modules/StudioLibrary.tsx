@@ -38,6 +38,7 @@ import { svgIcons } from '../../ui';
 import folderAddAnim from '../../../../../design-system/assets/icons/folder-icon-add.json?url';
 import folderSvg from '../../../../../design-system/assets/icons/folder-icon.svg?url';
 import messageSvg from '../../../../../design-system/assets/icons/message-icon.svg?url';
+import suggestionIcon from '../../../../../design-system/assets/icons/message-square.svg?url';
 import { animIcons } from '../../ui';
 export const plusAnimations = animIcons.plus;
 const editAnim = animIcons.edit.hover;
@@ -71,6 +72,7 @@ function MaskIcon({ src, label }: { src: string; label: string }) {
 const tagLook = {
   welcome: { label: 'Welcome Message', icon: svgIcons.welcomeTag },
   'reaction-role': { label: 'Reaction Role', icon: svgIcons.reactionRole },
+  suggestion: { label: 'Suggestion', icon: suggestionIcon },
 } as const;
 
 /** Tags for where else a template is used; hovering says exactly where. */

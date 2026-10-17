@@ -76,6 +76,21 @@ function place(
     const top = up ? box.top - gap - height : box.bottom + gap;
     p.style.left = `${left - origin.left}px`;
     p.style.top = `${top - origin.top}px`;
+    // While what opened it is scrolled out of sight (under the top bar, say),
+    // the popover hides with it instead of floating over the page.
+    const gone =
+      box.height > 0 && (box.bottom <= area.top || box.top >= area.bottom);
+    p.style.visibility = gone ? 'hidden' : '';
+    // Whatever it measures, it never hangs past the top bar or the window.
+    const r = p.getBoundingClientRect();
+    const minTop = area.top + margin;
+    const maxBottom = area.bottom - margin;
+    if (r.top < minTop || r.bottom > maxBottom) {
+      const fitTop = Math.max(r.top, minTop);
+      const fitHeight = Math.max(Math.min(r.bottom, maxBottom) - fitTop, 120);
+      p.style.maxHeight = `${fitHeight}px`;
+      p.style.top = `${(up ? box.top - gap - Math.min(r.height, fitHeight) : fitTop) - origin.top}px`;
+    }
     return;
   }
   const inParent =
@@ -125,7 +140,22 @@ export function usePlacement(
     again();
     window.addEventListener('resize', again);
     if (fixed) window.addEventListener('scroll', onScroll, true);
+    // What opened it can grow (picked chips wrap onto a new line) and the
+    // list can change (a search, rows still rendering), so it's placed
+    // again whenever either changes size.
+    let frame = 0;
+    const sized =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(again);
+          });
+    sized?.observe(a);
+    for (const child of Array.from(p.children)) sized?.observe(child);
     return () => {
+      cancelAnimationFrame(frame);
+      sized?.disconnect();
       window.removeEventListener('resize', again);
       window.removeEventListener('scroll', onScroll, true);
     };

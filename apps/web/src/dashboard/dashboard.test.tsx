@@ -489,6 +489,174 @@ describe('Automatic roles', () => {
   }, 20_000);
 });
 
+describe('Reaction roles: Sparko’s template', () => {
+  it('offers Sparko’s own claim message, shown but not editable', async () => {
+    open(`${pixel}/role-menus?tab=items`);
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: /RR Template/ },
+        { timeout: 4000 },
+      ),
+    );
+    await screen.findByText(/You’re editing/);
+    await userEvent.click(
+      screen.getByRole('switch', { name: /Send a response/ }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /Claim message/ }),
+    );
+    await userEvent.click(
+      screen.getByRole('option', { name: /Sparko’s template/ }),
+    );
+    expect(
+      await screen.findByText(/It doesn’t use one of your templates/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('{role.selected.list}')).toBeInTheDocument();
+  }, 20_000);
+});
+
+describe('Suggestions', () => {
+  it('checks the settings before saving, then goes live', async () => {
+    open(`${pixel}/suggestions`);
+    expect(
+      await screen.findByText('Channels and people', {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    const age = screen.getByRole('textbox', { name: 'Minimum account age' });
+    await userEvent.type(age, '2y');
+    expect(
+      await screen.findByText('Has to be between 1d and 1y.'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/The account age has to be between 1d and 1y/),
+    ).toBeInTheDocument();
+    await userEvent.clear(age);
+    await userEvent.type(age, '2w');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Live in #general/, {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('adds a status and sets what it does', async () => {
+    open(`${pixel}/suggestions`);
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Status$/ }, { timeout: 4000 }),
+    );
+    // A new status needs a name before it saves.
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Give each status a name/),
+    ).toBeInTheDocument();
+    const names = screen.getAllByRole('textbox', { name: 'Status name' });
+    await userEvent.type(names.at(-1)!, 'In progress');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for In progress' }),
+    );
+    const panel = screen.getByRole('dialog', {
+      name: /What “In progress” does/,
+    });
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Add an action' }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: /Close voting/ }),
+    );
+    expect(within(panel).getByText('Close voting')).toBeInTheDocument();
+    // Built-in statuses keep their approve.
+    await userEvent.click(within(panel).getByRole('button', { name: 'Close' }));
+    expect(screen.getByText('Close voting')).toBeInTheDocument();
+  }, 20_000);
+
+  it('starts the message from a default template, locked to one embed', async () => {
+    open(`${pixel}/suggestions?tab=edit`);
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: 'Use a default template' },
+        { timeout: 4000 },
+      ),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Default templates' });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /Suggestion card/ }),
+    );
+    expect(await screen.findByText('Live preview')).toBeInTheDocument();
+    // No pictures, extra embeds, buttons or menus to add.
+    expect(
+      screen.queryByRole('button', { name: 'Add to the message' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add an image' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove embed 1' }),
+    ).not.toBeInTheDocument();
+    // The vote buttons are edited from the preview.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit the upvote button' }),
+    );
+    const vote = screen.getByRole('dialog', { name: 'Editing the upvote' });
+    const label = within(vote).getByRole('textbox', {
+      name: 'Upvote button name',
+    });
+    await userEvent.clear(label);
+    await userEvent.type(label, 'Yes please');
+    await userEvent.click(within(vote).getByRole('button', { name: 'Done' }));
+    expect(
+      screen.getByRole('button', { name: 'Edit the upvote button' }),
+    ).toHaveTextContent('Yes please');
+  }, 20_000);
+
+  it('lists suggestions in Storage with their reasons, and deletes them', async () => {
+    open(`${pixel}/suggestions?tab=storage`);
+    expect(
+      await screen.findByText('Weekly art challenge', {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Love it. Starting next Monday in #art-share!'),
+    ).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Search suggestions' }),
+      'memes',
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Weekly art challenge'),
+      ).not.toBeInTheDocument(),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete suggestion #6' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: /Delete suggestion #6/ });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete' }),
+    );
+    expect(await screen.findByText('No suggestions here')).toBeInTheDocument();
+  }, 20_000);
+
+  it('renames commands and refuses names Discord won’t take', async () => {
+    open(`${pixel}/suggestions?tab=commands`);
+    const names = await screen.findAllByRole(
+      'textbox',
+      { name: 'Name' },
+      { timeout: 4000 },
+    );
+    await userEvent.clear(names[0]!);
+    await userEvent.type(names[0]!, 'idea!');
+    expect(
+      screen.getByText('1 to 32 lowercase letters, numbers, - or _.'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Command names are 1 to 32/),
+    ).toBeInTheDocument();
+  }, 20_000);
+});
+
 describe('Tickets', () => {
   it('lists tickets needing a reply, longest waits first, and searches them', async () => {
     open(`${pixel}/tickets`);

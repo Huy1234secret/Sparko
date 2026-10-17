@@ -19,10 +19,16 @@ import { plusAnimations } from './StudioLibrary';
 
 type Limits = { timed: number; rules: number; conditions: number };
 
+const arFormat = 'Use m, h and d, like 30m, 12h or 7d.';
+
 /** A time written like "7d": shows what it means, or what's wrong with it. */
-function durationHint(text: string, range: { min: number; max: number }) {
+function durationHint(
+  text: string,
+  range: { min: number; max: number },
+  format: string,
+) {
   const ms = parseDuration(text);
-  if (ms === null) return 'Use m, h and d, like 30m, 12h or 7d.';
+  if (ms === null) return format;
   if (ms < range.min || ms > range.max) return null;
   return undefined;
 }
@@ -34,13 +40,15 @@ const tipped = (text: string, tip: string): ReactNode => (
   </>
 );
 
-function DurationInput({
+/** A length of time typed like "7d", checked against its range as it's typed. */
+export function DurationInput({
   label,
   tip,
   value,
   onChange,
   range,
   placeholder,
+  format = arFormat,
 }: {
   label: string;
   tip: string;
@@ -48,8 +56,10 @@ function DurationInput({
   onChange: (v: string) => void;
   range: { min: number; max: number; label: string };
   placeholder: string;
+  /** How to write it, shown when it can't be read. */
+  format?: string;
 }) {
-  const hint = value.trim() ? durationHint(value, range) : undefined;
+  const hint = value.trim() ? durationHint(value, range, format) : undefined;
   return (
     <Input
       label={tipped(label, tip)}
@@ -68,7 +78,15 @@ function DurationInput({
 }
 
 /** "2/3 ⏳": how many of the plan's slots are used. */
-function Used({ n, max, what }: { n: number; max: number; what: string }) {
+export function Used({
+  n,
+  max,
+  what,
+}: {
+  n: number;
+  max: number;
+  what: string;
+}) {
   return (
     <span className="sp-ar__used" title={`${n} of ${max} ${what} used`}>
       {n}/{max}
@@ -349,7 +367,7 @@ const newCondition = (kind: ARConditionKind): ARCondition =>
     ? { id: newId(), kind, min: '30d' }
     : kind === 'badge'
       ? { id: newId(), kind, badges: [] }
-      : { id: newId(), kind, boosts: 1, for: '7d' };
+      : { id: newId(), kind, for: '7d' };
 
 const badgeItems = arBadges.map((b) => ({ value: b.id, label: b.label }));
 
@@ -471,30 +489,7 @@ function RuleCard({
                     />
                   )}
                   {c.kind === 'booster' && (
-                    <div className="sp-ar__pair">
-                      <Input
-                        label={tipped(
-                          'Boosts at least',
-                          'How many times the member has boosted this server, from 1 to 100. Discord doesn’t tell bots this, so Sparko counts the server’s boost messages from when Automatic roles was turned on.',
-                        )}
-                        aria-label="Boosts at least"
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={String(c.boosts)}
-                        onChange={(e) =>
-                          editCondition(c.id, {
-                            ...c,
-                            boosts: Math.max(
-                              1,
-                              Math.min(
-                                100,
-                                Math.round(Number(e.target.value) || 1),
-                              ),
-                            ),
-                          })
-                        }
-                      />
+                    <>
                       <DurationInput
                         label="Boosting for at least"
                         tip="How long the member has been boosting without stopping. Use h and d, like 12h or 7d. From 1 day up to 365 days."
@@ -503,7 +498,7 @@ function RuleCard({
                         range={arRanges.boost}
                         onChange={(v) => editCondition(c.id, { ...c, for: v })}
                       />
-                    </div>
+                    </>
                   )}
                 </div>
                 <RemoveButton

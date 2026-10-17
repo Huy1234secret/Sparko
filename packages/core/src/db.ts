@@ -225,6 +225,54 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX ar_log_by_guild ON ar_log (guild_id, id DESC);`,
+  // 10: suggestions, who voted on them, and what happened to them.
+  `CREATE TABLE suggestions (
+    guild_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    author_id TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    author_avatar TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    files TEXT NOT NULL DEFAULT '[]',
+    dup_key TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    closed INTEGER NOT NULL DEFAULT 0,
+    up INTEGER NOT NULL DEFAULT 0,
+    down INTEGER NOT NULL DEFAULT 0,
+    channel_id TEXT,
+    message_id TEXT,
+    more_ids TEXT NOT NULL DEFAULT '[]',
+    thread_id TEXT,
+    review_channel_id TEXT,
+    review_message_id TEXT,
+    reason_json TEXT,
+    created_at INTEGER NOT NULL,
+    last_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, number)
+  );
+  CREATE INDEX suggestions_by_message ON suggestions (message_id);
+  CREATE INDEX suggestions_by_review ON suggestions (review_message_id);
+  CREATE INDEX suggestions_by_author ON suggestions (guild_id, author_id);
+  CREATE INDEX suggestions_open ON suggestions (closed, last_at);
+  CREATE TABLE sg_votes (
+    guild_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    vote INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, number, user_id)
+  );
+  CREATE TABLE sg_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    number INTEGER,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX sg_log_by_guild ON sg_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

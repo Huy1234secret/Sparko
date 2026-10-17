@@ -776,6 +776,14 @@ export const IssueProvider = IssueContext.Provider;
 export const useIssue = () => useContext(IssueContext);
 
 /**
+ * A message that keeps its shape: one embed or container, no pictures of
+ * its own and no extra buttons or menus. Suggestion messages are like this.
+ */
+const LockedContext = createContext(false);
+export const LockedCanvas = LockedContext.Provider;
+export const useCanvasLocked = () => useContext(LockedContext);
+
+/**
  * Takes the person to a problem: scrolls the part of the editor it's in
  * (marked with `data-issue`) into view, flashes a red outline round it and
  * puts the caret there. Without that exact part, the nearest one holding

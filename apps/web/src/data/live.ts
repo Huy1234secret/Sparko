@@ -242,6 +242,28 @@ export function withBackend(
       );
       return r.member;
     },
+    async getSuggestions(id) {
+      if (!(await backend()).live) return sample.getSuggestions(id);
+      return getJson(`${server(id)}/suggestions`);
+    },
+    async saveSuggestions(id, change) {
+      if (!(await backend()).live) return sample.saveSuggestions(id, change);
+      await call('PUT', `${server(id)}/suggestions`, change);
+    },
+    async listSuggestions(id, filter) {
+      if (!(await backend()).live) return sample.listSuggestions(id, filter);
+      return getJson(
+        `${server(id)}/suggestions/list?q=${encodeURIComponent(filter.query)}&status=${encodeURIComponent(filter.status)}`,
+      );
+    },
+    async deleteSuggestion(id, number) {
+      if (!(await backend()).live) return sample.deleteSuggestion(id, number);
+      await call('DELETE', `${server(id)}/suggestions/${number}`);
+    },
+    async testSuggestion(id, channel) {
+      if (!(await backend()).live) return sample.testSuggestion(id, channel);
+      await call('POST', `${server(id)}/suggestions/test`, { channel });
+    },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);
       return getJson(`${server(id)}/reaction-roles`);

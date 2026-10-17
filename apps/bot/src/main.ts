@@ -52,6 +52,7 @@ import {
   pendingBefore,
   startAutoRoleSweep,
 } from './auto-roles.ts';
+import { suggestionsBot } from './suggestions.ts';
 import {
   checkWelcome,
   memberJoined,
@@ -73,6 +74,9 @@ const db = openDb(defaultDbPath(join(import.meta.dirname, '../../..')));
 const rest = discordRest({ token });
 const tickets = ticketActions(rest, db);
 let client: Client;
+const suggestions = suggestionsBot(db, rest, {
+  appId: () => client?.application?.id,
+});
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
 /** And only shares message text with the Message Content Intent on. */
@@ -107,6 +111,7 @@ const handlers: Handlers = {
         : undefined,
     );
   },
+  ...suggestions.handlers((id) => client.guilds.cache.get(id)),
   'rr-sync': (job) =>
     syncReactionRole(
       rest,
@@ -174,6 +179,8 @@ function wire(c: Client) {
     } catch (error) {
       console.error('Couldn’t register slash commands', error);
     }
+    // Each server's own suggestion commands, with the names it picked.
+    void suggestions.registerAll((id) => ready.guilds.cache.has(id));
     requeueRunning(db);
     startJobLoop(db, handlers);
     const beat = () => {
@@ -190,6 +197,27 @@ function wire(c: Client) {
   });
 
   c.on(Events.InteractionCreate, (interaction) => {
+    // Suggestions: the server's commands, their forms, votes and review.
+    if (interaction.inCachedGuild()) {
+      if (interaction.isAutocomplete() && suggestions.autocomplete(interaction))
+        return;
+      if (interaction.isChatInputCommand() && suggestions.command(interaction))
+        return;
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId.startsWith('sg:')
+      ) {
+        void suggestions.modal(interaction);
+        return;
+      }
+      if (
+        (interaction.isButton() || interaction.isStringSelectMenu()) &&
+        interaction.customId.startsWith('sg:')
+      ) {
+        void suggestions.component(interaction);
+        return;
+      }
+    }
     if (
       interaction.isButton() &&
       interaction.customId.startsWith(ticketButtonPrefix) &&
@@ -319,9 +347,17 @@ function wire(c: Client) {
   });
   c.on(Events.MessageReactionAdd, (reaction, user) => {
     void reactionRoleReaction(reaction, user, 'react');
+    void suggestionReaction(reaction, user, true);
   });
   c.on(Events.MessageReactionRemove, (reaction, user) => {
     void reactionRoleReaction(reaction, user, 'unreact');
+    void suggestionReaction(reaction, user, false);
+  });
+  c.on(Events.MessageDelete, (message) => {
+    if (message.guild)
+      suggestions
+        .deleted(message.guild, message.channelId, message.id)
+        .catch(failed(`A deleted suggestion in ${message.guild.id}`));
   });
   c.on(Events.GuildMemberRemove, (member) => {
     if (!member.user?.bot) arLeft(db, member.guild.id, member.id, Date.now());
@@ -329,6 +365,33 @@ function wire(c: Client) {
       failed(`Saying goodbye to ${member.id} in ${member.guild.id}`),
     );
   });
+}
+
+/** A vote by reaction on a suggestion. */
+async function suggestionReaction(
+  reaction: MessageReaction | PartialMessageReaction,
+  user: User | PartialUser,
+  added: boolean,
+) {
+  try {
+    if (user.bot || !reaction.message.guildId) return;
+    const e = reaction.emoji;
+    const emoji = e.id
+      ? `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`
+      : e.name;
+    if (!emoji) return;
+    await suggestions.reaction(
+      {
+        messageId: reaction.message.id,
+        channelId: reaction.message.channelId,
+        emoji,
+      },
+      user.id,
+      added,
+    );
+  } catch (error) {
+    console.error('A suggestion vote failed', error);
+  }
 }
 
 /** Sends a direct message; people who don't take DMs simply don't get it. */
@@ -547,6 +610,8 @@ if (!membersIntent || !contentIntent)
 setInterval(() => void tickets.sweep(), 5 * 60_000).unref();
 // Timed roles and rules.
 startAutoRoleSweep(db, rest, (id) => client.guilds.cache.has(id));
+// Suggestions that close after a while.
+suggestions.startSweep((id) => client.guilds.cache.has(id));
 setStatus(
   db,
   'intents',
