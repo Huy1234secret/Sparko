@@ -159,9 +159,13 @@ export function Combobox(props: Props) {
   const selected = props.multiple ? props.value : [props.value];
   const isSelected = (value: string) => selected.includes(value);
   const needle = query.trim().toLowerCase();
-  const list = items.filter(
-    (i) => !needle || i.label.toLowerCase().includes(needle),
-  );
+  // Each group shows once, in the order its first item came, so items of
+  // one folder listed apart still sit under one heading.
+  const groups = new Map<string, ComboItem[]>();
+  for (const i of items)
+    if (!needle || i.label.toLowerCase().includes(needle))
+      groups.set(i.group ?? '', [...(groups.get(i.group ?? '') ?? []), i]);
+  const list = [...groups.values()].flat();
   const close = () => {
     setOpen(false);
     trigger.current?.focus();

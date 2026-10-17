@@ -88,4 +88,29 @@ describe('Combobox', () => {
     await userEvent.click(screen.getByRole('option', { name: /rules/ }));
     expect(trigger.querySelector('.sp-combo-chip')).toHaveTextContent('rules');
   });
+
+  it('shows each group once, even when its items are listed apart', async () => {
+    const items: ComboItem[] = [
+      { value: 'none', label: 'No DM' },
+      { value: 'a', label: 'Modern goodbye', group: 'Welcome' },
+      { value: 'b', label: 'Announcement', group: 'Test' },
+      { value: 'c', label: 'Modern welcome', group: 'Welcome' },
+    ];
+    render(
+      <Combobox
+        label="Template"
+        items={items}
+        value="none"
+        onChange={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^Template/ }));
+    expect(screen.getAllByText('Welcome')).toHaveLength(1);
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'No DM',
+      'Modern goodbye',
+      'Modern welcome',
+      'Announcement',
+    ]);
+  });
 });
