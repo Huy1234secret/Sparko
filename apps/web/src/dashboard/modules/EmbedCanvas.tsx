@@ -4,6 +4,7 @@ import type { StudioEmbed, StudioMessage } from '../../data';
 import {
   CloseButton,
   EditText,
+  useCanvasLocked,
   MaskIcon,
   UrlPopover,
   moveItem,
@@ -221,6 +222,7 @@ function EmbedBlock({
   onRemove: () => void;
 }) {
   const [pop, setPop] = useState<Pop | null>(openPop);
+  const locked = useCanvasLocked();
   const fields = embed.fields;
   // The empty field's id becomes the real field's, so typing carries on.
   let n = fields.length;
@@ -378,15 +380,17 @@ function EmbedBlock({
               />
             ))}
           </div>
-          <div className="sp-embed__image">
-            <Picture
-              url={embed.image}
-              label="an image"
-              className="sp-embed-pic--image"
-              onOpen={() => setPop('image')}
-            />
-            {url('image', 'Image URL')}
-          </div>
+          {!locked && (
+            <div className="sp-embed__image">
+              <Picture
+                url={embed.image}
+                label="an image"
+                className="sp-embed-pic--image"
+                onOpen={() => setPop('image')}
+              />
+              {url('image', 'Image URL')}
+            </div>
+          )}
           <div className="dc-embed__footer sp-embed__line">
             {embed.footer.trim() &&
               (embed.footerIcon ? (
@@ -444,11 +448,13 @@ function EmbedBlock({
           onClose={close}
         />
       )}
-      <CloseButton
-        label={`Remove ${label}`}
-        className="sp-embed-remove"
-        onClick={onRemove}
-      />
+      {!locked && (
+        <CloseButton
+          label={`Remove ${label}`}
+          className="sp-embed-remove"
+          onClick={onRemove}
+        />
+      )}
     </div>
   );
 }

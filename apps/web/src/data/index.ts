@@ -16,7 +16,12 @@ import type {
   TicketPanel,
   TicketPriority,
 } from './types';
-import type { AutoRoles, ReactionRole, WelcomeConfig } from './studio-format';
+import type {
+  AutoRoles,
+  ReactionRole,
+  Suggestions,
+  WelcomeConfig,
+} from './studio-format';
 
 export * from './types';
 export * from './library';
@@ -48,6 +53,9 @@ export const keys = {
   rr: (id: string) => ['rr', id] as const,
   ar: (id: string) => ['ar', id] as const,
   arMembers: (id: string, q: string) => ['ar', id, 'members', q] as const,
+  sg: (id: string) => ['sg', id] as const,
+  sgList: (id: string, q: string, status: string) =>
+    ['sg', id, 'list', q, status] as const,
 };
 
 export const useSession = () =>
@@ -89,6 +97,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: keys.studio(serverId) }),
       client.invalidateQueries({ queryKey: keys.rr(serverId) }),
       client.invalidateQueries({ queryKey: keys.ar(serverId) }),
+      client.invalidateQueries({ queryKey: keys.sg(serverId) }),
     ]);
 }
 
@@ -358,6 +367,39 @@ export function useRRActions(serverId: string) {
     remove: useMutation({
       mutationFn: (id: string) => api.deleteReactionRole(serverId, id),
       ...options,
+    }),
+  };
+}
+export const useSuggestions = (serverId: string) =>
+  useQuery({
+    queryKey: keys.sg(serverId),
+    queryFn: () => api.getSuggestions(serverId),
+  });
+/** Suggestions in Storage, filtered by what staff typed and picked. */
+export const useSuggestionList = (
+  serverId: string,
+  query: string,
+  status: string,
+) =>
+  useQuery({
+    queryKey: keys.sgList(serverId, query.trim(), status),
+    queryFn: () =>
+      api.listSuggestions(serverId, { query: query.trim(), status }),
+  });
+export function useSuggestionActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: Suggestions }) =>
+        api.saveSuggestions(serverId, change),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (number: number) => api.deleteSuggestion(serverId, number),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: (channel: string) => api.testSuggestion(serverId, channel),
     }),
   };
 }

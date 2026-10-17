@@ -238,6 +238,7 @@ describe('public site', () => {
       '/features/autoroles',
       '/features/role-menus',
       '/features/studio',
+      '/features/suggestions',
       '/features/tickets',
       '/features/welcome',
     ]);

@@ -654,6 +654,80 @@ describe('server API', () => {
     ).toBe(404);
   });
 
+  it('saves suggestions, checks them, lists them and deletes them', async () => {
+    type SG = {
+      on: boolean;
+      config: Record<string, unknown> & {
+        commands: Record<string, { name: string }>;
+      };
+      storage: { count: number; perKb: number };
+      limits: { statuses: number };
+    };
+    const state = await body<SG>(await call('/9001/suggestions'));
+    expect(state.on).toBe(false);
+    expect(state.limits.statuses).toBe(6);
+    expect(state.storage).toMatchObject({ count: 0, perKb: 4 });
+    // Without a channel it can't be saved.
+    const bad = await call('/9001/suggestions', {
+      method: 'PUT',
+      body: JSON.stringify({ on: true, config: state.config }),
+    });
+    expect((await body<{ message: string }>(bad)).message).toContain(
+      'channel suggestions are posted in',
+    );
+    const config = { ...state.config, channel: '501', approvers: ['301'] };
+    const ok = await call('/9001/suggestions', {
+      method: 'PUT',
+      body: JSON.stringify({ on: true, config }),
+    });
+    expect(ok.status).toBe(204);
+    let job = claimJob(db)!;
+    while (job.kind !== 'suggestions') {
+      finishJob(db, job.id, null, Date.now());
+      job = claimJob(db)!;
+    }
+    finishJob(db, job.id, null, Date.now());
+    expect((await body<SG>(await call('/9001/suggestions'))).on).toBe(true);
+
+    // A suggestion the bot posted shows in Storage, and can be deleted.
+    db.prepare(
+      `INSERT INTO suggestions (guild_id, number, author_id, author_name, title, body,
+         dup_key, channel_id, message_id, created_at, last_at)
+       VALUES ('9001', 1, '555', 'mia', 'Movie nights', 'Fridays', 'k', '501', '77', 0, 0)`,
+    ).run();
+    type List = { suggestions: { number: number; title: string }[] };
+    expect(
+      (await body<List>(await call('/9001/suggestions/list?q=movie')))
+        .suggestions,
+    ).toMatchObject([{ number: 1, title: 'Movie nights' }]);
+    expect(
+      (await call('/9001/suggestions/1', { method: 'DELETE' })).status,
+    ).toBe(204);
+    const del = claimJob(db)!;
+    expect(del.kind).toBe('suggestions-delete');
+    expect(del.payload).toMatchObject({ messageIds: ['77'] });
+    finishJob(db, del.id, null, Date.now());
+    expect(
+      (await body<List>(await call('/9001/suggestions/list'))).suggestions,
+    ).toEqual([]);
+    expect(
+      (await call('/9001/suggestions/1', { method: 'DELETE' })).status,
+    ).toBe(404);
+
+    // Test messages go to the bot.
+    expect(
+      (
+        await call('/9001/suggestions/test', {
+          method: 'POST',
+          body: JSON.stringify({ channel: '501' }),
+        })
+      ).status,
+    ).toBe(204);
+    const test = claimJob(db)!;
+    expect(test.kind).toBe('suggestions-test');
+    finishJob(db, test.id, null, Date.now());
+  });
+
   it('keeps templates in folders, in the order people put them', async () => {
     type Library = {
       templates: { id: string; name: string; folderId: string | null }[];

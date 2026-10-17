@@ -20,6 +20,8 @@ import {
 } from '../../ui';
 import type { SparkoModule } from '../../content/modules';
 import {
+  RR_SPARKO,
+  rrSparkoMessage,
   nameTaken,
   planIssue,
   rrIssue,
@@ -532,8 +534,27 @@ function RREditor({
 }) {
   const message = messageOf(rr.message);
   const responseId = rr.response[side];
-  const response = responseId ? messageOf(responseId) : undefined;
+  const sparko = responseId === RR_SPARKO;
+  const response = sparko
+    ? rrSparkoMessage(side)
+    : responseId
+      ? messageOf(responseId)
+      : undefined;
   const items = templateItems(studio);
+  // Sparko's own message comes first; it isn't one of the server's templates.
+  const responseItems = (which: 'claim' | 'remove'): ComboItem[] => [
+    {
+      value: RR_SPARKO,
+      label: 'Sparko’s template',
+      icon: 'sparkles',
+      group: 'Options',
+      note:
+        which === 'claim'
+          ? 'Added {role.selected.list}'
+          : 'Removed {role.removed.list}',
+    },
+    ...items,
+  ];
   const channel = channels.find((c) => c.id === rr.channel);
   const mode = modes.find((m) => m.value === rr.mode)!;
 
@@ -719,7 +740,30 @@ function RREditor({
               { value: 'remove', label: 'Remove message' },
             ]}
           />
-          {response && responseId ? (
+          {response && sparko ? (
+            // Sparko's own message shows as it's sent, but can't be edited.
+            <div className="sp-rr-sparko" inert>
+              <MessageCanvas
+                key={`${RR_SPARKO}-${side}`}
+                server={server}
+                message={response}
+                tried={false}
+                headingId="rr-response-preview"
+                roleVariables
+                above={
+                  <p className="sp-edit-banner" role="status">
+                    <Icon name="sparkles" size="sm" />
+                    <span>
+                      This is <b>Sparko’s template</b>. It doesn’t use one of
+                      your templates, so it can’t be edited here. Pick one of
+                      yours to change it.
+                    </span>
+                  </p>
+                }
+                onChange={() => {}}
+              />
+            </div>
+          ) : response && responseId ? (
             <MessageCanvas
               key={responseId}
               server={server}
@@ -779,20 +823,22 @@ function RREditor({
               searchPlaceholder="Search templates"
               placeholder="Pick a template"
               value={rr.response.claim}
-              onChange={(claim) =>
-                onChange({ response: { ...rr.response, claim } })
-              }
-              items={items}
+              onChange={(claim) => {
+                onChange({ response: { ...rr.response, claim } });
+                onSide('claim');
+              }}
+              items={responseItems('claim')}
             />
             <Combobox
               label="Remove message"
               searchPlaceholder="Search templates"
               placeholder="Pick a template"
               value={rr.response.remove}
-              onChange={(remove) =>
-                onChange({ response: { ...rr.response, remove } })
-              }
-              items={items}
+              onChange={(remove) => {
+                onChange({ response: { ...rr.response, remove } });
+                onSide('remove');
+              }}
+              items={responseItems('remove')}
             />
             <Combobox
               label="Send to"

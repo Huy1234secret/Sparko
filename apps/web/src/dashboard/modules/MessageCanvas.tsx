@@ -9,7 +9,7 @@ import {
 import { ContainerCanvas, MAX_GALLERY, newImage } from './ContainerCanvas';
 import { EmbedCanvas, MAX_EMBEDS, newEmbed } from './EmbedCanvas';
 import { newButton, newMenu, roomFor } from './ComponentsEditor';
-import { useInsertTarget } from './EditorBits';
+import { LockedCanvas, useInsertTarget } from './EditorBits';
 import { EmojiButton } from './EmojiPicker';
 import { PlusMenu, type PlusItem } from './PlusMenu';
 import { VariablesButton } from './VariablesButton';
@@ -41,6 +41,7 @@ function PreviewTools({
   v2,
   memberVariables,
   roleVariables,
+  suggestionVariables,
 }: {
   serverId: string;
   items: PlusItem[];
@@ -48,6 +49,7 @@ function PreviewTools({
   v2: boolean;
   memberVariables: boolean;
   roleVariables: boolean;
+  suggestionVariables: boolean;
 }) {
   const target = useInsertTarget();
   // Goes where the person was last writing, or at the end of the text.
@@ -62,10 +64,11 @@ function PreviewTools({
         v2={v2}
         member={memberVariables}
         role={roleVariables}
+        suggestion={suggestionVariables}
         onPick={put}
       />
       <EmojiButton serverId={serverId} onPick={put} />
-      <PlusMenu items={items} />
+      {items.length > 0 && <PlusMenu items={items} />}
     </div>
   );
 }
@@ -85,6 +88,8 @@ export function MessageCanvas({
   below,
   memberVariables,
   roleVariables,
+  suggestionVariables,
+  locked,
   check = (m) => m,
 }: {
   server: Server;
@@ -101,6 +106,13 @@ export function MessageCanvas({
   memberVariables?: boolean;
   /** Lists the variables reaction role responses fill in. */
   roleVariables?: boolean;
+  /** Lists the variables suggestion messages fill in. */
+  suggestionVariables?: boolean;
+  /**
+   * Keeps the message's shape: one embed or container, no pictures of its
+   * own, and no buttons or menus to add. Text can still go outside it.
+   */
+  locked?: boolean;
   /** Adjusts the message before it's checked. */
   check?: (m: StudioMessage) => StudioMessage;
 }) {
@@ -124,74 +136,80 @@ export function MessageCanvas({
     onChange({ components: [...message.components, menu] });
   };
   const rows = 'Discord shows up to 5 rows of buttons and menus.';
-  const items: PlusItem[] = v2
-    ? [
-        {
-          label: 'Add image',
-          disabled: message.v2.gallery.length >= MAX_GALLERY,
-          note: 'A gallery holds up to 10 images.',
-          onSelect: () => {
-            const image = newImage();
-            onChange({
-              v2: { ...message.v2, gallery: [...message.v2.gallery, image] },
-            });
-            setFocus({ id: image.id });
+  const separator: PlusItem = {
+    label: 'Add separator',
+    onSelect: () =>
+      onChange({
+        v2: {
+          ...message.v2,
+          text: `${message.v2.text}\n{separator}\n`.slice(0, 4000),
+        },
+      }),
+  };
+  const items: PlusItem[] = locked
+    ? v2
+      ? [separator]
+      : []
+    : v2
+      ? [
+          {
+            label: 'Add image',
+            disabled: message.v2.gallery.length >= MAX_GALLERY,
+            note: 'A gallery holds up to 10 images.',
+            onSelect: () => {
+              const image = newImage();
+              onChange({
+                v2: { ...message.v2, gallery: [...message.v2.gallery, image] },
+              });
+              setFocus({ id: image.id });
+            },
           },
-        },
-        {
-          label: 'Add button',
-          disabled: !roomFor(message.components, 'button'),
-          note: rows,
-          onSelect: addButton,
-        },
-        {
-          label: 'Add menu',
-          disabled: !roomFor(message.components, 'menu'),
-          note: rows,
-          onSelect: addMenu,
-        },
-        {
-          label: 'Add separator',
-          onSelect: () =>
-            onChange({
-              v2: {
-                ...message.v2,
-                text: `${message.v2.text}\n{separator}\n`.slice(0, 4000),
-              },
-            }),
-        },
-      ]
-    : [
-        {
-          label: 'Add embed',
-          disabled: message.embeds.length >= MAX_EMBEDS,
-          note: 'A message holds up to 10 embeds.',
-          onSelect: () => onChange({ embeds: [...message.embeds, newEmbed()] }),
-        },
-        {
-          label: 'Add button',
-          disabled: !roomFor(message.components, 'button'),
-          note: rows,
-          onSelect: addButton,
-        },
-        {
-          label: 'Add menu',
-          disabled: !roomFor(message.components, 'menu'),
-          note: rows,
-          onSelect: addMenu,
-        },
-        {
-          label: 'Add image',
-          disabled: message.embeds.length >= MAX_EMBEDS,
-          note: 'A message holds up to 10 embeds.',
-          // An image on its own is an embed with only a picture in it.
-          onSelect: () => {
-            const embed = newEmbed();
-            onChange({ embeds: [...message.embeds, embed] });
-            setFocus({ id: embed.id, pop: 'image' });
+          {
+            label: 'Add button',
+            disabled: !roomFor(message.components, 'button'),
+            note: rows,
+            onSelect: addButton,
           },
-        },
-      ];
+          {
+            label: 'Add menu',
+            disabled: !roomFor(message.components, 'menu'),
+            note: rows,
+            onSelect: addMenu,
+          },
+          separator,
+        ]
+      : [
+          {
+            label: 'Add embed',
+            disabled: message.embeds.length >= MAX_EMBEDS,
+            note: 'A message holds up to 10 embeds.',
+            onSelect: () =>
+              onChange({ embeds: [...message.embeds, newEmbed()] }),
+          },
+          {
+            label: 'Add button',
+            disabled: !roomFor(message.components, 'button'),
+            note: rows,
+            onSelect: addButton,
+          },
+          {
+            label: 'Add menu',
+            disabled: !roomFor(message.components, 'menu'),
+            note: rows,
+            onSelect: addMenu,
+          },
+          {
+            label: 'Add image',
+            disabled: message.embeds.length >= MAX_EMBEDS,
+            note: 'A message holds up to 10 embeds.',
+            // An image on its own is an embed with only a picture in it.
+            onSelect: () => {
+              const embed = newEmbed();
+              onChange({ embeds: [...message.embeds, embed] });
+              setFocus({ id: embed.id, pop: 'image' });
+            },
+          },
+        ];
 
   return (
     <section className="sp-studio__canvas" aria-labelledby={headingId}>
@@ -200,7 +218,12 @@ export function MessageCanvas({
         className="sp-studio__type"
         value={message.layout}
         onChange={(layout) => {
-          onChange({ layout });
+          // A locked message always has its one embed.
+          onChange(
+            locked && layout === 'embed' && !message.embeds.length
+              ? { layout, embeds: [newEmbed()] }
+              : { layout },
+          );
         }}
         options={[
           { value: 'embed', label: 'Embed message' },
@@ -216,6 +239,7 @@ export function MessageCanvas({
           serverId={server.id}
           memberVariables={!!memberVariables}
           roleVariables={!!roleVariables}
+          suggestionVariables={!!suggestionVariables}
           items={items}
           v2={v2}
           onEmoji={(text) =>
@@ -234,21 +258,23 @@ export function MessageCanvas({
       </div>
       <fieldset className="sp-fieldset" disabled={paused} data-issue="message">
         <legend className="sp-sr-only">Message</legend>
-        {v2 ? (
-          <ContainerCanvas
-            message={message}
-            serverId={server.id}
-            onChange={onChange}
-            focusId={focus?.id ?? null}
-          />
-        ) : (
-          <EmbedCanvas
-            message={message}
-            serverId={server.id}
-            onChange={onChange}
-            focus={focus}
-          />
-        )}
+        <LockedCanvas value={!!locked}>
+          {v2 ? (
+            <ContainerCanvas
+              message={message}
+              serverId={server.id}
+              onChange={onChange}
+              focusId={focus?.id ?? null}
+            />
+          ) : (
+            <EmbedCanvas
+              message={message}
+              serverId={server.id}
+              onChange={onChange}
+              focus={focus}
+            />
+          )}
+        </LockedCanvas>
         {below}
       </fieldset>
       {tried && problem && (

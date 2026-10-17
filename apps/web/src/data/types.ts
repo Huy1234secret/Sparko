@@ -3,6 +3,9 @@ import type {
   AutoRoles,
   GreetKind,
   ReactionRole,
+  SgLogEntry,
+  SgSuggestion,
+  Suggestions,
   WelcomeConfig,
 } from './studio-format';
 
@@ -408,7 +411,10 @@ export type StudioTemplate = {
   meta: string;
   message: StudioMessage;
   /** Where else it's used, for the tags on its card. */
-  usedIn?: { kind: 'welcome' | 'reaction-role'; where: string }[];
+  usedIn?: {
+    kind: 'welcome' | 'reaction-role' | 'suggestion';
+    where: string;
+  }[];
 };
 export type StudioFolder = {
   id: string;
@@ -494,4 +500,37 @@ export interface PanelApi {
   /** Uploads a picture (up to 5 MB) and returns a link Discord can load. */
   uploadImage(serverId: string, file: File): Promise<string>;
   listServerEmojis(serverId: string): Promise<ServerEmoji[]>;
+}
+
+export type SGStorage = {
+  count: number;
+  limit: number;
+  /** Each suggestion uses this much of the server's storage. */
+  perKb: number;
+  usedKb: number;
+  limitMb: number;
+};
+export type SGState = {
+  on: boolean;
+  config: Suggestions;
+  limits: { statuses: number; actions: number; storageMb: number };
+  storage: SGStorage;
+  channels: Channel[];
+  roles: RoleOption[];
+  log: SgLogEntry[];
+};
+
+export interface PanelApi {
+  getSuggestions(serverId: string): Promise<SGState>;
+  saveSuggestions(
+    serverId: string,
+    change: { on: boolean; config: Suggestions },
+  ): Promise<void>;
+  listSuggestions(
+    serverId: string,
+    filter: { query: string; status: string },
+  ): Promise<{ suggestions: SgSuggestion[]; storage: SGStorage }>;
+  deleteSuggestion(serverId: string, number: number): Promise<void>;
+  /** Posts a made-up suggestion in a channel, to see the message. */
+  testSuggestion(serverId: string, channel: string): Promise<void>;
 }

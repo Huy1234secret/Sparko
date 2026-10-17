@@ -42,7 +42,7 @@ const rule = (patch: Partial<ARRule> = {}): ARRule => ({
   conditions: [
     { id: 'c1', kind: 'age', min: '30d' },
     { id: 'c2', kind: 'badge', badges: ['early'] },
-    { id: 'c3', kind: 'booster', boosts: 2, for: '1d' },
+    { id: 'c3', kind: 'booster', for: '1d' },
   ],
   links: ['and', 'or'],
   role: '31',
@@ -146,14 +146,10 @@ describe('automatic roles: settings', () => {
     const r = rule();
     // age AND badge OR booster: old account without the badge fails …
     expect(ruleMet(r, old, now)).toBe(false);
-    // … with the badge passes, and so does boosting twice for a day.
+    // … with the badge passes, and so does boosting for over a day.
     expect(ruleMet(r, { ...old, flags: 1 << 9 }, now)).toBe(true);
-    expect(
-      ruleMet(r, { ...old, boosts: 2, boostingSince: now - 2 * D }, now),
-    ).toBe(true);
-    expect(
-      ruleMet(r, { ...old, boosts: 1, boostingSince: now - 2 * D }, now),
-    ).toBe(false);
+    expect(ruleMet(r, { ...old, boostingSince: now - 2 * D }, now)).toBe(true);
+    expect(ruleMet(r, { ...old, boostingSince: now - D / 2 }, now)).toBe(false);
   });
 
   it('stacks timed roles, or keeps only the latest', () => {

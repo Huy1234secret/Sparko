@@ -204,6 +204,50 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     pairs: ['role-menus', 'welcome'],
   },
+  suggestions: {
+    headline: 'Ideas from members, decided in the open.',
+    points: [
+      'Vote with reactions, buttons or a menu',
+      'Approved, Denied and your own statuses, each with a reason',
+      'Optional staff review before anything is posted',
+    ],
+    how: [
+      {
+        icon: 'message-square',
+        title: 'Members suggest',
+        body: '/suggest opens a short form for a title and the idea, with up to 3 files. Choose who can suggest, a minimum account age, a cooldown, a pending limit and lengths up to 12,000 characters. Duplicates are turned away.',
+      },
+      {
+        icon: 'trending-up',
+        title: 'Everyone votes',
+        body: 'Two fixed votes as reactions, buttons or a menu, with the ratio in the message. Allow or block changing votes and voting on your own idea, and open a discussion thread on each one.',
+      },
+      {
+        icon: 'flag',
+        title: 'Staff decide',
+        body: 'Set a status with a command; Sparko asks for a reason and shows it under the suggestion with who set it. Statuses can close voting, DM the author or blacklist them. Approve, deny or close on their own after a number of votes or a time.',
+      },
+      {
+        icon: 'layers',
+        title: 'Storage, logs and commands',
+        body: 'Every suggestion with its author, status, votes and reason, coloured by how it’s doing. Logs of everything that happened, and the commands renamed to suit your server.',
+      },
+    ],
+    steps: [
+      'Open Suggestions, switch it on and pick the suggestions channel.',
+      'Choose who can suggest, approve and delete, and how members vote.',
+      'In Edit, start from a default message or make your own.',
+      'Save. Sparko adds the commands to your server.',
+    ],
+    commands: [
+      '/suggest',
+      '/suggestion-status',
+      '/suggestion-approve',
+      '/suggestion-deny',
+      '/suggestion-delete',
+    ],
+    pairs: ['studio', 'role-menus'],
+  },
 };
 
 export const isReady = (id: string) => id in featureDetails;

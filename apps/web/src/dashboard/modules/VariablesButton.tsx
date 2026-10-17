@@ -23,6 +23,7 @@ export function VariablesButton({
   v2,
   member,
   role,
+  suggestion,
   onPick,
 }: {
   /** Components V2 messages also have {separator}. */
@@ -31,6 +32,8 @@ export function VariablesButton({
   member?: boolean;
   /** Reaction role responses fill in the role. */
   role?: boolean;
+  /** Suggestion messages fill in the suggestion. */
+  suggestion?: boolean;
   onPick: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -49,7 +52,10 @@ export function VariablesButton({
   usePlacement(presence.mounted, wrap, pop, menuPlacement);
   const list = [
     ...studioVariables.filter(
-      (v) => (member || !v.member) && (role || !v.role),
+      (v) =>
+        (member || !v.member) &&
+        (role || !v.role) &&
+        (suggestion || !v.suggestion),
     ),
     ...(v2
       ? [

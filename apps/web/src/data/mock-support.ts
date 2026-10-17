@@ -36,6 +36,8 @@ type Helpers = {
   you: () => Session['user'];
   /** Templates Welcome messages send, and in which message. */
   welcomeUses?: (serverId: string) => { id: string; where: string }[];
+  /** Templates Suggestions use, and for what. */
+  suggestionUses?: (serverId: string) => { id: string; where: string }[];
 };
 
 type SupportApi = Pick<
@@ -780,7 +782,7 @@ export function createSupportMock(h: Helpers) {
       const uses = new Map<string, NonNullable<StudioTemplate['usedIn']>>();
       const add = (
         id: string,
-        kind: 'welcome' | 'reaction-role',
+        kind: 'welcome' | 'reaction-role' | 'suggestion',
         where: string,
       ) => {
         if (!id) return;
@@ -790,6 +792,8 @@ export function createSupportMock(h: Helpers) {
       };
       for (const u of h.welcomeUses?.(serverId) ?? [])
         add(u.id, 'welcome', u.where);
+      for (const u of h.suggestionUses?.(serverId) ?? [])
+        add(u.id, 'suggestion', u.where);
       for (const r of s.rr.templates)
         for (const t of [
           r.config.message,
@@ -1076,6 +1080,9 @@ export function createSupportMock(h: Helpers) {
     reset: () => state.clear(),
     /** The server's roles, shared with other sample modules. */
     rolesOf: (serverId: string) => of(serverId).studio.roles,
+    /** The server's Studio templates, for checking what other modules pick. */
+    templateIds: (serverId: string) =>
+      new Set(of(serverId).studio.templates.map((t) => t.id)),
     /** The channel a module posts in, for the apply check. */
     postingChannel: (serverId: string, moduleId: string) => {
       if (moduleId === 'tickets') {

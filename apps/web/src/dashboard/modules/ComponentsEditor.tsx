@@ -144,7 +144,7 @@ export function TrashButton({
   );
 }
 
-function DragHandle({
+export function DragHandle({
   label,
   onPointerDown,
   onKeyDown,
@@ -416,7 +416,7 @@ const colours: { value: ButtonColour; label: string }[] = [
   { value: 'grey', label: 'Grey' },
 ];
 
-function Panel({
+export function Panel({
   title,
   description,
   onClose,

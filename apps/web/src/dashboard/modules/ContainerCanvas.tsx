@@ -25,6 +25,7 @@ import {
   slideFrom,
   useReorder,
   previewPicture,
+  useCanvasLocked,
 } from './EditorBits';
 import { newId } from './parts';
 import addImage from '../../../../../design-system/assets/icons/add-image-button.png';
@@ -491,6 +492,7 @@ export function ContainerCanvas({
 }) {
   const v = message.v2;
   const [pop, setPop] = useState<'colour' | 'thumbnail' | null>(null);
+  const locked = useCanvasLocked();
   const edit = (patch: Partial<StudioV2>) =>
     onChange({ v2: { ...v, ...patch } });
   const components = message.components;
@@ -690,20 +692,22 @@ export function ContainerCanvas({
             style={{ '--dc-color': v.accent } as CSSProperties}
           >
             <div className="sp-embed-gutter sp-v2-gutter">
-              <button
-                type="button"
-                className="sp-embed-tool sp-v2-add"
-                aria-label="Add an image to the gallery"
-                disabled={v.gallery.length >= MAX_GALLERY}
-                title={
-                  v.gallery.length >= MAX_GALLERY
-                    ? 'A gallery holds up to 10 images'
-                    : undefined
-                }
-                onClick={addPicture}
-              >
-                <MaskIcon src={addImage} size={18} />
-              </button>
+              {!locked && (
+                <button
+                  type="button"
+                  className="sp-embed-tool sp-v2-add"
+                  aria-label="Add an image to the gallery"
+                  disabled={v.gallery.length >= MAX_GALLERY}
+                  title={
+                    v.gallery.length >= MAX_GALLERY
+                      ? 'A gallery holds up to 10 images'
+                      : undefined
+                  }
+                  onClick={addPicture}
+                >
+                  <MaskIcon src={addImage} size={18} />
+                </button>
+              )}
               <button
                 type="button"
                 className="sp-embed-wheel"

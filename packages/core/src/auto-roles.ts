@@ -21,7 +21,8 @@ export type ARTimed = {
 export type ARCondition =
   | { id: string; kind: 'age'; min: Duration }
   | { id: string; kind: 'badge'; badges: string[] }
-  | { id: string; kind: 'booster'; boosts: number; for: Duration };
+  /** `boosts` is from settings saved before only the time counted. */
+  | { id: string; kind: 'booster'; for: Duration; boosts?: number };
 export type ARConditionKind = ARCondition['kind'];
 export type ARLink = 'and' | 'or';
 
@@ -74,9 +75,12 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const units: Record<string, number> = {
   m: MINUTE,
+  // "mi" is a minute and "mt" a month (30 days), for when "m" could be either.
+  mi: MINUTE,
   h: HOUR,
   d: DAY,
   w: 7 * DAY,
+  mt: 30 * DAY,
   y: 365 * DAY,
 };
 
@@ -86,7 +90,7 @@ export function parseDuration(text: string): number | null {
   if (!s) return null;
   let total = 0;
   let rest = s;
-  const part = /^(\d{1,5})\s*([mhdwy])\s*/;
+  const part = /^(\d{1,5})\s*(mi|mt|[mhdwy])\s*/;
   while (rest) {
     const m = part.exec(rest);
     if (!m) return null;
@@ -278,11 +282,6 @@ export function arIssue(
         )
           return { at: spot, problem: `Pick at least one badge in ${what}.` };
       } else if (c.kind === 'booster') {
-        if (!Number.isInteger(c.boosts) || c.boosts < 1 || c.boosts > 100)
-          return {
-            at: spot,
-            problem: `The boosts in ${what} have to be between 1 and 100.`,
-          };
         const ms = typeof c.for === 'string' ? parseDuration(c.for) : null;
         if (ms === null || ms < arRanges.boost.min || ms > arRanges.boost.max)
           return {
@@ -309,7 +308,7 @@ export function cleanAR(c: AutoRoles): AutoRoles {
       ? { id: k.id, kind: 'age', min: k.min.trim() }
       : k.kind === 'badge'
         ? { id: k.id, kind: 'badge', badges: [...new Set(k.badges)] }
-        : { id: k.id, kind: 'booster', boosts: k.boosts, for: k.for.trim() };
+        : { id: k.id, kind: 'booster', for: k.for.trim() };
   return {
     join: {
       before: [...new Set(c.join.before)],
@@ -358,7 +357,6 @@ export function conditionMet(c: ARCondition, f: ARFacts, now: number) {
     return arBadges.some((b) => c.badges.includes(b.id) && f.flags & b.flag);
   return (
     f.boostingSince !== null &&
-    Math.max(f.boosts, 1) >= c.boosts &&
     now - f.boostingSince >= (parseDuration(c.for) ?? 0)
   );
 }

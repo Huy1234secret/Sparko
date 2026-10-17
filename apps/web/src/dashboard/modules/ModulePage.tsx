@@ -27,6 +27,7 @@ import {
 import { AutoRolesModule } from './AutoRolesModule';
 import { ReactionRolesModule } from './ReactionRolesModule';
 import { StudioModule } from './StudioModule';
+import { SuggestionsModule } from './SuggestionsModule';
 import { TicketsModule } from './TicketsModule';
 import { WelcomeModule } from './WelcomeModule';
 
@@ -264,5 +265,7 @@ export function ModulePage() {
     return <TicketsModule module={module} server={server} />;
   if (module.id === 'autoroles')
     return <AutoRolesModule module={module} server={server} />;
+  if (module.id === 'suggestions')
+    return <SuggestionsModule module={module} server={server} />;
   return <GenericModule module={module} server={server} />;
 }
