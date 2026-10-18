@@ -2047,6 +2047,19 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-action__mode {
   justify-self: start;
 }
+.sp-action__off {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--sp-line-strong);
+  border-radius: 999px;
+  color: var(--sp-muted);
+  font: 600 10px/14px var(--sp-font-sans);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
 .sp-action__trash {
   opacity: 0.8;
 }
@@ -2422,6 +2435,11 @@ body:has(> .sp-settings-scrim) > #root {
   background: none;
   color: var(--sp-text);
   font: 400 13px/18px var(--sp-font-sans);
+}
+/* The box around it shows the focus, so the input doesn't add a second ring. */
+.sp-vars-pop__search input:focus,
+.sp-vars-pop__search input:focus-visible {
+  box-shadow: none;
 }
 
 /* Dropdowns: picked values as outlined chips, an animated search box, and

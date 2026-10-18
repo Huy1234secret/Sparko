@@ -585,10 +585,20 @@ describe('Suggestions', () => {
       within(dialog).getByRole('button', { name: /Suggestion card/ }),
     );
     expect(await screen.findByText('Live preview')).toBeInTheDocument();
-    // No pictures, extra embeds, buttons or menus to add.
+    // Buttons and menus can be added, but no pictures or extra embeds.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add to the message' }),
+    );
     expect(
-      screen.queryByRole('button', { name: 'Add to the message' }),
+      screen.getByRole('menuitem', { name: 'Add button' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Add menu' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Add embed' }),
     ).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
     expect(
       screen.queryByRole('button', { name: 'Add an image' }),
     ).not.toBeInTheDocument();
@@ -609,6 +619,29 @@ describe('Suggestions', () => {
     expect(
       screen.getByRole('button', { name: 'Edit the upvote button' }),
     ).toHaveTextContent('Yes please');
+    // Its own buttons can vote, approve or deny.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add to the message' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add button' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Edit button Button/ }),
+    );
+    const panel = screen.getByRole('dialog', { name: 'Button settings' });
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Add an action' }),
+    );
+    await userEvent.click(
+      within(panel).getByRole('menuitem', { name: 'Approve' }),
+    );
+    expect(within(panel).getByRole('radio', { name: 'Approve' })).toBeChecked();
+    // It answers the click itself, so nothing else can join it.
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Add an action' }),
+    );
+    expect(
+      within(panel).getByRole('menuitem', { name: 'Send message' }),
+    ).toBeDisabled();
   }, 20_000);
 
   it('lists suggestions in Storage with their reasons, and deletes them', async () => {
@@ -1042,6 +1075,10 @@ describe('Message Studio', () => {
     await userEvent.click(
       within(panel).getByRole('button', { name: 'Add an action' }),
     );
+    // Suggestion actions only work on the suggestion message.
+    expect(
+      within(panel).getByRole('menuitem', { name: 'Upvote' }),
+    ).toBeDisabled();
     await userEvent.click(
       within(panel).getByRole('menuitem', { name: 'Send message' }),
     );

@@ -7,6 +7,7 @@
  */
 import { parseDuration } from './auto-roles.ts';
 import {
+  componentRows,
   embedDefault,
   emojiPayload,
   IS_COMPONENTS_V2,
@@ -578,15 +579,15 @@ export function sgUpgrade(saved: Partial<Suggestions> | null | undefined) {
 }
 
 /**
- * Problems with a suggestion message template: one embed or container, no
- * pictures, and no buttons or menus (the vote buttons are added).
+ * Problems with a suggestion message template: one embed or container and
+ * no pictures. Its own buttons and menus sit above the vote buttons.
  */
 export function sgMessageIssue(m: StudioMessage): SgIssue | null {
-  if (m.components.length)
+  if (m.layout !== 'v2' && componentRows(m.components).length > 4)
     return {
       at: 'message',
       problem:
-        'Suggestion messages can’t have their own buttons or menus. The vote buttons are added for you.',
+        'The vote buttons take one of Discord’s five rows, so a suggestion message has up to 4 rows of its own.',
     };
   if (m.layout === 'v2') {
     if (m.v2.gallery.length)

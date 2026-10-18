@@ -349,7 +349,12 @@ export type StudioAction =
       dm: boolean;
       ephemeral: boolean;
     }
-  | { id: string; type: 'role'; mode: 'give' | 'take'; roles: string[] };
+  | { id: string; type: 'role'; mode: 'give' | 'take'; roles: string[] }
+  | {
+      id: string;
+      type: 'suggestion';
+      act: 'upvote' | 'downvote' | 'approve' | 'deny';
+    };
 export type ButtonColour = 'blurple' | 'grey' | 'green' | 'red';
 export type StudioButton = {
   id: string;

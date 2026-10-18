@@ -353,6 +353,7 @@ export function SuggestionsModule({
                 folders: studio.data.folders,
                 roles: studio.data.roles,
                 sendLimit: studio.data.sendLimit,
+                suggestion: true,
               }}
             >
               {tab === 'settings' && (
@@ -684,7 +685,8 @@ function SGEdit({
                   Editing <b>{message.name}</b> from Message Studio. It holds
                   one embed or container without pictures; members’ files show
                   with <code>{'{files}'}</code>. Click a vote button to change
-                  it.
+                  it, or add your own buttons and menus that vote, approve or
+                  deny.
                 </span>
               </p>
             }

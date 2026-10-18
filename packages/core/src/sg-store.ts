@@ -5,6 +5,7 @@ import { normaliseStudio, type StudioMessage } from './studio-format.ts';
 import { getTemplate } from './templates.ts';
 import { Plain } from './ticket-actions.ts';
 import { reactionPath } from './reaction-roles.ts';
+import { rememberPost } from './studio-actions.ts';
 import {
   SG_MODULE,
   sgCanSuggest,
@@ -269,10 +270,9 @@ function reviewBody(main: Record<string, unknown>, s: Stored, done?: string) {
       },
     ],
   };
-  // The vote buttons don't belong on the review copy.
+  // The vote buttons and the template's own don't belong on the review copy.
   const components = ((main.components ?? []) as { type: number }[]).filter(
-    (x) =>
-      x.type !== 1 || !JSON.stringify(x).includes('"custom_id":"sg:') || false,
+    (x) => x.type !== 1 || !/"custom_id":"s[gp]:/.test(JSON.stringify(x)),
   );
   return v2
     ? {
@@ -309,6 +309,9 @@ export async function sgPost(
 ): Promise<Stored> {
   const { config: c } = sgConfigOf(db, s.guildId);
   const { main, more } = bodies(db, s, c, now);
+  // So the template's own buttons and menus work on the posted message.
+  const remember = (messageId: string) =>
+    rememberPost(db, s.guildId, messageId, sgMessage(db, s.guildId, c), now);
   let next = { ...s };
   try {
     if (next.messageId && next.channelId) {
@@ -317,6 +320,7 @@ export async function sgPost(
           `/channels/${next.channelId}/messages/${next.messageId}`,
           main,
         );
+        remember(next.messageId);
         for (const [i, id] of next.moreIds.entries())
           if (more[i])
             await rest
@@ -340,6 +344,7 @@ export async function sgPost(
           .id,
       );
     next = { ...next, channelId: channel, messageId: sent.id, moreIds };
+    remember(sent.id);
     await addReactions(rest, next, c);
     if (c.threads && !next.threadId) {
       const thread = await rest

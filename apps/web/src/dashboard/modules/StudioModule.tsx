@@ -424,6 +424,9 @@ export function StudioModule({
                   folders: studio.data.folders,
                   roles: studio.data.roles,
                   sendLimit: studio.data.sendLimit,
+                  suggestion: !!template.usedIn?.some(
+                    (u) => u.kind === 'suggestion',
+                  ),
                 }}
               >
                 <p className="sp-edit-banner" role="status">

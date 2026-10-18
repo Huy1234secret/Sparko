@@ -312,7 +312,7 @@ describe('Message Studio messages', () => {
     expect(studioProblem(m)).toBeNull();
   });
 
-  it('fills in variables, and leaves ones it can’t fill', () => {
+  it('fills in variables, empties ones that don’t apply, and leaves unknown ones', () => {
     expect(
       fillVariables('{user.name} of {server} ({server.members}) {unknown}', {
         now: 86_400_000,
@@ -321,7 +321,7 @@ describe('Message Studio messages', () => {
       }),
     ).toBe('Quinn of Pixel Plaza (8,214) {unknown}');
     expect(fillVariables('{user} on {date}', { now: 86_400_000 })).toBe(
-      '{user} on <t:86400:D>',
+      ' on <t:86400:D>',
     );
   });
 
@@ -717,6 +717,52 @@ describe('using buttons and menus in Discord', () => {
       path: '/webhooks/app/tok',
       body: { flags: 64, content: expect.stringMatching(/Manage Roles/) },
     });
+  });
+
+  it('skips suggestion actions on messages that aren’t suggestions', async () => {
+    const { db, rest, calls, i } = setup();
+    rememberPost(
+      db,
+      'g',
+      'plain',
+      {
+        ...base,
+        components: [
+          button('up', {
+            actions: [{ id: 'v', type: 'suggestion', act: 'upvote' }],
+          }),
+        ],
+      },
+      1,
+    );
+    await handleStudioInteraction(
+      rest,
+      db,
+      { ...i, messageId: 'plain', customId: 'sp:b:up' },
+      1,
+    );
+    expect(calls).toEqual([expect.objectContaining({ body: { type: 6 } })]);
+  });
+
+  it('keeps a suggestion action on its own', () => {
+    const vote = { id: 'v', type: 'suggestion', act: 'approve' } as const;
+    const role: StudioButton['actions'][number] = {
+      id: 'r',
+      type: 'role',
+      mode: 'give',
+      roles: ['900'],
+    };
+    const withActions = (actions: StudioButton['actions']) => ({
+      ...base,
+      components: [button('b', { actions })],
+    });
+    expect(studioProblem(withActions([vote]))).toBeNull();
+    expect(studioProblem(withActions([vote, role]))).toMatch(/only action/);
+    expect(
+      studioProblem(
+        withActions([{ ...vote, act: 'boo' } as unknown as typeof vote]),
+      ),
+    ).toMatch(/damaged/);
   });
 
   it('says so when the message isn’t one it knows', async () => {

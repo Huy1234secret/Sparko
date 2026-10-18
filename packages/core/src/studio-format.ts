@@ -42,7 +42,20 @@ export type StudioAction =
       /** Sends a reply only the person who clicked can see. */
       ephemeral: boolean;
     }
-  | { id: string; type: 'role'; mode: 'give' | 'take'; roles: string[] };
+  | { id: string; type: 'role'; mode: 'give' | 'take'; roles: string[] }
+  /**
+   * Only on suggestion messages: votes on the suggestion, or (for staff who
+   * can approve) approves or denies it. Anywhere else it does nothing.
+   */
+  | { id: string; type: 'suggestion'; act: SuggestionAct };
+
+export const SUGGESTION_ACTS = [
+  'upvote',
+  'downvote',
+  'approve',
+  'deny',
+] as const;
+export type SuggestionAct = (typeof SUGGESTION_ACTS)[number];
 
 export type ButtonColour = 'blurple' | 'grey' | 'green' | 'red';
 export type StudioButton = {
@@ -616,6 +629,15 @@ function actionsProblem(list: unknown, at: string): StudioIssue | null {
       )
         return issue(
           'Pick the roles a “Give or take role” action changes.',
+          here,
+        );
+    } else if (a.type === 'suggestion') {
+      if (!SUGGESTION_ACTS.includes(a.act))
+        return issue('An action is damaged. Remove it and add it again.', here);
+      // It answers the click itself, so nothing else can run alongside.
+      if (list.length > 1)
+        return issue(
+          'A suggestion action has to be the only action on its button or option.',
           here,
         );
     } else

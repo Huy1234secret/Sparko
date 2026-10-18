@@ -3,6 +3,8 @@ import {
   sgDefault,
   SG_MODULE,
   getSuggestion,
+  rememberPost,
+  sgDefaultMessage,
   upsertGuild,
   writeModule,
   type Rest,
@@ -99,5 +101,98 @@ describe('votes by reaction', () => {
     await bot.reaction({ ...at, emoji: '👍' }, '5', true);
     expect(getSuggestion(db, 'g', 1)).toMatchObject({ up: 0 });
     expect(deletes.at(-1)).toContain('/5');
+  });
+});
+
+describe('suggestion actions on the template’s own buttons', () => {
+  const setup = () => {
+    const db = openDb(':memory:');
+    upsertGuild(
+      db,
+      { id: 'g', name: 'G', icon: null, memberCount: 1, installed: true },
+      0,
+    );
+    writeModule(db, 'g', SG_MODULE, { on: true, config: sgDefault('100') }, 0);
+    db.prepare(
+      `INSERT INTO suggestions (guild_id, number, author_id, author_name, title, body,
+         dup_key, channel_id, message_id, created_at, last_at)
+       VALUES ('g', 1, '5', 'ayo', 'T', 'B', 'k', '100', 'm1', 0, 0)`,
+    ).run();
+    const button = (id: string, act: 'upvote' | 'approve') => ({
+      id,
+      type: 'button' as const,
+      label: id,
+      emoji: '',
+      colour: 'grey' as const,
+      link: false,
+      url: '',
+      actions: [{ id: `${id}-a`, type: 'suggestion' as const, act }],
+    });
+    rememberPost(
+      db,
+      'g',
+      'm1',
+      {
+        ...sgDefaultMessage(),
+        components: [
+          button('up', 'upvote'),
+          button('ok', 'approve'),
+          { ...button('plain', 'upvote'), actions: [] },
+        ],
+      },
+      0,
+    );
+    const rest = {
+      patch: vi.fn(async () => ({})),
+      post: vi.fn(async () => ({ id: 'x' })),
+      put: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+    } as unknown as Rest;
+    const bot = suggestionsBot(db, rest, { appId: () => 'app' });
+    const click = (customId: string, manager = false) => ({
+      customId,
+      guildId: 'g',
+      message: { id: 'm1' },
+      user: { id: '7' },
+      member: {
+        roles: { cache: new Map() },
+        permissions: { has: () => manager },
+      },
+      deferred: false,
+      replied: false,
+      isStringSelectMenu: () => false,
+      reply: vi.fn(async () => {}),
+      showModal: vi.fn(async () => {}),
+    });
+    return { db, bot, click };
+  };
+  type Click = Parameters<ReturnType<typeof suggestionsBot>['studioAction']>[0];
+
+  it('votes with an Upvote button', async () => {
+    const { db, bot, click } = setup();
+    expect(await bot.studioAction(click('sp:b:up') as unknown as Click)).toBe(
+      true,
+    );
+    expect(getSuggestion(db, 'g', 1)).toMatchObject({ up: 1 });
+  });
+
+  it('asks staff for a reason before approving, and turns others away', async () => {
+    const { bot, click } = setup();
+    const member = click('sp:b:ok');
+    await bot.studioAction(member as unknown as Click);
+    expect(member.showModal).not.toHaveBeenCalled();
+    expect(member.reply).toHaveBeenCalledWith(
+      expect.objectContaining({ content: expect.stringMatching(/staff/) }),
+    );
+    const staff = click('sp:b:ok', true);
+    await bot.studioAction(staff as unknown as Click);
+    expect(staff.showModal).toHaveBeenCalled();
+  });
+
+  it('leaves other buttons to Message Studio', async () => {
+    const { bot, click } = setup();
+    expect(
+      await bot.studioAction(click('sp:b:plain') as unknown as Click),
+    ).toBe(false);
   });
 });
