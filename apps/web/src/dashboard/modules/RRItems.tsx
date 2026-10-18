@@ -58,7 +58,7 @@ function ItemSettings({
 }) {
   const choices = roleItems(roles, [item.role]);
   const optional = (taken: string): ComboItem[] => [
-    { value: NONE, label: 'None', icon: 'ban', group: 'Options' },
+    { value: NONE, label: 'None', icon: 'ban', group: 'Default' },
     ...roleItems(roles).map((r) =>
       r.value === taken
         ? { ...r, disabled: true, note: 'Picked above' }

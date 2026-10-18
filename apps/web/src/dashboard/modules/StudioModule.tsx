@@ -67,9 +67,12 @@ function StudioEditor({
   onFix,
   onCheck,
   checking,
+  uses = [],
 }: {
   server: Server;
   message: StudioMessage;
+  /** Where else the template is used, so its variables work here too. */
+  uses?: string[];
   channels: { id: string; name: string; category: string; canPost: boolean }[];
   saving: boolean;
   dirty: boolean;
@@ -130,6 +133,9 @@ function StudioEditor({
           message={message}
           tried={tried}
           onChange={onChange}
+          memberVariables={uses.includes('welcome')}
+          roleVariables={uses.includes('reaction-role')}
+          suggestionVariables={uses.includes('suggestion')}
         />
 
         <div className="sp-stack sp-studio__side">
@@ -418,6 +424,9 @@ export function StudioModule({
                   folders: studio.data.folders,
                   roles: studio.data.roles,
                   sendLimit: studio.data.sendLimit,
+                  suggestion: !!template.usedIn?.some(
+                    (u) => u.kind === 'suggestion',
+                  ),
                 }}
               >
                 <p className="sp-edit-banner" role="status">
@@ -430,6 +439,7 @@ export function StudioModule({
                 <StudioEditor
                   server={server}
                   message={message}
+                  uses={template?.usedIn?.map((u) => u.kind) ?? []}
                   channels={channels}
                   saving={actions.updateTemplate.isPending}
                   dirty={dirty}

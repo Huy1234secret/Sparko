@@ -42,7 +42,20 @@ export type StudioAction =
       /** Sends a reply only the person who clicked can see. */
       ephemeral: boolean;
     }
-  | { id: string; type: 'role'; mode: 'give' | 'take'; roles: string[] };
+  | { id: string; type: 'role'; mode: 'give' | 'take'; roles: string[] }
+  /**
+   * Only on suggestion messages: votes on the suggestion, or (for staff who
+   * can approve) approves or denies it. Anywhere else it does nothing.
+   */
+  | { id: string; type: 'suggestion'; act: SuggestionAct };
+
+export const SUGGESTION_ACTS = [
+  'upvote',
+  'downvote',
+  'approve',
+  'deny',
+] as const;
+export type SuggestionAct = (typeof SUGGESTION_ACTS)[number];
 
 export type ButtonColour = 'blurple' | 'grey' | 'green' | 'red';
 export type StudioButton = {
@@ -618,6 +631,15 @@ function actionsProblem(list: unknown, at: string): StudioIssue | null {
           'Pick the roles a “Give or take role” action changes.',
           here,
         );
+    } else if (a.type === 'suggestion') {
+      if (!SUGGESTION_ACTS.includes(a.act))
+        return issue('An action is damaged. Remove it and add it again.', here);
+      // It answers the click itself, so nothing else can run alongside.
+      if (list.length > 1)
+        return issue(
+          'A suggestion action has to be the only action on its button or option.',
+          here,
+        );
     } else
       return issue('An action is damaged. Remove it and add it again.', here);
   }
@@ -956,7 +978,8 @@ export const studioVariables: StudioVariable[] = [
 
 /**
  * Fills {variables} in. A variable with nothing to fill it (no member when
- * staff post from the dashboard, say) is left as written. {separator} only
+ * staff post from the dashboard, say) is sent empty; text in braces that
+ * isn't a variable is left as written. {separator} only
  * means something in Components V2 and is dropped elsewhere.
  */
 export function fillVariables(text: string, ctx: { now: number } & StudioVars) {
@@ -985,11 +1008,15 @@ export function fillVariables(text: string, ctx: { now: number } & StudioVars) {
     separator: '',
     ...ctx.extra,
   };
+  // A variable this message can't fill (like {role} outside a reaction
+  // role) is sent empty; braces that aren't a variable stay as written.
   return text.replace(
     /\{([a-z.-]+)\}/g,
-    (whole, name: string) => values[name] ?? whole,
+    (whole, name: string) =>
+      values[name] ?? (known.has(name) || name in values ? '' : whole),
   );
 }
+const known = new Set(studioVariables.map((v) => v.name));
 export const IS_COMPONENTS_V2 = 1 << 15;
 
 /** The message body for Discord's create/edit message endpoints. */

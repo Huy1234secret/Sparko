@@ -63,6 +63,8 @@ type StudioData = {
   folders: StudioFolder[];
   roles: StudioState['roles'];
   sendLimit: number;
+  /** The message is a suggestion message, so suggestion actions work. */
+  suggestion?: boolean;
 };
 const StudioDataContext = createContext<StudioData | null>(null);
 export function StudioDataProvider({
@@ -105,10 +107,14 @@ export const newMenu = (): StudioMenu => ({
   ],
 });
 /** Whether one more button, or one more menu, still fits in five rows. */
-export function roomFor(list: StudioComponent[], kind: 'button' | 'menu') {
+export function roomFor(
+  list: StudioComponent[],
+  kind: 'button' | 'menu',
+  max = MAX_ROWS,
+) {
   return (
     componentRows([...list, kind === 'button' ? newButton() : newMenu()])
-      .length <= MAX_ROWS
+      .length <= max
   );
 }
 
@@ -172,6 +178,13 @@ export function DragHandle({
 
 // Actions --------------------------------------------------------------------
 
+const SUGGESTION_ACTS = [
+  { value: 'upvote', label: 'Upvote' },
+  { value: 'downvote', label: 'Downvote' },
+  { value: 'approve', label: 'Approve' },
+  { value: 'deny', label: 'Deny' },
+] as const;
+
 const folderLabel = (folders: StudioFolder[], id: string | null) =>
   folderPath({ templates: [], folders }, id)
     .map((f) => f.name)
@@ -198,7 +211,11 @@ function ActionCard({
   const data = useStudioData();
   const [fading, setFading] = useState(false);
   const title =
-    action.type === 'send' ? 'Send message template' : 'Give or take role';
+    action.type === 'send'
+      ? 'Send message template'
+      : action.type === 'role'
+        ? 'Give or take role'
+        : 'Suggestion';
   // Templates are listed folder by folder, loose ones first.
   const folderOf = (t: { folderId: string | null }) =>
     t.folderId ? folderLabel(data.folders, t.folderId) : '';
@@ -249,11 +266,30 @@ function ActionCard({
             text={
               action.type === 'send'
                 ? `Sends these templates, one after another. ${data.sendLimit === 1 ? 'Free servers send 1 template per action; Plus sends up to 10.' : `Up to ${data.sendLimit} templates per action.`}`
-                : 'Gives the person who clicked these roles, or takes them away. Sparko’s own role must sit above them in Server Settings → Roles.'
+                : action.type === 'role'
+                  ? 'Gives the person who clicked these roles, or takes them away. Sparko’s own role must sit above them in Server Settings → Roles.'
+                  : 'Upvote and Downvote count like the vote buttons. Approve and Deny are for staff who can approve suggestions: they get a form for the reason first.'
             }
           />
+          {action.type === 'suggestion' && !data.suggestion && (
+            <span className="sp-action__off">
+              Off here{' '}
+              <InfoTip text="This template isn’t the suggestion message, so Sparko skips this action." />
+            </span>
+          )}
         </span>
-        {action.type === 'send' ? (
+        {action.type === 'suggestion' ? (
+          <Segmented
+            label="What it does"
+            className="sp-action__mode"
+            value={action.act}
+            onChange={(act) => onChange({ ...action, act })}
+            options={SUGGESTION_ACTS.map((a) => ({
+              value: a.value,
+              label: a.label,
+            }))}
+          />
+        ) : action.type === 'send' ? (
           <>
             <Combobox
               multiple
@@ -349,7 +385,14 @@ function ActionsEditor({
   const { list: listRef, ...reorder } = useReorder({
     onMove: (from, to) => onChange(moveItem(actions, from, to)),
   });
+  const data = useStudioData();
   const add = (a: StudioAction) => onChange([...actions, a]);
+  // A suggestion action answers the click itself, so it stands alone.
+  const alone = actions.some((a) => a.type === 'suggestion');
+  const full = actions.length >= 10 || alone;
+  const fullNote = alone
+    ? 'A suggestion action has to be the only one.'
+    : 'Up to 10 actions on a button or option.';
   return (
     <div className="sp-actions" data-issue={`${issueAt}/actions`}>
       <div className="sp-actions__head">
@@ -362,7 +405,8 @@ function ActionsEditor({
           items={[
             {
               label: 'Send message',
-              disabled: actions.length >= 10,
+              disabled: full,
+              note: fullNote,
               onSelect: () =>
                 add({
                   id: newId(),
@@ -374,10 +418,20 @@ function ActionsEditor({
             },
             {
               label: 'Give or take role',
-              disabled: actions.length >= 10,
+              disabled: full,
+              note: fullNote,
               onSelect: () =>
                 add({ id: newId(), type: 'role', mode: 'give', roles: [] }),
             },
+            ...SUGGESTION_ACTS.map((a) => ({
+              label: a.label,
+              disabled: !data.suggestion || actions.length > 0,
+              note: !data.suggestion
+                ? 'Only on the suggestion message.'
+                : 'A suggestion action has to be the only one.',
+              onSelect: () =>
+                add({ id: newId(), type: 'suggestion', act: a.value }),
+            })),
           ]}
         />
       </div>
@@ -400,7 +454,8 @@ function ActionsEditor({
         </ol>
       ) : (
         <p className="sp-hint">
-          Nothing happens yet. Use + to send templates or give and take roles.
+          Nothing happens yet. Use + to send templates, give and take roles
+          {data.suggestion ? ', or vote, approve and deny' : ''}.
         </p>
       )}
     </div>

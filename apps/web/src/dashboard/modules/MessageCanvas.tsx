@@ -8,7 +8,7 @@ import {
 } from '../../data';
 import { ContainerCanvas, MAX_GALLERY, newImage } from './ContainerCanvas';
 import { EmbedCanvas, MAX_EMBEDS, newEmbed } from './EmbedCanvas';
-import { newButton, newMenu, roomFor } from './ComponentsEditor';
+import { MAX_ROWS, newButton, newMenu, roomFor } from './ComponentsEditor';
 import { LockedCanvas, useInsertTarget } from './EditorBits';
 import { EmojiButton } from './EmojiPicker';
 import { PlusMenu, type PlusItem } from './PlusMenu';
@@ -110,7 +110,7 @@ export function MessageCanvas({
   suggestionVariables?: boolean;
   /**
    * Keeps the message's shape: one embed or container, no pictures of its
-   * own, and no buttons or menus to add. Text can still go outside it.
+   * own. Text, buttons and menus can still go outside it.
    */
   locked?: boolean;
   /** Adjusts the message before it's checked. */
@@ -135,7 +135,12 @@ export function MessageCanvas({
     const menu = newMenu();
     onChange({ components: [...message.components, menu] });
   };
-  const rows = 'Discord shows up to 5 rows of buttons and menus.';
+  // A suggestion's vote buttons take one of an embed message's five rows.
+  const maxRows = locked && !v2 ? MAX_ROWS - 1 : MAX_ROWS;
+  const rows =
+    maxRows < MAX_ROWS
+      ? 'The vote buttons take a row, so this holds 4 rows of buttons and menus.'
+      : 'Discord shows up to 5 rows of buttons and menus.';
   const separator: PlusItem = {
     label: 'Add separator',
     onSelect: () =>
@@ -146,10 +151,22 @@ export function MessageCanvas({
         },
       }),
   };
+  const button: PlusItem = {
+    label: 'Add button',
+    disabled: !roomFor(message.components, 'button', maxRows),
+    note: rows,
+    onSelect: addButton,
+  };
+  const menu: PlusItem = {
+    label: 'Add menu',
+    disabled: !roomFor(message.components, 'menu', maxRows),
+    note: rows,
+    onSelect: addMenu,
+  };
   const items: PlusItem[] = locked
     ? v2
-      ? [separator]
-      : []
+      ? [button, menu, separator]
+      : [button, menu]
     : v2
       ? [
           {
@@ -164,18 +181,8 @@ export function MessageCanvas({
               setFocus({ id: image.id });
             },
           },
-          {
-            label: 'Add button',
-            disabled: !roomFor(message.components, 'button'),
-            note: rows,
-            onSelect: addButton,
-          },
-          {
-            label: 'Add menu',
-            disabled: !roomFor(message.components, 'menu'),
-            note: rows,
-            onSelect: addMenu,
-          },
+          button,
+          menu,
           separator,
         ]
       : [
@@ -186,18 +193,8 @@ export function MessageCanvas({
             onSelect: () =>
               onChange({ embeds: [...message.embeds, newEmbed()] }),
           },
-          {
-            label: 'Add button',
-            disabled: !roomFor(message.components, 'button'),
-            note: rows,
-            onSelect: addButton,
-          },
-          {
-            label: 'Add menu',
-            disabled: !roomFor(message.components, 'menu'),
-            note: rows,
-            onSelect: addMenu,
-          },
+          button,
+          menu,
           {
             label: 'Add image',
             disabled: message.embeds.length >= MAX_EMBEDS,

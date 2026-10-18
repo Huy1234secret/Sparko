@@ -241,21 +241,7 @@ function wire(c: Client) {
       interaction.customId.startsWith('sp:') &&
       interaction.inGuild()
     ) {
-      handleStudioInteraction(rest, db, {
-        id: interaction.id,
-        token: interaction.token,
-        applicationId: interaction.applicationId,
-        guildId: interaction.guildId,
-        channelId: interaction.channelId,
-        userId: interaction.user.id,
-        userName:
-          interaction.member && 'displayName' in interaction.member
-            ? interaction.member.displayName
-            : interaction.user.displayName,
-        messageId: interaction.message.id,
-        customId: interaction.customId,
-        values: interaction.isStringSelectMenu() ? interaction.values : [],
-      }).catch((error: unknown) =>
+      studio(interaction).catch((error: unknown) =>
         console.error('A Message Studio button failed', error),
       );
       return;
@@ -265,6 +251,32 @@ function wire(c: Client) {
       console.error(`/${interaction.commandName} failed`, error),
     );
   });
+  /** Suggestion actions go to suggestions; everything else to Message Studio. */
+  async function studio(
+    interaction: ButtonInteraction | StringSelectMenuInteraction,
+  ) {
+    if (!interaction.inGuild()) return;
+    if (
+      interaction.inCachedGuild() &&
+      (await suggestions.studioAction(interaction))
+    )
+      return;
+    await handleStudioInteraction(rest, db, {
+      id: interaction.id,
+      token: interaction.token,
+      applicationId: interaction.applicationId,
+      guildId: interaction.guildId,
+      channelId: interaction.channelId,
+      userId: interaction.user.id,
+      userName:
+        interaction.member && 'displayName' in interaction.member
+          ? interaction.member.displayName
+          : interaction.user.displayName,
+      messageId: interaction.message.id,
+      customId: interaction.customId,
+      values: interaction.isStringSelectMenu() ? interaction.values : [],
+    });
+  }
   c.on(Events.GuildCreate, (guild) => {
     record(guild, true);
     addAudit(

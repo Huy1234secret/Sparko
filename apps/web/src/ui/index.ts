@@ -7,3 +7,4 @@ export * from './placement';
 export * from './search-icon';
 export * from './anim-icons';
 export * from './crystal';
+export * from './tip';

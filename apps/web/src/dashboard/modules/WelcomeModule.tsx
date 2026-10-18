@@ -725,7 +725,7 @@ function GreetSettingsCard({
                 value: NONE,
                 label: 'No sending in a channel',
                 icon: 'ban',
-                group: 'Options',
+                group: 'Default',
               },
               ...channels.map((c) => ({
                 value: c.id,
@@ -752,13 +752,13 @@ function GreetSettingsCard({
                 value: 'none',
                 label: 'No DM user',
                 icon: 'ban',
-                group: 'Options',
+                group: 'Default',
               },
               {
                 value: 'same',
                 label: 'Same template sent in channel',
                 icon: 'copy',
-                group: 'Options',
+                group: 'Default',
               },
               ...items,
             ]}

@@ -190,7 +190,8 @@ export async function handleStudioInteraction(
 
   for (const action of actions) {
     if (action.type === 'send') await sendOne(action);
-    else
+    // Suggestion actions only work on suggestions, which answer them first.
+    else if (action.type === 'role')
       for (const role of action.roles) {
         const path = `/guilds/${i.guildId}/members/${i.userId}/roles/${role}`;
         try {

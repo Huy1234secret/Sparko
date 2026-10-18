@@ -261,6 +261,31 @@ describe('the message', () => {
         embeds: [{ ...card.embeds[0]!, image: 'https://x.png' }],
       })?.problem,
     ).toMatch(/picture/);
+    // Its own buttons are fine, as long as the vote row still fits.
+    const b = (id: string) => ({
+      id,
+      type: 'button' as const,
+      label: id,
+      emoji: '',
+      colour: 'grey' as const,
+      link: false,
+      url: '',
+      actions: [],
+    });
+    const menu = (id: string) => ({
+      id,
+      type: 'menu' as const,
+      placeholder: '',
+      multiple: false,
+      options: [],
+    });
+    expect(sgMessageIssue({ ...card, components: [b('a')] })).toBeNull();
+    expect(
+      sgMessageIssue({
+        ...card,
+        components: [b('a'), menu('m1'), menu('m2'), menu('m3'), menu('m4')],
+      })?.problem,
+    ).toMatch(/4 rows/);
   });
   it('fills the suggestion variables and adds the vote buttons', () => {
     const { main } = sgPayloads(config(), sgPresets[0]!.message, suggestion(), {

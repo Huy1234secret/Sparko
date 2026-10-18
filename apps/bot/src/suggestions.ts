@@ -10,8 +10,11 @@ import {
   type StringSelectMenuInteraction,
 } from 'discord.js';
 import {
+  actionsFor,
   emojiKey,
+  findPost,
   getSuggestion,
+  parseStudioCustomId,
   Plain,
   reactionPath,
   sgAccept,
@@ -24,6 +27,7 @@ import {
   sgDelete,
   sgFindStatus,
   sgGuilds,
+  sgMessage,
   sgMessageDeleted,
   sgRefresh,
   sgRemoveMessages,
@@ -526,6 +530,63 @@ export function suggestionsBot(
     return true;
   }
 
+  /**
+   * A suggestion action on one of the template's own buttons or menus.
+   * Returns false when the click isn't one, so Message Studio answers it.
+   */
+  async function studioAction(
+    i: ButtonInteraction<'cached'> | StringSelectMenuInteraction<'cached'>,
+  ) {
+    const parsed = parseStudioCustomId(i.customId);
+    const s = parsed && suggestionByMessage(db, i.message.id);
+    if (!parsed || !s || s.messageId !== i.message.id) return false;
+    const { config } = sgConfigOf(db, i.guildId);
+    const post = findPost(db, i.message.id);
+    const message =
+      post?.guildId === i.guildId
+        ? post.message
+        : sgMessage(db, i.guildId, config);
+    const c = message.components.find(
+      (x) => x.id === parsed.id && x.type === parsed.kind,
+    );
+    const action = c
+      ? actionsFor(c, i.isStringSelectMenu() ? i.values : []).find(
+          (a) => a.type === 'suggestion',
+        )
+      : undefined;
+    if (action?.type !== 'suggestion') return false;
+    try {
+      if (action.act === 'upvote' || action.act === 'downvote')
+        await vote(i, action.act === 'upvote' ? 1 : -1);
+      else if (
+        !sgAllowed(config.approvers, rolesOf(i.member), isManager(i.member))
+      )
+        await say(i, 'Only staff who can approve suggestions can do this.');
+      else {
+        const status = sgFindStatus(
+          config,
+          action.act === 'approve' ? 'approved' : 'denied',
+        );
+        if (!status) await say(i, 'That status doesn’t exist any more.');
+        else
+          await i.showModal(
+            reasonForm(
+              `sg:status:${s.number}:${status.id}`,
+              s.number,
+              status.name,
+            ),
+          );
+      }
+    } catch (e) {
+      if (!(e instanceof Plain)) console.error('A suggestion action failed', e);
+      await say(
+        i,
+        e instanceof Plain ? e.message : 'Something went wrong. Try again.',
+      ).catch(() => {});
+    }
+    return true;
+  }
+
   // Reactions -------------------------------------------------------------------
 
   /** Someone reacted on a suggestion, or took a reaction off. */
@@ -644,6 +705,7 @@ export function suggestionsBot(
     autocomplete,
     modal,
     component,
+    studioAction,
     reaction,
     deleted,
     startSweep,

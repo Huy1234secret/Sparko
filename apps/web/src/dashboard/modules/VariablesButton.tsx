@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import {
+  HoverTip,
+  Icon,
   LottieIcon,
   cx,
   menuPlacement,
@@ -42,31 +44,63 @@ export function VariablesButton({
   const [anim, setAnim] = useState<'reveal' | 'hover' | 'open'>('reveal');
   const [playKey, setPlayKey] = useState(1);
   const wrap = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState('');
   const toggle = (next: boolean) => {
     setOpen(next);
-    if (next) setAnim('open');
+    if (next) {
+      setAnim('open');
+      setQuery('');
+    }
   };
   const pop = useRef<HTMLDivElement>(null);
   useDismiss(open, () => toggle(false), wrap);
   const presence = usePresence(open);
   usePlacement(presence.mounted, wrap, pop, menuPlacement);
-  const list = [
-    ...studioVariables.filter(
-      (v) =>
-        (member || !v.member) &&
-        (role || !v.role) &&
-        (suggestion || !v.suggestion),
-    ),
-    ...(v2
-      ? [
-          {
-            name: 'separator',
-            about:
-              'Draws a line across the container and starts a new section.',
-          },
-        ]
-      : []),
+  // Every variable is listed. Ones this message can't fill are still there,
+  // faded with a tag saying where they work: added anyway, they're sent empty.
+  const all = [
+    ...studioVariables,
+    {
+      name: 'separator',
+      about: 'Draws a line across the container and starts a new section.',
+      v2: true as const,
+    },
   ];
+  const works = (v: (typeof all)[number]) =>
+    (member || !('member' in v && v.member)) &&
+    (role || !('role' in v && v.role)) &&
+    (suggestion || !('suggestion' in v && v.suggestion)) &&
+    (v2 || !('v2' in v && v.v2));
+  const needle = query.trim().toLowerCase();
+  const found = all.filter(
+    (v) =>
+      !needle ||
+      v.name.includes(needle) ||
+      v.about.toLowerCase().includes(needle),
+  );
+  const list = [...found.filter(works), ...found.filter((v) => !works(v))];
+  const tagOf = (v: (typeof all)[number]) =>
+    'suggestion' in v && v.suggestion
+      ? {
+          label: 'Suggestion',
+          tip: 'Only filled in by suggestion messages. Anywhere else it’s sent empty.',
+        }
+      : 'role' in v && v.role
+        ? {
+            label: 'Reaction role',
+            tip: 'Only filled in by reaction role responses. Anywhere else it’s sent empty.',
+          }
+        : 'member' in v && v.member
+          ? {
+              label: 'Welcome',
+              tip: 'Only filled in by welcome, leave and boost messages. Anywhere else it’s sent empty.',
+            }
+          : 'v2' in v && v.v2
+            ? {
+                label: 'V2',
+                tip: 'Only works in V2 components messages. In an embed message it’s left out.',
+              }
+            : null;
   return (
     <div ref={wrap} className="sp-pop-anchor">
       <button
@@ -109,22 +143,50 @@ export function VariablesButton({
             Sparko fills these in when it sends the message. Click one to add it
             where you were writing.
           </p>
-          {list.map((v, i) => (
-            <button
-              key={v.name}
-              type="button"
-              role="menuitem"
-              className="sp-vars-pop__item"
-              autoFocus={i === 0}
-              onClick={() => {
-                onPick(`{${v.name}}`);
-                toggle(false);
-              }}
-            >
-              <code>{`{${v.name}}`}</code>
-              <span>{v.about}</span>
-            </button>
-          ))}
+          <label className="sp-vars-pop__search">
+            <Icon name="search" size="sm" />
+            <input
+              type="search"
+              aria-label="Search variables"
+              placeholder="Search variables"
+              value={query}
+              autoFocus
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+          {list.map((v) => {
+            const ok = works(v);
+            const tag = tagOf(v);
+            return (
+              <button
+                key={v.name}
+                type="button"
+                role="menuitem"
+                className={cx('sp-vars-pop__item', !ok && 'is-off')}
+                onClick={() => {
+                  onPick(`{${v.name}}`);
+                  toggle(false);
+                }}
+              >
+                <span className="sp-vars-pop__head">
+                  <code>{`{${v.name}}`}</code>
+                  {tag && (
+                    <HoverTip
+                      className="sp-vars-pop__tag"
+                      text={tag.tip}
+                      focusable={false}
+                    >
+                      {tag.label}
+                    </HoverTip>
+                  )}
+                </span>
+                <span>{v.about}</span>
+              </button>
+            );
+          })}
+          {!list.length && (
+            <p className="sp-vars-pop__note">Nothing matches “{query}”.</p>
+          )}
         </div>
       )}
     </div>

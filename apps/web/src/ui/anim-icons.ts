@@ -28,6 +28,18 @@ const pair = (name: string, solid = false): Two | undefined => {
     ? { reveal, hover, ...(solid ? { solid } : {}) }
     : undefined;
 };
+/** A single animation file, or undefined until it's added. */
+const maybe = (name: string) =>
+  files[`../../../../design-system/assets/icons/animated-icons/${name}.json`];
+/** A reveal and hover pair named any of the ways the files are named. */
+const pairOf = (...names: [string, string][]): Two | undefined => {
+  for (const [r, h] of names) {
+    const reveal = maybe(r);
+    const hover = maybe(h);
+    if (reveal && hover) return { reveal, hover };
+  }
+  return undefined;
+};
 /** A button-style icon: it draws in, plays on hover, and plays when pressed. */
 const set = <K extends string>(name: string, states: K[]) =>
   Object.fromEntries(states.map((s) => [s, file(`${name}-${s}`)])) as Record<
@@ -93,6 +105,15 @@ export const animIcons = {
   shuffle: pair('shuffle-icon'),
   /** Automatic roles. */
   autoRole: pair('automatic-role-icon'),
+  /** Suggestions: the module, and its Commands tab. */
+  lightBulb: pairOf(
+    ['light-bulb-icon-reveal', 'light-bulb-icon-hover'],
+    ['light-bulb-reveal-icon', 'light-bulb-hover-icon'],
+    ['light-bulb-reveal-icon', 'light-bulb-icon-hover'],
+  ),
+  command: pair('command-icon'),
+  /** The gear that plays beside a rule count. */
+  gear: maybe('setting-icon-hover'),
   upload: set('upload-button', ['reveal', 'hover', 'select']),
 };
 export type RevealHover = {
@@ -115,4 +136,5 @@ export const svgIcons = {
   reactionRole: svg('reaction-role-icon'),
   welcomeTag: svg('tag-welcome-message'),
   sandClock: svg('sand-clock-icon'),
+  status: svg('status-icon'),
 };

@@ -1,5 +1,13 @@
-import { Fragment, type CSSProperties, type ReactNode } from 'react';
-import { Checkbox, Combobox, Icon, Input, svgIcons } from '../../ui';
+import { Fragment, useState, type CSSProperties } from 'react';
+import {
+  Checkbox,
+  Combobox,
+  Icon,
+  Input,
+  LottieIcon,
+  animIcons,
+  svgIcons,
+} from '../../ui';
 import {
   arBadges,
   arConditionNames,
@@ -12,7 +20,7 @@ import {
   type AutoRoles,
   type RoleOption,
 } from '../../data';
-import { AnimatedIconButton, InfoTip } from './EditorBits';
+import { AnimatedIconButton } from './EditorBits';
 import { PlusMenu } from './PlusMenu';
 import { newId, roleItems } from './parts';
 import { plusAnimations } from './StudioLibrary';
@@ -33,14 +41,6 @@ function durationHint(
   return undefined;
 }
 
-/** A label with an (i) beside it that says more on hover. */
-const tipped = (text: string, tip: string): ReactNode => (
-  <>
-    {text} <InfoTip text={tip} />
-  </>
-);
-
-/** A length of time typed like "7d", checked against its range as it's typed. */
 export function DurationInput({
   label,
   tip,
@@ -62,8 +62,8 @@ export function DurationInput({
   const hint = value.trim() ? durationHint(value, range, format) : undefined;
   return (
     <Input
-      label={tipped(label, tip)}
-      aria-label={label}
+      label={label}
+      hint={tip}
       value={value}
       placeholder={placeholder}
       maxLength={20}
@@ -77,25 +77,38 @@ export function DurationInput({
   );
 }
 
-/** "2/3 ⏳": how many of the plan's slots are used. */
+/** "2/3 ⏳": how many of the plan's slots are used, with a small icon. */
 export function Used({
   n,
   max,
   what,
+  icon = 'sand',
 }: {
   n: number;
   max: number;
   what: string;
+  icon?: 'sand' | 'gear' | 'status';
 }) {
+  const [play, setPlay] = useState(0);
+  const mask =
+    icon === 'status' && svgIcons.status ? svgIcons.status : svgIcons.sandClock;
   return (
-    <span className="sp-ar__used" title={`${n} of ${max} ${what} used`}>
+    <span
+      className="sp-ar__used"
+      title={`${n} of ${max} ${what} used`}
+      onPointerEnter={() => setPlay((k) => k + 1)}
+    >
       {n}/{max}
-      <span
-        className="sp-mask-icon"
-        role="img"
-        aria-label="used"
-        style={{ '--sp-mask': `url("${svgIcons.sandClock}")` } as CSSProperties}
-      />
+      {icon === 'gear' && animIcons.gear ? (
+        <LottieIcon src={animIcons.gear} size={16} playKey={play} />
+      ) : (
+        <span
+          className="sp-mask-icon"
+          role="img"
+          aria-label="used"
+          style={{ '--sp-mask': `url("${mask}")` } as CSSProperties}
+        />
+      )}
     </span>
   );
 }
@@ -155,10 +168,8 @@ export function ARTriggers({
         </div>
         <div className="sp-card__body sp-ar__pair">
           <Combobox
-            label={tipped(
-              'Before verified',
-              'Given the moment someone joins, while they still have to accept the server’s rules (Discord’s membership screening). Sparko takes these away and gives the After verified roles once they accept.',
-            )}
+            label="Before verified"
+            hint="Given the moment someone joins, while they still have to accept the server’s rules (Discord’s membership screening). Sparko takes these away and gives the After verified roles once they accept."
             multiple
             placeholder="No roles"
             searchPlaceholder="Search roles"
@@ -169,10 +180,8 @@ export function ARTriggers({
             items={roleItems(roles, config.join.before)}
           />
           <Combobox
-            label={tipped(
-              'After verified',
-              'Given once someone accepts the server’s rules. If the server doesn’t ask new members to accept rules, these are given as soon as they join.',
-            )}
+            label="After verified"
+            hint="Given once someone accepts the server’s rules. If the server doesn’t ask new members to accept rules, these are given as soon as they join."
             multiple
             placeholder="No roles"
             searchPlaceholder="Search roles"
@@ -300,7 +309,12 @@ export function ARTriggers({
             </p>
           </div>
           <div className="sp-ar__head-actions">
-            <Used n={config.rules.length} max={limits.rules} what="rules" />
+            <Used
+              n={config.rules.length}
+              max={limits.rules}
+              what="rules"
+              icon="gear"
+            />
             <AnimatedIconButton
               size="sm"
               {...plusAnimations}
@@ -474,10 +488,8 @@ function RuleCard({
                   )}
                   {c.kind === 'badge' && (
                     <Combobox
-                      label={tipped(
-                        'Has any of these badges',
-                        'The member needs at least one of the badges you pick. Only badges on public profiles count; Discord doesn’t let bots see Nitro.',
-                      )}
+                      label="Has any of these badges"
+                      hint="The member needs at least one of the badges you pick. Only badges on public profiles count; Discord doesn’t let bots see Nitro."
                       multiple
                       placeholder="Pick badges"
                       searchPlaceholder="Search badges"
