@@ -69,6 +69,12 @@ export type StudioButton = {
   link: boolean;
   url: string;
   actions: StudioAction[];
+  /**
+   * A suggestion's upvote or downvote button, placed among the others. It
+   * looks and acts as the suggestion settings say, and is left out of any
+   * message that isn't a suggestion.
+   */
+  vote?: 'up' | 'down';
 };
 export type MenuOption = {
   id: string;
@@ -667,7 +673,10 @@ function componentsProblem(list: unknown): StudioIssue | null {
     const at = `component:${c?.id}`;
     if (!id(c?.id))
       return issue('A button is damaged. Remove it and add it again.');
-    if (c.type === 'button') {
+    if (c.type === 'button' && c.vote !== undefined) {
+      if (c.vote !== 'up' && c.vote !== 'down')
+        return issue('A button is damaged. Remove it and add it again.', at);
+    } else if (c.type === 'button') {
       if (!str(c.label, 80) || !emojiOk(c.emoji))
         return issue('Button text holds up to 80 characters.', `${at}/label`);
       if (!c.label.trim() && !c.emoji)
@@ -785,6 +794,8 @@ export const studioCustomId = (c: StudioComponent) =>
 export function componentsPayload(
   list: StudioComponent[],
   fill: (text: string) => string = (t) => t,
+  /** Voting has closed, so vote buttons are greyed out. */
+  closed = false,
 ) {
   return componentRows(list).map((row) => ({
     type: 1,
@@ -810,7 +821,10 @@ export function componentsPayload(
         style: c.link ? 5 : buttonStyles[c.colour],
         ...(c.label.trim() ? { label: fill(c.label).slice(0, 80) } : {}),
         ...(c.emoji ? { emoji: emojiPayload(c.emoji) } : {}),
-        ...(c.link ? { url: c.url } : { custom_id: studioCustomId(c) }),
+        ...(c.link
+          ? { url: c.url }
+          : { custom_id: c.vote ? `sg:${c.vote}` : studioCustomId(c) }),
+        ...(c.vote && closed ? { disabled: true } : {}),
       };
     }),
   }));
@@ -860,6 +874,14 @@ export type StudioVars = {
   roleList?: string | undefined;
   /** More variables a module fills in, like a suggestion's {status}. */
   extra?: Record<string, string> | undefined;
+  /** A suggestion's vote buttons: how they look, and whether voting closed. */
+  votes?:
+    | {
+        up: { label: string; emoji: string; colour: ButtonColour };
+        down: { label: string; emoji: string; colour: ButtonColour };
+        closed: boolean;
+      }
+    | undefined;
 };
 
 export type StudioVariable = {
@@ -1017,13 +1039,39 @@ export function fillVariables(text: string, ctx: { now: number } & StudioVars) {
 const known = new Set(studioVariables.map((v) => v.name));
 export const IS_COMPONENTS_V2 = 1 << 15;
 
+/** Whether a message places a suggestion's vote buttons itself. */
+export const hasVoteButtons = (m: StudioMessage) =>
+  m.components.some((c) => c.type === 'button' && !!c.vote);
+
+/** Vote buttons dressed as the suggestion says, or left out off one. */
+function withVotes(m: StudioMessage, votes: StudioVars['votes']) {
+  if (!hasVoteButtons(m)) return m;
+  const components = m.components.flatMap((c): StudioComponent[] =>
+    c.type !== 'button' || !c.vote
+      ? [c]
+      : votes
+        ? [{ ...c, ...votes[c.vote], link: false, actions: [] }]
+        : [],
+  );
+  const kept = new Set(components.map((c) => c.id));
+  return {
+    ...m,
+    components,
+    v2: {
+      ...m.v2,
+      place: m.v2.place.filter((p) => kept.has(p.id) || p.id === 'gallery'),
+    },
+  };
+}
+
 /** The message body for Discord's create/edit message endpoints. */
 export function studioPayload(
   input: StudioMessage,
   /** `raw` leaves {variables} as written, for showing and editing the JSON. */
   ctx: { now: number; raw?: boolean } & StudioVars,
 ) {
-  const m = normaliseStudio(input);
+  const m = withVotes(normaliseStudio(input), ctx.votes);
+  const closed = !!ctx.votes?.closed;
   // Mentions in Studio messages are shown but never ping anyone by surprise.
   const allowed_mentions = { parse: [] as string[] };
   const fill = (text: string) => (ctx.raw ? text : fillVariables(text, ctx));
@@ -1051,7 +1099,7 @@ export function studioPayload(
       const out: object[] = [];
       let run: StudioComponent[] = [];
       const flushRun = () => {
-        out.push(...componentsPayload(run, fill));
+        out.push(...componentsPayload(run, fill, closed));
         run = [];
       };
       for (const p of placedIn(v.place, slot)) {
@@ -1108,7 +1156,8 @@ export function studioPayload(
           components: [
             { type: 10, content: fill(pieces.at(-1)!.trim()) || '\u200b' },
           ],
-          accessory: componentsPayload([beside], fill)[0]!.components[0],
+          accessory: componentsPayload([beside], fill, closed)[0]!
+            .components[0],
         });
       }
       const after = items({ at: 'line', line: i });
@@ -1180,7 +1229,7 @@ export function studioPayload(
   return {
     content: fill(m.content),
     embeds,
-    components: componentsPayload(m.components, fill),
+    components: componentsPayload(m.components, fill, closed),
     allowed_mentions,
   };
 }

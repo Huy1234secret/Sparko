@@ -87,6 +87,32 @@ const useStudioData = () => {
   return data;
 };
 
+/** How a suggestion's vote buttons look and what else they do. */
+type VoteLook = {
+  label: string;
+  emoji: string;
+  colour: ButtonColour;
+  actions: StudioAction[];
+};
+const VoteButtonsContext = createContext<{
+  get: (which: 'up' | 'down') => VoteLook;
+  set: (which: 'up' | 'down', look: VoteLook) => void;
+} | null>(null);
+export const VoteButtonsProvider = VoteButtonsContext.Provider;
+
+/** A suggestion's upvote or downvote button, placed among the others. */
+export const voteButton = (which: 'up' | 'down'): StudioButton => ({
+  id: `vote-${which}`,
+  type: 'button',
+  vote: which,
+  label: which === 'up' ? 'Upvote' : 'Downvote',
+  emoji: which === 'up' ? '👍' : '👎',
+  colour: which === 'up' ? 'green' : 'red',
+  link: false,
+  url: '',
+  actions: [],
+});
+
 export const MAX_ROWS = 5;
 export const newButton = (): StudioButton => ({
   id: newId(),
@@ -897,23 +923,50 @@ export function ComponentItem({
   count,
   reorder,
   startOpen,
-  vote,
-  onChange,
-  onRemove,
+  onChange: change,
+  onRemove: remove,
 }: {
   component: StudioComponent;
   index: number;
   count: number;
   reorder: ItemDrag;
   startOpen: boolean;
-  /** A suggestion's vote button, which can't be removed. */
-  vote?: 'up' | 'down';
   onChange: (c: StudioComponent) => void;
   onRemove?: () => void;
 }) {
   const [opened, setOpen] = useState(startOpen);
   const [fading, setFading] = useState(false);
-  const c = component;
+  const data = useStudioData();
+  // A suggestion's vote button looks and acts as the suggestion settings
+  // say, and can't be removed from a suggestion message.
+  const votes = useContext(VoteButtonsContext);
+  const vote = component.type === 'button' ? component.vote : undefined;
+  const c: StudioComponent =
+    vote && component.type === 'button'
+      ? {
+          ...component,
+          ...(votes
+            ? votes.get(vote)
+            : {
+                label: vote === 'up' ? 'Upvote' : 'Downvote',
+                emoji: vote === 'up' ? '👍' : '👎',
+                colour: vote === 'up' ? 'green' : 'red',
+                actions: [],
+              }),
+          link: false,
+        }
+      : component;
+  const onChange = (next: StudioComponent) => {
+    if (vote && votes && next.type === 'button')
+      votes.set(vote, {
+        label: next.label,
+        emoji: next.emoji,
+        colour: next.colour,
+        actions: next.actions,
+      });
+    else if (!vote) change(next);
+  };
+  const onRemove = vote && (votes || data.suggestion) ? undefined : remove;
   // A problem in its settings opens them, until they're closed again.
   const issue = useIssue();
   const [closedFor, setClosedFor] = useState(0);

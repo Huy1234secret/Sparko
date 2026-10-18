@@ -31,6 +31,7 @@ import {
   sgPresets,
   sgRatioColour,
   sgStatusName,
+  normaliseStudio,
   sgVoteOrder,
   studioIssue,
   useStudio,
@@ -46,6 +47,7 @@ import {
   type SgLogEntry,
   type SgPreset,
   type SgSuggestion,
+  type SgVoteOption,
   type StudioMessage,
   type StudioState,
   type Suggestions,
@@ -64,8 +66,9 @@ import { ContainerCanvas } from './ContainerCanvas';
 import { EmbedCanvas } from './EmbedCanvas';
 import {
   ActionsEditor,
-  ComponentItem,
   StudioDataProvider,
+  VoteButtonsProvider,
+  voteButton,
 } from './ComponentsEditor';
 import {
   AnimatedIconButton,
@@ -74,7 +77,6 @@ import {
   InsertProvider,
   IssueProvider,
   flashIssue,
-  useReorder,
   type ShownIssue,
 } from './EditorBits';
 import { JsonPanel } from './JsonPanel';
@@ -444,15 +446,38 @@ export function SuggestionsModule({
 
 // Edit ------------------------------------------------------------------------
 
+/** A message with the vote buttons placed, or taken out, as voting is set. */
+function withVoteButtons(
+  m: StudioMessage,
+  vote: Suggestions['vote'],
+): StudioMessage {
+  const isVote = (c: StudioMessage['components'][number]) =>
+    c.type === 'button' && !!c.vote;
+  if (vote.kind !== 'button')
+    return m.components.some(isVote)
+      ? normaliseStudio({
+          ...m,
+          components: m.components.filter((c) => !isVote(c)),
+        })
+      : m;
+  const missing = sgVoteOrder(vote, ['up', 'down'] as const).filter(
+    (w) => !m.components.some((c) => c.type === 'button' && c.vote === w),
+  );
+  return missing.length
+    ? normaliseStudio({
+        ...m,
+        components: [...m.components, ...missing.map(voteButton)],
+      })
+    : m;
+}
+
 /** The vote buttons, menu or reactions under the preview; click to edit. */
 function VotePreview({
   config,
   onEdit,
-  onChange,
 }: {
   config: Suggestions;
   onEdit: (which: 'up' | 'down') => void;
-  onChange: (patch: Partial<Suggestions>) => void;
 }) {
   const v = config.vote;
   const ratio = { up: 12, down: 3 };
@@ -473,8 +498,8 @@ function VotePreview({
         ))}
       </div>
     );
-  if (v.kind === 'button')
-    return <VoteButtons config={config} onChange={onChange} />;
+  // Vote buttons sit among the message's own buttons instead.
+  if (v.kind === 'button') return null;
   return (
     <div className="sp-rr-preview" aria-label="Vote menu">
       <button
@@ -486,79 +511,6 @@ function VotePreview({
         <span>{v.placeholder || 'Vote on this suggestion'}</span>
         <Icon name="chevron-down" size="sm" />
       </button>
-    </div>
-  );
-}
-
-/**
- * The vote buttons, edited like any other button: they can be dragged and
- * given more actions, but always vote first and can't be removed.
- */
-function VoteButtons({
-  config,
-  onChange,
-}: {
-  config: Suggestions;
-  onChange: (patch: Partial<Suggestions>) => void;
-}) {
-  const v = config.vote;
-  const order = sgVoteOrder(v, ['up', 'down'] as const);
-  const { list: listRef, ...reorder } = useReorder({
-    mode: 'grid',
-    onMove: (from, to) => {
-      if (from !== to) onChange({ vote: { ...v, first: order[to]! } });
-    },
-  });
-  return (
-    <div className="sp-rr-preview" aria-label="Vote buttons">
-      <div
-        ref={listRef}
-        className={cx(
-          'dc-components sp-comps',
-          reorder.dragging && 'is-dragging',
-        )}
-      >
-        <div className="dc-row">
-          {order.map((which, i) => {
-            const o = v[which];
-            return (
-              <ComponentItem
-                key={which}
-                vote={which}
-                index={i}
-                count={2}
-                reorder={reorder}
-                startOpen={false}
-                component={{
-                  id: `vote-${which}`,
-                  type: 'button',
-                  label: o.label,
-                  emoji: o.emoji,
-                  colour: o.colour,
-                  link: false,
-                  url: '',
-                  actions: o.actions,
-                }}
-                onChange={(c) => {
-                  if (c.type !== 'button') return;
-                  onChange({
-                    vote: {
-                      ...v,
-                      [which]: {
-                        ...o,
-                        label: c.label,
-                        emoji: c.emoji,
-                        colour: c.colour,
-                        actions: c.actions,
-                      },
-                    },
-                  });
-                }}
-              />
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -661,6 +613,27 @@ function SGEdit({
   const [testChannel, setTestChannel] = useState(config.channel);
   const id = config.message;
   const message = id ? messageOf(id) : undefined;
+  // Vote buttons sit among the message's own: added where they're missing,
+  // and left out when people vote another way.
+  const shown = message && withVoteButtons(message, config.vote);
+  const voteButtons = {
+    get: (w: 'up' | 'down') => {
+      const o = config.vote[w];
+      return {
+        label: o.label,
+        emoji: o.emoji,
+        colour: o.colour,
+        actions: o.actions,
+      };
+    },
+    set: (
+      w: 'up' | 'down',
+      look: Pick<SgVoteOption, 'label' | 'emoji' | 'colour' | 'actions'>,
+    ) =>
+      onChange({
+        vote: { ...config.vote, [w]: { ...config.vote[w], ...look } },
+      }),
+  };
   const paused = !!server.paused;
   const picker = (
     <PresetPicker
@@ -722,36 +695,43 @@ function SGEdit({
       <div className="sp-studio__grid">
         <fieldset className="sp-fieldset" disabled={paused}>
           <legend className="sp-sr-only">Suggestion message</legend>
-          <MessageCanvas
-            key={id}
-            server={server}
-            message={message}
-            tried={tried}
-            headingId="sg-preview"
-            suggestionVariables
-            locked
-            check={(m) => ({ ...m, channel: '1' })}
-            onChange={(patch) => onMessage(id, patch)}
-            above={
-              <p className="sp-edit-banner" role="status">
-                <Icon name="info" size="sm" />
-                <span>
-                  Editing <b>{message.name}</b> from Message Studio. It holds
-                  one embed or container without pictures; members’ files show
-                  with <code>{'{files}'}</code>. Click a vote button to change
-                  it, or add your own buttons and menus that vote, approve or
-                  deny.
-                </span>
-              </p>
-            }
-            below={
-              <VotePreview
-                config={config}
-                onEdit={(w) => setVoteEdit(w)}
-                onChange={onChange}
-              />
-            }
-          />
+          <VoteButtonsProvider value={voteButtons}>
+            <MessageCanvas
+              key={id}
+              server={server}
+              message={shown!}
+              tried={tried}
+              headingId="sg-preview"
+              suggestionVariables
+              locked
+              maxRows={config.vote.kind === 'menu' ? 4 : 5}
+              check={(m) => ({ ...m, channel: '1' })}
+              onChange={(patch) =>
+                // The first change keeps the vote buttons where they're shown.
+                onMessage(
+                  id,
+                  shown !== message && !patch.components
+                    ? { components: shown!.components, ...patch }
+                    : patch,
+                )
+              }
+              above={
+                <p className="sp-edit-banner" role="status">
+                  <Icon name="info" size="sm" />
+                  <span>
+                    Editing <b>{message.name}</b> from Message Studio. It holds
+                    one embed or container without pictures; members’ files show
+                    with <code>{'{files}'}</code>. Click a vote button to change
+                    it, or add your own buttons and menus that vote, approve or
+                    deny.
+                  </span>
+                </p>
+              }
+              below={
+                <VotePreview config={config} onEdit={(w) => setVoteEdit(w)} />
+              }
+            />
+          </VoteButtonsProvider>
         </fieldset>
 
         <section
