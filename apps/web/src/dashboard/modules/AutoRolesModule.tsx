@@ -47,7 +47,7 @@ const MODULE = 'autoroles';
 const tabIcons = [
   { icon: 'zap', anim: animIcons.settingOutline },
   { icon: 'scroll-text', anim: animIcons.log },
-  { icon: 'database', anim: undefined },
+  { icon: 'database', anim: animIcons.storage },
 ];
 
 const when = (at: number) =>

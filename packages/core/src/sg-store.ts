@@ -1,6 +1,6 @@
 import type { Db } from './db.ts';
 import { DiscordCodes, DiscordError, type Rest } from './discord.ts';
-import { getGuild, getModule } from './store.ts';
+import { getGuild, getModule, serverVars } from './store.ts';
 import { normaliseStudio, type StudioMessage } from './studio-format.ts';
 import { getTemplate } from './templates.ts';
 import { Plain } from './ticket-actions.ts';
@@ -236,10 +236,7 @@ export function sgMessage(db: Db, guildId: string, c: Suggestions) {
   return normaliseStudio(t?.message ?? sgDefaultMessage());
 }
 
-const serverOf = (db: Db, guildId: string) => {
-  const g = getGuild(db, guildId);
-  return g ? { name: g.name, members: g.memberCount } : undefined;
-};
+const serverOf = (db: Db, guildId: string) => serverVars(getGuild(db, guildId));
 
 function bodies(db: Db, s: Stored, c: Suggestions, now: number) {
   return sgPayloads(c, sgMessage(db, s.guildId, c), s, {

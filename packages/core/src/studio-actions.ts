@@ -8,7 +8,7 @@ import {
   type StudioComponent,
   type StudioMessage,
 } from './studio-format.ts';
-import { getGuild } from './store.ts';
+import { getGuild, serverVars } from './store.ts';
 import { getTemplate } from './templates.ts';
 
 /**
@@ -70,6 +70,10 @@ export type StudioInteraction = {
   userId: string;
   /** The clicker's name in the server, for {user.name}. */
   userName: string;
+  /** Their picture, and when they made their account and joined. */
+  userAvatar?: string | undefined;
+  userCreated?: number | undefined;
+  userJoined?: number | undefined;
   messageId: string;
   customId: string;
   /** What was picked in a menu. */
@@ -95,7 +99,6 @@ export async function handleStudioInteraction(
   now = Date.now(),
 ) {
   const callback = `/interactions/${i.id}/${i.token}/callback`;
-  const webhook = `/webhooks/${i.applicationId}/${i.token}`;
   const parsed = parseStudioCustomId(i.customId);
   const post = findPost(db, i.messageId);
   const component =
@@ -115,18 +118,35 @@ export async function handleStudioInteraction(
     return;
   }
 
-  const actions = actionsFor(component, i.values);
+  await runStudioActions(rest, db, i, actionsFor(component, i.values), now);
+}
+
+/**
+ * Runs actions for a click, from top to bottom. `acked` is for a click
+ * something else already answered (a vote): private messages follow it.
+ */
+export async function runStudioActions(
+  rest: Rest,
+  db: Db,
+  i: Omit<StudioInteraction, 'customId' | 'values'>,
+  actions: StudioAction[],
+  now = Date.now(),
+  acked = false,
+) {
+  const callback = `/interactions/${i.id}/${i.token}/callback`;
+  const webhook = `/webhooks/${i.applicationId}/${i.token}`;
   // A private reply is started straight away when one will be sent.
   const replies = actions.some(
     (a) => a.type === 'send' && a.ephemeral && !a.dm,
   );
-  await rest.post(
-    callback,
-    replies ? { type: 5, data: { flags: EPHEMERAL } } : { type: 6 },
-  );
+  if (!acked)
+    await rest.post(
+      callback,
+      replies ? { type: 5, data: { flags: EPHEMERAL } } : { type: 6 },
+    );
 
   const problems: string[] = [];
-  let answered = false;
+  let answered = acked;
   const sendOne = async (action: Extract<StudioAction, { type: 'send' }>) => {
     for (const templateId of action.templates) {
       const template = getTemplate<StudioMessage>(
@@ -143,8 +163,14 @@ export async function handleStudioInteraction(
       const guild = getGuild(db, i.guildId);
       const body = studioPayload(message, {
         now,
-        user: { id: i.userId, name: i.userName },
-        server: guild && { name: guild.name, members: guild.memberCount },
+        user: {
+          id: i.userId,
+          name: i.userName,
+          avatar: i.userAvatar,
+          createdAt: i.userCreated,
+          joinedAt: i.userJoined,
+        },
+        server: serverVars(guild),
         channel: i.channelId,
       }) as Record<string, unknown> & {
         flags?: number;

@@ -59,6 +59,8 @@ export type GuildRow = {
   plan: 'free' | 'plus';
   paused: { reason: string; reference: string } | null;
   joinedAt: number | null;
+  boosts: number;
+  boostLevel: number;
 };
 
 const toGuild = (r: Row): GuildRow => ({
@@ -70,7 +72,21 @@ const toGuild = (r: Row): GuildRow => ({
   plan: r.plan === 'plus' ? 'plus' : 'free',
   paused: parse(r.paused_json, null),
   joinedAt: (r.joined_at as number | null) ?? null,
+  boosts: (r.boosts as number | undefined) ?? 0,
+  boostLevel: (r.boost_level as number | undefined) ?? 0,
 });
+
+/** What a saved server fills in: {server}, {server.icon}, {server.boosts}… */
+export const serverVars = (g: GuildRow | undefined) =>
+  g && {
+    name: g.name,
+    members: g.memberCount,
+    icon: g.icon
+      ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.${g.icon.startsWith('a_') ? 'gif' : 'png'}?size=256`
+      : undefined,
+    boosts: g.boosts,
+    level: g.boostLevel,
+  };
 
 export function getGuild(db: Db, id: string) {
   const r = db.prepare('SELECT * FROM guilds WHERE id = ?').get(id) as
@@ -95,15 +111,18 @@ export function upsertGuild(
     icon: string | null;
     memberCount: number;
     installed: boolean;
+    boosts?: number;
+    boostLevel?: number;
   },
   now: number,
 ) {
   db.prepare(
-    `INSERT INTO guilds (id, name, icon, member_count, installed, joined_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO guilds (id, name, icon, member_count, installed, joined_at, updated_at, boosts, boost_level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (id) DO UPDATE SET
        name = excluded.name, icon = excluded.icon,
        member_count = excluded.member_count,
+       boosts = excluded.boosts, boost_level = excluded.boost_level,
        joined_at = CASE WHEN guilds.installed = 0 AND excluded.installed = 1
          THEN excluded.joined_at ELSE guilds.joined_at END,
        installed = excluded.installed, updated_at = excluded.updated_at`,
@@ -115,6 +134,8 @@ export function upsertGuild(
     g.installed ? 1 : 0,
     g.installed ? now : null,
     now,
+    g.boosts ?? 0,
+    g.boostLevel ?? 0,
   );
 }
 

@@ -599,7 +599,7 @@ export function componentRows(list: StudioComponent[]) {
   return rows;
 }
 
-function actionsProblem(list: unknown, at: string): StudioIssue | null {
+export function actionsProblem(list: unknown, at: string): StudioIssue | null {
   if (!Array.isArray(list) || list.length > 10)
     return issue(
       'Use up to 10 actions on a button or option.',
@@ -634,10 +634,16 @@ function actionsProblem(list: unknown, at: string): StudioIssue | null {
     } else if (a.type === 'suggestion') {
       if (!SUGGESTION_ACTS.includes(a.act))
         return issue('An action is damaged. Remove it and add it again.', here);
-      // It answers the click itself, so nothing else can run alongside.
-      if (list.length > 1)
+      // Approve and Deny answer the click with a form, so they stand alone.
+      // A vote answers it too, so it goes first and the rest follow.
+      if ((a.act === 'approve' || a.act === 'deny') && list.length > 1)
         return issue(
-          'A suggestion action has to be the only action on its button or option.',
+          'Approve and Deny have to be the only action on their button or option.',
+          here,
+        );
+      if (a !== list[0])
+        return issue(
+          'A vote has to be the first action on its button or option.',
           here,
         );
     } else
@@ -859,8 +865,6 @@ export type StudioVars = {
 export type StudioVariable = {
   name: string;
   about: string;
-  /** Filled in only by welcome, leave and boost messages. */
-  member?: true;
   /** Filled in only by reaction role responses. */
   role?: true;
   /** Filled in only by suggestion messages. */
@@ -886,32 +890,26 @@ export const studioVariables: StudioVariable[] = [
   {
     name: 'user.avatar',
     about: 'The member’s profile picture. Paste it as a picture link.',
-    member: true,
   },
   {
     name: 'user.created',
     about: 'How long ago their Discord account was made.',
-    member: true,
   },
   {
     name: 'user.joined',
     about: 'How long ago they joined the server.',
-    member: true,
   },
   {
     name: 'server.icon',
     about: 'The server’s picture. Paste it as a picture link.',
-    member: true,
   },
   {
     name: 'server.boosts',
     about: 'How many boosts the server has.',
-    member: true,
   },
   {
     name: 'server.level',
     about: 'The server’s boost level, 0 to 3.',
-    member: true,
   },
   {
     name: 'role',

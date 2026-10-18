@@ -99,6 +99,7 @@ export {
   sgMessageIssue,
   sgOutcome,
   sgPresets,
+  sgVoteOrder,
   sgRanges,
   sgRatioColour,
   sgStatusName,

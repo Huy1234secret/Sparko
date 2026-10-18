@@ -1,6 +1,6 @@
 import type { Db } from './db.ts';
 import { DiscordCodes, DiscordError, type Rest } from './discord.ts';
-import { getGuild, getModule } from './store.ts';
+import { getGuild, getModule, serverVars } from './store.ts';
 import { getPosted, setPosted } from './tickets.ts';
 import { Plain } from './ticket-actions.ts';
 import { rememberPost } from './studio-actions.ts';
@@ -34,7 +34,7 @@ export async function publishStudio(
   const body = studioPayload(m, {
     now,
     user,
-    server: guild && { name: guild.name, members: guild.memberCount },
+    server: serverVars(guild),
     channel: m.channel,
   });
   const key = `studio:${m.layout}`;
@@ -102,7 +102,7 @@ export async function editStudioMessage(
   const body = studioPayload(m, {
     now,
     user,
-    server: guild && { name: guild.name, members: guild.memberCount },
+    server: serverVars(guild),
     channel: target.channelId,
   });
   try {

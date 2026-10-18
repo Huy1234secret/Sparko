@@ -7,6 +7,7 @@
  */
 import { parseDuration } from './auto-roles.ts';
 import {
+  actionsProblem,
   componentRows,
   embedDefault,
   emojiPayload,
@@ -14,6 +15,7 @@ import {
   studioPayload,
   v2Default,
   type ButtonColour,
+  type StudioAction,
   type StudioMessage,
   type StudioVars,
 } from './studio-format.ts';
@@ -29,6 +31,8 @@ export type SgVoteOption = {
   /** A menu option's description. */
   description: string;
   colour: ButtonColour;
+  /** What else a vote does, after counting it (buttons and menus only). */
+  actions: StudioAction[];
 };
 
 /** What a status does when staff set it, from top to bottom. */
@@ -70,6 +74,8 @@ export type Suggestions = {
     kind: SgVoteKind;
     up: SgVoteOption;
     down: SgVoteOption;
+    /** Which vote comes first, as people drag them. */
+    first: 'up' | 'down';
     /** The menu's text before anything is picked. */
     placeholder: string;
   };
@@ -180,8 +186,21 @@ export const sgDefault = (channel = ''): Suggestions => ({
   deleters: [],
   vote: {
     kind: 'button',
-    up: { emoji: '👍', label: 'Upvote', description: '', colour: 'green' },
-    down: { emoji: '👎', label: 'Downvote', description: '', colour: 'red' },
+    up: {
+      emoji: '👍',
+      label: 'Upvote',
+      description: '',
+      colour: 'green',
+      actions: [],
+    },
+    down: {
+      emoji: '👎',
+      label: 'Downvote',
+      description: '',
+      colour: 'red',
+      actions: [],
+    },
+    first: 'up',
     placeholder: 'Vote on this suggestion',
   },
   changeVotes: true,
@@ -350,6 +369,7 @@ export function sgIssue(
   // Voting.
   const v = x.vote;
   if (!v || !['reaction', 'button', 'menu'].includes(v.kind)) return missing;
+  if (!['up', 'down'].includes(v.first)) return missing;
   for (const [o, name] of [
     [v.up, 'upvote'],
     [v.down, 'downvote'],
@@ -364,6 +384,13 @@ export function sgIssue(
       return missing;
     if (o.emoji.length > 80)
       return at('vote', `The ${name} emoji is too long.`);
+    // The vote itself is the first action; up to 9 more follow it.
+    if (!Array.isArray(o.actions) || o.actions.length > 9)
+      return at('vote', `The ${name} does up to 9 more things.`);
+    if (o.actions.some((a) => a?.type === 'suggestion'))
+      return at('vote', `The ${name} already votes; add other actions.`);
+    const actions = actionsProblem(o.actions, 'vote');
+    if (actions) return at('vote', `The ${name}: ${actions.problem}`);
     if (v.kind === 'reaction' && !o.emoji)
       return at('vote', `Pick an emoji for the ${name}.`);
     if (v.kind === 'button') {
@@ -510,6 +537,7 @@ export function cleanSuggestions(c: Suggestions): Suggestions {
     label: o.label.trim(),
     description: o.description.trim(),
     colour: o.colour,
+    actions: structuredClone(o.actions),
   });
   return {
     channel: c.channel,
@@ -524,6 +552,7 @@ export function cleanSuggestions(c: Suggestions): Suggestions {
       kind: c.vote.kind,
       up: option(c.vote.up),
       down: option(c.vote.down),
+      first: c.vote.first,
       placeholder: c.vote.placeholder.trim(),
     },
     changeVotes: c.changeVotes,
@@ -573,7 +602,12 @@ export function sgUpgrade(saved: Partial<Suggestions> | null | undefined) {
   return {
     ...base,
     ...saved,
-    vote: { ...base.vote, ...saved.vote },
+    vote: {
+      ...base.vote,
+      ...saved.vote,
+      up: { ...base.vote.up, ...saved.vote?.up },
+      down: { ...base.vote.down, ...saved.vote?.down },
+    },
     commands: { ...base.commands, ...saved.commands },
   } as Suggestions;
 }
@@ -887,6 +921,12 @@ export function sgChunks(text: string, first: number, rest: number) {
 
 const hexNumber = (h: string) => Number.parseInt(h.slice(1), 16);
 
+/** The upvote and downvote, in the order people put them. */
+export const sgVoteOrder = <T>(
+  v: { first: 'up' | 'down' },
+  pair: readonly [T, T],
+) => (v.first === 'down' ? [pair[1], pair[0]] : [pair[0], pair[1]]);
+
 /** Discord's vote buttons or menu for a suggestion. */
 export function sgVoteComponents(c: Suggestions, closed: boolean) {
   const v = c.vote;
@@ -896,12 +936,10 @@ export function sgVoteComponents(c: Suggestions, closed: boolean) {
     return [
       {
         type: 1,
-        components: (
-          [
-            ['sg:up', v.up],
-            ['sg:down', v.down],
-          ] as const
-        ).map(([id, o]) => ({
+        components: sgVoteOrder(v, [
+          ['sg:up', v.up],
+          ['sg:down', v.down],
+        ] as const).map(([id, o]) => ({
           type: 2,
           style: style[o.colour],
           custom_id: id,
@@ -922,12 +960,10 @@ export function sgVoteComponents(c: Suggestions, closed: boolean) {
           placeholder: (closed ? 'Voting is closed' : v.placeholder) || 'Vote',
           min_values: 1,
           max_values: 1,
-          options: (
-            [
-              ['up', v.up],
-              ['down', v.down],
-            ] as const
-          ).map(([value, o]) => ({
+          options: sgVoteOrder(v, [
+            ['up', v.up],
+            ['down', v.down],
+          ] as const).map(([value, o]) => ({
             label: o.label || (value === 'up' ? 'Upvote' : 'Downvote'),
             value,
             ...(o.description ? { description: o.description } : {}),

@@ -273,6 +273,9 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX sg_log_by_guild ON sg_log (guild_id, id DESC);`,
+  // Boosts, so {server.boosts} and {server.level} work in every message.
+  `ALTER TABLE guilds ADD COLUMN boosts INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE guilds ADD COLUMN boost_level INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export function openDb(path: string): Db {

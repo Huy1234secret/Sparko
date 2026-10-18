@@ -31,6 +31,7 @@ import {
   sgPresets,
   sgRatioColour,
   sgStatusName,
+  sgVoteOrder,
   studioIssue,
   useStudio,
   useStudioActions,
@@ -61,7 +62,11 @@ import {
 } from './frame';
 import { ContainerCanvas } from './ContainerCanvas';
 import { EmbedCanvas } from './EmbedCanvas';
-import { StudioDataProvider } from './ComponentsEditor';
+import {
+  ActionsEditor,
+  ComponentItem,
+  StudioDataProvider,
+} from './ComponentsEditor';
 import {
   AnimatedIconButton,
   EditingIcon,
@@ -69,6 +74,7 @@ import {
   InsertProvider,
   IssueProvider,
   flashIssue,
+  useReorder,
   type ShownIssue,
 } from './EditorBits';
 import { JsonPanel } from './JsonPanel';
@@ -91,7 +97,7 @@ const tabLabels: Record<Tab, string> = {
 const tabIcons: Record<Tab, { icon: string; anim: RevealHover | undefined }> = {
   settings: { icon: 'settings', anim: animIcons.settingOutline },
   edit: { icon: 'square-pen', anim: animIcons.template },
-  storage: { icon: 'layers', anim: undefined },
+  storage: { icon: 'layers', anim: animIcons.storage },
   logs: { icon: 'scroll-text', anim: animIcons.log },
   commands: { icon: 'terminal', anim: animIcons.command },
 };
@@ -442,9 +448,11 @@ export function SuggestionsModule({
 function VotePreview({
   config,
   onEdit,
+  onChange,
 }: {
   config: Suggestions;
   onEdit: (which: 'up' | 'down') => void;
+  onChange: (patch: Partial<Suggestions>) => void;
 }) {
   const v = config.vote;
   const ratio = { up: 12, down: 3 };
@@ -466,34 +474,7 @@ function VotePreview({
       </div>
     );
   if (v.kind === 'button')
-    return (
-      <div className="sp-rr-preview" aria-label="Vote buttons">
-        <div className="dc-row">
-          {(['up', 'down'] as const).map((which) => {
-            const o = v[which];
-            return (
-              <button
-                key={which}
-                type="button"
-                aria-label={`Edit the ${which}vote button`}
-                onClick={() => onEdit(which)}
-                className={cx(
-                  'dc-btn sp-sg-edit-vote',
-                  o.colour === 'blurple' && 'dc-btn--primary',
-                  o.colour === 'green' && 'dc-btn--success',
-                  o.colour === 'red' && 'dc-btn--danger',
-                )}
-              >
-                {o.emoji && (
-                  <span className="dc-emoji">{renderDiscordText(o.emoji)}</span>
-                )}
-                {o.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
+    return <VoteButtons config={config} onChange={onChange} />;
   return (
     <div className="sp-rr-preview" aria-label="Vote menu">
       <button
@@ -505,6 +486,79 @@ function VotePreview({
         <span>{v.placeholder || 'Vote on this suggestion'}</span>
         <Icon name="chevron-down" size="sm" />
       </button>
+    </div>
+  );
+}
+
+/**
+ * The vote buttons, edited like any other button: they can be dragged and
+ * given more actions, but always vote first and can't be removed.
+ */
+function VoteButtons({
+  config,
+  onChange,
+}: {
+  config: Suggestions;
+  onChange: (patch: Partial<Suggestions>) => void;
+}) {
+  const v = config.vote;
+  const order = sgVoteOrder(v, ['up', 'down'] as const);
+  const { list: listRef, ...reorder } = useReorder({
+    mode: 'grid',
+    onMove: (from, to) => {
+      if (from !== to) onChange({ vote: { ...v, first: order[to]! } });
+    },
+  });
+  return (
+    <div className="sp-rr-preview" aria-label="Vote buttons">
+      <div
+        ref={listRef}
+        className={cx(
+          'dc-components sp-comps',
+          reorder.dragging && 'is-dragging',
+        )}
+      >
+        <div className="dc-row">
+          {order.map((which, i) => {
+            const o = v[which];
+            return (
+              <ComponentItem
+                key={which}
+                vote={which}
+                index={i}
+                count={2}
+                reorder={reorder}
+                startOpen={false}
+                component={{
+                  id: `vote-${which}`,
+                  type: 'button',
+                  label: o.label,
+                  emoji: o.emoji,
+                  colour: o.colour,
+                  link: false,
+                  url: '',
+                  actions: o.actions,
+                }}
+                onChange={(c) => {
+                  if (c.type !== 'button') return;
+                  onChange({
+                    vote: {
+                      ...v,
+                      [which]: {
+                        ...o,
+                        label: c.label,
+                        emoji: c.emoji,
+                        colour: c.colour,
+                        actions: c.actions,
+                      },
+                    },
+                  });
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -691,7 +745,11 @@ function SGEdit({
               </p>
             }
             below={
-              <VotePreview config={config} onEdit={(w) => setVoteEdit(w)} />
+              <VotePreview
+                config={config}
+                onEdit={(w) => setVoteEdit(w)}
+                onChange={onChange}
+              />
             }
           />
         </fieldset>
@@ -788,23 +846,40 @@ function SGEdit({
             : voteEdit
               ? [voteEdit]
               : []
-          ).map((which) => (
-            <VoteCard
-              key={which}
-              kind={config.vote.kind}
-              which={which}
-              option={config.vote[which]}
-              serverId={server.id}
-              onChange={(patch) =>
-                onChange({
-                  vote: {
-                    ...config.vote,
-                    [which]: { ...config.vote[which], ...patch },
-                  },
-                })
-              }
-            />
-          ))}
+          ).map((which) => {
+            const change = (patch: Partial<Suggestions['vote']['up']>) =>
+              onChange({
+                vote: {
+                  ...config.vote,
+                  [which]: { ...config.vote[which], ...patch },
+                },
+              });
+            return (
+              <VoteCard
+                key={which}
+                kind={config.vote.kind}
+                which={which}
+                option={config.vote[which]}
+                serverId={server.id}
+                onChange={change}
+              >
+                {config.vote.kind === 'menu' && (
+                  <div className="sp-sg-vote__actions">
+                    <ActionsEditor
+                      actions={config.vote[which].actions}
+                      issueAt={`vote:${which}`}
+                      locked={{
+                        title: which === 'up' ? 'Upvote' : 'Downvote',
+                        about:
+                          'Counts the vote. The actions below run only when a vote counts, not when it’s taken back.',
+                      }}
+                      onChange={(actions) => change({ actions })}
+                    />
+                  </div>
+                )}
+              </VoteCard>
+            );
+          })}
         </ul>
       </Modal>
     </div>

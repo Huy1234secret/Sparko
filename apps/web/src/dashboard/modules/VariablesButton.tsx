@@ -23,15 +23,12 @@ export const variablesAnimations = [bookReveal, bookHover, bookOpen];
  */
 export function VariablesButton({
   v2,
-  member,
   role,
   suggestion,
   onPick,
 }: {
   /** Components V2 messages also have {separator}. */
   v2: boolean;
-  /** Welcome, leave and boost messages fill in more about the member. */
-  member?: boolean;
   /** Reaction role responses fill in the role. */
   role?: boolean;
   /** Suggestion messages fill in the suggestion. */
@@ -67,7 +64,6 @@ export function VariablesButton({
     },
   ];
   const works = (v: (typeof all)[number]) =>
-    (member || !('member' in v && v.member)) &&
     (role || !('role' in v && v.role)) &&
     (suggestion || !('suggestion' in v && v.suggestion)) &&
     (v2 || !('v2' in v && v.v2));
@@ -90,17 +86,12 @@ export function VariablesButton({
             label: 'Reaction role',
             tip: 'Only filled in by reaction role responses. Anywhere else it’s sent empty.',
           }
-        : 'member' in v && v.member
+        : 'v2' in v && v.v2
           ? {
-              label: 'Welcome',
-              tip: 'Only filled in by welcome, leave and boost messages. Anywhere else it’s sent empty.',
+              label: 'V2',
+              tip: 'Only works in V2 components messages. In an embed message it’s left out.',
             }
-          : 'v2' in v && v.v2
-            ? {
-                label: 'V2',
-                tip: 'Only works in V2 components messages. In an embed message it’s left out.',
-              }
-            : null;
+          : null;
   return (
     <div ref={wrap} className="sp-pop-anchor">
       <button
