@@ -448,30 +448,7 @@ async function reactionRoleReaction(
     // A refused reaction is taken back off, so it doesn't look like it worked.
     if (action === 'react' && done.refused.length && !done.given.length)
       await reaction.users.remove(user.id).catch(() => {});
-    const note = done.response ?? {
-      content: rrSummary(done),
-      allowed_mentions: { parse: [] },
-    };
-    if (!done.response && !done.refused.length) return;
-    // Reactions can't answer privately in the channel, so a channel reply
-    // mentions them and is deleted after ten seconds.
-    if (done.delivery !== 'dm') {
-      const sent = await rest
-        .post<{ id: string }>(`/channels/${done.channelId}/messages`, {
-          ...note,
-          content:
-            `<@${member.id}> ${(note as { content?: string }).content ?? ''}`.trim(),
-          allowed_mentions: { parse: [], users: [member.id] },
-        })
-        .catch(() => null);
-      if (sent)
-        setTimeout(() => {
-          rest
-            .delete(`/channels/${done.channelId}/messages/${sent.id}`)
-            .catch(() => {});
-        }, 10_000).unref();
-    }
-    if (done.delivery !== 'channel') await dm(member.id, note);
+    // Reactions can't be answered privately, so they get no reply.
   } catch (error) {
     console.error('A reaction role reaction failed', error);
   }

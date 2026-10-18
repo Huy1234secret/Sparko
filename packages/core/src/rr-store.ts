@@ -359,13 +359,15 @@ export async function applyReactionRole(
   // The response message, if one is set for what happened.
   const res = r.response;
   const pick = given.length ? res.claim : taken.length ? res.remove : '';
-  const message: StudioMessage | undefined = !res.on
-    ? undefined
-    : pick === RR_SPARKO
-      ? rrSparkoMessage(given.length ? 'claim' : 'remove')
-      : pick
-        ? getTemplate<StudioMessage>(db, guildId, 'studio', pick)?.message
-        : undefined;
+  // Reactions can't be answered privately, so only buttons and menus reply.
+  const message: StudioMessage | undefined =
+    !res.on || r.kind === 'reaction'
+      ? undefined
+      : pick === RR_SPARKO
+        ? rrSparkoMessage(given.length ? 'claim' : 'remove')
+        : pick
+          ? getTemplate<StudioMessage>(db, guildId, 'studio', pick)?.message
+          : undefined;
   const guild = getGuild(db, guildId);
   const role = given[0] ?? taken[0];
   const response = message
