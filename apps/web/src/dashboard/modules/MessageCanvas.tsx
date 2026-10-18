@@ -86,6 +86,7 @@ export function MessageCanvas({
   roleVariables,
   suggestionVariables,
   locked,
+  maxRows: rowLimit,
   check = (m) => m,
 }: {
   server: Server;
@@ -107,6 +108,8 @@ export function MessageCanvas({
    * own. Text, buttons and menus can still go outside it.
    */
   locked?: boolean;
+  /** Rows of buttons and menus it can hold, when fewer than Discord's 5. */
+  maxRows?: number;
   /** Adjusts the message before it's checked. */
   check?: (m: StudioMessage) => StudioMessage;
 }) {
@@ -129,11 +132,11 @@ export function MessageCanvas({
     const menu = newMenu();
     onChange({ components: [...message.components, menu] });
   };
-  // A suggestion's vote buttons take one of an embed message's five rows.
-  const maxRows = locked && !v2 ? MAX_ROWS - 1 : MAX_ROWS;
+  // A suggestion's vote menu takes one of an embed message's five rows.
+  const maxRows = v2 ? MAX_ROWS : (rowLimit ?? MAX_ROWS);
   const rows =
     maxRows < MAX_ROWS
-      ? 'The vote buttons take a row, so this holds 4 rows of buttons and menus.'
+      ? `The vote menu takes a row, so this holds ${maxRows} rows of buttons and menus.`
       : 'Discord shows up to 5 rows of buttons and menus.';
   const separator: PlusItem = {
     label: 'Add separator',

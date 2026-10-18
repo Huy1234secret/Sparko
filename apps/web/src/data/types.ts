@@ -365,6 +365,8 @@ export type StudioButton = {
   link: boolean;
   url: string;
   actions: StudioAction[];
+  /** A suggestion's upvote or downvote button, placed among the others. */
+  vote?: 'up' | 'down';
 };
 export type MenuOption = {
   id: string;

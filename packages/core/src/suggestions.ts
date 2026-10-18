@@ -11,6 +11,7 @@ import {
   componentRows,
   embedDefault,
   emojiPayload,
+  hasVoteButtons,
   IS_COMPONENTS_V2,
   studioPayload,
   v2Default,
@@ -617,7 +618,11 @@ export function sgUpgrade(saved: Partial<Suggestions> | null | undefined) {
  * no pictures. Its own buttons and menus sit above the vote buttons.
  */
 export function sgMessageIssue(m: StudioMessage): SgIssue | null {
-  if (m.layout !== 'v2' && componentRows(m.components).length > 4)
+  if (
+    m.layout !== 'v2' &&
+    !hasVoteButtons(m) &&
+    componentRows(m.components).length > 4
+  )
     return {
       at: 'message',
       problem:
@@ -1028,11 +1033,22 @@ export function sgPayloads(
   const user = c.anonymous
     ? undefined
     : { id: s.authorId, name: s.authorName, avatar: s.authorAvatar };
+  // Vote buttons the message places itself replace the row under it.
+  const placed = c.vote.kind === 'button' && hasVoteButtons(message);
+  const own = (o: SgVoteOption) => ({
+    label: o.label,
+    emoji: o.emoji,
+    colour: o.colour,
+  });
   const main = studioPayload(message, {
     ...ctx,
     user,
     extra: { ...ctx.extra, ...extra },
+    votes: placed
+      ? { up: own(c.vote.up), down: own(c.vote.down), closed: s.closed }
+      : undefined,
   }) as Payload;
+  const voteRow = placed ? [] : sgVoteComponents(c, s.closed);
   const pictures = s.files.filter((f) => f.kind !== 'file');
   const st = sgStatusOf(c, s.status);
   const color = st?.color ?? '#FACC15';
@@ -1073,7 +1089,7 @@ export function sgPayloads(
           },
         ],
       });
-    main.components!.push(...sgVoteComponents(c, s.closed));
+    main.components!.push(...voteRow);
   } else {
     const embed = main.embeds?.[0];
     if (embed && !embed.image && pictures[0]?.kind === 'image')
@@ -1090,10 +1106,7 @@ export function sgPayloads(
         footer: { text: reason.byId },
         timestamp: new Date(reason.at).toISOString(),
       });
-    main.components = [
-      ...(main.components ?? []),
-      ...sgVoteComponents(c, s.closed),
-    ];
+    main.components = [...(main.components ?? []), ...voteRow];
   }
   const accent =
     message.layout === 'v2'

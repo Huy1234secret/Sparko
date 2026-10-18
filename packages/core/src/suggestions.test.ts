@@ -287,6 +287,60 @@ describe('the message', () => {
       })?.problem,
     ).toMatch(/4 rows/);
   });
+  it('puts vote buttons where the message places them', () => {
+    const card = sgPresets[0]!.message;
+    const vote = (which: 'up' | 'down') => ({
+      id: `vote-${which}`,
+      type: 'button' as const,
+      vote: which,
+      label: '',
+      emoji: '',
+      colour: 'grey' as const,
+      link: false,
+      url: '',
+      actions: [],
+    });
+    const own = {
+      id: 'mine',
+      type: 'button' as const,
+      label: 'Rules',
+      emoji: '',
+      colour: 'grey' as const,
+      link: true,
+      url: 'https://x.example',
+      actions: [],
+    };
+    const message = { ...card, components: [vote('down'), own, vote('up')] };
+    const { main } = sgPayloads(config(), message, suggestion(), { now: 0 });
+    // One row: downvote, the link, upvote, dressed as the settings say.
+    expect(main.components).toMatchObject([
+      {
+        type: 1,
+        components: [
+          { custom_id: 'sg:down', label: 'Downvote', style: 4 },
+          { url: 'https://x.example' },
+          { custom_id: 'sg:up', label: 'Upvote', style: 3 },
+        ],
+      },
+    ]);
+    // Closed voting greys them out.
+    const closed = sgPayloads(config(), message, suggestion({ closed: true }), {
+      now: 0,
+    }).main.components as { components: { disabled?: boolean }[] }[];
+    expect(closed[0]!.components[0]!.disabled).toBe(true);
+    // Voting with a menu leaves them out and adds the menu.
+    const menu = sgPayloads(
+      config({ vote: { ...sgDefault('1').vote, kind: 'menu' } }),
+      message,
+      suggestion(),
+      { now: 0 },
+    ).main.components as { components: { custom_id?: string }[] }[];
+    expect(menu.map((r) => r.components.map((c) => c.custom_id))).toEqual([
+      [undefined],
+      ['sg:vote'],
+    ]);
+    expect(sgMessageIssue(message)).toBeNull();
+  });
   it('fills the suggestion variables and adds the vote buttons', () => {
     const { main } = sgPayloads(config(), sgPresets[0]!.message, suggestion(), {
       now: 0,
