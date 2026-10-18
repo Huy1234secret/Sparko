@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { cx, Icon } from './core';
+import { InfoTip } from './tip';
 import { LottieIcon, preloadAnimations } from './animated';
 import { SearchIcon, searchAnimations } from './search-icon';
 import { usePlacement, usePresence } from './placement';
@@ -230,8 +231,15 @@ export function Combobox(props: Props) {
       onPointerEnter={preloadCombobox}
       onFocus={preloadCombobox}
     >
-      <span className="sp-label" id={`${id}-label`}>
-        {label}
+      <span className="sp-label">
+        <span id={`${id}-label`}>{label}</span>
+        {/* Help sits in an (i) beside the label, not under the list. */}
+        {hint && label && (
+          <>
+            {' '}
+            <InfoTip text={hint} />
+          </>
+        )}
       </span>
       {props.multiple ? (
         <div
@@ -404,7 +412,7 @@ export function Combobox(props: Props) {
           <Icon name="circle-alert" />
           {error}
         </p>
-      ) : hint ? (
+      ) : hint && !label ? (
         <p className="sp-hint">{hint}</p>
       ) : null}
     </div>

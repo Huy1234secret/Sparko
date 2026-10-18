@@ -29,6 +29,7 @@ import {
   InfoTip,
   moveItem,
   useReorder,
+  HoverTip,
 } from './EditorBits';
 import { EmojiField } from './EmojiPicker';
 import { PlusMenu } from './PlusMenu';
@@ -251,7 +252,7 @@ function ActionCard({
                 value: NONE,
                 label: 'Sparko’s template',
                 icon: 'sparkles',
-                group: 'Options',
+                group: 'Default',
                 note: 'Says the status, the reason and who set it',
               },
               ...templates,
@@ -260,9 +261,13 @@ function ActionCard({
         )}
       </div>
       {fixed ? (
-        <span className="sp-action__trash sp-sg-fixed" title="Always on">
+        <HoverTip
+          className="sp-action__trash sp-sg-fixed"
+          text="This action is always on, so it can’t be removed."
+          label
+        >
           <Icon name="lock" size="sm" />
-        </span>
+        </HoverTip>
       ) : (
         <TrashButton
           label={`Remove action ${index + 1}`}
@@ -428,9 +433,13 @@ function StatusCard({
         <Icon name="settings" size="lg" />
       </button>
       {builtIn ? (
-        <span className="sp-sg-fixed" title="Approved and Denied are built in">
+        <HoverTip
+          className="sp-sg-fixed"
+          text="Approved and Denied are built in, so they can’t be removed. You can still rename them and change what they do."
+          label
+        >
           <Icon name="lock" size="sm" />
-        </span>
+        </HoverTip>
       ) : (
         <button
           type="button"
@@ -541,7 +550,7 @@ export function SGSettings({
                     value: NONE,
                     label: 'None: post straight away',
                     icon: 'ban',
-                    group: 'Options',
+                    group: 'Default',
                   },
                   ...channels.map((c) => ({
                     value: c.id,
@@ -590,7 +599,7 @@ export function SGSettings({
                 value={config.blacklist || NONE}
                 onChange={(v) => onChange({ blacklist: v === NONE ? '' : v })}
                 items={[
-                  { value: NONE, label: 'None', icon: 'ban', group: 'Options' },
+                  { value: NONE, label: 'None', icon: 'ban', group: 'Default' },
                   ...roleItems(roles, [config.blacklist]).map((r) =>
                     config.suggesters.includes(r.value)
                       ? { ...r, disabled: true, note: 'Can suggest' }
@@ -766,6 +775,7 @@ export function SGSettings({
               n={config.statuses.length}
               max={limits.statuses}
               what="statuses"
+              icon="status"
             />
             <AnimatedIconButton
               size="sm"

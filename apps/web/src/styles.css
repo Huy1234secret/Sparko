@@ -410,3 +410,42 @@ a.sp-soon__signin {
 .sp-soon__legal {
   font-size: 13px;
 }
+
+/* The (i) beside a setting, and the dark bubble it shows on hover. */
+.sp-tip {
+  position: relative;
+  display: inline-grid;
+  vertical-align: -3px;
+  color: var(--sp-muted);
+  cursor: help;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.sp-tip:hover,
+.sp-tip:focus-visible {
+  outline: none;
+  color: var(--sp-text);
+}
+.sp-tip__bubble {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  width: max-content;
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: var(--sp-radius-chip);
+  background: var(--sp-tooltip-bg);
+  box-shadow: var(--sp-shadow-overlay);
+  color: var(--sp-tooltip-text);
+  font: 400 12px/17px var(--sp-font-sans);
+  text-transform: none;
+  letter-spacing: normal;
+  pointer-events: none;
+  animation: sp-tip-fade var(--sp-dur-fast) var(--sp-ease-out);
+}
+@keyframes sp-tip-fade {
+  from {
+    opacity: 0;
+  }
+}

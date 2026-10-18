@@ -956,7 +956,8 @@ export const studioVariables: StudioVariable[] = [
 
 /**
  * Fills {variables} in. A variable with nothing to fill it (no member when
- * staff post from the dashboard, say) is left as written. {separator} only
+ * staff post from the dashboard, say) is sent empty; text in braces that
+ * isn't a variable is left as written. {separator} only
  * means something in Components V2 and is dropped elsewhere.
  */
 export function fillVariables(text: string, ctx: { now: number } & StudioVars) {
@@ -985,11 +986,15 @@ export function fillVariables(text: string, ctx: { now: number } & StudioVars) {
     separator: '',
     ...ctx.extra,
   };
+  // A variable this message can't fill (like {role} outside a reaction
+  // role) is sent empty; braces that aren't a variable stay as written.
   return text.replace(
     /\{([a-z.-]+)\}/g,
-    (whole, name: string) => values[name] ?? whole,
+    (whole, name: string) =>
+      values[name] ?? (known.has(name) || name in values ? '' : whole),
   );
 }
+const known = new Set(studioVariables.map((v) => v.name));
 export const IS_COMPONENTS_V2 = 1 << 15;
 
 /** The message body for Discord's create/edit message endpoints. */

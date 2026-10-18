@@ -93,7 +93,7 @@ const tabIcons: Record<Tab, { icon: string; anim: RevealHover | undefined }> = {
   edit: { icon: 'square-pen', anim: animIcons.template },
   storage: { icon: 'layers', anim: undefined },
   logs: { icon: 'scroll-text', anim: animIcons.log },
-  commands: { icon: 'terminal', anim: undefined },
+  commands: { icon: 'terminal', anim: animIcons.command },
 };
 
 /** The open tab, kept in the address so links and Back work. */

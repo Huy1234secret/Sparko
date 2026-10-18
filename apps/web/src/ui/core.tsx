@@ -1,5 +1,6 @@
 import { SearchIcon } from './search-icon';
 import { AnimatedCheck, RevealIcon } from './animated';
+import { InfoTip } from './tip';
 import type { RevealHover } from './anim-icons';
 import {
   useId,
@@ -128,19 +129,30 @@ export function Field({
 }) {
   return (
     <div className="sp-field">
-      {label && (
-        <label className="sp-label" htmlFor={htmlFor}>
-          {label}
-          {optional && <span className="sp-label__opt"> (optional)</span>}
-        </label>
-      )}
+      {label &&
+        (hint ? (
+          // Help sits in an (i) beside the label, not under the field, and
+          // stays out of the field's name.
+          <span className="sp-label">
+            <label htmlFor={htmlFor}>
+              {label}
+              {optional && <span className="sp-label__opt"> (optional)</span>}
+            </label>{' '}
+            <InfoTip text={hint} />
+          </span>
+        ) : (
+          <label className="sp-label" htmlFor={htmlFor}>
+            {label}
+            {optional && <span className="sp-label__opt"> (optional)</span>}
+          </label>
+        ))}
       {children}
       {error ? (
         <p className="sp-field-error">
           <Icon name="circle-alert" />
           {error}
         </p>
-      ) : hint ? (
+      ) : hint && !label ? (
         <p className="sp-hint">{hint}</p>
       ) : null}
     </div>
@@ -210,7 +222,13 @@ export function Textarea({
   const inputId = id ?? auto;
   const length = String(rest.value ?? '').length;
   return (
-    <Field label={label} error={error} htmlFor={inputId}>
+    <Field
+      label={label}
+      error={error}
+      htmlFor={inputId}
+      // With a label, the hint moves into the label's (i).
+      {...(label && hint ? { hint } : {})}
+    >
       <div
         className={cx(
           'sp-input sp-input--multiline',
@@ -225,9 +243,9 @@ export function Textarea({
           {...rest}
         />
       </div>
-      {!error && (hint || maxLength) && (
+      {!error && ((hint && !label) || maxLength) && (
         <div className="sp-field__row">
-          <p className="sp-hint">{hint}</p>
+          <p className="sp-hint">{label ? null : hint}</p>
           {maxLength && (
             <p className="sp-hint sp-tnum">
               {length} / {maxLength}

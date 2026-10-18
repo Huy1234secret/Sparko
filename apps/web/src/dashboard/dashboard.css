@@ -2088,38 +2088,6 @@ body:has(> .sp-settings-scrim) > #root {
 }
 
 /* Info tips: the (i) beside a setting, explained on hover or focus */
-.sp-tip {
-  position: relative;
-  display: inline-grid;
-  vertical-align: -3px;
-  color: var(--sp-muted);
-  cursor: help;
-  text-transform: none;
-  letter-spacing: normal;
-}
-.sp-tip:hover,
-.sp-tip:focus-visible {
-  outline: none;
-  color: var(--sp-text);
-}
-.sp-tip__bubble {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1000;
-  width: max-content;
-  max-width: 260px;
-  padding: 8px 10px;
-  border-radius: var(--sp-radius-chip);
-  background: var(--sp-tooltip-bg);
-  box-shadow: var(--sp-shadow-overlay);
-  color: var(--sp-tooltip-text);
-  font: 400 12px/17px var(--sp-font-sans);
-  text-transform: none;
-  letter-spacing: normal;
-  pointer-events: none;
-  animation: sp-fade var(--sp-dur-fast) var(--sp-ease-out);
-}
 
 /* Anything being dragged lifts off the page and follows the pointer. */
 .sp-embed-wrap.is-dragged,
@@ -2146,8 +2114,13 @@ body:has(> .sp-settings-scrim) > #root {
   top: 22px;
   left: -58px;
   width: 52px;
-  grid-template-columns: 24px 24px;
+  /* Right-aligned, so the wheel sits by the bar even when the gallery
+     button isn't there (as in suggestions). */
+  grid-template-columns: none;
   grid-template-rows: auto;
+  grid-auto-columns: 24px;
+  grid-auto-flow: column;
+  justify-content: end;
   align-content: start;
   gap: 4px;
 }
@@ -2404,6 +2377,52 @@ body:has(> .sp-settings-scrim) > #root {
   color: var(--sp-muted);
   font: 400 12px/16px var(--sp-font-sans);
 }
+.sp-vars-pop__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Tags say which messages fill a variable in; hover one for more. */
+.sp-vars-pop__item .sp-vars-pop__tag {
+  padding: 1px 7px;
+  border: 1px solid var(--sp-line-strong);
+  border-radius: 999px;
+  color: var(--sp-muted);
+  font: 600 10px/14px var(--sp-font-sans);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+/* Variables this message can't fill: still added if picked, sent empty. */
+.sp-vars-pop__item.is-off code,
+.sp-vars-pop__item.is-off > span:last-child {
+  opacity: 0.5;
+}
+.sp-vars-pop__search {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-surface);
+  color: var(--sp-muted);
+}
+.sp-vars-pop__search:focus-within {
+  border-color: var(--sp-focus-edge);
+}
+.sp-vars-pop__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--sp-text);
+  font: 400 13px/18px var(--sp-font-sans);
+}
 
 /* Dropdowns: picked values as outlined chips, an animated search box, and
    options that outline on hover and draw a tick when picked. Roles are
@@ -2640,6 +2659,9 @@ body:has(> .sp-settings-scrim) > #root {
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  /* One row the panel's height: the text scrolls inside it, and the line
+     numbers (moved to match) don't stretch it to the whole document. */
+  grid-template-rows: minmax(0, 1fr);
   height: 320px;
   overflow: hidden;
   border: 1px solid var(--sp-line-strong);
@@ -3236,14 +3258,12 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-cp__shuffle.is-on .sp-check__box--anim {
   animation: sp-shuffle-ink 4s linear infinite;
 }
-.sp-embed-wrap.is-shuffle .dc-embed,
-.sp-embed-wrap.is-shuffle.sp-v2-wrap > * {
+.sp-embed-wrap.is-shuffle .dc-embed {
   animation: sp-shuffle-bar 4s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .sp-cp__shuffle.is-on .sp-check__box--anim,
-  .sp-embed-wrap.is-shuffle .dc-embed,
-  .sp-embed-wrap.is-shuffle.sp-v2-wrap > * {
+  .sp-embed-wrap.is-shuffle .dc-embed {
     animation-duration: 20s;
   }
 }
@@ -3474,6 +3494,12 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-sg-vote {
   position: relative;
   padding-top: 22px;
+}
+/* Same spacing for reactions, buttons and menus, so the emoji stays put
+   when switching between them. */
+.sp-rr-item.sp-sg-vote {
+  gap: 10px;
+  padding: 24px 10px 10px;
 }
 .sp-sg-vote__tag {
   position: absolute;

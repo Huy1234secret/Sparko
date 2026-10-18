@@ -542,16 +542,12 @@ function RREditor({
       : undefined;
   const items = templateItems(studio);
   // Sparko's own message comes first; it isn't one of the server's templates.
-  const responseItems = (which: 'claim' | 'remove'): ComboItem[] => [
+  const responseItems: ComboItem[] = [
     {
       value: RR_SPARKO,
       label: 'Sparko’s template',
       icon: 'sparkles',
-      group: 'Options',
-      note:
-        which === 'claim'
-          ? 'Added {role.selected.list}'
-          : 'Removed {role.removed.list}',
+      group: 'Default',
     },
     ...items,
   ];
@@ -827,7 +823,7 @@ function RREditor({
                 onChange({ response: { ...rr.response, claim } });
                 onSide('claim');
               }}
-              items={responseItems('claim')}
+              items={responseItems}
             />
             <Combobox
               label="Remove message"
@@ -838,7 +834,7 @@ function RREditor({
                 onChange({ response: { ...rr.response, remove } });
                 onSide('remove');
               }}
-              items={responseItems('remove')}
+              items={responseItems}
             />
             <Combobox
               label="Send to"
