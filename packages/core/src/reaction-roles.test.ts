@@ -228,9 +228,9 @@ describe('reaction roles', () => {
       action: 'react',
       emoji: '🎮',
     });
-    expect(claimed?.off === false && claimed.response).toMatchObject({
-      content: 'Added <@&11>',
-    });
+    // Reactions can't be answered privately, so they get no response.
+    expect(claimed?.off === false && claimed.given).toEqual(['11']);
+    expect(claimed?.off === false && claimed.response).toBeNull();
     const removed = await applyReactionRole(rest, db, {
       messageId: 'm1',
       user: { id: '7', name: 'tomoko' },
@@ -238,8 +238,40 @@ describe('reaction roles', () => {
       action: 'unreact',
       emoji: '🎮',
     });
-    expect(removed?.off === false && removed.response).toMatchObject({
-      content: 'Removed <@&11>',
+    expect(removed?.off === false && removed.taken).toEqual(['11']);
+    expect(removed?.off === false && removed.response).toBeNull();
+
+    // Buttons answer privately, so they do get the response.
+    updateTemplate(
+      db,
+      'g',
+      RR_MODULE,
+      id,
+      {
+        who: 'Rhea',
+        message: rr({
+          kind: 'button',
+          message,
+          items: items.slice(0, 2),
+          response: {
+            on: true,
+            delivery: 'dm',
+            claim: RR_SPARKO,
+            remove: RR_SPARKO,
+          },
+        }),
+      },
+      3,
+    );
+    const pressed = await applyReactionRole(rest, db, {
+      messageId: 'm1',
+      user: { id: '7', name: 'tomoko' },
+      roles: [],
+      action: 'button',
+      item: 'a',
+    });
+    expect(pressed?.off === false && pressed.response).toMatchObject({
+      content: 'Added <@&11>',
     });
     expect(
       rrIssue(

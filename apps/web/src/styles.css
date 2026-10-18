@@ -449,3 +449,17 @@ a.sp-soon__signin {
     opacity: 0;
   }
 }
+
+/* A switch forced off: a lock sits in its thumb. */
+.sp-switch.is-locked {
+  opacity: 0.7;
+}
+.sp-switch.is-locked .sp-switch__thumb {
+  display: grid;
+  place-items: center;
+}
+.sp-switch__lock {
+  width: 10px;
+  height: 10px;
+  color: var(--sp-surface);
+}

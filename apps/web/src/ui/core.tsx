@@ -1,6 +1,6 @@
 import { SearchIcon } from './search-icon';
 import { AnimatedCheck, RevealIcon } from './animated';
-import { InfoTip } from './tip';
+import { HoverTip, InfoTip } from './tip';
 import type { RevealHover } from './anim-icons';
 import {
   useId,
@@ -306,6 +306,7 @@ export function Switch({
   description,
   loading,
   disabled,
+  locked,
 }: {
   checked: boolean;
   onChange?: (value: boolean) => void;
@@ -313,26 +314,31 @@ export function Switch({
   description?: string;
   loading?: boolean;
   disabled?: boolean;
+  /** Forced off: a lock on the thumb, and why on hover. */
+  locked?: string | undefined;
 }) {
-  return (
+  const box = (
     <label
       className={cx(
         'sp-switch',
         loading && 'is-loading',
-        disabled && 'is-disabled',
+        (disabled || locked) && 'is-disabled',
+        locked && 'is-locked',
       )}
     >
       <input
         className="sp-choice-input"
         type="checkbox"
         role="switch"
-        checked={checked}
-        disabled={disabled || loading}
+        checked={checked && !locked}
+        disabled={disabled || loading || !!locked}
         onChange={(e) => onChange?.(e.target.checked)}
         aria-label={label ? undefined : description}
       />
       <span className="sp-switch__track">
-        <span className="sp-switch__thumb" />
+        <span className="sp-switch__thumb">
+          {locked && <Icon name="lock" className="sp-switch__lock" />}
+        </span>
       </span>
       {label && (
         <span className="sp-switch__text">
@@ -344,6 +350,7 @@ export function Switch({
       )}
     </label>
   );
+  return locked ? <HoverTip text={locked}>{box}</HoverTip> : box;
 }
 
 export function Checkbox({

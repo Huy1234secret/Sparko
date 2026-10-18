@@ -533,6 +533,9 @@ function RREditor({
   onNewResponse: (which: 'claim' | 'remove') => void;
 }) {
   const message = messageOf(rr.message);
+  // Reactions can't be answered privately, so only buttons and menus reply.
+  const reactions = rr.kind === 'reaction';
+  const responseOn = rr.response.on && !reactions;
   const responseId = rr.response[side];
   const sparko = responseId === RR_SPARKO;
   const response = sparko
@@ -723,8 +726,8 @@ function RREditor({
       {/* The message a member gets when a role is given or taken. */}
       <div className="sp-studio__grid sp-rr-response" data-issue="response">
         <div
-          className={cx('sp-stack', !rr.response.on && 'sp-rr-off')}
-          inert={!rr.response.on}
+          className={cx('sp-stack', !responseOn && 'sp-rr-off')}
+          inert={!responseOn}
         >
           <Segmented
             label="Response for"
@@ -803,16 +806,21 @@ function RREditor({
               </p>
             </div>
             <Switch
-              checked={rr.response.on}
+              checked={responseOn}
               onChange={(next) =>
                 onChange({ response: { ...rr.response, on: next } })
               }
               description="Send a response"
+              locked={
+                reactions
+                  ? 'Discord can’t answer a reaction privately, so responses only work with buttons and menus.'
+                  : undefined
+              }
             />
           </div>
           <div
-            className={cx('sp-card__body', !rr.response.on && 'sp-rr-off')}
-            inert={!rr.response.on}
+            className={cx('sp-card__body', !responseOn && 'sp-rr-off')}
+            inert={!responseOn}
           >
             <Combobox
               label="Claim message"
@@ -840,11 +848,7 @@ function RREditor({
               label="Send to"
               searchable={false}
               value={rr.response.delivery}
-              hint={
-                rr.kind === 'reaction'
-                  ? 'Reactions can’t answer privately, so in the channel the reply mentions the member and is deleted after 10 seconds.'
-                  : 'In the channel, only the member sees it.'
-              }
+              hint="In the channel, only the member sees it."
               onChange={(v) =>
                 onChange({
                   response: { ...rr.response, delivery: v as RRDelivery },
