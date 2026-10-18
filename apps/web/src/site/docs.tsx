@@ -852,7 +852,6 @@ const pages: DocPage[] = [
               </dt>
               <dd>
                 {v.about}
-                {v.member && ' Welcome, leave and boost messages only.'}
                 {v.role && ' Reaction role responses only.'}
               </dd>
             </div>

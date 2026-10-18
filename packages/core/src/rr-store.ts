@@ -1,8 +1,9 @@
 import type { Db } from './db.ts';
 import { DiscordCodes, DiscordError, type Rest } from './discord.ts';
-import { getGuild, getModule } from './store.ts';
+import { getGuild, getModule, serverVars } from './store.ts';
 import { rememberPost } from './studio-actions.ts';
 import {
+  type StudioVars,
   normaliseStudio,
   studioPayload,
   type StudioMessage,
@@ -180,7 +181,7 @@ export async function syncReactionRole(
   const guild = getGuild(db, guildId);
   const base = studioPayload(m, {
     now,
-    server: guild && { name: guild.name, members: guild.memberCount },
+    server: serverVars(guild),
     channel: r.channel,
     roleList: rrRoleList(r),
   }) as { components?: object[] } & Record<string, unknown>;
@@ -262,7 +263,8 @@ export async function deleteReactionRolePost(
 
 export type RRUse = {
   messageId: string;
-  user: { id: string; name: string };
+  /** The member, for {user}, {user.avatar}, {user.joined}… in responses. */
+  user: NonNullable<StudioVars['user']>;
   /** The roles the member has now. */
   roles: string[];
   /** Role names, for {role.name} in responses. */
@@ -372,7 +374,7 @@ export async function applyReactionRole(
         user: u.user,
         role: role ? { id: role, name: u.roleName?.(role) ?? role } : undefined,
         roleList: rrRoleList(r),
-        server: guild && { name: guild.name, members: guild.memberCount },
+        server: serverVars(guild),
         channel: post.channelId,
         extra: rrChangedLists(given, taken),
       })

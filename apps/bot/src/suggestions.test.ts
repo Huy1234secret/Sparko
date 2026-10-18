@@ -164,7 +164,7 @@ describe('suggestion actions on the template’s own buttons', () => {
       reply: vi.fn(async () => {}),
       showModal: vi.fn(async () => {}),
     });
-    return { db, bot, click };
+    return { db, bot, click, rest };
   };
   type Click = Parameters<ReturnType<typeof suggestionsBot>['studioAction']>[0];
 
@@ -187,6 +187,40 @@ describe('suggestion actions on the template’s own buttons', () => {
     const staff = click('sp:b:ok', true);
     await bot.studioAction(staff as unknown as Click);
     expect(staff.showModal).toHaveBeenCalled();
+  });
+
+  it('runs a vote button’s other actions after counting the vote', async () => {
+    const { db, bot, click, rest } = setup();
+    const config = sgDefault('100');
+    config.vote.up.actions = [
+      { id: 'r', type: 'role', mode: 'give', roles: ['900'] },
+    ];
+    writeModule(db, 'g', SG_MODULE, { on: true, config }, 0);
+    const i = {
+      ...click('sg:up'),
+      id: 'i1',
+      token: 't',
+      applicationId: 'app',
+      channelId: '100',
+      user: {
+        id: '7',
+        displayName: 'Quinn',
+        displayAvatarURL: () => '',
+        createdTimestamp: 0,
+      },
+      isButton: () => true,
+    };
+    await bot.component(i as unknown as Click);
+    expect(getSuggestion(db, 'g', 1)).toMatchObject({ up: 1 });
+    expect(rest.put).toHaveBeenCalledWith(
+      '/guilds/g/members/7/roles/900',
+      undefined,
+      expect.any(String),
+    );
+    // Taking the vote back doesn't give the role again.
+    vi.mocked(rest.put).mockClear();
+    await bot.component(i as unknown as Click);
+    expect(rest.put).not.toHaveBeenCalled();
   });
 
   it('leaves other buttons to Message Studio', async () => {

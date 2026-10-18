@@ -15,6 +15,7 @@ import {
   findPost,
   getSuggestion,
   parseStudioCustomId,
+  runStudioActions,
   Plain,
   reactionPath,
   sgAccept,
@@ -44,8 +45,10 @@ import {
   type Rest,
   type SgFile,
   type SgLeftovers,
+  type StudioAction,
   type Suggestions,
 } from '@sparko/core';
+import { studioInfo } from './studio-info.ts';
 import { Explained } from './jobs.ts';
 
 const EPHEMERAL = MessageFlags.Ephemeral;
@@ -457,9 +460,11 @@ export function suggestionsBot(
 
   // Buttons and the menu --------------------------------------------------------
 
+  /** Counts a vote, then runs what else that vote does. */
   async function vote(
     i: ButtonInteraction<'cached'> | StringSelectMenuInteraction<'cached'>,
     value: 1 | -1,
+    then?: StudioAction[],
   ) {
     const s = suggestionByMessage(db, i.message.id);
     if (!s) return say(i, 'This suggestion is gone.');
@@ -475,7 +480,7 @@ export function suggestionsBot(
       v === 1
         ? config.vote.up.label || 'upvote'
         : config.vote.down.label || 'downvote';
-    return say(
+    await say(
       i,
       r.vote === 0
         ? 'Took your vote back.'
@@ -483,6 +488,11 @@ export function suggestionsBot(
           ? `Changed your vote to ${name(r.vote)}.`
           : `Voted ${name(r.vote)}.${config.changeVotes ? ' Press it again to take it back.' : ''}`,
     );
+    // Taking a vote back doesn't run its actions.
+    const more =
+      then ?? (value === 1 ? config.vote.up : config.vote.down).actions;
+    if (r.vote === value && more.length)
+      await runStudioActions(rest, db, studioInfo(i), more, Date.now(), true);
   }
 
   async function component(
@@ -491,9 +501,14 @@ export function suggestionsBot(
     const id = parseSgId(i.customId);
     if (!id || id.kind === 'new') return false;
     try {
-      if (id.kind === 'vote') return await vote(i, id.vote);
-      if (id.kind === 'menu' && i.isStringSelectMenu())
-        return await vote(i, i.values[0] === 'down' ? -1 : 1);
+      if (id.kind === 'vote') {
+        await vote(i, id.vote);
+        return true;
+      }
+      if (id.kind === 'menu' && i.isStringSelectMenu()) {
+        await vote(i, i.values[0] === 'down' ? -1 : 1);
+        return true;
+      }
       if (id.kind === 'accept' || id.kind === 'reject') {
         const { config } = sgConfigOf(db, i.guildId);
         if (
@@ -557,7 +572,13 @@ export function suggestionsBot(
     if (action?.type !== 'suggestion') return false;
     try {
       if (action.act === 'upvote' || action.act === 'downvote')
-        await vote(i, action.act === 'upvote' ? 1 : -1);
+        await vote(
+          i,
+          action.act === 'upvote' ? 1 : -1,
+          actionsFor(c!, i.isStringSelectMenu() ? i.values : []).filter(
+            (a) => a !== action,
+          ),
+        );
       else if (
         !sgAllowed(config.approvers, rolesOf(i.member), isManager(i.member))
       )

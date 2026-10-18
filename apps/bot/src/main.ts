@@ -9,6 +9,7 @@ import {
   Partials,
   type ButtonInteraction,
   type Guild,
+  type GuildMember,
   type MessageReaction,
   type PartialMessageReaction,
   type PartialUser,
@@ -53,6 +54,7 @@ import {
   startAutoRoleSweep,
 } from './auto-roles.ts';
 import { suggestionsBot } from './suggestions.ts';
+import { studioInfo } from './studio-info.ts';
 import {
   checkWelcome,
   memberJoined,
@@ -140,6 +142,15 @@ const handlers: Handlers = {
   },
 };
 
+/** A member, for {user}, {user.avatar}, {user.created} and {user.joined}. */
+const memberVars = (member: GuildMember) => ({
+  id: member.id,
+  name: member.displayName,
+  avatar: member.user.displayAvatarURL({ extension: 'png', size: 256 }),
+  createdAt: member.user.createdTimestamp,
+  joinedAt: member.joinedTimestamp ?? undefined,
+});
+
 const record = (guild: Guild, installed: boolean) =>
   upsertGuild(
     db,
@@ -149,6 +160,8 @@ const record = (guild: Guild, installed: boolean) =>
       icon: guild.icon,
       memberCount: guild.memberCount,
       installed,
+      boosts: guild.premiumSubscriptionCount ?? 0,
+      boostLevel: guild.premiumTier,
     },
     Date.now(),
   );
@@ -261,22 +274,10 @@ function wire(c: Client) {
       (await suggestions.studioAction(interaction))
     )
       return;
-    await handleStudioInteraction(rest, db, {
-      id: interaction.id,
-      token: interaction.token,
-      applicationId: interaction.applicationId,
-      guildId: interaction.guildId,
-      channelId: interaction.channelId,
-      userId: interaction.user.id,
-      userName:
-        interaction.member && 'displayName' in interaction.member
-          ? interaction.member.displayName
-          : interaction.user.displayName,
-      messageId: interaction.message.id,
-      customId: interaction.customId,
-      values: interaction.isStringSelectMenu() ? interaction.values : [],
-    });
+    await handleStudioInteraction(rest, db, studioInfo(interaction));
   }
+  // Keeps the name, picture and boosts current for {server…} variables.
+  c.on(Events.GuildUpdate, (_, guild) => record(guild, true));
   c.on(Events.GuildCreate, (guild) => {
     record(guild, true);
     addAudit(
@@ -437,7 +438,7 @@ async function reactionRoleReaction(
     if (!emoji) return;
     const done = await applyReactionRole(rest, db, {
       messageId: reaction.message.id,
-      user: { id: member.id, name: member.displayName },
+      user: memberVars(member),
       roles: [...member.roles.cache.keys()],
       roleName: (id) => guild.roles.cache.get(id)?.name,
       action,
@@ -487,7 +488,7 @@ async function reactionRoleInteraction(
     const { member } = interaction;
     const base = {
       messageId: interaction.message.id,
-      user: { id: member.id, name: member.displayName },
+      user: memberVars(member),
       roles: [...member.roles.cache.keys()],
       roleName: (id: string) => interaction.guild.roles.cache.get(id)?.name,
     };

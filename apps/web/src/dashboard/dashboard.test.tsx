@@ -605,17 +605,30 @@ describe('Suggestions', () => {
     expect(
       screen.queryByRole('button', { name: 'Remove embed 1' }),
     ).not.toBeInTheDocument();
-    // The vote buttons are edited from the preview.
+    // The vote buttons are edited like any button, but always vote first
+    // and can't be removed.
+    expect(
+      screen.queryByRole('button', { name: 'Remove the upvote button' }),
+    ).not.toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('button', { name: 'Edit the upvote button' }),
     );
-    const vote = screen.getByRole('dialog', { name: 'Editing the upvote' });
-    const label = within(vote).getByRole('textbox', {
-      name: 'Upvote button name',
-    });
+    const vote = screen.getByRole('dialog', { name: 'Upvote button' });
+    const label = within(vote).getByRole('textbox', { name: /Button text/ });
     await userEvent.clear(label);
     await userEvent.type(label, 'Yes please');
-    await userEvent.click(within(vote).getByRole('button', { name: 'Done' }));
+    expect(within(vote).getByText('Upvote')).toBeInTheDocument();
+    await userEvent.click(
+      within(vote).getByRole('button', { name: 'Add an action' }),
+    );
+    expect(
+      within(vote).getByRole('menuitem', { name: 'Approve' }),
+    ).toBeDisabled();
+    await userEvent.click(
+      within(vote).getByRole('menuitem', { name: 'Give or take role' }),
+    );
+    expect(within(vote).getByText('Give or take role')).toBeInTheDocument();
+    await userEvent.click(within(vote).getByRole('button', { name: 'Close' }));
     expect(
       screen.getByRole('button', { name: 'Edit the upvote button' }),
     ).toHaveTextContent('Yes please');

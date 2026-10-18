@@ -39,7 +39,6 @@ function PreviewTools({
   items,
   onEmoji,
   v2,
-  memberVariables,
   roleVariables,
   suggestionVariables,
 }: {
@@ -47,7 +46,6 @@ function PreviewTools({
   items: PlusItem[];
   onEmoji: (text: string) => void;
   v2: boolean;
-  memberVariables: boolean;
   roleVariables: boolean;
   suggestionVariables: boolean;
 }) {
@@ -62,7 +60,6 @@ function PreviewTools({
     <div className="sp-preview-tools">
       <VariablesButton
         v2={v2}
-        member={memberVariables}
         role={roleVariables}
         suggestion={suggestionVariables}
         onPick={put}
@@ -86,7 +83,6 @@ export function MessageCanvas({
   headingId = 'studio-preview',
   above,
   below,
-  memberVariables,
   roleVariables,
   suggestionVariables,
   locked,
@@ -102,8 +98,6 @@ export function MessageCanvas({
   above?: ReactNode;
   /** Shown under the message, as part of it. */
   below?: ReactNode;
-  /** Lists the variables only welcome, leave and boost messages fill in. */
-  memberVariables?: boolean;
   /** Lists the variables reaction role responses fill in. */
   roleVariables?: boolean;
   /** Lists the variables suggestion messages fill in. */
@@ -234,7 +228,6 @@ export function MessageCanvas({
         </h2>
         <PreviewTools
           serverId={server.id}
-          memberVariables={!!memberVariables}
           roleVariables={!!roleVariables}
           suggestionVariables={!!suggestionVariables}
           items={items}

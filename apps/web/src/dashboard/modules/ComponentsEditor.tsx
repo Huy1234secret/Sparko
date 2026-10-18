@@ -33,6 +33,7 @@ import {
 } from '../../data';
 import {
   CloseButton,
+  HoverTip,
   InfoTip,
   MaskIcon,
   moveItem,
@@ -370,29 +371,41 @@ function ActionCard({
 }
 
 /** A list of actions with "Add actions"; they run from top to bottom. */
-function ActionsEditor({
+export function ActionsEditor({
   actions,
   onChange,
   issueAt,
   title = 'Add actions',
+  locked,
 }: {
   actions: StudioAction[];
   onChange: (actions: StudioAction[]) => void;
   /** The button or option they belong to, for pointing at problems. */
   issueAt: string;
   title?: ReactNode;
+  /** An action that always comes first and can't be moved or removed. */
+  locked?: { title: string; about: string };
 }) {
   const { list: listRef, ...reorder } = useReorder({
     onMove: (from, to) => onChange(moveItem(actions, from, to)),
   });
   const data = useStudioData();
   const add = (a: StudioAction) => onChange([...actions, a]);
-  // A suggestion action answers the click itself, so it stands alone.
-  const alone = actions.some((a) => a.type === 'suggestion');
-  const full = actions.length >= 10 || alone;
+  // Approve and Deny answer the click with a form, so they stand alone.
+  const alone = actions.some(
+    (a) => a.type === 'suggestion' && (a.act === 'approve' || a.act === 'deny'),
+  );
+  const max = locked ? 9 : 10;
+  const full = actions.length >= max || alone;
   const fullNote = alone
-    ? 'A suggestion action has to be the only one.'
-    : 'Up to 10 actions on a button or option.';
+    ? 'Approve and Deny have to be the only action.'
+    : `Up to ${max} actions on a button or option.`;
+  // A vote or a decision goes first, so it can only be added to an empty list.
+  const suggestionNote = !data.suggestion
+    ? 'Only on the suggestion message.'
+    : locked
+      ? 'This already votes.'
+      : 'A suggestion action has to come first.';
   return (
     <div className="sp-actions" data-issue={`${issueAt}/actions`}>
       <div className="sp-actions__head">
@@ -425,16 +438,30 @@ function ActionsEditor({
             },
             ...SUGGESTION_ACTS.map((a) => ({
               label: a.label,
-              disabled: !data.suggestion || actions.length > 0,
-              note: !data.suggestion
-                ? 'Only on the suggestion message.'
-                : 'A suggestion action has to be the only one.',
+              disabled: !data.suggestion || !!locked || actions.length > 0,
+              note: suggestionNote,
               onSelect: () =>
                 add({ id: newId(), type: 'suggestion', act: a.value }),
             })),
           ]}
         />
       </div>
+      {locked && (
+        <div className="sp-action is-locked">
+          <HoverTip
+            className="sp-action__lock"
+            text="Added for you and always first, so it can’t be moved or removed."
+            label
+          >
+            <Icon name="lock" size="sm" />
+          </HoverTip>
+          <div className="sp-action__body">
+            <span className="sp-action__title">
+              {locked.title} <InfoTip text={locked.about} />
+            </span>
+          </div>
+        </div>
+      )}
       {actions.length ? (
         <ol ref={listRef} className="sp-actions__list">
           {actions.map((a, i) => (
@@ -452,7 +479,7 @@ function ActionsEditor({
             />
           ))}
         </ol>
-      ) : (
+      ) : locked ? null : (
         <p className="sp-hint">
           Nothing happens yet. Use + to send templates, give and take roles
           {data.suggestion ? ', or vote, approve and deny' : ''}.
@@ -513,17 +540,21 @@ export function Panel({
 
 function ButtonSettings({
   button,
+  vote,
   onChange,
   onClose,
 }: {
   button: StudioButton;
+  /** A suggestion's vote button: it always votes, and never links. */
+  vote?: 'up' | 'down' | undefined;
   onChange: (b: StudioButton) => void;
   onClose: () => void;
 }) {
   const data = useStudioData();
+  const voteName = vote === 'up' ? 'Upvote' : 'Downvote';
   return (
     <Panel
-      title="Button settings"
+      title={vote ? `${voteName} button` : 'Button settings'}
       description="How it looks, and what it does when someone clicks it."
       onClose={onClose}
     >
@@ -578,36 +609,55 @@ function ButtonSettings({
         </div>
       </div>
       <hr className="sp-settings-pop__sep" />
-      <Segmented
-        label="Button type"
-        className="sp-settings-pop__type"
-        value={button.link ? 'link' : 'action'}
-        onChange={(t) => onChange({ ...button, link: t === 'link' })}
-        options={[
-          { value: 'link', label: 'Link button' },
-          { value: 'action', label: 'Action button' },
-        ]}
-      />
-      {button.link ? (
-        <Input
-          data-issue={`component:${button.id}/url`}
-          label="URL"
-          placeholder="https://"
-          value={button.url}
-          hint="Link buttons are always grey in Discord."
-          error={
-            button.url && !/^https:\/\/\S+$/.test(button.url)
-              ? 'Use a link that starts with https://.'
-              : undefined
-          }
-          onChange={(e) => onChange({ ...button, url: e.target.value.trim() })}
-        />
-      ) : (
+      {vote ? (
         <ActionsEditor
           actions={button.actions}
           issueAt={`component:${button.id}`}
+          locked={{
+            title: voteName,
+            about:
+              vote === 'up'
+                ? 'Counts a vote for the suggestion. Pressing it again takes the vote back, when changing votes is on; the actions below run only when a vote counts.'
+                : 'Counts a vote against the suggestion. Pressing it again takes the vote back, when changing votes is on; the actions below run only when a vote counts.',
+          }}
           onChange={(actions) => onChange({ ...button, actions })}
         />
+      ) : (
+        <>
+          <Segmented
+            label="Button type"
+            className="sp-settings-pop__type"
+            value={button.link ? 'link' : 'action'}
+            onChange={(t) => onChange({ ...button, link: t === 'link' })}
+            options={[
+              { value: 'link', label: 'Link button' },
+              { value: 'action', label: 'Action button' },
+            ]}
+          />
+          {button.link ? (
+            <Input
+              data-issue={`component:${button.id}/url`}
+              label="URL"
+              placeholder="https://"
+              value={button.url}
+              hint="Link buttons are always grey in Discord."
+              error={
+                button.url && !/^https:\/\/\S+$/.test(button.url)
+                  ? 'Use a link that starts with https://.'
+                  : undefined
+              }
+              onChange={(e) =>
+                onChange({ ...button, url: e.target.value.trim() })
+              }
+            />
+          ) : (
+            <ActionsEditor
+              actions={button.actions}
+              issueAt={`component:${button.id}`}
+              onChange={(actions) => onChange({ ...button, actions })}
+            />
+          )}
+        </>
       )}
     </Panel>
   );
@@ -847,6 +897,7 @@ export function ComponentItem({
   count,
   reorder,
   startOpen,
+  vote,
   onChange,
   onRemove,
 }: {
@@ -855,8 +906,10 @@ export function ComponentItem({
   count: number;
   reorder: ItemDrag;
   startOpen: boolean;
+  /** A suggestion's vote button, which can't be removed. */
+  vote?: 'up' | 'down';
   onChange: (c: StudioComponent) => void;
-  onRemove: () => void;
+  onRemove?: () => void;
 }) {
   const [opened, setOpen] = useState(startOpen);
   const [fading, setFading] = useState(false);
@@ -874,7 +927,11 @@ export function ComponentItem({
     setOpen(false);
     setClosedFor(issue?.n ?? 0);
   };
-  const name = c.type === 'button' ? `button ${c.label || index + 1}` : 'menu';
+  const name = vote
+    ? `the ${vote}vote button`
+    : c.type === 'button'
+      ? `button ${c.label || index + 1}`
+      : 'menu';
   const handle = (
     <DragHandle
       label={`Move ${name}. Drag it, or use the arrow keys.`}
@@ -942,15 +999,22 @@ export function ComponentItem({
           <Icon name="chevron-down" />
         </div>
       )}
-      <TrashButton
-        label={`Remove ${name}`}
-        className="sp-comp__trash"
-        onHover={setFading}
-        onClick={onRemove}
-      />
+      {onRemove && (
+        <TrashButton
+          label={`Remove ${name}`}
+          className="sp-comp__trash"
+          onHover={setFading}
+          onClick={onRemove}
+        />
+      )}
       {open &&
         (c.type === 'button' ? (
-          <ButtonSettings button={c} onChange={onChange} onClose={close} />
+          <ButtonSettings
+            button={c}
+            vote={vote}
+            onChange={onChange}
+            onClose={close}
+          />
         ) : (
           <MenuSettings menu={c} onChange={onChange} onClose={close} />
         ))}

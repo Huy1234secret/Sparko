@@ -22,6 +22,8 @@ import {
   studioPayload,
   studioProblem,
   upsertGuild,
+  getGuild,
+  serverVars,
   writeModule,
   type Rest,
   type StudioMessage,
@@ -323,6 +325,29 @@ describe('Message Studio messages', () => {
     expect(fillVariables('{user} on {date}', { now: 86_400_000 })).toBe(
       ' on <t:86400:D>',
     );
+  });
+
+  it('fills the server’s picture and boosts from what’s saved', () => {
+    const db = openDb(':memory:');
+    upsertGuild(
+      db,
+      {
+        id: '5',
+        name: 'Pixel',
+        icon: 'abc',
+        memberCount: 3,
+        installed: true,
+        boosts: 7,
+        boostLevel: 2,
+      },
+      0,
+    );
+    expect(
+      fillVariables('{server.icon} {server.boosts} {server.level}', {
+        now: 0,
+        server: serverVars(getGuild(db, '5')),
+      }),
+    ).toBe('https://cdn.discordapp.com/icons/5/abc.png?size=256 7 2');
   });
 
   it('refuses messages Discord would reject', () => {
@@ -758,6 +783,10 @@ describe('using buttons and menus in Discord', () => {
     });
     expect(studioProblem(withActions([vote]))).toBeNull();
     expect(studioProblem(withActions([vote, role]))).toMatch(/only action/);
+    // A vote goes first; other actions can follow it.
+    const up = { ...vote, act: 'upvote' } as const;
+    expect(studioProblem(withActions([up, role]))).toBeNull();
+    expect(studioProblem(withActions([role, up]))).toMatch(/first/);
     expect(
       studioProblem(
         withActions([{ ...vote, act: 'boo' } as unknown as typeof vote]),

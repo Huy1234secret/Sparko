@@ -84,12 +84,15 @@ export function VoteCard({
   option,
   serverId,
   onChange,
+  children,
 }: {
   kind: SgVoteKind;
   which: 'up' | 'down';
   option: SgVoteOption;
   serverId: string;
   onChange: (patch: Partial<SgVoteOption>) => void;
+  /** More under it, like a menu option's actions. */
+  children?: ReactNode;
 }) {
   const name = which === 'up' ? 'Upvote' : 'Downvote';
   const emoji = (
@@ -173,6 +176,7 @@ export function VoteCard({
           )}
         </>
       )}
+      {children}
     </li>
   );
 }

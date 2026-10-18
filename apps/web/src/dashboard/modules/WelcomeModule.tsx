@@ -518,7 +518,6 @@ export function WelcomeModule({
                         message={previewing}
                         tried={tried}
                         headingId="greet-preview"
-                        memberVariables
                         check={(m) => ({ ...m, channel: '1' })}
                         onChange={(patch) => editTemplate(previewId, patch)}
                         above={

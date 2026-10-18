@@ -133,7 +133,6 @@ function StudioEditor({
           message={message}
           tried={tried}
           onChange={onChange}
-          memberVariables={uses.includes('welcome')}
           roleVariables={uses.includes('reaction-role')}
           suggestionVariables={uses.includes('suggestion')}
         />

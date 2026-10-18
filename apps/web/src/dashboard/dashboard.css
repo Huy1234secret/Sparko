@@ -2047,6 +2047,18 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-action__mode {
   justify-self: start;
 }
+.sp-sg-vote__actions {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.sp-action.is-locked {
+  align-items: center;
+  margin-bottom: 8px;
+}
+.sp-action__lock {
+  display: inline-flex;
+  color: var(--sp-muted);
+}
 .sp-action__off {
   display: inline-flex;
   align-items: center;

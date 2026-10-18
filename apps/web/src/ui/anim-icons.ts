@@ -112,6 +112,8 @@ export const animIcons = {
     ['light-bulb-reveal-icon', 'light-bulb-icon-hover'],
   ),
   command: pair('command-icon'),
+  /** Storage tabs. */
+  storage: pair('storage-icon'),
   /** The gear that plays beside a rule count. */
   gear: maybe('setting-icon-hover'),
   upload: set('upload-button', ['reveal', 'hover', 'select']),
