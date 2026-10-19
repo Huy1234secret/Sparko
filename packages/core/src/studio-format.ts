@@ -891,6 +891,8 @@ export type StudioVariable = {
   role?: true;
   /** Filled in only by suggestion messages. */
   suggestion?: true;
+  /** Filled in only by birthday messages. */
+  birthday?: true;
 };
 
 /** Variables people can write in Studio messages, in braces. */
@@ -993,6 +995,38 @@ export const studioVariables: StudioVariable[] = [
     about:
       'The files the member added. Pictures and videos are shown in the message.',
     suggestion: true,
+  },
+  {
+    name: 'birthday.users',
+    about: 'Mentions everyone the birthday message is for.',
+    birthday: true,
+  },
+  {
+    name: 'birthday.count',
+    about: 'How many members have their birthday in the message.',
+    birthday: true,
+  },
+  {
+    name: 'birthday.age',
+    about:
+      'How old they turn, for one birthday. Empty when they didn’t save the year or ages are hidden.',
+    birthday: true,
+  },
+  {
+    name: 'birthday.date',
+    about: 'The birthday’s date, like 14 March.',
+    birthday: true,
+  },
+  {
+    name: 'month',
+    about: 'The month, like March, in the monthly birthday post.',
+    birthday: true,
+  },
+  {
+    name: 'birthday.list',
+    about:
+      'Every birthday this month, one per line, like “@rhea — 14 March”, in the monthly post.',
+    birthday: true,
   },
 ];
 

@@ -111,7 +111,8 @@ export const animIcons = {
     ['light-bulb-reveal-icon', 'light-bulb-hover-icon'],
     ['light-bulb-reveal-icon', 'light-bulb-icon-hover'],
   ),
-  command: pair('command-icon'),
+  // Drawn as a plain white shape.
+  command: pair('command-icon', true),
   /** Storage tabs. */
   storage: pair('storage-icon'),
   /** The gear that plays beside a rule count. */

@@ -1,5 +1,7 @@
+import type { BdEntry } from './studio-format';
 import type {
   ARMemberView,
+  BDMemberFound,
   AvatarColor,
   PanelApi,
   Server,
@@ -263,6 +265,45 @@ export function withBackend(
     async testSuggestion(id, channel) {
       if (!(await backend()).live) return sample.testSuggestion(id, channel);
       await call('POST', `${server(id)}/suggestions/test`, { channel });
+    },
+    async getBirthdays(id) {
+      if (!(await backend()).live) return sample.getBirthdays(id);
+      return getJson(`${server(id)}/birthdays`);
+    },
+    async saveBirthdays(id, change) {
+      if (!(await backend()).live) return sample.saveBirthdays(id, change);
+      await call('PUT', `${server(id)}/birthdays`, change);
+    },
+    async listBirthdays(id, query) {
+      if (!(await backend()).live) return sample.listBirthdays(id, query);
+      return getJson(
+        `${server(id)}/birthdays/list?q=${encodeURIComponent(query)}`,
+      );
+    },
+    async findBirthdayMembers(id, query) {
+      if (!(await backend()).live) return sample.findBirthdayMembers(id, query);
+      const r = await getJson<{ members: BDMemberFound[] }>(
+        `${server(id)}/birthdays/members?q=${encodeURIComponent(query)}`,
+      );
+      return r.members;
+    },
+    async setBirthday(id, userId, date) {
+      if (!(await backend()).live) return sample.setBirthday(id, userId, date);
+      const r = await call<{ birthday: BdEntry }>(
+        'PUT',
+        `${server(id)}/birthdays/members/${userId}`,
+        date,
+      );
+      return r.birthday;
+    },
+    async removeBirthday(id, userId) {
+      if (!(await backend()).live) return sample.removeBirthday(id, userId);
+      await call('DELETE', `${server(id)}/birthdays/members/${userId}`);
+    },
+    async testBirthday(id, channel, kind) {
+      if (!(await backend()).live)
+        return sample.testBirthday(id, channel, kind);
+      await call('POST', `${server(id)}/birthdays/test`, { channel, kind });
     },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);

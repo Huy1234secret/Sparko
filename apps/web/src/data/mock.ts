@@ -19,6 +19,7 @@ import {
 import { createAutoRolesMock } from './mock-autoroles';
 import { createSupportMock } from './mock-support';
 import { createSuggestionsMock } from './mock-suggestions';
+import { createBirthdaysMock } from './mock-birthdays';
 
 /**
  * Sample data for building the dashboard before the backend is reconnected.
@@ -118,6 +119,7 @@ const firstServerOn: Record<string, boolean> = {
   levels: true,
   autoroles: true,
   suggestions: true,
+  birthdays: true,
   giveaways: true,
   welcome: false,
 };
@@ -494,6 +496,7 @@ export function resetMock() {
   resetSupport();
   resetAutoRoles();
   resetSuggestions();
+  resetBirthdays();
 }
 
 const {
@@ -518,6 +521,7 @@ const {
     );
   },
   suggestionUses: (serverId) => suggestionUses(serverId),
+  birthdayUses: (serverId) => birthdayUses(serverId),
 });
 const { api: autoRolesApi, reset: resetAutoRoles } = createAutoRolesMock({
   wait: <T>(value: T) => wait(value),
@@ -546,9 +550,27 @@ const {
   },
   you: () => session.user,
 });
+const {
+  api: birthdaysApi,
+  reset: resetBirthdays,
+  uses: birthdayUses,
+} = createBirthdaysMock({
+  wait: <T>(value: T) => wait(value),
+  copy,
+  server: serverById,
+  channels: (serverId) => channelsFor(stateOf(serverId)),
+  roles: (serverId) => rolesOf(serverId),
+  templates: (serverId) => templateIds(serverId),
+  isOn: (serverId) => !!stateOf(serverId).on['birthdays'],
+  setOn: (serverId, on) => {
+    stateOf(serverId).on['birthdays'] = on;
+  },
+  you: () => session.user,
+});
 export const mockApi: PanelApi = {
   ...coreApi,
   ...supportApi,
   ...autoRolesApi,
   ...suggestionsApi,
+  ...birthdaysApi,
 };

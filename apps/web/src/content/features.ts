@@ -248,6 +248,50 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     pairs: ['studio', 'role-menus'],
   },
+  birthdays: {
+    headline: 'Every birthday celebrated, at the right time.',
+    points: [
+      'Posts at your hour, in the server’s or each member’s time zone',
+      'A birthday role for the day, a DM and a monthly list',
+      '29 February is celebrated on the 28th in other years',
+    ],
+    how: [
+      {
+        icon: 'gift',
+        title: 'Members save their birthday',
+        body: '/birthday set takes the day, the month, and the year and time zone if they like, with time zones suggested as they type. The year is only used for their age. Limit how often it can change, and how new an account or member can be.',
+      },
+      {
+        icon: 'party-popper',
+        title: 'Sparko celebrates on the day',
+        body: 'At the hour you pick, one post names everyone (or one post each), with a ping if you like. Sparko gives a birthday role for 24 hours, can DM them, and never posts twice in a year.',
+      },
+      {
+        icon: 'calendar',
+        title: 'Birthdays this month',
+        body: 'On the 1st, a list of every birthday that month. Members can see upcoming birthdays and any month’s with commands.',
+      },
+      {
+        icon: 'layers',
+        title: 'Storage, logs and commands',
+        body: 'Every birthday by month with an Upcoming panel, where staff add, change or remove them. Logs of everything that happened, and the commands renamed to suit your server.',
+      },
+    ],
+    steps: [
+      'Open Birthdays, switch it on and pick the birthday channel.',
+      'Choose the hour, the time zone and a birthday role.',
+      'In Edit, start each message from a default or make your own.',
+      'Save. Sparko adds /birthday to your server.',
+    ],
+    commands: [
+      '/birthday set',
+      '/birthday remove',
+      '/birthday view',
+      '/birthday upcoming',
+      '/birthday list',
+    ],
+    pairs: ['welcome', 'autoroles'],
+  },
 };
 
 export const isReady = (id: string) => id in featureDetails;

@@ -39,6 +39,7 @@ import folderAddAnim from '../../../../../design-system/assets/icons/folder-icon
 import folderSvg from '../../../../../design-system/assets/icons/folder-icon.svg?url';
 import messageSvg from '../../../../../design-system/assets/icons/message-icon.svg?url';
 import suggestionIcon from '../../../../../design-system/assets/icons/message-square.svg?url';
+import birthdayIcon from '../../../../../design-system/assets/icons/gift.svg?url';
 import { animIcons } from '../../ui';
 export const plusAnimations = animIcons.plus;
 const editAnim = animIcons.edit.hover;
@@ -73,6 +74,7 @@ const tagLook = {
   welcome: { label: 'Welcome Message', icon: svgIcons.welcomeTag },
   'reaction-role': { label: 'Reaction Role', icon: svgIcons.reactionRole },
   suggestion: { label: 'Suggestion', icon: suggestionIcon },
+  birthday: { label: 'Birthday', icon: birthdayIcon },
 } as const;
 
 /** Tags for where else a template is used; hovering says exactly where. */

@@ -8,6 +8,7 @@ import { adoptServers, mockApi } from './mock';
 import { backend, withBackend } from './live';
 import { applyMove } from './library';
 import type {
+  BDDate,
   LibraryMove,
   ModuleState,
   PanelApi,
@@ -18,6 +19,8 @@ import type {
 } from './types';
 import type {
   AutoRoles,
+  BdKind,
+  Birthdays,
   ReactionRole,
   Suggestions,
   WelcomeConfig,
@@ -56,6 +59,9 @@ export const keys = {
   sg: (id: string) => ['sg', id] as const,
   sgList: (id: string, q: string, status: string) =>
     ['sg', id, 'list', q, status] as const,
+  bd: (id: string) => ['bd', id] as const,
+  bdList: (id: string, q: string) => ['bd', id, 'list', q] as const,
+  bdMembers: (id: string, q: string) => ['bd', id, 'members', q] as const,
 };
 
 export const useSession = () =>
@@ -98,6 +104,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: keys.rr(serverId) }),
       client.invalidateQueries({ queryKey: keys.ar(serverId) }),
       client.invalidateQueries({ queryKey: keys.sg(serverId) }),
+      client.invalidateQueries({ queryKey: keys.bd(serverId) }),
     ]);
 }
 
@@ -400,6 +407,47 @@ export function useSuggestionActions(serverId: string) {
     }),
     test: useMutation({
       mutationFn: (channel: string) => api.testSuggestion(serverId, channel),
+    }),
+  };
+}
+export const useBirthdays = (serverId: string) =>
+  useQuery({
+    queryKey: keys.bd(serverId),
+    queryFn: () => api.getBirthdays(serverId),
+  });
+/** Saved birthdays and the next ones, matching what staff typed. */
+export const useBirthdayList = (serverId: string, query: string) =>
+  useQuery({
+    queryKey: keys.bdList(serverId, query.trim()),
+    queryFn: () => api.listBirthdays(serverId, query.trim()),
+  });
+/** Server members to add a birthday for; nothing until something is typed. */
+export const useBirthdayMembers = (serverId: string, query: string) =>
+  useQuery({
+    queryKey: keys.bdMembers(serverId, query.trim()),
+    queryFn: () => api.findBirthdayMembers(serverId, query.trim()),
+    enabled: query.trim().length > 0,
+  });
+export function useBirthdayActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: Birthdays }) =>
+        api.saveBirthdays(serverId, change),
+      onSuccess: refresh,
+    }),
+    set: useMutation({
+      mutationFn: ({ userId, ...date }: BDDate & { userId: string }) =>
+        api.setBirthday(serverId, userId, date),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (userId: string) => api.removeBirthday(serverId, userId),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: ({ channel, kind }: { channel: string; kind: BdKind }) =>
+        api.testBirthday(serverId, channel, kind),
     }),
   };
 }
