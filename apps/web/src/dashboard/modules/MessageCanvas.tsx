@@ -42,6 +42,7 @@ function PreviewTools({
   roleVariables,
   suggestionVariables,
   birthdayVariables,
+  questionVariables,
 }: {
   serverId: string;
   items: PlusItem[];
@@ -50,6 +51,7 @@ function PreviewTools({
   roleVariables: boolean;
   suggestionVariables: boolean;
   birthdayVariables: boolean;
+  questionVariables: boolean;
 }) {
   const target = useInsertTarget();
   // Goes where the person was last writing, or at the end of the text.
@@ -65,6 +67,7 @@ function PreviewTools({
         role={roleVariables}
         suggestion={suggestionVariables}
         birthday={birthdayVariables}
+        question={questionVariables}
         onPick={put}
       />
       <EmojiButton serverId={serverId} onPick={put} />
@@ -89,6 +92,7 @@ export function MessageCanvas({
   roleVariables,
   suggestionVariables,
   birthdayVariables,
+  questionVariables,
   locked,
   maxRows: rowLimit,
   check = (m) => m,
@@ -109,6 +113,8 @@ export function MessageCanvas({
   suggestionVariables?: boolean;
   /** Lists the variables birthday messages fill in. */
   birthdayVariables?: boolean;
+  /** Lists the variables question messages fill in. */
+  questionVariables?: boolean;
   /**
    * Keeps the message's shape: one embed or container, no pictures of its
    * own. Text, buttons and menus can still go outside it.
@@ -240,6 +246,7 @@ export function MessageCanvas({
           roleVariables={!!roleVariables}
           suggestionVariables={!!suggestionVariables}
           birthdayVariables={!!birthdayVariables}
+          questionVariables={!!questionVariables}
           items={items}
           v2={v2}
           onEmoji={(text) =>

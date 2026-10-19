@@ -705,6 +705,214 @@ describe('Suggestions', () => {
   }, 20_000);
 });
 
+describe('Questions & answers', () => {
+  const cozy = '/dashboard/900000000000000002';
+
+  it('checks the settings before saving, then goes live', async () => {
+    open(`${pixel}/questions`);
+    expect(
+      await screen.findByText('Channel and people', {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    const expire = screen.getByRole('textbox', {
+      name: 'Expire unanswered questions after',
+    });
+    await userEvent.type(expire, '30mi');
+    expect(
+      await screen.findByText('Has to be between 1h and 1y.'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Expire after has to be between 1h and 1y/),
+    ).toBeInTheDocument();
+    await userEvent.clear(expire);
+    await userEvent.type(expire, '1w');
+    // Keeping threads open hides how long to wait.
+    await userEvent.click(screen.getByRole('radio', { name: 'Keep open' }));
+    expect(
+      screen.queryByRole('textbox', { name: 'Close the thread after' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Live in #support/, {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('adds categories up to the plan’s limit', async () => {
+    open(`${pixel}/questions`);
+    const add = await screen.findByRole(
+      'button',
+      { name: /Category$/ },
+      { timeout: 4000 },
+    );
+    expect(screen.getByTitle('4 of 5 categories used')).toBeInTheDocument();
+    await userEvent.click(add);
+    expect(screen.getByTitle('5 of 5 categories used')).toBeInTheDocument();
+    expect(add).toBeDisabled();
+    // A new category needs a name before it saves.
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Give each category a name/),
+    ).toBeInTheDocument();
+    const names = screen.getAllByRole('textbox', { name: 'Category name' });
+    await userEvent.type(names.at(-1)!, 'Art');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Roles' }));
+    expect(
+      screen.getAllByRole('textbox', { name: 'Category name' }),
+    ).toHaveLength(4);
+  }, 20_000);
+
+  it('edits the question and answer messages from default templates', async () => {
+    open(`${pixel}/questions?tab=edit`);
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: 'Use a default template' },
+        { timeout: 4000 },
+      ),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Default templates' });
+    expect(
+      within(dialog).queryByRole('button', { name: /Answer card/ }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /Question card/ }),
+    );
+    expect(await screen.findByText('Live preview')).toBeInTheDocument();
+    // The fixed buttons show under the question.
+    const fixed = screen.getByLabelText('Question buttons');
+    expect(within(fixed).getByText('Mark answered')).toBeInTheDocument();
+    expect(within(fixed).getByText(/Me too/)).toBeInTheDocument();
+    // No pictures or extra embeds.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add to the message' }),
+    );
+    expect(
+      screen.queryByRole('menuitem', { name: 'Add embed' }),
+    ).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    // Question variables are listed for this message.
+    await userEvent.click(screen.getByRole('button', { name: 'Variables' }));
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: 'Search variables' }),
+      'metoo',
+    );
+    const item = screen.getByRole('menuitem', { name: /\{metoo\.count\}/ });
+    expect(item).not.toHaveClass('is-off');
+    await userEvent.keyboard('{Escape}');
+    // The answer message is its own template.
+    await userEvent.click(
+      screen.getByRole('radio', { name: 'Answer message' }),
+    );
+    expect(
+      await screen.findByText('How should answers look?'),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use a default template' }),
+    );
+    await userEvent.click(
+      within(
+        screen.getByRole('dialog', { name: 'Default templates' }),
+      ).getByRole('button', { name: /Modern answer/ }),
+    );
+    expect(await screen.findByText('Live preview')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Question buttons')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Live in #support/, {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('lists questions in Storage with their answers, and deletes them', async () => {
+    open(`${pixel}/questions?tab=storage`);
+    expect(
+      await screen.findByText(
+        'How do I get the Artist role?',
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Only in #introductions, once/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Deleted in Discord')).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Search questions' }),
+      'stream',
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText('How do I get the Artist role?'),
+      ).not.toBeInTheDocument(),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete question #8' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: /Delete question #8/ });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete' }),
+    );
+    expect(await screen.findByText('No questions here')).toBeInTheDocument();
+  }, 20_000);
+
+  it('filters the log', async () => {
+    open(`${pixel}/questions?tab=logs`);
+    expect(
+      await screen.findByText(
+        /\[ASKED\] #8 asked by @kestrel/,
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Answers' }));
+    expect(screen.queryByText(/\[ASKED\]/)).not.toBeInTheDocument();
+    expect(screen.getByText(/\[RE-ANSWERED\] #7/)).toBeInTheDocument();
+  }, 20_000);
+
+  it('renames commands and refuses names Discord or Suggestions use', async () => {
+    open(`${pixel}/questions?tab=commands`);
+    const names = await screen.findAllByRole(
+      'textbox',
+      { name: 'Name' },
+      { timeout: 4000 },
+    );
+    expect(names).toHaveLength(6);
+    await userEvent.clear(names[0]!);
+    await userEvent.type(names[0]!, 'Help desk!');
+    expect(
+      screen.getByText('1 to 32 lowercase letters, numbers, - or _.'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Command names are 1 to 32/),
+    ).toBeInTheDocument();
+    await userEvent.clear(names[0]!);
+    await userEvent.type(names[0]!, 'suggest');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/already a command in this server/),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('works while it’s off, on Plus', async () => {
+    open(`${cozy}/questions`);
+    expect(
+      await screen.findByText(
+        'Questions & answers is off. Turn it on above to edit it.',
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTitle('6 of 25 categories used')).toBeInTheDocument();
+    expect(
+      screen.getByTitle('5 of 20 open questions per member used'),
+    ).toBeInTheDocument();
+  }, 20_000);
+});
+
 describe('Tickets', () => {
   it('lists tickets needing a reply, longest waits first, and searches them', async () => {
     open(`${pixel}/tickets`);

@@ -36,12 +36,14 @@ import {
   greetNames,
   greetTemplates,
   isLegacyWelcome,
+  QA_MODULE,
   RR_MODULE,
   SG_MODULE,
   BD_MODULE,
   bdKinds,
   bdKindNames,
   type Birthdays,
+  type Questions,
   type ReactionRole,
   type Suggestions,
   type WelcomeConfig,
@@ -110,13 +112,23 @@ export function studioRoutes({
     const uses = new Map<
       string,
       {
-        kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday';
+        kind:
+          | 'welcome'
+          | 'reaction-role'
+          | 'suggestion'
+          | 'birthday'
+          | 'question';
         where: string;
       }[]
     >();
     const add = (
       id: string,
-      kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday',
+      kind:
+        | 'welcome'
+        | 'reaction-role'
+        | 'suggestion'
+        | 'birthday'
+        | 'question',
       where: string,
     ) => {
       if (!id) return;
@@ -162,6 +174,16 @@ export function studioRoutes({
           'birthday',
           `Birthdays (${bdKindNames[k]})`,
         );
+    const qa = getModule<Questions>(db, guildId, QA_MODULE).config;
+    if (qa) {
+      add(qa.message, 'question', 'Questions & answers (the question message)');
+      add(
+        qa.answerMessage,
+        'question',
+        'Questions & answers (the answer message)',
+      );
+      add(qa.dmMessage, 'question', 'Questions & answers (the answered DM)');
+    }
     return uses;
   };
 

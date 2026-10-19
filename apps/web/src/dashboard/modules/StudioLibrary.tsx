@@ -40,6 +40,7 @@ import folderSvg from '../../../../../design-system/assets/icons/folder-icon.svg
 import messageSvg from '../../../../../design-system/assets/icons/message-icon.svg?url';
 import suggestionIcon from '../../../../../design-system/assets/icons/message-square.svg?url';
 import birthdayIcon from '../../../../../design-system/assets/icons/gift.svg?url';
+import questionIcon from '../../../../../design-system/assets/icons/circle-help.svg?url';
 import { animIcons } from '../../ui';
 export const plusAnimations = animIcons.plus;
 const editAnim = animIcons.edit.hover;
@@ -75,6 +76,7 @@ const tagLook = {
   'reaction-role': { label: 'Reaction Role', icon: svgIcons.reactionRole },
   suggestion: { label: 'Suggestion', icon: suggestionIcon },
   birthday: { label: 'Birthday', icon: birthdayIcon },
+  question: { label: 'Q&A', icon: questionIcon },
 } as const;
 
 /** Tags for where else a template is used; hovering says exactly where. */

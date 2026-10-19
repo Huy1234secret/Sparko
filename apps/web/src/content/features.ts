@@ -292,6 +292,50 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     pairs: ['welcome', 'autoroles'],
   },
+  questions: {
+    headline: 'Questions asked once, answered in the open.',
+    points: [
+      'A thread on every question, with an Answer button for staff',
+      'Answered threads close straight away or after a while',
+      'Categories, “Me too” counts and a DM when it’s answered',
+    ],
+    how: [
+      {
+        icon: 'circle-help',
+        title: 'Members ask',
+        body: '/question ask opens a short form for a title and the details, with a category and up to 3 files. Choose who can ask, a blacklist role, a cooldown, how many open questions each member can have, and anonymous asking.',
+      },
+      {
+        icon: 'message-square',
+        title: 'Staff answer in a thread',
+        body: 'Each question is posted with its own thread. Staff press Answer (or use /question answer); the answer goes in the thread and shows on the question with who wrote it. The asker can press Mark answered, and others press Me too.',
+      },
+      {
+        icon: 'lock',
+        title: 'Threads close on their own',
+        body: 'Once answered, the thread closes straight away, after a time you pick, or stays open. Questions nobody answers can expire. Staff can close, reopen or delete any question.',
+      },
+      {
+        icon: 'layers',
+        title: 'Storage, logs and commands',
+        body: 'Every question with its asker, category, status and answer. Logs of everything that happened, and the commands renamed to suit your server.',
+      },
+    ],
+    steps: [
+      'Open Questions & answers, switch it on and pick the questions channel.',
+      'Choose who can ask and who answers, and add categories if you like.',
+      'In Edit, start the question and answer messages from a default or make your own.',
+      'Save. Sparko adds /question to your server.',
+    ],
+    commands: [
+      '/question ask',
+      '/question answer',
+      '/question close',
+      '/question reopen',
+      '/question delete',
+    ],
+    pairs: ['suggestions', 'tickets'],
+  },
 };
 
 export const isReady = (id: string) => id in featureDetails;

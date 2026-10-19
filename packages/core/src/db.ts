@@ -312,6 +312,51 @@ const migrations = [
     guild_id TEXT PRIMARY KEY,
     monthly TEXT NOT NULL DEFAULT ''
   );`,
+  // Questions & answers: the questions, who pressed Me too, and the log.
+  `CREATE TABLE questions (
+    guild_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    asker_id TEXT NOT NULL,
+    asker_name TEXT NOT NULL,
+    asker_avatar TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    files TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'open',
+    me_too INTEGER NOT NULL DEFAULT 0,
+    channel_id TEXT,
+    message_id TEXT,
+    thread_id TEXT,
+    answer_id TEXT,
+    answer_json TEXT,
+    closed_json TEXT,
+    created_at INTEGER NOT NULL,
+    answered_at INTEGER,
+    close_at INTEGER,
+    thread_closed INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, number)
+  );
+  CREATE INDEX questions_by_message ON questions (message_id);
+  CREATE INDEX questions_by_asker ON questions (guild_id, asker_id);
+  CREATE INDEX questions_due ON questions (thread_closed, close_at);
+  CREATE TABLE qa_metoo (
+    guild_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    PRIMARY KEY (guild_id, number, user_id)
+  );
+  CREATE TABLE qa_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    number INTEGER,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX qa_log_by_guild ON qa_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

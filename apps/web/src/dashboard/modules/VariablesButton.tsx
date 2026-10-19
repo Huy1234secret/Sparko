@@ -26,6 +26,7 @@ export function VariablesButton({
   role,
   suggestion,
   birthday,
+  question,
   onPick,
 }: {
   /** Components V2 messages also have {separator}. */
@@ -36,6 +37,8 @@ export function VariablesButton({
   suggestion?: boolean;
   /** Birthday messages fill in who it's for. */
   birthday?: boolean;
+  /** Question, answer and answered-DM messages fill in the question. */
+  question?: boolean;
   onPick: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -66,11 +69,40 @@ export function VariablesButton({
       v2: true as const,
     },
   ];
-  const works = (v: (typeof all)[number]) =>
-    (role || !('role' in v && v.role)) &&
-    (suggestion || !('suggestion' in v && v.suggestion)) &&
-    (birthday || !('birthday' in v && v.birthday)) &&
-    (v2 || !('v2' in v && v.v2));
+  // Variables only some messages fill in, by the flag they carry.
+  const owners = [
+    {
+      key: 'role',
+      on: role,
+      label: 'Reaction role',
+      where: 'reaction role responses',
+    },
+    {
+      key: 'suggestion',
+      on: suggestion,
+      label: 'Suggestion',
+      where: 'suggestion messages',
+    },
+    {
+      key: 'question',
+      on: question,
+      label: 'Q&A',
+      where: 'question, answer and answered-DM messages',
+    },
+    {
+      key: 'birthday',
+      on: birthday,
+      label: 'Birthday',
+      where: 'birthday messages',
+    },
+  ] as const;
+  const ownersOf = (v: (typeof all)[number]) =>
+    owners.filter((o) => !!(v as Record<string, unknown>)[o.key]);
+  // A variable only some messages fill in works where any of them is this one.
+  const works = (v: (typeof all)[number]) => {
+    const of = ownersOf(v);
+    return (!of.length || of.some((o) => o.on)) && (v2 || !('v2' in v && v.v2));
+  };
   const needle = query.trim().toLowerCase();
   const found = all.filter(
     (v) =>
@@ -79,28 +111,22 @@ export function VariablesButton({
       v.about.toLowerCase().includes(needle),
   );
   const list = [...found.filter(works), ...found.filter((v) => !works(v))];
-  const tagOf = (v: (typeof all)[number]) =>
-    'suggestion' in v && v.suggestion
+  const tagOf = (v: (typeof all)[number]) => {
+    const of = ownersOf(v);
+    if (of.length) {
+      const where = of.map((o) => o.where);
+      return {
+        label: (of.find((o) => o.on) ?? of[0]!).label,
+        tip: `Only filled in by ${where.length > 1 ? `${where.slice(0, -1).join(', ')} and ${where.at(-1)}` : where[0]}. Anywhere else it’s sent empty.`,
+      };
+    }
+    return 'v2' in v && v.v2
       ? {
-          label: 'Suggestion',
-          tip: 'Only filled in by suggestion messages. Anywhere else it’s sent empty.',
+          label: 'V2',
+          tip: 'Only works in V2 components messages. In an embed message it’s left out.',
         }
-      : 'birthday' in v && v.birthday
-        ? {
-            label: 'Birthday',
-            tip: 'Only filled in by birthday messages. Anywhere else it’s sent empty.',
-          }
-        : 'role' in v && v.role
-          ? {
-              label: 'Reaction role',
-              tip: 'Only filled in by reaction role responses. Anywhere else it’s sent empty.',
-            }
-          : 'v2' in v && v.v2
-            ? {
-                label: 'V2',
-                tip: 'Only works in V2 components messages. In an embed message it’s left out.',
-              }
-            : null;
+      : null;
+  };
   return (
     <div ref={wrap} className="sp-pop-anchor">
       <button

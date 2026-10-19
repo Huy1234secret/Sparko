@@ -53,6 +53,7 @@ import {
   pendingBefore,
   startAutoRoleSweep,
 } from './auto-roles.ts';
+import { questionsBot } from './questions.ts';
 import { suggestionsBot } from './suggestions.ts';
 import { birthdaysBot } from './birthdays.ts';
 import { studioInfo } from './studio-info.ts';
@@ -81,6 +82,9 @@ const suggestions = suggestionsBot(db, rest, {
   appId: () => client?.application?.id,
 });
 const birthdays = birthdaysBot(db, rest, {
+  appId: () => client?.application?.id,
+});
+const questions = questionsBot(db, rest, {
   appId: () => client?.application?.id,
 });
 /** Discord only sends member joins with the Server Members Intent on. */
@@ -118,6 +122,7 @@ const handlers: Handlers = {
     );
   },
   ...suggestions.handlers((id) => client.guilds.cache.get(id)),
+  ...questions.handlers((id) => client.guilds.cache.get(id)),
   ...birthdays.handlers((id) => client.guilds.cache.get(id)),
   'rr-sync': (job) =>
     syncReactionRole(
@@ -198,6 +203,7 @@ function wire(c: Client) {
       console.error('Couldn’t register slash commands', error);
     }
     // Each server's own suggestion commands, with the names it picked.
+    void questions.registerAll((id) => ready.guilds.cache.has(id));
     void suggestions.registerAll((id) => ready.guilds.cache.has(id));
     void birthdays.registerAll((id) => ready.guilds.cache.has(id));
     requeueRunning(db);
@@ -227,6 +233,22 @@ function wire(c: Client) {
         return;
       if (interaction.isChatInputCommand() && birthdays.command(interaction))
         return;
+      // Questions & answers: /question, its forms and the question buttons.
+      if (interaction.isAutocomplete() && questions.autocomplete(interaction))
+        return;
+      if (interaction.isChatInputCommand() && questions.command(interaction))
+        return;
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId.startsWith('qa:')
+      ) {
+        void questions.modal(interaction);
+        return;
+      }
+      if (interaction.isButton() && interaction.customId.startsWith('qa:')) {
+        void questions.component(interaction);
+        return;
+      }
       if (
         interaction.isModalSubmit() &&
         interaction.customId.startsWith('sg:')
@@ -379,10 +401,13 @@ function wire(c: Client) {
     void suggestionReaction(reaction, user, false);
   });
   c.on(Events.MessageDelete, (message) => {
-    if (message.guild)
-      suggestions
-        .deleted(message.guild, message.channelId, message.id)
-        .catch(failed(`A deleted suggestion in ${message.guild.id}`));
+    if (!message.guild) return;
+    suggestions
+      .deleted(message.guild, message.channelId, message.id)
+      .catch(failed(`A deleted suggestion in ${message.guild.id}`));
+    questions
+      .deleted(message.id)
+      .catch(failed(`A deleted question in ${message.guild.id}`));
   });
   c.on(Events.GuildMemberRemove, (member) => {
     if (!member.user?.bot) arLeft(db, member.guild.id, member.id, Date.now());
@@ -614,6 +639,8 @@ setInterval(() => void tickets.sweep(), 5 * 60_000).unref();
 // Timed roles and rules.
 startAutoRoleSweep(db, rest, (id) => client.guilds.cache.has(id));
 // Suggestions that close after a while.
+// Question threads that close after a while, and questions that expire.
+questions.startSweep((id) => client.guilds.cache.has(id));
 suggestions.startSweep((id) => client.guilds.cache.has(id));
 // Birthdays at each server's hour, their roles and the monthly post.
 birthdays.startSweep((id) => client.guilds.cache.has(id));

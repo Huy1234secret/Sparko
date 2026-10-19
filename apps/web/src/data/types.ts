@@ -6,6 +6,9 @@ import type {
   BdLogEntry,
   Birthdays,
   GreetKind,
+  QaLogEntry,
+  QaQuestion,
+  Questions,
   ReactionRole,
   SgLogEntry,
   SgSuggestion,
@@ -423,7 +426,7 @@ export type StudioTemplate = {
   message: StudioMessage;
   /** Where else it's used, for the tags on its card. */
   usedIn?: {
-    kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday';
+    kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday' | 'question';
     where: string;
   }[];
 };
@@ -597,4 +600,40 @@ export interface PanelApi {
   removeBirthday(serverId: string, userId: string): Promise<void>;
   /** Posts a made-up birthday message in a channel, to see it. */
   testBirthday(serverId: string, channel: string, kind: BdKind): Promise<void>;
+}
+
+export type QAStorage = SGStorage;
+export type QAState = {
+  on: boolean;
+  config: Questions;
+  limits: {
+    categories: number;
+    maxOpen: number;
+    storageMb: number;
+    perKb: number;
+    questions: number;
+  };
+  storage: QAStorage;
+  channels: Channel[];
+  roles: RoleOption[];
+  log: QaLogEntry[];
+};
+
+export interface PanelApi {
+  getQuestions(serverId: string): Promise<QAState>;
+  saveQuestions(
+    serverId: string,
+    change: { on: boolean; config: Questions },
+  ): Promise<void>;
+  listQuestions(
+    serverId: string,
+    filter: { query: string; status: string },
+  ): Promise<{ questions: QaQuestion[]; storage: QAStorage }>;
+  deleteQuestion(serverId: string, number: number): Promise<void>;
+  /** Posts a made-up question or answer in a channel, to see the message. */
+  testQuestion(
+    serverId: string,
+    channel: string,
+    which: 'question' | 'answer',
+  ): Promise<void>;
 }
