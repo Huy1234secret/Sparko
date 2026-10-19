@@ -8,6 +8,7 @@ const animated: Record<string, RevealHover | undefined> = {
   'role-menus': animIcons.reactionRole,
   autoroles: animIcons.autoRole,
   suggestions: animIcons.lightBulb,
+  birthdays: animIcons.sparkle,
 };
 
 /**

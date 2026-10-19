@@ -236,6 +236,7 @@ describe('public site', () => {
     const links = screen.getAllByRole('link', { name: /Ready/ });
     expect(links.map((l) => l.getAttribute('href')).sort()).toEqual([
       '/features/autoroles',
+      '/features/birthdays',
       '/features/role-menus',
       '/features/studio',
       '/features/suggestions',

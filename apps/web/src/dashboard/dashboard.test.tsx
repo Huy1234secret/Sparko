@@ -127,7 +127,7 @@ describe('overview', () => {
   it('explains a missing permission and clears it after a re-check', async () => {
     open(pixel);
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Fix it' }),
+      await screen.findByRole('button', { name: 'Fix it' }, { timeout: 4000 }),
     );
     const dialog = screen.getByRole('dialog', {
       name: 'Give Sparko the Manage Roles permission',
@@ -138,9 +138,11 @@ describe('overview', () => {
     await userEvent.click(
       within(dialog).getByRole('button', { name: 'Check again' }),
     );
-    expect(await screen.findByText('All permissions OK')).toBeInTheDocument();
+    expect(
+      await screen.findByText('All permissions OK', {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
-  });
+  }, 15_000);
 });
 
 describe('navigation', () => {

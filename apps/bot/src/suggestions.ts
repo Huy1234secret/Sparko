@@ -22,7 +22,6 @@ import {
   sgAllowed,
   sgAutoStatus,
   sgCanSuggest,
-  sgCommandBodies,
   sgCommandFor,
   sgConfigOf,
   sgDelete,
@@ -50,6 +49,7 @@ import {
 } from '@sparko/core';
 import { studioInfo } from './studio-info.ts';
 import { Explained } from './jobs.ts';
+import { registerGuildCommands } from './guild-commands.ts';
 
 const EPHEMERAL = MessageFlags.Ephemeral;
 /** Discord's longest text box in a form. */
@@ -219,11 +219,8 @@ export function suggestionsBot(
   async function registerCommands(guildId: string) {
     const app = appId();
     if (!app) return;
-    const { on, config } = sgConfigOf(db, guildId);
-    await rest.put(
-      `/applications/${app}/guilds/${guildId}/commands`,
-      on ? sgCommandBodies(config) : [],
-    );
+    // With the server's other modules' commands, which share the list.
+    await registerGuildCommands(rest, db, app, guildId);
   }
 
   /** After a save: checks the channels, then registers the commands. */

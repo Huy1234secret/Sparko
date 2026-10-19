@@ -276,6 +276,42 @@ const migrations = [
   // Boosts, so {server.boosts} and {server.level} work in every message.
   `ALTER TABLE guilds ADD COLUMN boosts INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE guilds ADD COLUMN boost_level INTEGER NOT NULL DEFAULT 0;`,
+  // Birthdays members saved, what Sparko did with them, and the monthly post.
+  `CREATE TABLE birthdays (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    avatar TEXT NOT NULL DEFAULT '',
+    day INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    year INTEGER,
+    time_zone TEXT NOT NULL DEFAULT '',
+    set_by_id TEXT NOT NULL,
+    set_by_name TEXT NOT NULL,
+    in_server INTEGER NOT NULL DEFAULT 1,
+    celebrated_year INTEGER,
+    role_id TEXT,
+    role_until INTEGER,
+    changed_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );
+  CREATE INDEX birthdays_by_date ON birthdays (guild_id, month, day);
+  CREATE INDEX birthdays_roles ON birthdays (role_until);
+  CREATE TABLE bd_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX bd_log_by_guild ON bd_log (guild_id, id DESC);
+  CREATE TABLE bd_state (
+    guild_id TEXT PRIMARY KEY,
+    monthly TEXT NOT NULL DEFAULT ''
+  );`,
 ];
 
 export function openDb(path: string): Db {

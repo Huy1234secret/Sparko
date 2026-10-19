@@ -54,6 +54,7 @@ import {
   startAutoRoleSweep,
 } from './auto-roles.ts';
 import { suggestionsBot } from './suggestions.ts';
+import { birthdaysBot } from './birthdays.ts';
 import { studioInfo } from './studio-info.ts';
 import {
   checkWelcome,
@@ -77,6 +78,9 @@ const rest = discordRest({ token });
 const tickets = ticketActions(rest, db);
 let client: Client;
 const suggestions = suggestionsBot(db, rest, {
+  appId: () => client?.application?.id,
+});
+const birthdays = birthdaysBot(db, rest, {
   appId: () => client?.application?.id,
 });
 /** Discord only sends member joins with the Server Members Intent on. */
@@ -114,6 +118,7 @@ const handlers: Handlers = {
     );
   },
   ...suggestions.handlers((id) => client.guilds.cache.get(id)),
+  ...birthdays.handlers((id) => client.guilds.cache.get(id)),
   'rr-sync': (job) =>
     syncReactionRole(
       rest,
@@ -194,6 +199,7 @@ function wire(c: Client) {
     }
     // Each server's own suggestion commands, with the names it picked.
     void suggestions.registerAll((id) => ready.guilds.cache.has(id));
+    void birthdays.registerAll((id) => ready.guilds.cache.has(id));
     requeueRunning(db);
     startJobLoop(db, handlers);
     const beat = () => {
@@ -215,6 +221,11 @@ function wire(c: Client) {
       if (interaction.isAutocomplete() && suggestions.autocomplete(interaction))
         return;
       if (interaction.isChatInputCommand() && suggestions.command(interaction))
+        return;
+      // Birthdays: /birthday and its time zone suggestions.
+      if (interaction.isAutocomplete() && birthdays.autocomplete(interaction))
+        return;
+      if (interaction.isChatInputCommand() && birthdays.command(interaction))
         return;
       if (
         interaction.isModalSubmit() &&
@@ -343,6 +354,7 @@ function wire(c: Client) {
       arJoined(db, rest, member.guild.id, factsOf(member), Date.now()).catch(
         failed(`Automatic roles for ${member.id} in ${member.guild.id}`),
       );
+    if (!member.user.bot) birthdays.joined(member);
   });
   c.on(Events.GuildMemberUpdate, (before, after) => {
     memberUpdated(db, rest, before, after).catch(
@@ -374,6 +386,7 @@ function wire(c: Client) {
   });
   c.on(Events.GuildMemberRemove, (member) => {
     if (!member.user?.bot) arLeft(db, member.guild.id, member.id, Date.now());
+    if (!member.user?.bot) birthdays.left(member.guild.id, member.id);
     memberLeft(db, rest, member).catch(
       failed(`Saying goodbye to ${member.id} in ${member.guild.id}`),
     );
@@ -602,6 +615,8 @@ setInterval(() => void tickets.sweep(), 5 * 60_000).unref();
 startAutoRoleSweep(db, rest, (id) => client.guilds.cache.has(id));
 // Suggestions that close after a while.
 suggestions.startSweep((id) => client.guilds.cache.has(id));
+// Birthdays at each server's hour, their roles and the monthly post.
+birthdays.startSweep((id) => client.guilds.cache.has(id));
 setStatus(
   db,
   'intents',

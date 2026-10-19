@@ -1,6 +1,10 @@
 import type {
   ARLogEntry,
   AutoRoles,
+  BdEntry,
+  BdKind,
+  BdLogEntry,
+  Birthdays,
   GreetKind,
   ReactionRole,
   SgLogEntry,
@@ -419,7 +423,7 @@ export type StudioTemplate = {
   message: StudioMessage;
   /** Where else it's used, for the tags on its card. */
   usedIn?: {
-    kind: 'welcome' | 'reaction-role' | 'suggestion';
+    kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday';
     where: string;
   }[];
 };
@@ -540,4 +544,57 @@ export interface PanelApi {
   deleteSuggestion(serverId: string, number: number): Promise<void>;
   /** Posts a made-up suggestion in a channel, to see the message. */
   testSuggestion(serverId: string, channel: string): Promise<void>;
+}
+
+export type BDState = {
+  on: boolean;
+  config: Birthdays;
+  /** How many birthdays members have saved. */
+  count: number;
+  channels: Channel[];
+  roles: RoleOption[];
+  log: BdLogEntry[];
+};
+/** A birthday with when it's next, for the Upcoming panel. */
+export type BDUpcoming = BdEntry & {
+  next: { year: number; month: number; day: number; days: number };
+  age: number | null;
+};
+export type BDList = {
+  birthdays: BdEntry[];
+  upcoming: BDUpcoming[];
+  count: number;
+};
+/** A server member found to add a birthday for. */
+export type BDMemberFound = {
+  userId: string;
+  name: string;
+  avatar: string;
+  /** They already saved a birthday. */
+  saved: boolean;
+};
+export type BDDate = {
+  day: number;
+  month: number;
+  year: number | null;
+  /** '' for the server's time zone. */
+  timeZone: string;
+};
+
+export interface PanelApi {
+  getBirthdays(serverId: string): Promise<BDState>;
+  saveBirthdays(
+    serverId: string,
+    change: { on: boolean; config: Birthdays },
+  ): Promise<void>;
+  listBirthdays(serverId: string, query: string): Promise<BDList>;
+  findBirthdayMembers(
+    serverId: string,
+    query: string,
+  ): Promise<BDMemberFound[]>;
+  /** Staff add or change a member's birthday. */
+  setBirthday(serverId: string, userId: string, date: BDDate): Promise<BdEntry>;
+  removeBirthday(serverId: string, userId: string): Promise<void>;
+  /** Posts a made-up birthday message in a channel, to see it. */
+  testBirthday(serverId: string, channel: string, kind: BdKind): Promise<void>;
 }

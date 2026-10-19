@@ -38,6 +38,10 @@ import {
   isLegacyWelcome,
   RR_MODULE,
   SG_MODULE,
+  BD_MODULE,
+  bdKinds,
+  bdKindNames,
+  type Birthdays,
   type ReactionRole,
   type Suggestions,
   type WelcomeConfig,
@@ -105,11 +109,14 @@ export function studioRoutes({
   const templateUses = (guildId: string) => {
     const uses = new Map<
       string,
-      { kind: 'welcome' | 'reaction-role' | 'suggestion'; where: string }[]
+      {
+        kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday';
+        where: string;
+      }[]
     >();
     const add = (
       id: string,
-      kind: 'welcome' | 'reaction-role' | 'suggestion',
+      kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday',
       where: string,
     ) => {
       if (!id) return;
@@ -147,6 +154,14 @@ export function studioRoutes({
           if (a.type === 'dm')
             add(a.template, 'suggestion', `Suggestions (${st.name} DM)`);
     }
+    const bd = getModule<Birthdays>(db, guildId, BD_MODULE).config;
+    if (bd)
+      for (const k of bdKinds)
+        add(
+          bd.messages?.[k] ?? '',
+          'birthday',
+          `Birthdays (${bdKindNames[k]})`,
+        );
     return uses;
   };
 

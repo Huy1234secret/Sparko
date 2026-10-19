@@ -25,6 +25,7 @@ import {
   useSaveFlow,
 } from './frame';
 import { AutoRolesModule } from './AutoRolesModule';
+import { BirthdaysModule } from './BirthdaysModule';
 import { ReactionRolesModule } from './ReactionRolesModule';
 import { StudioModule } from './StudioModule';
 import { SuggestionsModule } from './SuggestionsModule';
@@ -267,5 +268,7 @@ export function ModulePage() {
     return <AutoRolesModule module={module} server={server} />;
   if (module.id === 'suggestions')
     return <SuggestionsModule module={module} server={server} />;
+  if (module.id === 'birthdays')
+    return <BirthdaysModule module={module} server={server} />;
   return <GenericModule module={module} server={server} />;
 }

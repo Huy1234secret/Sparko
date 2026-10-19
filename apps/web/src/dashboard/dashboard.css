@@ -3014,6 +3014,9 @@ body:has(> .sp-settings-scrim) > #root {
 .sp-lib-tag--suggestion {
   color: var(--sp-info);
 }
+.sp-lib-tag--birthday {
+  color: var(--sp-warning);
+}
 
 /* Reaction roles ----------------------------------------------------------- */
 .sp-rr-count {
@@ -3753,4 +3756,220 @@ a.sp-sg-card__open:focus-visible {
 .sp-rr-sparko .sp-studio__type,
 .sp-rr-sparko .sp-preview-tools {
   opacity: 0.5;
+}
+
+/* Birthdays ---------------------------------------------------------------- */
+.sp-bd-role {
+  max-width: 420px;
+}
+/* Storage: the list by month beside the Upcoming panel. */
+.sp-bd-storage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: 16px;
+  align-items: start;
+}
+.sp-bd-months {
+  display: grid;
+  gap: 18px;
+}
+.sp-bd-month {
+  display: grid;
+  gap: 8px;
+}
+.sp-bd-month__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--sp-line);
+  font: 600 13px/18px var(--sp-font-sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sp-bd-rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-bd-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-bd-row.is-left {
+  opacity: 0.6;
+}
+.sp-bd-row__day {
+  flex: none;
+  width: 28px;
+  color: var(--sp-muted);
+  font: 600 15px/20px var(--sp-font-sans);
+  text-align: center;
+}
+.sp-bd-avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sp-skeleton);
+  object-fit: cover;
+}
+.sp-bd-row__main {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.sp-bd-row__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sp-bd-row__name {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sp-bd-row__meta {
+  overflow-wrap: anywhere;
+}
+.sp-bd-row__actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+/* Upcoming: a little calendar page for each date. */
+.sp-bd-upcoming {
+  position: sticky;
+  top: calc(var(--sp-topbar-h) + 16px);
+}
+.sp-bd-next {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 12px 12px;
+  list-style: none;
+}
+.sp-bd-next__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: var(--sp-radius-control);
+}
+.sp-bd-next__row.is-today {
+  background: var(--sp-brand-soft);
+}
+.sp-bd-next__date {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  padding: 3px 0;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-chip);
+  background: var(--sp-raised);
+  line-height: 1;
+}
+.sp-bd-next__day {
+  font: 700 16px/18px var(--sp-font-sans);
+}
+.sp-bd-next__month {
+  color: var(--sp-muted);
+  font: 600 10px/12px var(--sp-font-sans);
+  text-transform: uppercase;
+}
+.sp-bd-next__who {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.sp-bd-next__cake {
+  flex: none;
+  font-size: 18px;
+}
+/* Adding a birthday: find the member, then the date. */
+.sp-bd-form .sp-field {
+  margin: 0;
+}
+.sp-bd-date {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 130px;
+  gap: 10px;
+  align-items: end;
+}
+.sp-bd-find {
+  gap: 8px;
+}
+.sp-bd-found {
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.sp-bd-found__item,
+.sp-bd-picked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.sp-bd-found__item {
+  cursor: pointer;
+}
+.sp-bd-found__item:hover {
+  border-color: var(--sp-brand-line);
+}
+.sp-bd-found__item:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-bd-picked .sp-btn,
+.sp-bd-found__saved {
+  margin-left: auto;
+}
+.sp-bd-found__none {
+  padding: 6px 2px;
+}
+@media (max-width: 900px) {
+  .sp-bd-storage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-bd-upcoming {
+    position: static;
+  }
+}
+@media (max-width: 520px) {
+  /* The four messages sit two by two instead of scrolling. */
+  .sp-bd-kinds {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sp-bd-date {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .sp-bd-date > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
 }

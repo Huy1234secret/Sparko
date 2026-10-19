@@ -39,7 +39,11 @@ const rows = [
   '/suggestion-deny|Utility|Staff who can approve|Deny a suggestion, with a reason.|/suggestion-deny id:12|id:The suggestion’s number',
   '/suggestion-delete|Utility|Staff who can delete|Delete a suggestion, its message and its data.|/suggestion-delete id:12|id:The suggestion’s number',
   '/giveaway start|Fun|Members with Manage Server|Start a giveaway with fair, random winners.|/giveaway start prize:Nitro Basic winners:1 ends:3d|prize:What people can win;winners:How many winners;ends:How long it runs',
-  '/birthday set|Fun|Everyone|Save your birthday so the server can celebrate.|/birthday set date:14 March|date:Day and month; the year is never shown',
+  '/birthday set|Fun|Everyone, unless limited|Save your birthday so the server can celebrate. Staff can set someone else’s.|/birthday set day:14 month:March timezone:Europe/London|day:The day of the month;month:The month;year:The year you were born, for your age (optional, never shown);timezone:Your time zone, suggested as you type (optional);member:Staff: someone else (optional)',
+  '/birthday remove|Fun|Everyone|Forget your birthday. Staff can remove someone else’s.|/birthday remove|member:Staff: someone else (optional)',
+  '/birthday view|Fun|Everyone|See a member’s birthday, and how soon it is.|/birthday view member:@rhea|member:Whose birthday (you if left empty)',
+  '/birthday upcoming|Fun|Everyone|The next 10 birthdays in the server.|/birthday upcoming|',
+  '/birthday list|Fun|Everyone|Every birthday in a month.|/birthday list month:April|month:Which month',
   '/rep|Fun|Everyone|Thank someone with +rep.|/rep user:@rhea|user:Who to thank',
 ];
 
