@@ -136,6 +136,7 @@ function StudioEditor({
           roleVariables={uses.includes('reaction-role')}
           suggestionVariables={uses.includes('suggestion')}
           birthdayVariables={uses.includes('birthday')}
+          questionVariables={uses.includes('question')}
         />
 
         <div className="sp-stack sp-studio__side">

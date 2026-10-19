@@ -9,8 +9,11 @@ import {
   Perm,
   createTicket,
   studioDefault,
+  qaDefaultMessage,
   setStatus,
+  sgDefault,
   upsertGuild,
+  writeModule,
   type GuildView,
   type Rest,
 } from '@sparko/core';
@@ -726,6 +729,164 @@ describe('server API', () => {
     const test = claimJob(db)!;
     expect(test.kind).toBe('suggestions-test');
     finishJob(db, test.id, null, Date.now());
+  });
+
+  it('saves questions, checks them, lists them and deletes them', async () => {
+    type QA = {
+      on: boolean;
+      config: Record<string, unknown> & {
+        command: { name: string; description: string };
+      };
+      storage: { count: number; perKb: number };
+      limits: { categories: number; maxOpen: number };
+      channels: { id: string; canThread: boolean }[];
+    };
+    const state = await body<QA>(await call('/9001/questions'));
+    expect(state.on).toBe(false);
+    expect(state.limits).toMatchObject({ categories: 5, maxOpen: 3 });
+    expect(state.storage).toMatchObject({ count: 0, perKb: 4 });
+    expect(state.channels[0]).toHaveProperty('canThread');
+    // Without a channel it can't be saved.
+    const bad = await call('/9001/questions', {
+      method: 'PUT',
+      body: JSON.stringify({ on: true, config: state.config }),
+    });
+    expect(bad.status).toBe(400);
+    expect((await body<{ message: string }>(bad)).message).toContain(
+      'channel questions are posted in',
+    );
+    // More open questions than Free allows, or a deleted role, are refused.
+    const put = (config: unknown) =>
+      call('/9001/questions', {
+        method: 'PUT',
+        body: JSON.stringify({ on: true, config }),
+      });
+    const config = { ...state.config, channel: '501', answerers: ['301'] };
+    expect(
+      (await body<{ message: string }>(await put({ ...config, maxOpen: 10 })))
+        .message,
+    ).toContain('1 to 3');
+    expect(
+      (await body<{ message: string }>(await put({ ...config, ping: '999' })))
+        .message,
+    ).toContain('deleted');
+    // A name Suggestions already uses is taken.
+    writeModule(
+      db,
+      '9001',
+      'suggestions',
+      { on: true, config: sgDefault('501') },
+      0,
+    );
+    expect(
+      (
+        await body<{ message: string }>(
+          await put({
+            ...config,
+            command: { ...config.command, name: 'suggest' },
+          }),
+        )
+      ).message,
+    ).toContain('already a command');
+    // The question message is a Studio template with one embed.
+    const template = async (message: object) =>
+      (
+        await body<{ id: string }>(
+          await call('/9001/studio/templates', {
+            method: 'POST',
+            body: JSON.stringify({ name: 'Q', message, folderId: null }),
+          }),
+        )
+      ).id;
+    const card = { ...qaDefaultMessage(), name: 'Q', channel: '501' };
+    const two = await template({
+      ...card,
+      embeds: [card.embeds[0], { ...card.embeds[0], id: 'e2' }],
+    });
+    expect(
+      (await body<{ message: string }>(await put({ ...config, message: two })))
+        .message,
+    ).toContain('one embed');
+    const message = await template(card);
+    const ok = await put({ ...config, message, extra: 'dropped' });
+    expect(ok.status).toBe(204);
+    type Studio = {
+      templates: { id: string; usedIn: { kind: string; where: string }[] }[];
+    };
+    const tagged = (await body<Studio>(await call('/9001/studio'))).templates;
+    expect(tagged.find((t) => t.id === message)!.usedIn).toEqual([
+      {
+        kind: 'question',
+        where: 'Questions & answers (the question message)',
+      },
+    ]);
+    let job = claimJob(db)!;
+    while (job.kind !== 'questions') {
+      finishJob(db, job.id, null, Date.now());
+      job = claimJob(db)!;
+    }
+    finishJob(db, job.id, null, Date.now());
+    const saved = await body<QA>(await call('/9001/questions'));
+    expect(saved.on).toBe(true);
+    expect(saved.config).not.toHaveProperty('extra');
+    expect(saved.config.answerers).toEqual(['301']);
+
+    // A question the bot posted shows in Storage, and can be deleted.
+    db.prepare(
+      `INSERT INTO questions (guild_id, number, asker_id, asker_name, title,
+         channel_id, message_id, thread_id, created_at)
+       VALUES ('9001', 1, '555', 'mia', 'Where are the rules?', '501', '77', '78', 0)`,
+    ).run();
+    type List = { questions: { number: number; title: string }[] };
+    expect(
+      (await body<List>(await call('/9001/questions/list?q=rules'))).questions,
+    ).toMatchObject([{ number: 1, title: 'Where are the rules?' }]);
+    expect(
+      (await body<List>(await call('/9001/questions/list?status=answered')))
+        .questions,
+    ).toEqual([]);
+    expect((await call('/9001/questions/1', { method: 'DELETE' })).status).toBe(
+      204,
+    );
+    const del = claimJob(db)!;
+    expect(del.kind).toBe('questions-delete');
+    expect(del.payload).toEqual({
+      channelId: '501',
+      messageId: '77',
+      threadId: '78',
+    });
+    finishJob(db, del.id, null, Date.now());
+    expect(
+      (await body<List>(await call('/9001/questions/list'))).questions,
+    ).toEqual([]);
+    expect((await call('/9001/questions/1', { method: 'DELETE' })).status).toBe(
+      404,
+    );
+
+    // Test messages go to the bot, for the question or the answer.
+    expect(
+      (
+        await call('/9001/questions/test', {
+          method: 'POST',
+          body: JSON.stringify({ channel: 'nope' }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await call('/9001/questions/test', {
+          method: 'POST',
+          body: JSON.stringify({ channel: '501', which: 'answer' }),
+        })
+      ).status,
+    ).toBe(204);
+    const test = claimJob(db)!;
+    expect(test.kind).toBe('questions-test');
+    expect(test.payload).toMatchObject({ channel: '501', which: 'answer' });
+    finishJob(db, test.id, null, Date.now());
+    writeModule(db, '9001', 'suggestions', { on: false }, 0);
+    for (const id of [two, message])
+      await call(`/9001/studio/templates/${id}`, { method: 'DELETE' });
   });
 
   it('keeps templates in folders, in the order people put them', async () => {

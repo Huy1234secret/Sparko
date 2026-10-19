@@ -305,6 +305,29 @@ export function withBackend(
         return sample.testBirthday(id, channel, kind);
       await call('POST', `${server(id)}/birthdays/test`, { channel, kind });
     },
+    async getQuestions(id) {
+      if (!(await backend()).live) return sample.getQuestions(id);
+      return getJson(`${server(id)}/questions`);
+    },
+    async saveQuestions(id, change) {
+      if (!(await backend()).live) return sample.saveQuestions(id, change);
+      await call('PUT', `${server(id)}/questions`, change);
+    },
+    async listQuestions(id, filter) {
+      if (!(await backend()).live) return sample.listQuestions(id, filter);
+      return getJson(
+        `${server(id)}/questions/list?q=${encodeURIComponent(filter.query)}&status=${encodeURIComponent(filter.status)}`,
+      );
+    },
+    async deleteQuestion(id, number) {
+      if (!(await backend()).live) return sample.deleteQuestion(id, number);
+      await call('DELETE', `${server(id)}/questions/${number}`);
+    },
+    async testQuestion(id, channel, which) {
+      if (!(await backend()).live)
+        return sample.testQuestion(id, channel, which);
+      await call('POST', `${server(id)}/questions/test`, { channel, which });
+    },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);
       return getJson(`${server(id)}/reaction-roles`);

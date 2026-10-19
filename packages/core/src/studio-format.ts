@@ -893,6 +893,8 @@ export type StudioVariable = {
   suggestion?: true;
   /** Filled in only by birthday messages. */
   birthday?: true;
+  /** Filled in only by question, answer and answered-DM messages. */
+  question?: true;
 };
 
 /** Variables people can write in Studio messages, in braces. */
@@ -975,8 +977,10 @@ export const studioVariables: StudioVariable[] = [
   },
   {
     name: 'status',
-    about: 'Its status, like Pending, Approved or Denied.',
+    about:
+      'Its status: Pending, Approved or Denied for a suggestion, or Open, Answered, Closed or Expired for a question.',
     suggestion: true,
+    question: true,
   },
   {
     name: 'vote.ratio.amount',
@@ -995,6 +999,58 @@ export const studioVariables: StudioVariable[] = [
     about:
       'The files the member added. Pictures and videos are shown in the message.',
     suggestion: true,
+    question: true,
+  },
+  {
+    name: 'question.title',
+    about: 'The question’s title.',
+    question: true,
+  },
+  {
+    name: 'question.body',
+    about: 'The details the member wrote under the title.',
+    question: true,
+  },
+  {
+    name: 'question.id',
+    about: 'The question’s number, like #12.',
+    question: true,
+  },
+  {
+    name: 'question.category',
+    about: 'The category picked, with its emoji, or General.',
+    question: true,
+  },
+  {
+    name: 'answer',
+    about:
+      'The answer staff wrote. The question message shows its first 1,000 characters.',
+    question: true,
+  },
+  {
+    name: 'answered.by',
+    about: 'Mentions who answered, without pinging them.',
+    question: true,
+  },
+  {
+    name: 'answered.by.name',
+    about: 'The name of who answered.',
+    question: true,
+  },
+  {
+    name: 'asker',
+    about: 'Mentions who asked, or says Anonymous when questions are.',
+    question: true,
+  },
+  {
+    name: 'metoo.count',
+    about: 'How many members pressed Me too.',
+    question: true,
+  },
+  {
+    name: 'thread',
+    about: 'Links the question’s thread.',
+    question: true,
   },
   {
     name: 'birthday.users',

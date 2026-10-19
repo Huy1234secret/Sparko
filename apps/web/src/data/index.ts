@@ -18,6 +18,7 @@ import type {
   TicketPriority,
 } from './types';
 import type {
+  Questions,
   AutoRoles,
   BdKind,
   Birthdays,
@@ -56,6 +57,9 @@ export const keys = {
   rr: (id: string) => ['rr', id] as const,
   ar: (id: string) => ['ar', id] as const,
   arMembers: (id: string, q: string) => ['ar', id, 'members', q] as const,
+  qa: (id: string) => ['qa', id] as const,
+  qaList: (id: string, q: string, status: string) =>
+    ['qa', id, 'list', q, status] as const,
   sg: (id: string) => ['sg', id] as const,
   sgList: (id: string, q: string, status: string) =>
     ['sg', id, 'list', q, status] as const,
@@ -98,6 +102,7 @@ function useRefresh(serverId: string) {
     Promise.all([
       client.invalidateQueries({ queryKey: keys.overview(serverId) }),
       client.invalidateQueries({ queryKey: ['module', serverId] }),
+      client.invalidateQueries({ queryKey: keys.qa(serverId) }),
       client.invalidateQueries({ queryKey: keys.welcome(serverId) }),
       client.invalidateQueries({ queryKey: ['tickets', serverId] }),
       client.invalidateQueries({ queryKey: keys.studio(serverId) }),
@@ -448,6 +453,44 @@ export function useBirthdayActions(serverId: string) {
     test: useMutation({
       mutationFn: ({ channel, kind }: { channel: string; kind: BdKind }) =>
         api.testBirthday(serverId, channel, kind),
+    }),
+  };
+}
+export const useQuestions = (serverId: string) =>
+  useQuery({
+    queryKey: keys.qa(serverId),
+    queryFn: () => api.getQuestions(serverId),
+  });
+/** Questions in Storage, filtered by what staff typed and picked. */
+export const useQuestionList = (
+  serverId: string,
+  query: string,
+  status: string,
+) =>
+  useQuery({
+    queryKey: keys.qaList(serverId, query.trim(), status),
+    queryFn: () => api.listQuestions(serverId, { query: query.trim(), status }),
+  });
+export function useQuestionActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: Questions }) =>
+        api.saveQuestions(serverId, change),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (number: number) => api.deleteQuestion(serverId, number),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: ({
+        channel,
+        which,
+      }: {
+        channel: string;
+        which: 'question' | 'answer';
+      }) => api.testQuestion(serverId, channel, which),
     }),
   };
 }

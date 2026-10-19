@@ -56,7 +56,7 @@ const table: [ModuleGroup, string[]][] = [
       'role-menus|Reaction roles|smile|Members give themselves roles with reactions, buttons or a menu.|Make a reaction role',
       'autoroles|Automatic roles|users|Give roles when members join, once they’ve stayed a while, or when they meet your rules.|Add a rule',
       'suggestions|Suggestions|message-square|Members suggest ideas, everyone votes, and staff mark them done.|Pick a suggestions channel',
-      'questions|Questions & answers|circle-help|Answer common questions automatically with saved replies.|Add a question',
+      'questions|Questions & answers|circle-help|Members ask with /question; staff answer in a thread, and answered threads close on their own.|Pick a questions channel',
       'starboard|Starboard|star|Messages that get enough stars are reposted to a highlights channel.|Pick a highlights channel',
       'polls|Polls|activity|Quick polls with buttons and live results.|Create a poll',
       'events|Events & RSVP|calendar|Schedule events, collect RSVPs and remind people before they start.|Schedule an event',

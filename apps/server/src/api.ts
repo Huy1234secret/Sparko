@@ -33,6 +33,7 @@ import { BadRequest, json, readJson } from './http.ts';
 import type { Media } from './media.ts';
 import { arRoutes } from './ar-api.ts';
 import { rrRoutes } from './rr-api.ts';
+import { qaRoutes } from './qa-api.ts';
 import { sgRoutes } from './sg-api.ts';
 import { bdRoutes } from './bd-api.ts';
 import { studioRoutes } from './studio-api.ts';
@@ -240,6 +241,7 @@ export function createApi({
   });
   const reactionRoles = rrRoutes({ db, view: (id) => view(id), now });
   const autoRoles = arRoutes({ db, view: (id) => view(id), now });
+  const questions = qaRoutes({ db, view: (id) => view(id), now });
   const suggestions = sgRoutes({ db, view: (id) => view(id), now });
   const birthdays = bdRoutes({
     db,
@@ -384,6 +386,17 @@ export function createApi({
       if (!handled) json(res, 404, { error: 'not_found' });
     } else if (rest.startsWith('/birthdays')) {
       const handled = await birthdays({
+        req,
+        res,
+        url,
+        method,
+        path: rest,
+        guildId,
+        user,
+      });
+      if (!handled) json(res, 404, { error: 'not_found' });
+    } else if (rest.startsWith('/questions')) {
+      const handled = await questions({
         req,
         res,
         url,

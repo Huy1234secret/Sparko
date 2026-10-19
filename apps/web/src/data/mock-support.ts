@@ -40,6 +40,8 @@ type Helpers = {
   suggestionUses?: (serverId: string) => { id: string; where: string }[];
   /** Templates Birthdays use, and for which message. */
   birthdayUses?: (serverId: string) => { id: string; where: string }[];
+  /** Templates Questions & answers use, and for what. */
+  questionUses?: (serverId: string) => { id: string; where: string }[];
 };
 
 type SupportApi = Pick<
@@ -784,7 +786,12 @@ export function createSupportMock(h: Helpers) {
       const uses = new Map<string, NonNullable<StudioTemplate['usedIn']>>();
       const add = (
         id: string,
-        kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday',
+        kind:
+          | 'welcome'
+          | 'reaction-role'
+          | 'suggestion'
+          | 'birthday'
+          | 'question',
         where: string,
       ) => {
         if (!id) return;
@@ -798,6 +805,8 @@ export function createSupportMock(h: Helpers) {
         add(u.id, 'suggestion', u.where);
       for (const u of h.birthdayUses?.(serverId) ?? [])
         add(u.id, 'birthday', u.where);
+      for (const u of h.questionUses?.(serverId) ?? [])
+        add(u.id, 'question', u.where);
       for (const r of s.rr.templates)
         for (const t of [
           r.config.message,

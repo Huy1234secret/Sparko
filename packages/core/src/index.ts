@@ -10,6 +10,8 @@ export * from './rr-store.ts';
 export * from './ar-store.ts';
 export * from './sg-store.ts';
 export * from './bd-store.ts';
+export * from './qa-store.ts';
+export * from './guild-commands.ts';
 export * from './tickets.ts';
 export * from './ticket-actions.ts';
 export * from './studio.ts';
