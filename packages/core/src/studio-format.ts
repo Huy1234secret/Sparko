@@ -457,7 +457,12 @@ const https = (url: unknown) => {
   }
 };
 /** Picture links can also be a picture Sparko fills in when it sends. */
-export const pictureVariables = ['{user.avatar}', '{server.icon}'] as const;
+export const pictureVariables = [
+  '{user.avatar}',
+  '{server.icon}',
+  '{author.avatar}',
+  '{message.image}',
+] as const;
 export const isPictureVariable = (url: unknown) =>
   (pictureVariables as readonly unknown[]).includes(url);
 const picture = (url: unknown) => https(url) || isPictureVariable(url);
@@ -891,6 +896,8 @@ export type StudioVariable = {
   role?: true;
   /** Filled in only by suggestion messages. */
   suggestion?: true;
+  /** Filled in only by starboard posts. */
+  starboard?: true;
   /** Filled in only by birthday messages. */
   birthday?: true;
   /** Filled in only by question, answer and answered-DM messages. */
@@ -1083,6 +1090,49 @@ export const studioVariables: StudioVariable[] = [
     about:
       'Every birthday this month, one per line, like “@rhea — 14 March”, in the monthly post.',
     birthday: true,
+  },
+  { name: 'stars', about: 'How many stars the message has.', starboard: true },
+  {
+    name: 'star.emoji',
+    about: 'The board’s star emoji, like ⭐.',
+    starboard: true,
+  },
+  { name: 'board', about: 'The board’s name.', starboard: true },
+  {
+    name: 'author',
+    about: 'Mentions who wrote the starred message, without pinging them.',
+    starboard: true,
+  },
+  {
+    name: 'author.name',
+    about: 'The name of who wrote the starred message.',
+    starboard: true,
+  },
+  {
+    name: 'author.avatar',
+    about: 'Their profile picture. Paste it as a picture link.',
+    starboard: true,
+  },
+  {
+    name: 'jump.link',
+    about: 'A link to the starred message.',
+    starboard: true,
+  },
+  {
+    name: 'message.content',
+    about: 'The starred message’s text.',
+    starboard: true,
+  },
+  {
+    name: 'message.image',
+    about:
+      'The first picture in the starred message. Paste it as a picture link; left out when there’s none.',
+    starboard: true,
+  },
+  {
+    name: 'message.date',
+    about: 'When the starred message was sent, in each reader’s own format.',
+    starboard: true,
   },
 ];
 

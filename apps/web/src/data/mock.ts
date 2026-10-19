@@ -18,6 +18,7 @@ import {
 } from './studio-format';
 import { createAutoRolesMock } from './mock-autoroles';
 import { createSupportMock } from './mock-support';
+import { createStarboardMock } from './mock-starboard';
 import { createQuestionsMock } from './mock-questions';
 import { createSuggestionsMock } from './mock-suggestions';
 import { createBirthdaysMock } from './mock-birthdays';
@@ -118,6 +119,7 @@ const firstServerOn: Record<string, boolean> = {
   cases: true,
   tickets: true,
   levels: true,
+  starboard: true,
   autoroles: true,
   questions: true,
   suggestions: true,
@@ -138,6 +140,8 @@ const channels: Channel[] = [
   ['art-share', 'Community'],
   ['roles', 'Community'],
   ['support', 'Help'],
+  ['starboard', 'Community'],
+  ['hall-of-fame', 'Community'],
 ].map(([name, category, canPost = true], i) => ({
   id: `80000000000000${String(i).padStart(4, '0')}`,
   name: name as string,
@@ -214,6 +218,7 @@ function stateOf(serverId: string): ServerState {
             welcome: true,
             tickets: server.members > 2000,
             levels: true,
+            starboard: server.plan === 'plus',
           },
       skipped: new Set(),
       welcome: {
@@ -498,6 +503,7 @@ export function resetMock() {
   resetSupport();
   resetQuestions();
   resetAutoRoles();
+  resetStarboard();
   resetSuggestions();
   resetBirthdays();
 }
@@ -524,6 +530,7 @@ const {
     );
   },
   suggestionUses: (serverId) => suggestionUses(serverId),
+  starboardUses: (serverId) => starboardUses(serverId),
   birthdayUses: (serverId) => birthdayUses(serverId),
   questionUses: (serverId) => questionUses(serverId),
 });
@@ -588,11 +595,29 @@ const {
   },
   you: () => session.user,
 });
+const {
+  api: starboardApi,
+  reset: resetStarboard,
+  uses: starboardUses,
+} = createStarboardMock({
+  wait: <T>(value: T) => wait(value),
+  copy,
+  server: serverById,
+  channels: (serverId) => channelsFor(stateOf(serverId)),
+  roles: (serverId) => rolesOf(serverId),
+  templates: (serverId) => templateIds(serverId),
+  isOn: (serverId) => !!stateOf(serverId).on['starboard'],
+  setOn: (serverId, on) => {
+    stateOf(serverId).on['starboard'] = on;
+  },
+  you: () => session.user,
+});
 export const mockApi: PanelApi = {
   ...coreApi,
   ...supportApi,
   ...autoRolesApi,
   ...suggestionsApi,
+  ...starboardApi,
   ...questionsApi,
   ...birthdaysApi,
 };

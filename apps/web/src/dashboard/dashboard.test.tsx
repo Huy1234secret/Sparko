@@ -913,6 +913,176 @@ describe('Questions & answers', () => {
   }, 20_000);
 });
 
+const cozy = '/dashboard/900000000000000002';
+
+describe('Starboard', () => {
+  it('has one board on Free, and checks a new board before saving on Plus', async () => {
+    open(`${pixel}/starboard`);
+    expect(
+      await screen.findByRole('button', { name: /Board$/ }, { timeout: 4000 }),
+    ).toBeDisabled();
+    cleanup();
+    open(`${cozy}/starboard`);
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Board$/ }, { timeout: 4000 }),
+    );
+    // The new board is picked, and needs its own channel.
+    expect(screen.getByRole('textbox', { name: /Board name/ })).toHaveValue(
+      'Board 3',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Pick the channel “Board 3” posts in/),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove Board 3' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit Hall of fame' }),
+    );
+    const stars = screen.getByRole('spinbutton', { name: 'Stars needed' });
+    expect(stars).toHaveValue(15);
+    await userEvent.clear(stars);
+    await userEvent.type(stars, '20');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Live in #starboard/, {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('starts a board’s post from a default template with the jump button', async () => {
+    open(`${cozy}/starboard?tab=edit&board=hof`);
+    expect(
+      await screen.findByText(
+        'How should Hall of fame posts look?',
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use a default template' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Default templates' });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /Highlight card/ }),
+    );
+    expect(await screen.findByText('Live preview')).toBeInTheDocument();
+    expect(screen.getByText('Jump to message')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Hall of fame' })).toBeChecked();
+    // Starboard variables are listed as working here.
+    await userEvent.click(screen.getByRole('button', { name: /Variables/ }));
+    const item = screen.getByRole('menuitem', { name: /\{message\.image\}/ });
+    expect(item).not.toHaveClass('is-off');
+  }, 20_000);
+
+  it('freezes, removes and blocks starred messages in Storage', async () => {
+    open(`${pixel}/starboard?tab=storage`);
+    expect(
+      await screen.findByText(
+        /whoever named the voice channels/,
+        {},
+        {
+          timeout: 4000,
+        },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Discord didn’t share the text of this message.'),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Unfreeze tomoko’s message' }),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Freeze tomoko’s message' }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Remove rhea’s message from the board',
+      }),
+    );
+    await userEvent.click(
+      within(
+        screen.getByRole('dialog', { name: /Take this off Starboard/ }),
+      ).getByRole('button', { name: 'Remove' }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText(/Server birthday/)).not.toBeInTheDocument(),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Block kestrel' }),
+    );
+    await userEvent.click(
+      within(screen.getByRole('dialog', { name: 'Block kestrel?' })).getByRole(
+        'button',
+        { name: 'Block' },
+      ),
+    );
+    const blocked = await screen.findByRole('button', {
+      name: 'Unblock kestrel',
+    });
+    await userEvent.click(blocked);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Unblock kestrel' }),
+      ).not.toBeInTheDocument(),
+    );
+    // Sorting by newest puts the newest message first.
+    await userEvent.click(screen.getByRole('radio', { name: 'Newest' }));
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('link', { name: /Open .* message in Discord/ })[0],
+      ).toHaveAccessibleName('Open kestrel’s message in Discord'),
+    );
+  }, 20_000);
+
+  it('filters the log and refuses command names Discord won’t take', async () => {
+    open(`${pixel}/starboard?tab=logs`);
+    await userEvent.click(
+      await screen.findByRole('radio', { name: 'Staff' }, { timeout: 4000 }),
+    );
+    expect(screen.getByText(/\[FROZEN\]/)).toBeInTheDocument();
+    expect(screen.queryByText(/\[POSTED\]/)).not.toBeInTheDocument();
+    cleanup();
+    open(`${pixel}/starboard?tab=commands`);
+    const names = await screen.findAllByRole(
+      'textbox',
+      { name: 'Name' },
+      { timeout: 4000 },
+    );
+    await userEvent.clear(names[1]!);
+    await userEvent.type(names[1]!, 'top!');
+    expect(
+      screen.getByText('1 to 32 lowercase letters, numbers, - or _.'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Command names are 1 to 32/),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('can be turned off and saved that way', async () => {
+    open(`${pixel}/starboard`);
+    await userEvent.click(
+      await screen.findByRole(
+        'switch',
+        { name: 'Starboard on or off' },
+        { timeout: 4000 },
+      ),
+    );
+    expect(
+      screen.getByText('The starboard is off. Turn it on above to edit it.'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Save changes' }),
+      ).not.toBeInTheDocument(),
+    );
+  }, 20_000);
+});
+
 describe('Tickets', () => {
   it('lists tickets needing a reply, longest waits first, and searches them', async () => {
     open(`${pixel}/tickets`);

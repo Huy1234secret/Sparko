@@ -357,6 +357,72 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX qa_log_by_guild ON qa_log (guild_id, id DESC);`,
+  // Starboard: starred messages per board, who starred them, who's blocked,
+  // and what happened.
+  `CREATE TABLE sb_entries (
+    guild_id TEXT NOT NULL,
+    board_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    author_name TEXT NOT NULL DEFAULT '',
+    author_avatar TEXT NOT NULL DEFAULT '',
+    content TEXT,
+    image TEXT NOT NULL DEFAULT '',
+    stars INTEGER NOT NULL DEFAULT 0,
+    shown INTEGER NOT NULL DEFAULT 0,
+    milestone INTEGER NOT NULL DEFAULT 0,
+    post_channel_id TEXT,
+    post_id TEXT,
+    frozen INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    message_at INTEGER NOT NULL,
+    posted_at INTEGER,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, board_id, message_id)
+  );
+  CREATE INDEX sb_entries_by_post ON sb_entries (post_id);
+  CREATE INDEX sb_entries_by_message ON sb_entries (message_id);
+  CREATE INDEX sb_entries_by_author ON sb_entries (guild_id, author_id);
+  CREATE INDEX sb_entries_waiting ON sb_entries (guild_id, posted_at, updated_at);
+  CREATE TABLE sb_reactors (
+    guild_id TEXT NOT NULL,
+    board_id TEXT NOT NULL,
+    message_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    emoji TEXT NOT NULL,
+    on_post INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, board_id, message_id, user_id, emoji, on_post)
+  );
+  CREATE INDEX sb_reactors_by_user ON sb_reactors (guild_id, user_id);
+  CREATE TABLE sb_blocked (
+    guild_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    preview TEXT NOT NULL DEFAULT '',
+    by_name TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, kind, target_id)
+  );
+  CREATE TABLE sb_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    board_id TEXT NOT NULL DEFAULT '',
+    board_name TEXT NOT NULL DEFAULT '',
+    message_id TEXT NOT NULL DEFAULT '',
+    channel_id TEXT NOT NULL DEFAULT '',
+    author_id TEXT NOT NULL DEFAULT '',
+    author_name TEXT NOT NULL DEFAULT '',
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    stars INTEGER NOT NULL DEFAULT 0,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX sb_log_by_guild ON sb_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

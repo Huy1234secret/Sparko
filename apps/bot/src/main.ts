@@ -10,6 +10,7 @@ import {
   type ButtonInteraction,
   type Guild,
   type GuildMember,
+  type Message,
   type MessageReaction,
   type PartialMessageReaction,
   type PartialUser,
@@ -53,10 +54,12 @@ import {
   pendingBefore,
   startAutoRoleSweep,
 } from './auto-roles.ts';
+import { starboardBot } from './starboard.ts';
 import { questionsBot } from './questions.ts';
 import { suggestionsBot } from './suggestions.ts';
 import { birthdaysBot } from './birthdays.ts';
 import { studioInfo } from './studio-info.ts';
+import { registerAllGuildCommands } from './guild-commands.ts';
 import {
   checkWelcome,
   memberJoined,
@@ -86,6 +89,24 @@ const birthdays = birthdaysBot(db, rest, {
 });
 const questions = questionsBot(db, rest, {
   appId: () => client?.application?.id,
+});
+const starboard = starboardBot(db, rest, {
+  appId: () => client?.application?.id,
+  discord: {
+    message: (guildId, channelId, messageId) =>
+      starredMessage(guildId, channelId, messageId),
+    roles: async (guildId, userId) => {
+      const member = await client.guilds.cache
+        .get(guildId)
+        ?.members.fetch(userId)
+        .catch(() => null);
+      return member ? [...member.roles.cache.keys()] : null;
+    },
+    nsfw: (_, channelId) => {
+      const channel = client.channels.cache.get(channelId);
+      return !!channel && 'nsfw' in channel && channel.nsfw;
+    },
+  },
 });
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
@@ -122,6 +143,7 @@ const handlers: Handlers = {
     );
   },
   ...suggestions.handlers((id) => client.guilds.cache.get(id)),
+  ...starboard.handlers((id) => client.guilds.cache.get(id)),
   ...questions.handlers((id) => client.guilds.cache.get(id)),
   ...birthdays.handlers((id) => client.guilds.cache.get(id)),
   'rr-sync': (job) =>
@@ -202,10 +224,10 @@ function wire(c: Client) {
     } catch (error) {
       console.error('Couldn’t register slash commands', error);
     }
-    // Each server's own suggestion commands, with the names it picked.
-    void questions.registerAll((id) => ready.guilds.cache.has(id));
-    void suggestions.registerAll((id) => ready.guilds.cache.has(id));
-    void birthdays.registerAll((id) => ready.guilds.cache.has(id));
+    // Every module's per-server commands, with the names each server picked.
+    void registerAllGuildCommands(rest, db, ready.application.id, (id) =>
+      ready.guilds.cache.has(id),
+    );
     requeueRunning(db);
     startJobLoop(db, handlers);
     const beat = () => {
@@ -237,6 +259,11 @@ function wire(c: Client) {
       if (interaction.isAutocomplete() && questions.autocomplete(interaction))
         return;
       if (interaction.isChatInputCommand() && questions.command(interaction))
+        return;
+      // The starboard: /starboard and its board names.
+      if (interaction.isAutocomplete() && starboard.autocomplete(interaction))
+        return;
+      if (interaction.isChatInputCommand() && starboard.command(interaction))
         return;
       if (
         interaction.isModalSubmit() &&
@@ -395,12 +422,26 @@ function wire(c: Client) {
   c.on(Events.MessageReactionAdd, (reaction, user) => {
     void reactionRoleReaction(reaction, user, 'react');
     void suggestionReaction(reaction, user, true);
+    void starboardReaction(reaction, user, true);
   });
   c.on(Events.MessageReactionRemove, (reaction, user) => {
     void reactionRoleReaction(reaction, user, 'unreact');
     void suggestionReaction(reaction, user, false);
+    void starboardReaction(reaction, user, false);
+  });
+  c.on(Events.MessageReactionRemoveAll, (message) => {
+    if (message.guildId) starboard.cleared(message.guildId, message.id);
+  });
+  c.on(Events.MessageReactionRemoveEmoji, (reaction) => {
+    const emoji = emojiOf(reaction);
+    if (reaction.message.guildId && emoji)
+      starboard.cleared(reaction.message.guildId, reaction.message.id, emoji);
   });
   c.on(Events.MessageDelete, (message) => {
+    if (message.guildId)
+      starboard
+        .deleted(message.guildId, message.id)
+        .catch(failed(`A deleted starred message in ${message.guildId}`));
     if (!message.guild) return;
     suggestions
       .deleted(message.guild, message.channelId, message.id)
@@ -408,6 +449,13 @@ function wire(c: Client) {
     questions
       .deleted(message.id)
       .catch(failed(`A deleted question in ${message.guild.id}`));
+  });
+  c.on(Events.MessageBulkDelete, (messages) => {
+    for (const message of messages.values())
+      if (message.guildId)
+        starboard
+          .deleted(message.guildId, message.id)
+          .catch(failed(`A deleted starred message in ${message.guildId}`));
   });
   c.on(Events.GuildMemberRemove, (member) => {
     if (!member.user?.bot) arLeft(db, member.guild.id, member.id, Date.now());
@@ -443,6 +491,89 @@ async function suggestionReaction(
   } catch (error) {
     console.error('A suggestion vote failed', error);
   }
+}
+
+/** A reaction's emoji, written the way settings save it. */
+const emojiOf = (reaction: MessageReaction | PartialMessageReaction) => {
+  const e = reaction.emoji;
+  return e.id ? `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>` : e.name;
+};
+
+/** A star added to (or taken off) a message or a board post. */
+async function starboardReaction(
+  reaction: MessageReaction | PartialMessageReaction,
+  user: User | PartialUser,
+  added: boolean,
+) {
+  try {
+    const guildId = reaction.message.guildId;
+    const emoji = emojiOf(reaction);
+    if (!guildId || !emoji) return;
+    // Partial reactions don't say how many there are until fetched.
+    const full =
+      added && reaction.partial
+        ? await reaction.fetch().catch(() => null)
+        : reaction;
+    const who = user.partial ? await user.fetch().catch(() => user) : user;
+    await starboard.reaction(
+      {
+        guildId,
+        channelId: reaction.message.channelId,
+        messageId: reaction.message.id,
+        emoji,
+        count: full && !full.partial ? full.count : null,
+        user: { id: who.id, bot: !!who.bot },
+      },
+      added,
+    );
+  } catch (error) {
+    console.error('A starboard reaction failed', error);
+  }
+}
+
+/** A message someone starred, with what the board's rules need to know. */
+async function starredMessage(
+  guildId: string,
+  channelId: string,
+  messageId: string,
+) {
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel || !('messages' in channel) || channel.isDMBased()) return null;
+  const msg: Message | null = await channel.messages
+    .fetch(messageId)
+    .catch(() => null);
+  if (!msg || msg.guildId !== guildId) return null;
+  const member =
+    msg.member ??
+    (await msg.guild?.members.fetch(msg.author.id).catch(() => null)) ??
+    null;
+  const thread = channel.isThread();
+  const picture =
+    msg.attachments.find((a) => !!a.contentType?.startsWith('image/'))?.url ??
+    msg.embeds.map((e) => e.image?.url ?? e.thumbnail?.url).find(Boolean) ??
+    '';
+  // Without the Message Content Intent, Discord sends most text empty.
+  const content = msg.content || (contentIntent ? '' : null);
+  return {
+    id: msg.id,
+    channelId,
+    parentId: thread ? channel.parentId : null,
+    nsfw: thread ? !!channel.parent?.nsfw : 'nsfw' in channel && channel.nsfw,
+    authorId: msg.author.id,
+    authorName:
+      member?.displayName ?? msg.author.globalName ?? msg.author.username,
+    authorAvatar: (member ?? msg.author).displayAvatarURL({
+      extension: 'png',
+      size: 256,
+    }),
+    authorBot: msg.author.bot,
+    authorRoles: member ? [...member.roles.cache.keys()] : [],
+    content,
+    image: picture,
+    // Text Discord kept back can't be measured, so it isn't too short.
+    length: content === null ? Number.MAX_SAFE_INTEGER : content.length,
+    createdAt: msg.createdTimestamp,
+  };
 }
 
 /** Sends a direct message; people who don't take DMs simply don't get it. */

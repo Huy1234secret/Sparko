@@ -889,6 +889,148 @@ describe('server API', () => {
       await call(`/9001/studio/templates/${id}`, { method: 'DELETE' });
   });
 
+  it('saves the starboard, and lists, freezes, removes and blocks its messages', async () => {
+    type SB = {
+      on: boolean;
+      config: {
+        boards: Record<string, unknown>[];
+        staff: string[];
+        commands: Record<string, { name: string }>;
+      };
+      limits: { boards: number };
+      storage: { count: number; perKb: number };
+      blocked: unknown[];
+    };
+    const finish = (kind: string) => {
+      let job = claimJob(db)!;
+      while (job.kind !== kind) {
+        finishJob(db, job.id, null, Date.now());
+        job = claimJob(db)!;
+      }
+      finishJob(db, job.id, null, Date.now());
+      return job;
+    };
+    const state = await body<SB>(await call('/9001/starboard'));
+    expect(state).toMatchObject({
+      on: false,
+      limits: { boards: 1 },
+      storage: { count: 0, perKb: 2 },
+      blocked: [],
+    });
+    const put = (config: unknown) =>
+      call('/9001/starboard', {
+        method: 'PUT',
+        body: JSON.stringify({ on: true, config }),
+      });
+    // A board needs its channel, and Free has one board.
+    expect(
+      (await body<{ message: string }>(await put(state.config))).message,
+    ).toContain('Pick the channel “Starboard” posts in');
+    const board = { ...state.config.boards[0], channel: '501' };
+    const two = await put({
+      ...state.config,
+      boards: [board, { ...board, id: 'hof', name: 'Hall', channel: '502' }],
+    });
+    expect((await body<{ message: string }>(two)).message).toContain('1 board');
+    expect(
+      (await put({ ...state.config, boards: [board], staff: ['301'] })).status,
+    ).toBe(204);
+    finish('starboard');
+    expect((await body<SB>(await call('/9001/starboard'))).on).toBe(true);
+
+    // A message the bot posted shows in Storage.
+    db.prepare(
+      `INSERT INTO sb_entries (guild_id, board_id, message_id, channel_id, author_id,
+         author_name, content, stars, shown, post_channel_id, post_id, message_at, posted_at, updated_at)
+       VALUES ('9001', 'main', '300', '501', '555', 'mia', 'A cat', 4, 4, '501', '88', 0, 0, 0)`,
+    ).run();
+    type List = { entries: { messageId: string; frozen: boolean }[] };
+    expect(
+      (await body<List>(await call('/9001/starboard/list?q=cat&sort=newest')))
+        .entries,
+    ).toMatchObject([{ messageId: '300', frozen: false }]);
+    expect(
+      (await body<List>(await call('/9001/starboard/list?board=other')))
+        .entries,
+    ).toEqual([]);
+
+    const frozen = await call('/9001/starboard/entries/main/300/freeze', {
+      method: 'POST',
+      body: JSON.stringify({ frozen: true }),
+    });
+    expect(
+      (await body<{ entry: { frozen: boolean } }>(frozen)).entry.frozen,
+    ).toBe(true);
+    await call('/9001/starboard/entries/main/300/freeze', {
+      method: 'POST',
+      body: JSON.stringify({ frozen: false }),
+    });
+    expect(finish('starboard-sync').payload).toEqual({
+      board: 'main',
+      message: '300',
+    });
+
+    // Blocking a message takes its post down and keeps it off.
+    const blocked = await call('/9001/starboard/blocked', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'message', id: '300', channelId: '501' }),
+    });
+    expect(
+      (await body<{ blocked: { kind: string; id: string }[] }>(blocked))
+        .blocked,
+    ).toMatchObject([{ kind: 'message', id: '300' }]);
+    expect(finish('starboard-delete').payload).toEqual({
+      posts: [{ channelId: '501', messageId: '88' }],
+    });
+    expect(
+      (await call('/9001/starboard/blocked/message/300', { method: 'DELETE' }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await call('/9001/starboard/blocked/message/300', { method: 'DELETE' }))
+        .status,
+    ).toBe(404);
+    await call('/9001/starboard/blocked', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'member', id: '555', name: 'mia' }),
+    });
+    expect(
+      (await body<SB>(await call('/9001/starboard'))).blocked,
+    ).toMatchObject([{ kind: 'member', id: '555', name: 'mia' }]);
+
+    // Removing one from the board.
+    db.prepare(
+      `INSERT INTO sb_entries (guild_id, board_id, message_id, channel_id, author_id,
+         stars, post_channel_id, post_id, message_at, posted_at, updated_at)
+       VALUES ('9001', 'main', '301', '501', '556', 5, '501', '89', 0, 0, 0)`,
+    ).run();
+    expect(
+      (await call('/9001/starboard/entries/main/301', { method: 'DELETE' }))
+        .status,
+    ).toBe(204);
+    expect(finish('starboard-delete').payload).toEqual({
+      posts: [{ channelId: '501', messageId: '89' }],
+    });
+    expect(
+      (await call('/9001/starboard/entries/main/301', { method: 'DELETE' }))
+        .status,
+    ).toBe(404);
+
+    // Test posts go to the bot.
+    expect(
+      (
+        await call('/9001/starboard/test', {
+          method: 'POST',
+          body: JSON.stringify({ board: 'main', channel: '501' }),
+        })
+      ).status,
+    ).toBe(204);
+    expect(finish('starboard-test').payload).toMatchObject({
+      board: 'main',
+      channel: '501',
+    });
+  });
+
   it('keeps templates in folders, in the order people put them', async () => {
     type Library = {
       templates: { id: string; name: string; folderId: string | null }[];

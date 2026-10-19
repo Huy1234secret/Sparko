@@ -25,6 +25,7 @@ export function VariablesButton({
   v2,
   role,
   suggestion,
+  starboard,
   birthday,
   question,
   onPick,
@@ -33,6 +34,8 @@ export function VariablesButton({
   v2: boolean;
   /** Reaction role responses fill in the role. */
   role?: boolean;
+  /** Starboard posts fill in the starred message. */
+  starboard?: boolean;
   /** Suggestion messages fill in the suggestion. */
   suggestion?: boolean;
   /** Birthday messages fill in who it's for. */
@@ -88,6 +91,12 @@ export function VariablesButton({
       on: question,
       label: 'Q&A',
       where: 'question, answer and answered-DM messages',
+    },
+    {
+      key: 'starboard',
+      on: starboard,
+      label: 'Starboard',
+      where: 'starboard posts',
     },
     {
       key: 'birthday',

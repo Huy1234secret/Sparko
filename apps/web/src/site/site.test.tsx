@@ -239,6 +239,7 @@ describe('public site', () => {
       '/features/birthdays',
       '/features/questions',
       '/features/role-menus',
+      '/features/starboard',
       '/features/studio',
       '/features/suggestions',
       '/features/tickets',

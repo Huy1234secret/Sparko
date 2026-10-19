@@ -336,6 +336,50 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     pairs: ['suggestions', 'tickets'],
   },
+  starboard: {
+    headline: 'The best of your server, in one channel.',
+    points: [
+      'Several boards, each with its own emojis and threshold',
+      'A count that updates as members star, without spamming edits',
+      'Freeze posts and block messages or members',
+    ],
+    how: [
+      {
+        icon: 'star',
+        title: 'Members star messages',
+        body: 'React with any of a board’s emojis. Each member counts once, and you choose whether the author’s own star and bots’ stars count. Stars on the board post count too.',
+      },
+      {
+        icon: 'trending-up',
+        title: 'Boards and a hall of fame',
+        body: 'Each board has its own channel, emojis, threshold and rules: watch every channel or only some, skip age-restricted ones, old or short messages, bots and blocked roles. A second board with a higher threshold makes a hall of fame.',
+      },
+      {
+        icon: 'message-square',
+        title: 'Posts that keep up',
+        body: 'The post is your own Message Studio template with a Jump to message button. Its count updates within a couple of seconds, and it can come down when stars drop or the original is deleted.',
+      },
+      {
+        icon: 'layers',
+        title: 'Storage, logs and commands',
+        body: 'Every starred message with its stars, to freeze, remove or block. Logs of posts, milestones and removals, and /starboard top, random and stats renamed to suit your server.',
+      },
+    ],
+    steps: [
+      'Open Starboard, switch it on and pick the highlights channel.',
+      'Choose the star emojis, how many stars it takes and the rules.',
+      'In Edit, start from a default post or make your own.',
+      'Save. Sparko adds /starboard to your server.',
+    ],
+    commands: [
+      '/starboard top',
+      '/starboard random',
+      '/starboard stats',
+      '/starboard freeze',
+      '/starboard block',
+    ],
+    pairs: ['studio', 'suggestions'],
+  },
 };
 
 export const isReady = (id: string) => id in featureDetails;

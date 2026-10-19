@@ -23,6 +23,7 @@ import type {
   BdKind,
   Birthdays,
   ReactionRole,
+  Starboard,
   Suggestions,
   WelcomeConfig,
 } from './studio-format';
@@ -60,6 +61,9 @@ export const keys = {
   qa: (id: string) => ['qa', id] as const,
   qaList: (id: string, q: string, status: string) =>
     ['qa', id, 'list', q, status] as const,
+  sb: (id: string) => ['sb', id] as const,
+  sbList: (id: string, board: string, sort: string, q: string) =>
+    ['sb', id, 'list', board, sort, q] as const,
   sg: (id: string) => ['sg', id] as const,
   sgList: (id: string, q: string, status: string) =>
     ['sg', id, 'list', q, status] as const,
@@ -102,6 +106,7 @@ function useRefresh(serverId: string) {
     Promise.all([
       client.invalidateQueries({ queryKey: keys.overview(serverId) }),
       client.invalidateQueries({ queryKey: ['module', serverId] }),
+      client.invalidateQueries({ queryKey: keys.sb(serverId) }),
       client.invalidateQueries({ queryKey: keys.qa(serverId) }),
       client.invalidateQueries({ queryKey: keys.welcome(serverId) }),
       client.invalidateQueries({ queryKey: ['tickets', serverId] }),
@@ -491,6 +496,67 @@ export function useQuestionActions(serverId: string) {
         channel: string;
         which: 'question' | 'answer';
       }) => api.testQuestion(serverId, channel, which),
+    }),
+  };
+}
+export const useStarboard = (serverId: string) =>
+  useQuery({
+    queryKey: keys.sb(serverId),
+    queryFn: () => api.getStarboard(serverId),
+  });
+/** Starred messages in Storage, for one board or all, sorted as picked. */
+export const useStarredList = (
+  serverId: string,
+  filter: { board: string; sort: 'stars' | 'newest'; query: string },
+) =>
+  useQuery({
+    queryKey: keys.sbList(
+      serverId,
+      filter.board,
+      filter.sort,
+      filter.query.trim(),
+    ),
+    queryFn: () =>
+      api.listStarred(serverId, { ...filter, query: filter.query.trim() }),
+  });
+export function useStarboardActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  const options = { onSuccess: refresh };
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: Starboard }) =>
+        api.saveStarboard(serverId, change),
+      ...options,
+    }),
+    remove: useMutation({
+      mutationFn: (e: { boardId: string; messageId: string }) =>
+        api.removeStarred(serverId, e),
+      ...options,
+    }),
+    freeze: useMutation({
+      mutationFn: ({
+        frozen,
+        ...e
+      }: {
+        boardId: string;
+        messageId: string;
+        frozen: boolean;
+      }) => api.freezeStarred(serverId, e, frozen),
+      ...options,
+    }),
+    block: useMutation({
+      mutationFn: (target: Parameters<typeof api.blockStarboard>[1]) =>
+        api.blockStarboard(serverId, target),
+      ...options,
+    }),
+    unblock: useMutation({
+      mutationFn: ({ kind, id }: { kind: 'message' | 'member'; id: string }) =>
+        api.unblockStarboard(serverId, kind, id),
+      ...options,
+    }),
+    test: useMutation({
+      mutationFn: ({ board, channel }: { board: string; channel: string }) =>
+        api.testStarboard(serverId, board, channel),
     }),
   };
 }

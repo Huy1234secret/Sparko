@@ -26,6 +26,7 @@ import {
 } from './frame';
 import { AutoRolesModule } from './AutoRolesModule';
 import { BirthdaysModule } from './BirthdaysModule';
+import { StarboardModule } from './StarboardModule';
 import { ReactionRolesModule } from './ReactionRolesModule';
 import { QuestionsModule } from './QuestionsModule';
 import { StudioModule } from './StudioModule';
@@ -267,6 +268,8 @@ export function ModulePage() {
     return <TicketsModule module={module} server={server} />;
   if (module.id === 'autoroles')
     return <AutoRolesModule module={module} server={server} />;
+  if (module.id === 'starboard')
+    return <StarboardModule module={module} server={server} />;
   if (module.id === 'suggestions')
     return <SuggestionsModule module={module} server={server} />;
   if (module.id === 'birthdays')

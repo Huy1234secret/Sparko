@@ -38,6 +38,7 @@ import {
   isLegacyWelcome,
   QA_MODULE,
   RR_MODULE,
+  SB_MODULE,
   SG_MODULE,
   BD_MODULE,
   bdKinds,
@@ -45,6 +46,7 @@ import {
   type Birthdays,
   type Questions,
   type ReactionRole,
+  type Starboard,
   type Suggestions,
   type WelcomeConfig,
 } from '@sparko/core';
@@ -117,7 +119,8 @@ export function studioRoutes({
           | 'reaction-role'
           | 'suggestion'
           | 'birthday'
-          | 'question';
+          | 'question'
+          | 'starboard';
         where: string;
       }[]
     >();
@@ -128,7 +131,8 @@ export function studioRoutes({
         | 'reaction-role'
         | 'suggestion'
         | 'birthday'
-        | 'question',
+        | 'question'
+        | 'starboard',
       where: string,
     ) => {
       if (!id) return;
@@ -184,6 +188,9 @@ export function studioRoutes({
       );
       add(qa.dmMessage, 'question', 'Questions & answers (the answered DM)');
     }
+    const sb = getModule<Starboard>(db, guildId, SB_MODULE).config;
+    for (const b of sb?.boards ?? [])
+      add(b.message, 'starboard', `Starboard (${b.name} posts)`);
     return uses;
   };
 

@@ -328,6 +328,49 @@ export function withBackend(
         return sample.testQuestion(id, channel, which);
       await call('POST', `${server(id)}/questions/test`, { channel, which });
     },
+    async getStarboard(id) {
+      if (!(await backend()).live) return sample.getStarboard(id);
+      return getJson(`${server(id)}/starboard`);
+    },
+    async saveStarboard(id, change) {
+      if (!(await backend()).live) return sample.saveStarboard(id, change);
+      await call('PUT', `${server(id)}/starboard`, change);
+    },
+    async listStarred(id, filter) {
+      if (!(await backend()).live) return sample.listStarred(id, filter);
+      return getJson(
+        `${server(id)}/starboard/list?board=${encodeURIComponent(filter.board)}&sort=${filter.sort}&q=${encodeURIComponent(filter.query)}`,
+      );
+    },
+    async removeStarred(id, e) {
+      if (!(await backend()).live) return sample.removeStarred(id, e);
+      await call(
+        'DELETE',
+        `${server(id)}/starboard/entries/${encodeURIComponent(e.boardId)}/${e.messageId}`,
+      );
+    },
+    async freezeStarred(id, e, frozen) {
+      if (!(await backend()).live) return sample.freezeStarred(id, e, frozen);
+      await call(
+        'POST',
+        `${server(id)}/starboard/entries/${encodeURIComponent(e.boardId)}/${e.messageId}/freeze`,
+        { frozen },
+      );
+    },
+    async blockStarboard(id, target) {
+      if (!(await backend()).live) return sample.blockStarboard(id, target);
+      await call('POST', `${server(id)}/starboard/blocked`, target);
+    },
+    async unblockStarboard(id, kind, target) {
+      if (!(await backend()).live)
+        return sample.unblockStarboard(id, kind, target);
+      await call('DELETE', `${server(id)}/starboard/blocked/${kind}/${target}`);
+    },
+    async testStarboard(id, board, channel) {
+      if (!(await backend()).live)
+        return sample.testStarboard(id, board, channel);
+      await call('POST', `${server(id)}/starboard/test`, { board, channel });
+    },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);
       return getJson(`${server(id)}/reaction-roles`);
