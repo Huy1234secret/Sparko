@@ -8,14 +8,13 @@ const animated: Record<string, RevealHover | undefined> = {
   'role-menus': animIcons.reactionRole,
   autoroles: animIcons.autoRole,
   suggestions: animIcons.lightBulb,
-  polls: animIcons.sparkle,
-  starboard: animIcons.sparkle,
-  birthdays: animIcons.sparkle,
-  questions: animIcons.infoBook,
+  polls: animIcons.polls,
+  starboard: animIcons.starboard,
+  birthdays: animIcons.birthdays,
+  questions: animIcons.questions,
   invites: animIcons.joinMessage,
-  events: animIcons.joinMessage,
-  // Join to create: the plus button's animation, drawn as a plain shape.
-  'temp-voice': { ...animIcons.plus, solid: true },
+  events: animIcons.events,
+  'temp-voice': animIcons.tempVoice,
 };
 
 /**

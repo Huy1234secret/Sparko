@@ -115,6 +115,13 @@ export const animIcons = {
   command: pair('command-icon', true),
   /** Storage tabs. */
   storage: pair('storage-icon'),
+  /** Community modules, each drawn as a plain white shape. */
+  questions: pair('qa-icon', true),
+  starboard: pair('starboard-icon', true),
+  polls: pair('poll-icon', true),
+  events: pair('event-icon', true),
+  birthdays: pair('birthday-icon', true),
+  tempVoice: pair('temporary-voice-icon', true),
   /** The gear that plays beside a rule count. */
   gear: maybe('setting-icon-hover'),
   upload: set('upload-button', ['reveal', 'hover', 'select']),
