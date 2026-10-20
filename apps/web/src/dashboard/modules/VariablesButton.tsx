@@ -29,6 +29,7 @@ export function VariablesButton({
   starboard,
   birthday,
   question,
+  invite,
   onPick,
 }: {
   /** Components V2 messages also have {separator}. */
@@ -45,6 +46,8 @@ export function VariablesButton({
   birthday?: boolean;
   /** Question, answer and answered-DM messages fill in the question. */
   question?: boolean;
+  /** Invite join and leave messages fill in who invited them. */
+  invite?: boolean;
   onPick: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -112,6 +115,12 @@ export function VariablesButton({
       on: birthday,
       label: 'Birthday',
       where: 'birthday messages',
+    },
+    {
+      key: 'invite',
+      on: invite,
+      label: 'Invite',
+      where: 'invite join and leave messages',
     },
   ] as const;
   const ownersOf = (v: (typeof all)[number]) =>

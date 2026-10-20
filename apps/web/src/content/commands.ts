@@ -57,6 +57,12 @@ const rows = [
   '/birthday view|Fun|Everyone|See a member’s birthday, and how soon it is.|/birthday view member:@rhea|member:Whose birthday (you if left empty)',
   '/birthday upcoming|Fun|Everyone|The next 10 birthdays in the server.|/birthday upcoming|',
   '/birthday list|Fun|Everyone|Every birthday in a month.|/birthday list month:April|month:Which month',
+  '/invites view|Utility|Everyone|See someone’s invites: regular, left, fake, bonus and the total.|/invites view member:@rhea|member:Whose invites (you if left empty)',
+  '/invites leaderboard|Utility|Everyone|The server’s top inviters, 10 to a page.|/invites leaderboard page:2|page:Which page (optional)',
+  '/invites who|Utility|Everyone|See who invited a member, with which invite.|/invites who member:@kit|member:Who to look up (you if left empty)',
+  '/invites list|Utility|Everyone|The members someone invited, newest first.|/invites list member:@rhea|member:Whose invited members (you if left empty)',
+  '/invites bonus|Utility|Staff who can manage invites|Add or take away bonus invites.|/invites bonus member:@rhea amount:5|member:Who gets the bonus;amount:Bonus invites; a negative number takes some away',
+  '/invites reset|Utility|Staff who can manage invites|Reset a member’s invites, or everyone’s. Who invited whom is kept.|/invites reset member:@rhea|member:Whose invites to reset;everyone:Reset everyone’s instead (optional)',
   '/rep|Fun|Everyone|Thank someone with +rep.|/rep user:@rhea|user:Who to thank',
 ];
 

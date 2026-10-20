@@ -24,6 +24,8 @@ import type {
   AutoRoles,
   BdKind,
   Birthdays,
+  InvKind,
+  Invites,
   ReactionRole,
   Starboard,
   Suggestions,
@@ -76,6 +78,13 @@ export const keys = {
   bd: (id: string) => ['bd', id] as const,
   bdList: (id: string, q: string) => ['bd', id, 'list', q] as const,
   bdMembers: (id: string, q: string) => ['bd', id, 'members', q] as const,
+  inv: (id: string) => ['inv', id] as const,
+  invBoard: (id: string, q: string, page: number) =>
+    ['inv', id, 'board', q, page] as const,
+  invMember: (id: string, userId: string) =>
+    ['inv', id, 'member', userId] as const,
+  invCodes: (id: string) => ['inv', id, 'codes'] as const,
+  invFind: (id: string, q: string) => ['inv', id, 'find', q] as const,
 };
 
 export const useSession = () =>
@@ -121,6 +130,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: keys.sg(serverId) }),
       client.invalidateQueries({ queryKey: keys.bd(serverId) }),
       client.invalidateQueries({ queryKey: keys.polls(serverId) }),
+      client.invalidateQueries({ queryKey: keys.inv(serverId) }),
     ]);
 }
 
@@ -620,6 +630,60 @@ export function usePollActions(serverId: string) {
         channel: string;
         kind: 'poll' | 'results';
       }) => api.testPoll(serverId, channel, kind),
+    }),
+  };
+}
+export const useInvites = (serverId: string) =>
+  useQuery({
+    queryKey: keys.inv(serverId),
+    queryFn: () => api.getInvites(serverId),
+  });
+/** A page of the leaderboard, or members matching what staff typed. */
+export const useInviteBoard = (serverId: string, query: string, page: number) =>
+  useQuery({
+    queryKey: keys.invBoard(serverId, query.trim(), page),
+    queryFn: () => api.inviteLeaderboard(serverId, query.trim(), page),
+    placeholderData: (previous) => previous,
+  });
+/** A member's counts, who invited them and who they invited. */
+export const useInviteMember = (serverId: string, userId: string | null) =>
+  useQuery({
+    queryKey: keys.invMember(serverId, userId ?? ''),
+    queryFn: () => api.inviteMember(serverId, userId!),
+    enabled: !!userId,
+  });
+export const useInviteCodes = (serverId: string) =>
+  useQuery({
+    queryKey: keys.invCodes(serverId),
+    queryFn: () => api.inviteCodes(serverId),
+  });
+/** Server members to give a bonus to; nothing until something is typed. */
+export const useInviteFind = (serverId: string, query: string) =>
+  useQuery({
+    queryKey: keys.invFind(serverId, query.trim()),
+    queryFn: () => api.findInviteMembers(serverId, query.trim()),
+    enabled: query.trim().length > 0,
+  });
+export function useInviteActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: Invites }) =>
+        api.saveInvites(serverId, change),
+      onSuccess: refresh,
+    }),
+    bonus: useMutation({
+      mutationFn: ({ userId, amount }: { userId: string; amount: number }) =>
+        api.giveInviteBonus(serverId, userId, amount),
+      onSuccess: refresh,
+    }),
+    reset: useMutation({
+      mutationFn: (userId: string | null) => api.resetInvites(serverId, userId),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: ({ channel, kind }: { channel: string; kind: InvKind }) =>
+        api.testInvite(serverId, channel, kind),
     }),
   };
 }

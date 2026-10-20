@@ -2,6 +2,8 @@ import type { BdEntry } from './studio-format';
 import type {
   ARMemberView,
   BDMemberFound,
+  INVDetail,
+  INVFound,
   AvatarColor,
   PanelApi,
   Server,
@@ -410,6 +412,58 @@ export function withBackend(
     async testPoll(id, channel, kind) {
       if (!(await backend()).live) return sample.testPoll(id, channel, kind);
       await call('POST', `${server(id)}/polls/test`, { channel, kind });
+    },
+    async getInvites(id) {
+      if (!(await backend()).live) return sample.getInvites(id);
+      return getJson(`${server(id)}/invites`);
+    },
+    async saveInvites(id, change) {
+      if (!(await backend()).live) return sample.saveInvites(id, change);
+      await call('PUT', `${server(id)}/invites`, change);
+    },
+    async inviteLeaderboard(id, query, page) {
+      if (!(await backend()).live)
+        return sample.inviteLeaderboard(id, query, page);
+      return getJson(
+        `${server(id)}/invites/leaderboard?q=${encodeURIComponent(query)}&page=${page}`,
+      );
+    },
+    async inviteMember(id, userId) {
+      if (!(await backend()).live) return sample.inviteMember(id, userId);
+      return getJson(`${server(id)}/invites/members/${userId}`);
+    },
+    async inviteCodes(id) {
+      if (!(await backend()).live) return sample.inviteCodes(id);
+      return getJson(`${server(id)}/invites/codes`);
+    },
+    async findInviteMembers(id, query) {
+      if (!(await backend()).live) return sample.findInviteMembers(id, query);
+      const r = await getJson<{ members: INVFound[] }>(
+        `${server(id)}/invites/find?q=${encodeURIComponent(query)}`,
+      );
+      return r.members;
+    },
+    async giveInviteBonus(id, userId, amount) {
+      if (!(await backend()).live)
+        return sample.giveInviteBonus(id, userId, amount);
+      return call<INVDetail>(
+        'POST',
+        `${server(id)}/invites/members/${userId}/bonus`,
+        { amount },
+      );
+    },
+    async resetInvites(id, userId) {
+      if (!(await backend()).live) return sample.resetInvites(id, userId);
+      await call(
+        'POST',
+        userId
+          ? `${server(id)}/invites/members/${userId}/reset`
+          : `${server(id)}/invites/reset`,
+      );
+    },
+    async testInvite(id, channel, kind) {
+      if (!(await backend()).live) return sample.testInvite(id, channel, kind);
+      await call('POST', `${server(id)}/invites/test`, { channel, kind });
     },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);

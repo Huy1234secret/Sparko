@@ -468,6 +468,63 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX poll_log_by_guild ON poll_log (guild_id, id DESC);`,
+  // Invite tracking: each server's invites, who joined with which, inviters'
+  // bonuses, the log, and the vanity link's uses.
+  `CREATE TABLE inv_codes (
+    guild_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    inviter_id TEXT,
+    inviter_name TEXT NOT NULL DEFAULT '',
+    channel_id TEXT NOT NULL DEFAULT '',
+    channel_name TEXT NOT NULL DEFAULT '',
+    uses INTEGER NOT NULL DEFAULT 0,
+    max_uses INTEGER NOT NULL DEFAULT 0,
+    expires_at INTEGER,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, code)
+  );
+  CREATE TABLE inv_joins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    avatar TEXT NOT NULL DEFAULT '',
+    inviter_id TEXT,
+    inviter_name TEXT NOT NULL DEFAULT '',
+    code TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL,
+    fake INTEGER NOT NULL DEFAULT 0,
+    counted INTEGER NOT NULL DEFAULT 1,
+    joined_at INTEGER NOT NULL,
+    left_at INTEGER
+  );
+  CREATE INDEX inv_joins_by_inviter ON inv_joins (guild_id, inviter_id);
+  CREATE INDEX inv_joins_by_member ON inv_joins (guild_id, user_id);
+  CREATE TABLE inv_people (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    avatar TEXT NOT NULL DEFAULT '',
+    bonus INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id)
+  );
+  CREATE TABLE inv_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX inv_log_by_guild ON inv_log (guild_id, id DESC);
+  CREATE TABLE inv_state (
+    guild_id TEXT PRIMARY KEY,
+    vanity_code TEXT NOT NULL DEFAULT '',
+    vanity_uses INTEGER NOT NULL DEFAULT 0,
+    can_list INTEGER NOT NULL DEFAULT 1,
+    synced_at INTEGER
+  );`,
 ];
 
 export function openDb(path: string): Db {

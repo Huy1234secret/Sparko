@@ -59,6 +59,7 @@ import { starboardBot } from './starboard.ts';
 import { questionsBot } from './questions.ts';
 import { suggestionsBot } from './suggestions.ts';
 import { birthdaysBot } from './birthdays.ts';
+import { invitesBot } from './invites.ts';
 import { studioInfo } from './studio-info.ts';
 import { registerAllGuildCommands } from './guild-commands.ts';
 import {
@@ -110,6 +111,9 @@ const starboard = starboardBot(db, rest, {
   },
 });
 const polls = pollsBot(db, rest, { appId: () => client?.application?.id });
+const invites = invitesBot(db, rest, {
+  appId: () => client?.application?.id,
+});
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
 /** And only shares message text with the Message Content Intent on. */
@@ -149,6 +153,7 @@ const handlers: Handlers = {
   ...starboard.handlers((id) => client.guilds.cache.get(id)),
   ...questions.handlers((id) => client.guilds.cache.get(id)),
   ...birthdays.handlers((id) => client.guilds.cache.get(id)),
+  ...invites.handlers((id) => client.guilds.cache.get(id)),
   'rr-sync': (job) =>
     syncReactionRole(
       rest,
@@ -231,6 +236,8 @@ function wire(c: Client) {
     void registerAllGuildCommands(rest, db, ready.application.id, (id) =>
       ready.guilds.cache.has(id),
     );
+    // Invite tracking: each server's invites to compare joins with.
+    void invites.syncAll((id) => ready.guilds.cache.has(id));
     requeueRunning(db);
     startJobLoop(db, handlers);
     const beat = () => {
@@ -279,6 +286,9 @@ function wire(c: Client) {
         void questions.component(interaction);
         return;
       }
+      // Invite tracking: /invites.
+      if (interaction.isChatInputCommand() && invites.command(interaction))
+        return;
       if (
         interaction.isModalSubmit() &&
         interaction.customId.startsWith('sg:')
@@ -362,6 +372,7 @@ function wire(c: Client) {
   c.on(Events.GuildUpdate, (_, guild) => record(guild, true));
   c.on(Events.GuildCreate, (guild) => {
     record(guild, true);
+    void invites.refresh(guild.id);
     addAudit(
       db,
       {
@@ -426,7 +437,13 @@ function wire(c: Client) {
         failed(`Automatic roles for ${member.id} in ${member.guild.id}`),
       );
     if (!member.user.bot) birthdays.joined(member);
+    invites
+      .joined(member)
+      .catch(failed(`Invite tracking for ${member.id} in ${member.guild.id}`));
   });
+  // Invites made and deleted, so joins can be matched to them.
+  c.on(Events.InviteCreate, (invite) => invites.created(invite));
+  c.on(Events.InviteDelete, (invite) => invites.deleted(invite));
   c.on(Events.GuildMemberUpdate, (before, after) => {
     memberUpdated(db, rest, before, after).catch(
       failed(`Updating ${after.id} in ${after.guild.id}`),
@@ -482,6 +499,9 @@ function wire(c: Client) {
   c.on(Events.GuildMemberRemove, (member) => {
     if (!member.user?.bot) arLeft(db, member.guild.id, member.id, Date.now());
     if (!member.user?.bot) birthdays.left(member.guild.id, member.id);
+    invites
+      .left(member)
+      .catch(failed(`Invite tracking for ${member.id} in ${member.guild.id}`));
     memberLeft(db, rest, member).catch(
       failed(`Saying goodbye to ${member.id} in ${member.guild.id}`),
     );
@@ -736,6 +756,8 @@ async function connect(members: boolean, content: boolean) {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildMessageReactions,
+      // Invites made and deleted, for invite tracking. Not privileged.
+      GatewayIntentBits.GuildInvites,
       ...(members ? [GatewayIntentBits.GuildMembers] : []),
       ...(content ? [GatewayIntentBits.MessageContent] : []),
     ],

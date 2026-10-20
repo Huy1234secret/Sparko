@@ -418,6 +418,51 @@ export const featureDetails: Record<string, FeatureDetail> = {
     commands: ['/poll create', '/poll end', '/poll results', '/poll voters'],
     pairs: ['studio', 'suggestions'],
   },
+  invites: {
+    headline: 'See who invited whom, and thank your best inviters.',
+    points: [
+      'Knows which invite each member used, or the vanity link',
+      'Leaves, fake accounts and bonuses counted the way you like',
+      'Reward roles at the totals you pick, given and taken by Sparko',
+    ],
+    how: [
+      {
+        icon: 'link',
+        title: 'Every join matched to its invite',
+        body: 'Sparko keeps track of your server’s invites and how often each is used, so when someone joins it knows whose invite they used. Joins with the vanity link or through Discovery are labelled too.',
+      },
+      {
+        icon: 'users',
+        title: 'Fair counts',
+        body: 'Each inviter has regular, left, fake and bonus invites. Choose whether leaves and fake accounts come off the total, how new an account has to be to count as fake, and whether members who rejoin count again.',
+      },
+      {
+        icon: 'award',
+        title: 'Reward roles',
+        body: 'Give a role at 5 invites, another at 10, and keep them all or only the highest. Sparko takes them back if someone drops below, if you like. Free has 3 rewards; Plus has 25.',
+      },
+      {
+        icon: 'scroll-text',
+        title: 'Messages, storage and logs',
+        body: 'Join and leave messages say who invited them, as templates you edit in Message Studio. Staff see the leaderboard, who invited anyone, the invite codes, and a log of every join, leave, reward and bonus.',
+      },
+    ],
+    steps: [
+      'Open Invite tracking and switch it on.',
+      'Give Sparko’s role Manage Server, so it can see your invites.',
+      'Pick the join message channel and add reward roles.',
+      'Save. Sparko adds /invites to your server.',
+    ],
+    commands: [
+      '/invites view',
+      '/invites leaderboard',
+      '/invites who',
+      '/invites list',
+      '/invites bonus',
+      '/invites reset',
+    ],
+    pairs: ['welcome', 'autoroles'],
+  },
 };
 
 export const isReady = (id: string) => id in featureDetails;

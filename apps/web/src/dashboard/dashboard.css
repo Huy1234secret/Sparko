@@ -4513,3 +4513,177 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
     flex-direction: column;
   }
 }
+
+/* Invite tracking ---------------------------------------------------------- */
+.sp-inv-age,
+.sp-inv-staff {
+  max-width: 420px;
+}
+.sp-inv-channel {
+  max-width: 420px;
+}
+.sp-sg-command.is-off .sp-inv-channel {
+  opacity: 0.55;
+}
+/* Storage: the leaderboard beside the member it's showing. */
+.sp-inv-storage {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+}
+.sp-inv-table {
+  box-shadow: none;
+}
+/* The leaderboard: a compact table that keeps its columns in a narrow card. */
+.sp-inv-board-wrap {
+  container-type: inline-size;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+}
+.sp-inv-board {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 14px/20px var(--sp-font-sans);
+}
+.sp-inv-board th {
+  height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--sp-line);
+  background: var(--sp-subtle);
+  color: var(--sp-muted);
+  font: 500 12px/16px var(--sp-font-sans);
+  text-align: left;
+  white-space: nowrap;
+}
+.sp-inv-board td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--sp-line);
+  vertical-align: middle;
+}
+.sp-inv-board tbody tr:last-child td {
+  border-bottom: 0;
+}
+.sp-inv-board tbody tr {
+  cursor: pointer;
+}
+.sp-inv-board tbody tr:hover td {
+  background: var(--sp-subtle);
+}
+.sp-inv-board tbody tr.is-picked td {
+  background: var(--sp-brand-soft);
+}
+.sp-inv-board .sp-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sp-inv-board__mini {
+  display: none;
+}
+@container (max-width: 520px) {
+  .sp-inv-board__n {
+    display: none;
+  }
+  .sp-inv-board__mini {
+    display: block;
+  }
+}
+.sp-inv-rank {
+  width: 44px;
+  color: var(--sp-muted);
+  font-weight: 600;
+}
+.sp-inv-total {
+  font-weight: 700;
+}
+.sp-inv-who {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sp-inv-who:focus-visible {
+  outline: none;
+  border-radius: var(--sp-radius-chip);
+  box-shadow: var(--sp-ring);
+}
+.sp-inv-code {
+  font: 500 13px/18px var(--sp-font-mono);
+}
+.sp-inv-member {
+  position: sticky;
+  top: calc(var(--sp-topbar-h) + 16px);
+}
+.sp-inv-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+.sp-inv-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-inv-count dt {
+  color: var(--sp-muted);
+  font: 500 12px/16px var(--sp-font-sans);
+}
+.sp-inv-count dd {
+  margin: 0;
+  font: 600 15px/20px var(--sp-font-sans);
+}
+.sp-inv-count.is-total {
+  grid-column: 1 / -1;
+  border-color: var(--sp-brand-line);
+  background: var(--sp-brand-soft);
+}
+.sp-inv-count.is-total dd {
+  font-size: 18px;
+}
+.sp-inv-member__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sp-inv-by {
+  display: grid;
+  gap: 8px;
+}
+.sp-inv-by__text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sp-inv-invited {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.sp-inv-log-head {
+  flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+  /* Titles get the full width; the buttons go underneath. */
+  .sp-inv-storage .sp-card__head,
+  .sp-inv-codes .sp-card__head {
+    flex-wrap: wrap;
+  }
+  .sp-inv-storage .sp-card__titles,
+  .sp-inv-codes .sp-card__titles {
+    flex: 1 1 220px;
+  }
+}
+@media (max-width: 900px) {
+  .sp-inv-storage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-inv-member {
+    position: static;
+  }
+}

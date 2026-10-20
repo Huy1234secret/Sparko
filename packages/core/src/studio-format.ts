@@ -904,6 +904,8 @@ export type StudioVariable = {
   birthday?: true;
   /** Filled in only by question, answer and answered-DM messages. */
   question?: true;
+  /** Filled in only by invite join and leave messages. */
+  invite?: true;
 };
 
 /** Variables people can write in Studio messages, in braces. */
@@ -1170,6 +1172,33 @@ export const studioVariables: StudioVariable[] = [
     name: 'poll.status',
     about: 'Open, Scheduled or Ended.',
     poll: true,
+  },
+  {
+    name: 'inviter',
+    about:
+      'Mentions who invited the member, without pinging them. “the vanity link” or “an unknown invite” when there’s nobody.',
+    invite: true,
+  },
+  {
+    name: 'inviter.name',
+    about: 'The inviter’s name, or “Vanity link” or “Unknown”.',
+    invite: true,
+  },
+  {
+    name: 'inviter.invites',
+    about: 'The inviter’s total invites, after this join or leave.',
+    invite: true,
+  },
+  { name: 'invite.code', about: 'The invite code they used.', invite: true },
+  {
+    name: 'invite.uses',
+    about: 'How many times that invite has been used.',
+    invite: true,
+  },
+  {
+    name: 'join.type',
+    about: 'How they joined: normal, vanity or unknown.',
+    invite: true,
   },
 ];
 
