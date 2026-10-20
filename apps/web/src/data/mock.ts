@@ -19,6 +19,7 @@ import {
 import { createAutoRolesMock } from './mock-autoroles';
 import { createSupportMock } from './mock-support';
 import { createStarboardMock } from './mock-starboard';
+import { createPollsMock } from './mock-polls';
 import { createQuestionsMock } from './mock-questions';
 import { createSuggestionsMock } from './mock-suggestions';
 import { createBirthdaysMock } from './mock-birthdays';
@@ -506,6 +507,7 @@ export function resetMock() {
   resetStarboard();
   resetSuggestions();
   resetBirthdays();
+  resetPolls();
 }
 
 const {
@@ -518,6 +520,7 @@ const {
   wait: <T>(value: T, slow?: boolean) =>
     wait(value, slow ? delayMs * 2 : delayMs),
   copy,
+  pollUses: (serverId) => pollUses(serverId),
   server: serverById,
   channels: (serverId) => channelsFor(stateOf(serverId)),
   you: () => session.user,
@@ -612,11 +615,29 @@ const {
   },
   you: () => session.user,
 });
+const {
+  api: pollsApi,
+  reset: resetPolls,
+  uses: pollUses,
+} = createPollsMock({
+  wait: <T>(value: T) => wait(value),
+  copy,
+  server: serverById,
+  channels: (serverId) => channelsFor(stateOf(serverId)),
+  roles: (serverId) => rolesOf(serverId),
+  templates: (serverId) => templateIds(serverId),
+  isOn: (serverId) => !!stateOf(serverId).on['polls'],
+  setOn: (serverId, on) => {
+    stateOf(serverId).on['polls'] = on;
+  },
+  you: () => session.user,
+});
 export const mockApi: PanelApi = {
   ...coreApi,
   ...supportApi,
   ...autoRolesApi,
   ...suggestionsApi,
+  ...pollsApi,
   ...starboardApi,
   ...questionsApi,
   ...birthdaysApi,

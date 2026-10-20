@@ -38,6 +38,8 @@ type Helpers = {
   welcomeUses?: (serverId: string) => { id: string; where: string }[];
   /** Templates Suggestions use, and for what. */
   suggestionUses?: (serverId: string) => { id: string; where: string }[];
+  /** Templates Polls use, and for what. */
+  pollUses?: (serverId: string) => { id: string; where: string }[];
   /** Templates starboard posts use, and on which board. */
   starboardUses?: (serverId: string) => { id: string; where: string }[];
   /** Templates Birthdays use, and for which message. */
@@ -794,7 +796,8 @@ export function createSupportMock(h: Helpers) {
           | 'suggestion'
           | 'birthday'
           | 'question'
-          | 'starboard',
+          | 'starboard'
+          | 'poll',
         where: string,
       ) => {
         if (!id) return;
@@ -812,6 +815,7 @@ export function createSupportMock(h: Helpers) {
         add(u.id, 'question', u.where);
       for (const u of h.starboardUses?.(serverId) ?? [])
         add(u.id, 'starboard', u.where);
+      for (const u of h.pollUses?.(serverId) ?? []) add(u.id, 'poll', u.where);
       for (const r of s.rr.templates)
         for (const t of [
           r.config.message,

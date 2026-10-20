@@ -31,6 +31,7 @@ import { ReactionRolesModule } from './ReactionRolesModule';
 import { QuestionsModule } from './QuestionsModule';
 import { StudioModule } from './StudioModule';
 import { SuggestionsModule } from './SuggestionsModule';
+import { PollsModule } from './PollsModule';
 import { TicketsModule } from './TicketsModule';
 import { WelcomeModule } from './WelcomeModule';
 
@@ -270,6 +271,8 @@ export function ModulePage() {
     return <AutoRolesModule module={module} server={server} />;
   if (module.id === 'starboard')
     return <StarboardModule module={module} server={server} />;
+  if (module.id === 'polls')
+    return <PollsModule module={module} server={server} />;
   if (module.id === 'suggestions')
     return <SuggestionsModule module={module} server={server} />;
   if (module.id === 'birthdays')

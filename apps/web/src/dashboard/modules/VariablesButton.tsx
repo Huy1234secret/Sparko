@@ -25,6 +25,7 @@ export function VariablesButton({
   v2,
   role,
   suggestion,
+  poll,
   starboard,
   birthday,
   question,
@@ -34,6 +35,8 @@ export function VariablesButton({
   v2: boolean;
   /** Reaction role responses fill in the role. */
   role?: boolean;
+  /** Poll messages fill in the poll. */
+  poll?: boolean;
   /** Starboard posts fill in the starred message. */
   starboard?: boolean;
   /** Suggestion messages fill in the suggestion. */
@@ -97,6 +100,12 @@ export function VariablesButton({
       on: starboard,
       label: 'Starboard',
       where: 'starboard posts',
+    },
+    {
+      key: 'poll',
+      on: poll,
+      label: 'Poll',
+      where: 'poll messages',
     },
     {
       key: 'birthday',

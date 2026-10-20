@@ -41,6 +41,7 @@ function PreviewTools({
   v2,
   roleVariables,
   suggestionVariables,
+  pollVariables,
   starboardVariables,
   birthdayVariables,
   questionVariables,
@@ -48,6 +49,7 @@ function PreviewTools({
   serverId: string;
   items: PlusItem[];
   onEmoji: (text: string) => void;
+  pollVariables: boolean;
   v2: boolean;
   starboardVariables: boolean;
   roleVariables: boolean;
@@ -68,6 +70,7 @@ function PreviewTools({
         v2={v2}
         role={roleVariables}
         suggestion={suggestionVariables}
+        poll={pollVariables}
         starboard={starboardVariables}
         birthday={birthdayVariables}
         question={questionVariables}
@@ -97,8 +100,10 @@ export function MessageCanvas({
   birthdayVariables,
   questionVariables,
   starboardVariables,
+  pollVariables,
   locked,
   maxRows: rowLimit,
+  rowsNote,
   rowTaker = 'The vote menu',
   check = (m) => m,
 }: {
@@ -116,12 +121,16 @@ export function MessageCanvas({
   roleVariables?: boolean;
   /** Lists the variables suggestion messages fill in. */
   suggestionVariables?: boolean;
+  /** Lists the variables poll messages fill in. */
+  pollVariables?: boolean;
   /** Lists the variables starboard posts fill in. */
   starboardVariables?: boolean;
   /** Lists the variables birthday messages fill in. */
   birthdayVariables?: boolean;
   /** Lists the variables question messages fill in. */
   questionVariables?: boolean;
+  /** Why it holds fewer rows, shown on the plus menu's items. */
+  rowsNote?: string;
   /**
    * Keeps the message's shape: one embed or container, no pictures of its
    * own. Text, buttons and menus can still go outside it.
@@ -157,7 +166,8 @@ export function MessageCanvas({
   const maxRows = v2 ? MAX_ROWS : (rowLimit ?? MAX_ROWS);
   const rows =
     maxRows < MAX_ROWS
-      ? `${rowTaker} takes a row, so this holds ${maxRows} rows of buttons and menus.`
+      ? (rowsNote ??
+        `${rowTaker} takes a row, so this holds ${maxRows} rows of buttons and menus.`)
       : 'Discord shows up to 5 rows of buttons and menus.';
   const separator: PlusItem = {
     label: 'Add separator',
@@ -254,6 +264,7 @@ export function MessageCanvas({
           serverId={server.id}
           roleVariables={!!roleVariables}
           suggestionVariables={!!suggestionVariables}
+          pollVariables={!!pollVariables}
           starboardVariables={!!starboardVariables}
           birthdayVariables={!!birthdayVariables}
           questionVariables={!!questionVariables}

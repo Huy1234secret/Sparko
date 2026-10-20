@@ -1083,6 +1083,213 @@ describe('Starboard', () => {
   }, 20_000);
 });
 
+describe('Polls', () => {
+  it('checks the settings before saving, then goes live', async () => {
+    open(`${pixel}/polls`);
+    const length = await screen.findByRole(
+      'textbox',
+      { name: 'Default length' },
+      { timeout: 4000 },
+    );
+    await userEvent.clear(length);
+    await userEvent.type(length, '2y');
+    expect(
+      await screen.findByText('Has to be between 1mi and 1mt.'),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/default length has to be between/),
+    ).toBeInTheDocument();
+    await userEvent.clear(length);
+    await userEvent.type(length, '3d');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Live in #general/, {
+        selector: '.sp-pipeline__step',
+      }),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('makes a poll in the builder, then keeps to the plan’s polls at once', async () => {
+    open(`${pixel}/polls?tab=polls`);
+    const post = await screen.findByRole(
+      'button',
+      { name: 'Post poll' },
+      { timeout: 4000 },
+    );
+    // Without a question it says so, and nothing is made.
+    await userEvent.click(post);
+    expect(await screen.findByText('Write the question.')).toBeInTheDocument();
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Question' }),
+      'Favourite season?',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Option 1' }),
+      'Summer',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Option 2' }),
+      'Winter',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Option' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Option 3' }),
+      'summer',
+    );
+    await userEvent.click(post);
+    expect(
+      await screen.findByText(/Two options are called “summer”/),
+    ).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Option 3' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Option 3' }),
+      'Autumn',
+    );
+    await userEvent.click(post);
+    expect(await screen.findByText('Poll #8 posted')).toBeInTheDocument();
+    expect(await screen.findByText('Favourite season?')).toBeInTheDocument();
+    // That's 3 of Free's 3 polls at once.
+    expect(
+      await screen.findByText(/This plan runs up to 3 polls at once/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Post poll' })).toBeDisabled();
+  }, 20_000);
+
+  it('schedules a poll for later', async () => {
+    open(`${pixel}/polls?tab=polls`);
+    await userEvent.type(
+      await screen.findByRole(
+        'textbox',
+        { name: 'Question' },
+        { timeout: 4000 },
+      ),
+      'Later?',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Option 1' }),
+      'Yes',
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Option 2' }),
+      'No',
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'Later' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Schedule poll' }),
+    );
+    expect(await screen.findByText('Poll #8 scheduled')).toBeInTheDocument();
+    // It waits beside the sample's scheduled poll.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: 'Post now' })).toHaveLength(
+        2,
+      ),
+    );
+  }, 20_000);
+
+  it('ends, rerolls, lists voters, exports and deletes polls', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    open(`${pixel}/polls?tab=polls`);
+    expect(
+      await screen.findByText(
+        'What should our next game night be?',
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    const results = screen.getByRole('list', { name: 'Results of poll #6' });
+    expect(within(results).getByText('44% · 14')).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Voters' })[0]!,
+    );
+    const voters = await screen.findByRole('dialog', {
+      name: 'Who voted on poll #6',
+    });
+    expect(await within(voters).findByText('mossy_bun')).toBeInTheDocument();
+    await userEvent.click(within(voters).getByRole('button', { name: 'Done' }));
+
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Export CSV' })[0]!,
+    );
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+
+    await userEvent.click(screen.getByRole('button', { name: 'End now' }));
+    expect(await screen.findByText('Ended poll #6')).toBeInTheDocument();
+
+    // Poll #3 tied, so staff can reroll it.
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Reroll tie' })[0]!,
+    );
+    expect(await screen.findByText(/^Picked “/)).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete poll #1' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: /Delete poll #1/ });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete' }),
+    );
+    expect(await screen.findByText('Deleted poll #1')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Name for the server mascot?'),
+      ).not.toBeInTheDocument(),
+    );
+  }, 20_000);
+
+  it('starts the poll and results messages from default templates', async () => {
+    open(`${pixel}/polls?tab=edit`);
+    expect(
+      await screen.findByText('How should polls look?', {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Use a default template' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Default templates' });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /Poll card/ }),
+    );
+    expect(await screen.findByText('Live preview')).toBeInTheDocument();
+    expect(screen.getByLabelText('Poll options')).toBeInTheDocument();
+    // Poll variables are listed for this message.
+    await userEvent.click(screen.getByRole('button', { name: 'Variables' }));
+    expect(
+      screen.getByRole('menuitem', { name: /\{poll\.options\}/ }),
+    ).not.toHaveClass('is-off');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('radio', { name: 'Results' }));
+    expect(
+      await screen.findByText('How should results look?'),
+    ).toBeInTheDocument();
+  }, 20_000);
+
+  it('logs what happened, and renames commands Discord will take', async () => {
+    open(`${pixel}/polls?tab=logs`);
+    expect(
+      await screen.findByText(
+        '[ENDED] #2 ended early by @rhea',
+        {},
+        { timeout: 4000 },
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Problems' }));
+    expect(screen.getByText(/wasn’t posted/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: /Commands/ }));
+    const names = await screen.findAllByRole('textbox', { name: 'Name' });
+    await userEvent.clear(names[1]!);
+    await userEvent.type(names[1]!, 'new poll');
+    expect(names[1]).toHaveValue('new-poll');
+    await userEvent.clear(names[0]!);
+    await userEvent.type(names[0]!, 'Vote!');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(
+      await screen.findByText(/Command names are 1 to 32/),
+    ).toBeInTheDocument();
+  }, 20_000);
+});
+
 describe('Tickets', () => {
   it('lists tickets needing a reply, longest waits first, and searches them', async () => {
     open(`${pixel}/tickets`);

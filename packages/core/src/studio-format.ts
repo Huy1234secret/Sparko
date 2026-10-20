@@ -891,6 +891,8 @@ export type StudioVars = {
 
 export type StudioVariable = {
   name: string;
+  /** Filled in only by poll messages. */
+  poll?: true;
   about: string;
   /** Filled in only by reaction role responses. */
   role?: true;
@@ -1133,6 +1135,41 @@ export const studioVariables: StudioVariable[] = [
     name: 'message.date',
     about: 'When the starred message was sent, in each reader’s own format.',
     starboard: true,
+  },
+  { name: 'poll.question', about: 'The poll’s question.', poll: true },
+  {
+    name: 'poll.options',
+    about:
+      'Every option with its bar, share and votes, like ▰▰▰▱▱ 60% (12). Hidden results list only the options.',
+    poll: true,
+  },
+  { name: 'poll.id', about: 'The poll’s number, like #4.', poll: true },
+  {
+    name: 'votes.total',
+    about: 'How many members have voted.',
+    poll: true,
+  },
+  {
+    name: 'poll.ends',
+    about:
+      'When it ends, like “in 2 hours”, or when it ended. “No end time” if it runs until staff end it.',
+    poll: true,
+  },
+  {
+    name: 'poll.author',
+    about: 'Mentions who made the poll, without pinging them.',
+    poll: true,
+  },
+  {
+    name: 'poll.winner',
+    about:
+      'The option with the most votes, or the tie. Filled in once the poll ends.',
+    poll: true,
+  },
+  {
+    name: 'poll.status',
+    about: 'Open, Scheduled or Ended.',
+    poll: true,
   },
 ];
 

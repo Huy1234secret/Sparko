@@ -237,6 +237,7 @@ describe('public site', () => {
     expect(links.map((l) => l.getAttribute('href')).sort()).toEqual([
       '/features/autoroles',
       '/features/birthdays',
+      '/features/polls',
       '/features/questions',
       '/features/role-menus',
       '/features/starboard',

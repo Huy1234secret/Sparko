@@ -2,6 +2,11 @@ import type {
   ARLogEntry,
   AutoRoles,
   BdEntry,
+  Poll,
+  PollDraft,
+  PollLogEntry,
+  PollVoter,
+  Polls,
   BdKind,
   BdLogEntry,
   Birthdays,
@@ -436,7 +441,8 @@ export type StudioTemplate = {
       | 'suggestion'
       | 'birthday'
       | 'question'
-      | 'starboard';
+      | 'starboard'
+      | 'poll';
     where: string;
   }[];
 };
@@ -704,5 +710,46 @@ export interface PanelApi {
     serverId: string,
     board: string,
     channel: string,
+  ): Promise<void>;
+}
+
+export type PollsState = {
+  on: boolean;
+  config: Polls;
+  limits: { options: number; active: number };
+  /** Polls posted or waiting to be, toward the plan's limit. */
+  open: number;
+  channels: Channel[];
+  roles: RoleOption[];
+  log: PollLogEntry[];
+};
+
+export interface PanelApi {
+  getPolls(serverId: string): Promise<PollsState>;
+  savePolls(
+    serverId: string,
+    change: { on: boolean; config: Polls },
+  ): Promise<void>;
+  listPolls(serverId: string): Promise<{ polls: Poll[]; open: number }>;
+  /** Saves a new poll; the bot posts it now or at its time. */
+  createPoll(serverId: string, draft: PollDraft): Promise<{ poll: Poll }>;
+  endPoll(serverId: string, id: number): Promise<void>;
+  /** Picks one of a tie's options at random. */
+  rerollPoll(
+    serverId: string,
+    id: number,
+  ): Promise<{ picked: { label: string } }>;
+  /** Posts a scheduled poll now. */
+  postPollNow(serverId: string, id: number): Promise<void>;
+  deletePoll(serverId: string, id: number): Promise<void>;
+  pollVoters(
+    serverId: string,
+    id: number,
+  ): Promise<{ anonymous: boolean; voters: PollVoter[] }>;
+  /** Posts a made-up poll, or its results, in a channel. */
+  testPoll(
+    serverId: string,
+    channel: string,
+    kind: 'poll' | 'results',
   ): Promise<void>;
 }

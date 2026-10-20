@@ -18,6 +18,8 @@ import type {
   TicketPriority,
 } from './types';
 import type {
+  PollDraft,
+  Polls,
   Questions,
   AutoRoles,
   BdKind,
@@ -56,6 +58,10 @@ export const keys = {
   ticketsConfig: (id: string) => ['tickets', id, 'config'] as const,
   studio: (id: string) => ['studio', id] as const,
   rr: (id: string) => ['rr', id] as const,
+  polls: (id: string) => ['polls', id] as const,
+  pollList: (id: string) => ['polls', id, 'list'] as const,
+  pollVoters: (id: string, poll: number) =>
+    ['polls', id, 'voters', poll] as const,
   ar: (id: string) => ['ar', id] as const,
   arMembers: (id: string, q: string) => ['ar', id, 'members', q] as const,
   qa: (id: string) => ['qa', id] as const,
@@ -98,7 +104,6 @@ export const useWelcome = (serverId: string) =>
     queryKey: keys.welcome(serverId),
     queryFn: () => api.getWelcome(serverId),
   });
-
 /** After any save, the overview and sidebar re-read what is on. */
 function useRefresh(serverId: string) {
   const client = useQueryClient();
@@ -115,6 +120,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: keys.ar(serverId) }),
       client.invalidateQueries({ queryKey: keys.sg(serverId) }),
       client.invalidateQueries({ queryKey: keys.bd(serverId) }),
+      client.invalidateQueries({ queryKey: keys.polls(serverId) }),
     ]);
 }
 
@@ -557,6 +563,63 @@ export function useStarboardActions(serverId: string) {
     test: useMutation({
       mutationFn: ({ board, channel }: { board: string; channel: string }) =>
         api.testStarboard(serverId, board, channel),
+    }),
+  };
+}
+export const usePolls = (serverId: string) =>
+  useQuery({
+    queryKey: keys.polls(serverId),
+    queryFn: () => api.getPolls(serverId),
+  });
+/** Every poll, running ones first; re-read often so the bars stay current. */
+export const usePollList = (serverId: string) =>
+  useQuery({
+    queryKey: keys.pollList(serverId),
+    queryFn: () => api.listPolls(serverId),
+    refetchInterval: 15_000,
+  });
+export const usePollVoters = (serverId: string, poll: number | null) =>
+  useQuery({
+    queryKey: keys.pollVoters(serverId, poll ?? 0),
+    queryFn: () => api.pollVoters(serverId, poll ?? 0),
+    enabled: poll !== null,
+  });
+export function usePollActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: Polls }) =>
+        api.savePolls(serverId, change),
+      onSuccess: refresh,
+    }),
+    create: useMutation({
+      mutationFn: (draft: PollDraft) => api.createPoll(serverId, draft),
+      onSuccess: refresh,
+    }),
+    end: useMutation({
+      mutationFn: (id: number) => api.endPoll(serverId, id),
+      onSuccess: refresh,
+    }),
+    reroll: useMutation({
+      mutationFn: (id: number) => api.rerollPoll(serverId, id),
+      onSuccess: refresh,
+    }),
+    postNow: useMutation({
+      mutationFn: (id: number) => api.postPollNow(serverId, id),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (id: number) => api.deletePoll(serverId, id),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: ({
+        channel,
+        kind,
+      }: {
+        channel: string;
+        kind: 'poll' | 'results';
+      }) => api.testPoll(serverId, channel, kind),
     }),
   };
 }

@@ -380,6 +380,44 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     pairs: ['studio', 'suggestions'],
   },
+  polls: {
+    headline: 'Ask the server, see the answers come in.',
+    points: [
+      'Vote with buttons or a menu, with live result bars',
+      'Anonymous, multiple choice, hidden results and role-only votes',
+      'Ends on time, at a vote count, or when staff say',
+    ],
+    how: [
+      {
+        icon: 'list-checks',
+        title: 'Make a poll',
+        body: 'Build one in the dashboard, or use /poll create for a quick form. Up to 25 options with emoji, posted now or scheduled for later, with an optional role ping.',
+      },
+      {
+        icon: 'trending-up',
+        title: 'Live results',
+        body: 'The message shows a bar for each option and updates as votes come in. Hide the results until it ends if you’d rather not sway anyone.',
+      },
+      {
+        icon: 'award',
+        title: 'A clear ending',
+        body: 'Polls end at their time, once enough members have voted, or when staff end them. The winner is shown, ties are shown as ties, and staff can reroll a tie.',
+      },
+      {
+        icon: 'scroll-text',
+        title: 'Voters, exports and logs',
+        body: 'See who voted for what on public polls, export the votes as CSV, and look back at every poll made, ended or deleted.',
+      },
+    ],
+    steps: [
+      'Open Polls, switch it on and pick the default channel.',
+      'Choose who can make polls and what new polls start with.',
+      'In Edit, start the poll and results messages from a default or your own.',
+      'Save, then make a poll in the Polls tab or with /poll create.',
+    ],
+    commands: ['/poll create', '/poll end', '/poll results', '/poll voters'],
+    pairs: ['studio', 'suggestions'],
+  },
 };
 
 export const isReady = (id: string) => id in featureDetails;
