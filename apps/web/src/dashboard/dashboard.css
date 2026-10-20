@@ -4044,3 +4044,225 @@ a.sp-sg-card__open:focus-visible {
     overflow-x: auto;
   }
 }
+
+/* Starboard ---------------------------------------------------------------- */
+/* Boards: pick one to edit it; the picked one is outlined in the brand. */
+.sp-sb-boards {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-sb-board {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+  transition: border-color var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-sb-board:hover {
+  border-color: var(--sp-line-strong);
+}
+.sp-sb-board.is-selected {
+  border-color: var(--sp-brand-edge);
+  background: var(--sp-brand-soft);
+}
+.sp-sb-board__pick {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--sp-radius-chip);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sp-sb-board__pick:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-sb-board__emoji {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--sp-surface);
+  font-size: 18px;
+}
+.sp-sb-board__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sp-sb-board__name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Star emojis sit in a row, with room for one more. */
+.sp-sb-emojis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sp-sb-stars {
+  align-items: start;
+}
+.sp-sb-pick {
+  display: grid;
+  gap: 6px;
+}
+.sp-sb-pick .sp-seg {
+  justify-self: start;
+  max-width: 100%;
+  overflow-x: auto;
+}
+/* The Jump to message button under the preview can't be edited. */
+.sp-sb-jump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sp-sb-jump .dc-btn {
+  cursor: default;
+}
+/* Storage: each starred message, with what staff can do to it. */
+.sp-sb-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+.sp-sb-filters > .sp-field:first-child {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.sp-sb-filters .sp-field {
+  min-width: 170px;
+  margin: 0;
+}
+.sp-sb-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--sp-brand);
+}
+.sp-sb-card.is-frozen {
+  border-left-color: var(--sp-info);
+}
+.sp-sb-card__open {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.sp-sb-card__open:focus-visible {
+  border-radius: var(--sp-radius-chip);
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-sb-card__body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.sp-sb-card__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
+}
+.sp-sb-card__hidden {
+  color: var(--sp-muted);
+  font-style: italic;
+}
+.sp-sb-card__image {
+  max-width: min(260px, 100%);
+  max-height: 120px;
+  border-radius: var(--sp-radius-chip);
+  background: var(--sp-skeleton);
+  object-fit: cover;
+}
+a.sp-sb-card__open:hover .sp-sg-card__name {
+  text-decoration: underline;
+}
+.sp-sb-stars-badge {
+  border-color: color-mix(in srgb, var(--sp-brand) 55%, transparent);
+  background: color-mix(in srgb, var(--sp-brand) 16%, transparent);
+  color: var(--sp-text);
+  font-variant-numeric: tabular-nums;
+}
+.sp-sb-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 -6px -4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--sp-line);
+}
+/* Blocked members and messages. */
+.sp-sb-blocked {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-sb-blocked__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--sp-line);
+}
+.sp-sb-blocked__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.sp-sb-blocked__icon {
+  flex: none;
+  color: var(--sp-danger);
+}
+.sp-sb-blocked__main {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.sp-sb-blocked__name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sp-sb-blocked__name a {
+  font-weight: 400;
+}
+.sp-sb-blocked__preview {
+  overflow: hidden;
+  color: var(--sp-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Subcommands sit under /starboard. */
+.sp-sg-command.sp-sb-sub {
+  margin-left: 20px;
+}
+@media (max-width: 640px) {
+  .sp-sg-command.sp-sb-sub {
+    margin-left: 0;
+  }
+}

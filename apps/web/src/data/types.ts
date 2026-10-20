@@ -10,8 +10,12 @@ import type {
   QaQuestion,
   Questions,
   ReactionRole,
+  SbBlocked,
+  SbEntry,
+  SbLogEntry,
   SgLogEntry,
   SgSuggestion,
+  Starboard,
   Suggestions,
   WelcomeConfig,
 } from './studio-format';
@@ -426,7 +430,13 @@ export type StudioTemplate = {
   message: StudioMessage;
   /** Where else it's used, for the tags on its card. */
   usedIn?: {
-    kind: 'welcome' | 'reaction-role' | 'suggestion' | 'birthday' | 'question';
+    kind:
+      | 'welcome'
+      | 'reaction-role'
+      | 'suggestion'
+      | 'birthday'
+      | 'question'
+      | 'starboard';
     where: string;
   }[];
 };
@@ -635,5 +645,64 @@ export interface PanelApi {
     serverId: string,
     channel: string,
     which: 'question' | 'answer',
+  ): Promise<void>;
+}
+
+export type SBStorage = {
+  count: number;
+  limit: number;
+  /** Each starred message uses this much of the server's storage. */
+  perKb: number;
+  usedKb: number;
+  limitMb: number;
+};
+export type SBState = {
+  on: boolean;
+  config: Starboard;
+  limits: { boards: number; emojis: number; storageMb: number };
+  storage: SBStorage;
+  channels: Channel[];
+  roles: RoleOption[];
+  log: SbLogEntry[];
+  blocked: SbBlocked[];
+};
+
+export interface PanelApi {
+  getStarboard(serverId: string): Promise<SBState>;
+  saveStarboard(
+    serverId: string,
+    change: { on: boolean; config: Starboard },
+  ): Promise<void>;
+  listStarred(
+    serverId: string,
+    filter: { board: string; sort: 'stars' | 'newest'; query: string },
+  ): Promise<{ entries: SbEntry[]; storage: SBStorage; blocked: SbBlocked[] }>;
+  /** Takes a message off a board; its stars are forgotten. */
+  removeStarred(
+    serverId: string,
+    entry: { boardId: string; messageId: string },
+  ): Promise<void>;
+  freezeStarred(
+    serverId: string,
+    entry: { boardId: string; messageId: string },
+    frozen: boolean,
+  ): Promise<void>;
+  /** Keeps a message or a member off every board. */
+  blockStarboard(
+    serverId: string,
+    target:
+      | { kind: 'message'; id: string; channelId: string }
+      | { kind: 'member'; id: string; name: string },
+  ): Promise<void>;
+  unblockStarboard(
+    serverId: string,
+    kind: SbBlocked['kind'],
+    id: string,
+  ): Promise<void>;
+  /** Posts a made-up starred message in a channel, to see the post. */
+  testStarboard(
+    serverId: string,
+    board: string,
+    channel: string,
   ): Promise<void>;
 }

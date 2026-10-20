@@ -1,7 +1,8 @@
 import type { Db } from './db.ts';
-import { bdCommandBodies, bdConfigOf } from './bd-store.ts';
-import { qaCommandBodies, qaConfigOf } from './qa-store.ts';
-import { sgCommandBodies, sgConfigOf } from './sg-store.ts';
+import { bdCommandBodies, bdConfigOf, bdGuilds } from './bd-store.ts';
+import { qaCommandBodies, qaConfigOf, qaGuilds } from './qa-store.ts';
+import { sbCommandBodies, sbConfigOf, sbGuilds } from './sb-store.ts';
+import { sgCommandBodies, sgConfigOf, sgGuilds } from './sg-store.ts';
 
 /**
  * Every slash command a server's own modules use, as one list. Discord
@@ -13,10 +14,12 @@ export function guildCommandBodies(db: Db, guildId: string) {
   const sg = sgConfigOf(db, guildId);
   const bd = bdConfigOf(db, guildId);
   const qa = qaConfigOf(db, guildId);
+  const sb = sbConfigOf(db, guildId);
   const all = [
     ...(sg.on ? sgCommandBodies(sg.config) : []),
     ...(bd.on ? bdCommandBodies(bd.config) : []),
     ...(qa.on ? qaCommandBodies(qa.config) : []),
+    ...(sb.on ? sbCommandBodies(sb.config) : []),
   ] as { name: string }[];
   const seen = new Set<string>();
   return all.filter((c) => !seen.has(c.name) && !!seen.add(c.name));
@@ -27,3 +30,13 @@ export function suggestionCommandNames(db: Db, guildId: string) {
   const sg = sgConfigOf(db, guildId);
   return new Set(sg.on ? sgCommandBodies(sg.config).map((c) => c.name) : []);
 }
+
+/** Servers with a module that has its own commands. */
+export const guildsWithCommands = (db: Db) => [
+  ...new Set([
+    ...sgGuilds(db),
+    ...bdGuilds(db),
+    ...qaGuilds(db),
+    ...sbGuilds(db),
+  ]),
+];

@@ -519,7 +519,15 @@ export function ModuleLoading({ module }: { module: SparkoModule }) {
   return (
     <ModuleSkeleton
       module={module}
-      tabs={module.id === 'welcome' ? 4 : module.id === 'suggestions' ? 5 : 3}
+      tabs={
+        module.id === 'welcome'
+          ? 4
+          : ['suggestions', 'starboard', 'questions', 'birthdays'].includes(
+                module.id,
+              )
+            ? 5
+            : 3
+      }
     >
       {editor ? (
         <SkelEditor />

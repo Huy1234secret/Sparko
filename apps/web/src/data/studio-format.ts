@@ -120,6 +120,36 @@ export {
   type SgVoteOption,
   type Suggestions,
 } from '../../../../packages/core/src/suggestions.ts';
+// The starboard shares its checks, rules and posts with the bot.
+export {
+  SB_MODULE,
+  SB_NO_TEXT,
+  cleanStarboard,
+  sbBoardDefault,
+  sbCommandAbout,
+  sbCommandKeys,
+  sbDefault,
+  sbDefaultMessage,
+  sbId,
+  sbIssue,
+  sbJumpLink,
+  sbLimits,
+  sbLogLine,
+  sbMessageIssue,
+  sbMilestones,
+  sbPresets,
+  sbRanges,
+  type SbBlocked,
+  type SbBoard,
+  type SbCommand,
+  type SbCommandKey,
+  type SbEntry,
+  type SbIssue,
+  type SbLogAction,
+  type SbLogEntry,
+  type SbPreset,
+  type Starboard,
+} from '../../../../packages/core/src/starboard.ts';
 // Birthdays share their checks, dates, time zones and messages with the bot.
 export {
   BD_MODULE,
