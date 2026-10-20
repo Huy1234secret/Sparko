@@ -31,6 +31,7 @@ export function VariablesButton({
   question,
   invite,
   event,
+  voice,
   onPick,
 }: {
   /** Components V2 messages also have {separator}. */
@@ -51,6 +52,8 @@ export function VariablesButton({
   invite?: boolean;
   /** Event messages and their DMs fill in the event. */
   event?: boolean;
+  /** The temporary voice panel fills in the room, inside one. */
+  voice?: boolean;
   onPick: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -130,6 +133,12 @@ export function VariablesButton({
       on: event,
       label: 'Event',
       where: 'event messages and their DMs',
+    },
+    {
+      key: 'voice',
+      on: voice,
+      label: 'Voice panel',
+      where: 'the temporary voice panel, inside a room',
     },
   ] as const;
   const ownersOf = (v: (typeof all)[number]) =>

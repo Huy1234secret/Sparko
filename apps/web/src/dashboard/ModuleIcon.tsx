@@ -14,6 +14,8 @@ const animated: Record<string, RevealHover | undefined> = {
   questions: animIcons.infoBook,
   invites: animIcons.joinMessage,
   events: animIcons.joinMessage,
+  // Join to create: the plus button's animation, drawn as a plain shape.
+  'temp-voice': { ...animIcons.plus, solid: true },
 };
 
 /**

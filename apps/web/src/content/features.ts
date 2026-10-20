@@ -508,6 +508,52 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     pairs: ['studio', 'role-menus'],
   },
+  'temp-voice': {
+    headline: 'A voice room for everyone who wants one.',
+    points: [
+      'Join a hub, press Create room or use /voice create',
+      'A control panel with buttons to rename, lock, hide, trust and more',
+      'Empty rooms are deleted, even ones left while Sparko was offline',
+    ],
+    how: [
+      {
+        icon: 'volume-2',
+        title: 'Join to create',
+        body: 'Members join a hub channel and Sparko makes their room in its category and moves them in. Pick the name, user limit, bitrate and whether rooms start locked or hidden, hub by hub (1 hub on Free, 10 on Plus).',
+      },
+      {
+        icon: 'sliders-horizontal',
+        title: 'The control panel',
+        body: 'A message with buttons: rename, limit, lock, hide, trust, invite, kick, block, claim, transfer, region, bitrate and delete. Its text is a Message Studio template, and it can go in each new room’s chat too.',
+      },
+      {
+        icon: 'terminal',
+        title: '/voice commands',
+        body: 'Every button is also a /voice command, renamed to suit your server. Only a room’s owner can change it; anyone can claim a room its owner left.',
+      },
+      {
+        icon: 'layers',
+        title: 'Storage, logs and memory',
+        body: 'See every open room and close one, and reset what members saved. Sparko remembers each member’s name, limit, lock and lists for their next room, if you like.',
+      },
+    ],
+    steps: [
+      'Open Temporary voice, switch it on and add a hub.',
+      'Pick the voice channel members join, and how rooms start.',
+      'Pick a panel channel and its buttons, and its text in Edit.',
+      'Save. Sparko posts the panel and adds /voice to your server.',
+    ],
+    commands: [
+      '/voice create',
+      '/voice lock',
+      '/voice hide',
+      '/voice trust',
+      '/voice block',
+      '/voice claim',
+      '/voice transfer',
+    ],
+    pairs: ['studio', 'autoroles'],
+  },
 };
 
 export const isReady = (id: string) => id in featureDetails;

@@ -34,6 +34,8 @@ export type GuildView = {
   }[];
   /** Voice and stage channels, for where an event happens. */
   voice?: { id: string; name: string; category: string; stage: boolean }[];
+  /** Categories, where temporary voice rooms can go. */
+  categories?: { id: string; name: string }[];
 };
 
 type DiscordChannel = {
@@ -46,9 +48,9 @@ type DiscordChannel = {
 };
 
 const TEXT = 0;
+const VOICE = 2;
 const ANNOUNCEMENT = 5;
 const CATEGORY = 4;
-const VOICE = 2;
 const STAGE = 13;
 
 /**
@@ -157,7 +159,10 @@ export function guildViews(rest: Rest, ttlMs = 60_000) {
           (c.parent_id && categories.get(c.parent_id)?.name) || 'No category',
         stage: c.type === STAGE,
       }));
-    return { perms, channels: list, roles, voice };
+    const categoryList = [...categories.values()]
+      .sort((a, b) => a.position - b.position)
+      .map((c) => ({ id: c.id, name: c.name }));
+    return { perms, channels: list, roles, voice, categories: categoryList };
   }
 
   function get(guildId: string, now = Date.now()) {

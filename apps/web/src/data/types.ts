@@ -21,6 +21,10 @@ import type {
   EvLogEntry,
   EvRsvp,
   Events,
+  TempVoice,
+  TvLogEntry,
+  TvPrefs,
+  TvRoom,
   GreetKind,
   QaLogEntry,
   QaQuestion,
@@ -455,7 +459,8 @@ export type StudioTemplate = {
       | 'starboard'
       | 'poll'
       | 'invite'
-      | 'event';
+      | 'event'
+      | 'voice';
     where: string;
   }[];
 };
@@ -907,4 +912,40 @@ export interface PanelApi {
   ): Promise<void>;
   /** Posts a made-up event message in a channel, to see it. */
   testEvent(serverId: string, channel: string, kind: EvKind): Promise<void>;
+}
+
+/** A voice channel members can join to get a room. */
+export type CategoryOption = { id: string; name: string };
+export type TVState = {
+  on: boolean;
+  config: TempVoice;
+  limits: { hubs: number; maxRooms: number; deleteAfter: number };
+  /** The server's boost level, which caps the bitrate. */
+  boostLevel: number;
+  /** How many rooms are open, and how many members saved settings. */
+  rooms: number;
+  prefs: number;
+  /** Where the panel is posted now, if it is. */
+  panel: { channelId: string } | null;
+  channels: Channel[];
+  voice: VoiceChannel[];
+  categories: CategoryOption[];
+  roles: RoleOption[];
+  log: TvLogEntry[];
+};
+export type TVPrefsList = { prefs: TvPrefs[]; count: number };
+
+export interface PanelApi {
+  getTempVoice(serverId: string): Promise<TVState>;
+  saveTempVoice(
+    serverId: string,
+    change: { on: boolean; config: TempVoice },
+  ): Promise<void>;
+  /** Posts (or updates) the control panel with the saved settings. */
+  postVoicePanel(serverId: string): Promise<ApplyResult>;
+  listVoiceRooms(serverId: string): Promise<TvRoom[]>;
+  /** Staff close a room: Sparko deletes it in Discord. */
+  closeVoiceRoom(serverId: string, channelId: string): Promise<void>;
+  listVoicePrefs(serverId: string, query: string): Promise<TVPrefsList>;
+  resetVoicePrefs(serverId: string, userId: string): Promise<void>;
 }

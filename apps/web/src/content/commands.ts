@@ -69,6 +69,13 @@ const rows = [
   '/event rsvp|Utility|Everyone, unless limited|Answer an event: Going, Maybe or Can’t go.|/event rsvp id:3 choice:Going|id:The event’s number;choice:Your answer',
   '/event cancel|Utility|Staff who manage events|Cancel an event. Everyone going gets a DM.|/event cancel id:3|id:The event’s number',
   '/event remind|Utility|Staff who manage events|Send the reminder DM to everyone going, now.|/event remind id:3|id:The event’s number',
+  '/voice create|Utility|Everyone|Make your own voice room. Sparko sends you its link and moves you in if you’re already in voice.|/voice create name:Movie night limit:6|name:The room’s name (optional);limit:How many can join, 0 for no limit (optional)',
+  '/voice lock|Utility|The room’s owner|Only trusted members can join your room. /voice unlock opens it again.|/voice lock|',
+  '/voice hide|Utility|The room’s owner|Only trusted members can see your room. /voice show shows it again.|/voice hide|',
+  '/voice trust|Utility|The room’s owner|Let someone join your room even when it’s locked or hidden. /voice untrust takes it back.|/voice trust member:@rhea|member:Who can join',
+  '/voice block|Utility|The room’s owner|Stop someone joining your room, and disconnect them. /voice unblock lets them back.|/voice block member:@spammy_dan|member:Who to block',
+  '/voice claim|Utility|Anyone in the room|Take over a room after its owner left it.|/voice claim|',
+  '/voice transfer|Utility|The room’s owner|Give your room to someone who’s in it.|/voice transfer member:@ayo|member:Who gets the room',
   '/rep|Fun|Everyone|Thank someone with +rep.|/rep user:@rhea|user:Who to thank',
 ];
 
