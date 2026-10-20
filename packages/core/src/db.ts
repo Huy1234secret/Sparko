@@ -573,6 +573,54 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX ev_log_by_guild ON ev_log (guild_id, id DESC);`,
+  // Temporary voice rooms Sparko made, members' saved room settings, and
+  // what happened to the rooms.
+  `CREATE TABLE tv_rooms (
+    channel_id TEXT PRIMARY KEY,
+    guild_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    owner_name TEXT NOT NULL,
+    hub_id TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    user_limit INTEGER NOT NULL DEFAULT 0,
+    locked INTEGER NOT NULL DEFAULT 0,
+    hidden INTEGER NOT NULL DEFAULT 0,
+    chat INTEGER NOT NULL DEFAULT 1,
+    trusted TEXT NOT NULL DEFAULT '[]',
+    blocked TEXT NOT NULL DEFAULT '[]',
+    base_json TEXT NOT NULL DEFAULT '[]',
+    members INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'waiting',
+    empty_since INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX tv_rooms_by_guild ON tv_rooms (guild_id, created_at);
+  CREATE INDEX tv_rooms_by_owner ON tv_rooms (guild_id, owner_id);
+  CREATE TABLE tv_prefs (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    user_limit INTEGER,
+    locked INTEGER NOT NULL DEFAULT 0,
+    trusted TEXT NOT NULL DEFAULT '[]',
+    blocked TEXT NOT NULL DEFAULT '[]',
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );
+  CREATE TABLE tv_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    room_id TEXT NOT NULL DEFAULT '',
+    room_name TEXT NOT NULL DEFAULT '',
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX tv_log_by_guild ON tv_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

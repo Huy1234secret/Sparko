@@ -908,6 +908,8 @@ export type StudioVariable = {
   invite?: true;
   /** Filled in only by event messages and their DMs. */
   event?: true;
+  /** Filled in only by the temporary voice panel, inside a room. */
+  voice?: true;
 };
 
 /** Variables people can write in Studio messages, in braces. */
@@ -1252,6 +1254,23 @@ export const studioVariables: StudioVariable[] = [
     about:
       'Mentions the first members going, like “@rhea, @ayo and 5 more”, without pinging them.',
     event: true,
+  },
+  {
+    name: 'room',
+    about:
+      'Links the voice room, when the panel is posted in a room’s own chat.',
+    voice: true,
+  },
+  { name: 'room.name', about: 'The voice room’s name.', voice: true },
+  {
+    name: 'room.owner',
+    about: 'Mentions the room’s owner, without pinging them.',
+    voice: true,
+  },
+  {
+    name: 'room.limit',
+    about: 'How many can join the room, or “No limit”.',
+    voice: true,
   },
 ];
 

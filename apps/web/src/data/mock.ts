@@ -25,6 +25,7 @@ import { createSuggestionsMock } from './mock-suggestions';
 import { createBirthdaysMock } from './mock-birthdays';
 import { createInvitesMock } from './mock-invites';
 import { createEventsMock } from './mock-events';
+import { createTempVoiceMock } from './mock-temp-voice';
 
 /**
  * Sample data for building the dashboard before the backend is reconnected.
@@ -128,6 +129,7 @@ const firstServerOn: Record<string, boolean> = {
   suggestions: true,
   birthdays: true,
   invites: true,
+  'temp-voice': true,
   giveaways: true,
   welcome: false,
 };
@@ -513,6 +515,7 @@ export function resetMock() {
   resetPolls();
   resetInvites();
   resetEvents();
+  resetTempVoice();
 }
 
 const {
@@ -543,6 +546,7 @@ const {
   questionUses: (serverId) => questionUses(serverId),
   inviteUses: (serverId) => inviteUses(serverId),
   eventUses: (serverId) => eventUses(serverId),
+  voiceUses: (serverId) => voiceUses(serverId),
 });
 const { api: autoRolesApi, reset: resetAutoRoles } = createAutoRolesMock({
   wait: <T>(value: T) => wait(value),
@@ -673,6 +677,23 @@ const {
   },
   you: () => session.user,
 });
+const {
+  api: tempVoiceApi,
+  reset: resetTempVoice,
+  uses: voiceUses,
+} = createTempVoiceMock({
+  wait: <T>(value: T) => wait(value),
+  copy,
+  server: serverById,
+  channels: (serverId) => channelsFor(stateOf(serverId)),
+  roles: (serverId) => rolesOf(serverId),
+  templates: (serverId) => templateIds(serverId),
+  isOn: (serverId) => !!stateOf(serverId).on['temp-voice'],
+  setOn: (serverId, on) => {
+    stateOf(serverId).on['temp-voice'] = on;
+  },
+  you: () => session.user,
+});
 export const mockApi: PanelApi = {
   ...coreApi,
   ...supportApi,
@@ -684,4 +705,5 @@ export const mockApi: PanelApi = {
   ...birthdaysApi,
   ...invitesApi,
   ...eventsApi,
+  ...tempVoiceApi,
 };

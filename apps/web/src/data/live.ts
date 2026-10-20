@@ -1,4 +1,4 @@
-import type { BdEntry, EvEvent, EvRsvp } from './studio-format';
+import type { BdEntry, EvEvent, EvRsvp, TvRoom } from './studio-format';
 import type {
   ARMemberView,
   BDMemberFound,
@@ -528,6 +528,39 @@ export function withBackend(
     async testEvent(id, channel, kind) {
       if (!(await backend()).live) return sample.testEvent(id, channel, kind);
       await call('POST', `${server(id)}/events/test`, { channel, kind });
+    },
+    async getTempVoice(id) {
+      if (!(await backend()).live) return sample.getTempVoice(id);
+      return getJson(`${server(id)}/temp-voice`);
+    },
+    async saveTempVoice(id, change) {
+      if (!(await backend()).live) return sample.saveTempVoice(id, change);
+      await call('PUT', `${server(id)}/temp-voice`, change);
+    },
+    async postVoicePanel(id) {
+      if (!(await backend()).live) return sample.postVoicePanel(id);
+      return call('POST', `${server(id)}/temp-voice/panel`);
+    },
+    async listVoiceRooms(id) {
+      if (!(await backend()).live) return sample.listVoiceRooms(id);
+      const r = await getJson<{ rooms: TvRoom[] }>(
+        `${server(id)}/temp-voice/rooms`,
+      );
+      return r.rooms;
+    },
+    async closeVoiceRoom(id, channelId) {
+      if (!(await backend()).live) return sample.closeVoiceRoom(id, channelId);
+      await call('DELETE', `${server(id)}/temp-voice/rooms/${channelId}`);
+    },
+    async listVoicePrefs(id, query) {
+      if (!(await backend()).live) return sample.listVoicePrefs(id, query);
+      return getJson(
+        `${server(id)}/temp-voice/prefs?q=${encodeURIComponent(query)}`,
+      );
+    },
+    async resetVoicePrefs(id, userId) {
+      if (!(await backend()).live) return sample.resetVoicePrefs(id, userId);
+      await call('DELETE', `${server(id)}/temp-voice/prefs/${userId}`);
     },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);

@@ -31,6 +31,7 @@ import type {
   Events,
   ReactionRole,
   Starboard,
+  TempVoice,
   Suggestions,
   WelcomeConfig,
 } from './studio-format';
@@ -91,6 +92,9 @@ export const keys = {
   ev: (id: string) => ['ev', id] as const,
   evList: (id: string, when: string) => ['ev', id, 'list', when] as const,
   evRsvps: (id: string, number: number) => ['ev', id, 'rsvps', number] as const,
+  tv: (id: string) => ['tv', id] as const,
+  tvRooms: (id: string) => ['tv', id, 'rooms'] as const,
+  tvPrefs: (id: string, q: string) => ['tv', id, 'prefs', q] as const,
 };
 
 export const useSession = () =>
@@ -138,6 +142,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: keys.polls(serverId) }),
       client.invalidateQueries({ queryKey: keys.inv(serverId) }),
       client.invalidateQueries({ queryKey: keys.ev(serverId) }),
+      client.invalidateQueries({ queryKey: keys.tv(serverId) }),
     ]);
 }
 
@@ -750,6 +755,46 @@ export function useEventActions(serverId: string) {
     test: useMutation({
       mutationFn: ({ channel, kind }: { channel: string; kind: EvKind }) =>
         api.testEvent(serverId, channel, kind),
+    }),
+  };
+}
+export const useTempVoice = (serverId: string) =>
+  useQuery({
+    queryKey: keys.tv(serverId),
+    queryFn: () => api.getTempVoice(serverId),
+  });
+/** Open voice rooms, for Storage. */
+export const useVoiceRooms = (serverId: string) =>
+  useQuery({
+    queryKey: keys.tvRooms(serverId),
+    queryFn: () => api.listVoiceRooms(serverId),
+  });
+/** Members' saved room settings, matching what staff typed. */
+export const useVoicePrefs = (serverId: string, query: string) =>
+  useQuery({
+    queryKey: keys.tvPrefs(serverId, query.trim()),
+    queryFn: () => api.listVoicePrefs(serverId, query.trim()),
+  });
+export function useTempVoiceActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: TempVoice }) =>
+        api.saveTempVoice(serverId, change),
+      onSuccess: refresh,
+    }),
+    post: useMutation({
+      mutationFn: () => api.postVoicePanel(serverId),
+      onSuccess: refresh,
+    }),
+    close: useMutation({
+      mutationFn: (channelId: string) =>
+        api.closeVoiceRoom(serverId, channelId),
+      onSuccess: refresh,
+    }),
+    reset: useMutation({
+      mutationFn: (userId: string) => api.resetVoicePrefs(serverId, userId),
+      onSuccess: refresh,
     }),
   };
 }

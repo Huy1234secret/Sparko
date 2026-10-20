@@ -245,6 +245,7 @@ describe('public site', () => {
       '/features/starboard',
       '/features/studio',
       '/features/suggestions',
+      '/features/temp-voice',
       '/features/tickets',
       '/features/welcome',
     ]);

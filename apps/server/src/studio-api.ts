@@ -54,6 +54,8 @@ import {
   evKinds,
   evKindNames,
   type Events,
+  TV_MODULE,
+  type TempVoice,
   type ReactionRole,
   type Polls,
   type Starboard,
@@ -133,7 +135,8 @@ export function studioRoutes({
           | 'starboard'
           | 'poll'
           | 'invite'
-          | 'event';
+          | 'event'
+          | 'voice';
         where: string;
       }[]
     >();
@@ -148,7 +151,8 @@ export function studioRoutes({
         | 'starboard'
         | 'poll'
         | 'invite'
-        | 'event',
+        | 'event'
+        | 'voice',
       where: string,
     ) => {
       if (!id) return;
@@ -224,6 +228,8 @@ export function studioRoutes({
     if (ev)
       for (const k of evKinds)
         add(ev.messages?.[k] ?? '', 'event', `Events (${evKindNames[k]})`);
+    const tv = getModule<TempVoice>(db, guildId, TV_MODULE).config;
+    add(tv?.panel?.message ?? '', 'voice', 'Temporary voice (control panel)');
     return uses;
   };
 

@@ -61,6 +61,7 @@ import { suggestionsBot } from './suggestions.ts';
 import { birthdaysBot } from './birthdays.ts';
 import { invitesBot } from './invites.ts';
 import { eventsBot } from './events.ts';
+import { isTempVoiceId, tempVoiceBot } from './temp-voice.ts';
 import { studioInfo } from './studio-info.ts';
 import { registerAllGuildCommands } from './guild-commands.ts';
 import {
@@ -118,6 +119,10 @@ const invites = invitesBot(db, rest, {
 const events = eventsBot(db, rest, {
   appId: () => client?.application?.id,
 });
+const tempVoice = tempVoiceBot(db, rest, {
+  appId: () => client?.application?.id,
+  inGuild: (id) => !!client?.guilds.cache.has(id),
+});
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
 /** And only shares message text with the Message Content Intent on. */
@@ -159,6 +164,7 @@ const handlers: Handlers = {
   ...birthdays.handlers((id) => client.guilds.cache.get(id)),
   ...invites.handlers((id) => client.guilds.cache.get(id)),
   ...events.handlers((id) => client.guilds.cache.get(id)),
+  ...tempVoice.handlers((id) => client.guilds.cache.get(id)),
   'rr-sync': (job) =>
     syncReactionRole(
       rest,
@@ -243,6 +249,12 @@ function wire(c: Client) {
     );
     // Invite tracking: each server's invites to compare joins with.
     void invites.syncAll((id) => ready.guilds.cache.has(id));
+    // Voice rooms emptied or deleted while Sparko was away are cleaned up.
+    void tempVoice
+      .startup([...ready.guilds.cache.values()])
+      .catch((error: unknown) =>
+        console.error('Catching up on voice rooms failed', error),
+      );
     requeueRunning(db);
     startJobLoop(db, handlers);
     const beat = () => {
@@ -308,6 +320,22 @@ function wire(c: Client) {
       }
       if (interaction.isButton() && interaction.customId.startsWith('ev:')) {
         void events.component(interaction);
+        return;
+      }
+      // Temporary voice: /voice, the panel's buttons, menus and forms.
+      if (interaction.isChatInputCommand() && tempVoice.command(interaction))
+        return;
+      if (
+        (interaction.isButton() ||
+          interaction.isStringSelectMenu() ||
+          interaction.isUserSelectMenu()) &&
+        isTempVoiceId(interaction.customId)
+      ) {
+        void tempVoice.component(interaction);
+        return;
+      }
+      if (interaction.isModalSubmit() && isTempVoiceId(interaction.customId)) {
+        void tempVoice.modal(interaction);
         return;
       }
       if (
@@ -516,6 +544,14 @@ function wire(c: Client) {
         starboard
           .deleted(message.guildId, message.id)
           .catch(failed(`A deleted starred message in ${message.guildId}`));
+  });
+  c.on(Events.VoiceStateUpdate, (before, after) => {
+    tempVoice
+      .voice(before, after)
+      .catch(failed(`Voice rooms in ${after.guild.id}`));
+  });
+  c.on(Events.ChannelDelete, (channel) => {
+    if (!channel.isDMBased()) tempVoice.channelDeleted(channel.id);
   });
   c.on(Events.GuildMemberRemove, (member) => {
     if (!member.user?.bot) arLeft(db, member.guild.id, member.id, Date.now());
@@ -779,6 +815,8 @@ async function connect(members: boolean, content: boolean) {
       GatewayIntentBits.GuildMessageReactions,
       // Invites made and deleted, for invite tracking. Not privileged.
       GatewayIntentBits.GuildInvites,
+      // Voice channel joins and leaves, for temporary voice rooms.
+      GatewayIntentBits.GuildVoiceStates,
       ...(members ? [GatewayIntentBits.GuildMembers] : []),
       ...(content ? [GatewayIntentBits.MessageContent] : []),
     ],
@@ -844,6 +882,8 @@ birthdays.startSweep((id) => client.guilds.cache.has(id));
 polls.startSweep((id) => client.guilds.cache.has(id));
 // Events: posting, reminders, starts, ends, repeats and attending roles.
 events.startSweep((id) => client.guilds.cache.has(id));
+// Empty temporary voice rooms.
+tempVoice.startSweep();
 setStatus(
   db,
   'intents',

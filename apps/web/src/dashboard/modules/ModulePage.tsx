@@ -34,6 +34,7 @@ import { QuestionsModule } from './QuestionsModule';
 import { StudioModule } from './StudioModule';
 import { SuggestionsModule } from './SuggestionsModule';
 import { PollsModule } from './PollsModule';
+import { TempVoiceModule } from './TempVoiceModule';
 import { TicketsModule } from './TicketsModule';
 import { WelcomeModule } from './WelcomeModule';
 
@@ -285,5 +286,7 @@ export function ModulePage() {
     return <InvitesModule module={module} server={server} />;
   if (module.id === 'events')
     return <EventsModule module={module} server={server} />;
+  if (module.id === 'temp-voice')
+    return <TempVoiceModule module={module} server={server} />;
   return <GenericModule module={module} server={server} />;
 }

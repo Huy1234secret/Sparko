@@ -47,6 +47,7 @@ function PreviewTools({
   questionVariables,
   inviteVariables,
   eventVariables,
+  voiceVariables,
 }: {
   serverId: string;
   items: PlusItem[];
@@ -60,6 +61,7 @@ function PreviewTools({
   questionVariables: boolean;
   inviteVariables: boolean;
   eventVariables: boolean;
+  voiceVariables: boolean;
 }) {
   const target = useInsertTarget();
   // Goes where the person was last writing, or at the end of the text.
@@ -80,6 +82,7 @@ function PreviewTools({
         question={questionVariables}
         invite={inviteVariables}
         event={eventVariables}
+        voice={voiceVariables}
         onPick={put}
       />
       <EmojiButton serverId={serverId} onPick={put} />
@@ -104,6 +107,7 @@ export function MessageCanvas({
   roleVariables,
   suggestionVariables,
   birthdayVariables,
+  voiceVariables,
   questionVariables,
   starboardVariables,
   pollVariables,
@@ -143,6 +147,8 @@ export function MessageCanvas({
   inviteVariables?: boolean;
   /** Lists the variables event messages fill in. */
   eventVariables?: boolean;
+  /** Lists the variables the temporary voice panel fills in. */
+  voiceVariables?: boolean;
   /**
    * Keeps the message's shape: one embed or container, no pictures of its
    * own. Text, buttons and menus can still go outside it.
@@ -282,6 +288,7 @@ export function MessageCanvas({
           questionVariables={!!questionVariables}
           inviteVariables={!!inviteVariables}
           eventVariables={!!eventVariables}
+          voiceVariables={!!voiceVariables}
           items={items}
           v2={v2}
           onEmoji={(text) =>

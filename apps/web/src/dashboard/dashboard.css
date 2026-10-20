@@ -4840,3 +4840,179 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
     grid-template-columns: 52px minmax(0, 1fr) 64px;
   }
 }
+
+/* Temporary voice ----------------------------------------------------------- */
+.sp-tv-hub {
+  display: grid;
+  gap: 12px;
+}
+.sp-tv-hub__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sp-tv-hub__head .sp-ar__item-title {
+  grid-column: auto;
+}
+.sp-tv-flags {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 16px;
+}
+.sp-tv-upsell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.sp-tv-posted {
+  margin: 6px 0 14px;
+}
+.sp-tv-rows {
+  margin-left: auto;
+  font-weight: 400;
+}
+/* The panel's buttons, picked in a grid. */
+.sp-tv-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px 12px;
+  padding: 12px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-tv-button-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+/* The fixed buttons under the panel's preview. */
+.sp-tv-preview {
+  margin-top: 0;
+}
+.sp-tv-preview .dc-row {
+  gap: 6px;
+}
+/* A little tighter than Discord's, so a row of five fits the preview. */
+.sp-tv-preview .dc-btn {
+  gap: 6px;
+  padding: 2px 10px;
+  cursor: default;
+}
+.sp-tv-preview-none {
+  margin: 0;
+  color: var(--sp-dc-muted);
+}
+/* Storage: open rooms and saved member settings. */
+.sp-tv-rooms,
+.sp-tv-prefs {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-tv-rooms {
+  padding: 16px 20px 20px;
+}
+.sp-tv-room,
+.sp-tv-pref {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-tv-room__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sp-brand-soft);
+  color: var(--sp-brand-text);
+}
+.sp-tv-room__main {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.sp-tv-room__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sp-tv-room__name {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sp-tv-room__meta {
+  overflow-wrap: anywhere;
+}
+.sp-tv-room__count {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sp-brand-soft);
+  font-size: 13px;
+}
+.sp-tv-room__count.is-empty {
+  background: transparent;
+  color: var(--sp-muted);
+}
+.sp-tv-owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+.sp-tv-owner__dot {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--sp-skeleton);
+  color: var(--sp-text);
+  font: 700 10px/1 var(--sp-font-sans);
+}
+.sp-tv-pref__dot {
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+}
+.sp-tv-pref__room {
+  color: var(--sp-muted);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 520px) {
+  .sp-tv-rooms {
+    padding: 12px;
+  }
+  .sp-tv-room {
+    flex-wrap: wrap;
+  }
+  .sp-tv-room__main {
+    flex-basis: calc(100% - 42px);
+  }
+  .sp-tv-room__count {
+    margin-left: 42px;
+  }
+  .sp-tv-room > .sp-icon-btn {
+    margin-left: auto;
+  }
+}
