@@ -48,6 +48,8 @@ type Helpers = {
   questionUses?: (serverId: string) => { id: string; where: string }[];
   /** Templates invite tracking uses, and for which message. */
   inviteUses?: (serverId: string) => { id: string; where: string }[];
+  /** Templates Events use, and for which message. */
+  eventUses?: (serverId: string) => { id: string; where: string }[];
 };
 
 type SupportApi = Pick<
@@ -800,7 +802,8 @@ export function createSupportMock(h: Helpers) {
           | 'question'
           | 'starboard'
           | 'poll'
-          | 'invite',
+          | 'invite'
+          | 'event',
         where: string,
       ) => {
         if (!id) return;
@@ -821,6 +824,8 @@ export function createSupportMock(h: Helpers) {
       for (const u of h.pollUses?.(serverId) ?? []) add(u.id, 'poll', u.where);
       for (const u of h.inviteUses?.(serverId) ?? [])
         add(u.id, 'invite', u.where);
+      for (const u of h.eventUses?.(serverId) ?? [])
+        add(u.id, 'event', u.where);
       for (const r of s.rr.templates)
         for (const t of [
           r.config.message,

@@ -463,6 +463,51 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     pairs: ['welcome', 'autoroles'],
   },
+  events: {
+    headline: 'Events people show up to.',
+    points: [
+      'Going, Maybe and Can’t go buttons with live counts',
+      'Capacity with a waitlist that moves people up',
+      'Reminders, a start ping and events that repeat',
+    ],
+    how: [
+      {
+        icon: 'calendar',
+        title: 'Schedule in seconds',
+        body: 'Build an event in the dashboard, or with /event create in Discord. Times are read the way people write them, like “tomorrow 7pm”, in your server’s time zone, and members see them in their own.',
+      },
+      {
+        icon: 'users',
+        title: 'Answers and a waitlist',
+        body: 'Members answer with buttons under the event, which shows who’s going. Set a capacity and anyone after that joins a waitlist; when a spot opens, the next in line moves up and gets a DM.',
+      },
+      {
+        icon: 'bell',
+        title: 'Reminders and repeats',
+        body: 'DM reminders before the start, a ping when it begins, and an attending role for the night. Weekly or monthly events post the next one as soon as one ends. Events can show in Discord’s own events list too.',
+      },
+      {
+        icon: 'layers',
+        title: 'Attendees, logs and commands',
+        body: 'See who answered what, mark no-shows and export a CSV. Every message is a Message Studio template, every change is logged, and the commands can be renamed.',
+      },
+    ],
+    steps: [
+      'Open Events & RSVP, switch it on and pick the events channel.',
+      'Choose the time zone, default reminders and answers.',
+      'Schedule your first event in the Events tab.',
+      'Save. Sparko adds /event to your server.',
+    ],
+    commands: [
+      '/event create',
+      '/event list',
+      '/event info',
+      '/event rsvp',
+      '/event cancel',
+      '/event remind',
+    ],
+    pairs: ['studio', 'role-menus'],
+  },
 };
 
 export const isReady = (id: string) => id in featureDetails;

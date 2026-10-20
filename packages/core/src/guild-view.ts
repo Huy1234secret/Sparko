@@ -32,6 +32,8 @@ export type GuildView = {
     /** Sparko can give and take it: below its own top role, not managed. */
     assignable: boolean;
   }[];
+  /** Voice and stage channels, for where an event happens. */
+  voice?: { id: string; name: string; category: string; stage: boolean }[];
 };
 
 type DiscordChannel = {
@@ -46,6 +48,8 @@ type DiscordChannel = {
 const TEXT = 0;
 const ANNOUNCEMENT = 5;
 const CATEGORY = 4;
+const VOICE = 2;
+const STAGE = 13;
 
 /**
  * What Sparko can do in a server, read from Discord with the bot token and
@@ -139,7 +143,21 @@ export function guildViews(rest: Rest, ttlMs = 60_000) {
         managed: r.managed,
         assignable: canManage && !r.managed && r.position < top,
       }));
-    return { perms, channels: list, roles };
+    const voice = channels
+      .filter((c) => c.type === VOICE || c.type === STAGE)
+      .sort((a, b) => {
+        const [pa, ca] = sortKey(a);
+        const [pb, cb] = sortKey(b);
+        return pa - pb || ca - cb;
+      })
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        category:
+          (c.parent_id && categories.get(c.parent_id)?.name) || 'No category',
+        stage: c.type === STAGE,
+      }));
+    return { perms, channels: list, roles, voice };
   }
 
   function get(guildId: string, now = Date.now()) {

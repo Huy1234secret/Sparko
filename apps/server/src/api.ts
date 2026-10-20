@@ -39,6 +39,7 @@ import { qaRoutes } from './qa-api.ts';
 import { sgRoutes } from './sg-api.ts';
 import { bdRoutes } from './bd-api.ts';
 import { invRoutes } from './inv-api.ts';
+import { evRoutes } from './ev-api.ts';
 import { studioRoutes } from './studio-api.ts';
 import { ticketRoutes } from './tickets-api.ts';
 
@@ -260,6 +261,7 @@ export function createApi({
     view: (id) => view(id),
     now,
   });
+  const events = evRoutes({ db, view: (id) => view(id), now });
   const tickets = ticketRoutes({
     db,
     rest: discord,
@@ -440,6 +442,17 @@ export function createApi({
       if (!handled) json(res, 404, { error: 'not_found' });
     } else if (rest.startsWith('/invites')) {
       const handled = await invites({
+        req,
+        res,
+        url,
+        method,
+        path: rest,
+        guildId,
+        user,
+      });
+      if (!handled) json(res, 404, { error: 'not_found' });
+    } else if (rest === '/events' || rest.startsWith('/events/')) {
+      const handled = await events({
         req,
         res,
         url,

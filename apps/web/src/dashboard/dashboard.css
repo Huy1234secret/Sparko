@@ -4687,3 +4687,156 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
     position: static;
   }
 }
+
+/* Events & RSVP ------------------------------------------------------------ */
+.sp-ev-narrow {
+  max-width: 460px;
+}
+.sp-ev-size {
+  max-width: 240px;
+}
+/* Reminders: chips, then a box to add one. */
+.sp-ev-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+.sp-ev-add {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 320px;
+}
+.sp-ev-add > .sp-field {
+  flex: 1;
+}
+.sp-ev-add > .sp-btn {
+  margin-top: 4px;
+}
+/* The three answers: emoji, name, on or off. */
+.sp-ev-options {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-ev-option {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 72px;
+  gap: 8px;
+  align-items: center;
+}
+.sp-ev-option[data-off] .sp-input {
+  opacity: 0.6;
+}
+.sp-ev-option__emoji {
+  text-align: center;
+}
+.sp-ev-option > .sp-switch,
+.sp-ev-option__always {
+  justify-self: end;
+}
+.sp-ev-option__always {
+  white-space: nowrap;
+}
+/* The builder sits above the list while it's open. */
+.sp-ev-builder {
+  scroll-margin-top: calc(var(--sp-topbar-h) + 16px);
+  border-color: var(--sp-brand-line);
+}
+.sp-ev-builder__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--sp-line);
+}
+.sp-ev-builder__foot .sp-btn {
+  margin-top: 12px;
+}
+/* The list: a calendar page, the details, the counts, the actions. */
+.sp-ev-rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-ev-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-ev-row.is-past .sp-ev-row__date,
+.sp-ev-row.is-past .sp-bd-row__name {
+  opacity: 0.7;
+}
+.sp-ev-row__main {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+.sp-ev-row__counts {
+  display: flex;
+  flex: none;
+  gap: 10px;
+  color: var(--sp-muted);
+  font-size: 13px;
+}
+.sp-ev-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sp-ev-count--going {
+  color: var(--sp-success, var(--sp-text));
+  font-weight: 600;
+}
+/* Who's coming. */
+.sp-ev-people__tabs {
+  align-self: start;
+}
+.sp-ev-people .sp-bd-rows {
+  max-height: 340px;
+  overflow-y: auto;
+}
+.sp-ev-noshow {
+  flex: none;
+}
+@media (max-width: 720px) {
+  .sp-ev-row {
+    flex-wrap: wrap;
+  }
+  .sp-ev-row__main {
+    flex-basis: calc(100% - 56px);
+  }
+  .sp-ev-row__counts {
+    margin-left: 52px;
+  }
+  .sp-ev-row .sp-bd-row__actions {
+    margin-left: auto;
+  }
+}
+@media (max-width: 520px) {
+  .sp-ev-list > .sp-card__head {
+    flex-wrap: wrap;
+  }
+  /* The four messages and the four answers sit two by two. */
+  .sp-ev-kinds,
+  .sp-ev-people__tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sp-ev-option {
+    grid-template-columns: 52px minmax(0, 1fr) 64px;
+  }
+}

@@ -46,6 +46,7 @@ function PreviewTools({
   birthdayVariables,
   questionVariables,
   inviteVariables,
+  eventVariables,
 }: {
   serverId: string;
   items: PlusItem[];
@@ -58,6 +59,7 @@ function PreviewTools({
   birthdayVariables: boolean;
   questionVariables: boolean;
   inviteVariables: boolean;
+  eventVariables: boolean;
 }) {
   const target = useInsertTarget();
   // Goes where the person was last writing, or at the end of the text.
@@ -77,6 +79,7 @@ function PreviewTools({
         birthday={birthdayVariables}
         question={questionVariables}
         invite={inviteVariables}
+        event={eventVariables}
         onPick={put}
       />
       <EmojiButton serverId={serverId} onPick={put} />
@@ -105,6 +108,7 @@ export function MessageCanvas({
   starboardVariables,
   pollVariables,
   inviteVariables,
+  eventVariables,
   locked,
   maxRows: rowLimit,
   rowsNote,
@@ -137,6 +141,8 @@ export function MessageCanvas({
   rowsNote?: string;
   /** Lists the variables invite join and leave messages fill in. */
   inviteVariables?: boolean;
+  /** Lists the variables event messages fill in. */
+  eventVariables?: boolean;
   /**
    * Keeps the message's shape: one embed or container, no pictures of its
    * own. Text, buttons and menus can still go outside it.
@@ -275,6 +281,7 @@ export function MessageCanvas({
           birthdayVariables={!!birthdayVariables}
           questionVariables={!!questionVariables}
           inviteVariables={!!inviteVariables}
+          eventVariables={!!eventVariables}
           items={items}
           v2={v2}
           onEmoji={(text) =>

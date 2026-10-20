@@ -525,6 +525,54 @@ const migrations = [
     can_list INTEGER NOT NULL DEFAULT 1,
     synced_at INTEGER
   );`,
+  // Events & RSVP: each event, members' answers, and what happened.
+  `CREATE TABLE events (
+    guild_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    details TEXT NOT NULL,
+    start_at INTEGER NOT NULL,
+    end_at INTEGER NOT NULL,
+    post_at INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'scheduled',
+    host_id TEXT NOT NULL,
+    host_name TEXT NOT NULL,
+    channel_id TEXT,
+    message_id TEXT,
+    discord_event_id TEXT,
+    reminded TEXT NOT NULL DEFAULT '[]',
+    start_pinged INTEGER NOT NULL DEFAULT 0,
+    series INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, number)
+  );
+  CREATE INDEX events_by_status ON events (guild_id, status, start_at);
+  CREATE INDEX events_by_message ON events (message_id);
+  CREATE TABLE ev_rsvps (
+    guild_id TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    avatar TEXT NOT NULL DEFAULT '',
+    answer TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    no_show INTEGER NOT NULL DEFAULT 0,
+    role_id TEXT,
+    PRIMARY KEY (guild_id, number, user_id)
+  );
+  CREATE INDEX ev_rsvps_roles ON ev_rsvps (role_id);
+  CREATE TABLE ev_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    number INTEGER,
+    title TEXT NOT NULL DEFAULT '',
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX ev_log_by_guild ON ev_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

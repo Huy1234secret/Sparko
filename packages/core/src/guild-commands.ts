@@ -1,5 +1,6 @@
 import type { Db } from './db.ts';
 import { bdCommandBodies, bdConfigOf, bdGuilds } from './bd-store.ts';
+import { evCommandBodies, evConfigOf, evGuilds } from './ev-store.ts';
 import { invCommandBodies, invConfigOf, invGuilds } from './inv-store.ts';
 import { pollCommandBodies, pollConfigOf, pollGuilds } from './poll-store.ts';
 import { qaCommandBodies, qaConfigOf, qaGuilds } from './qa-store.ts';
@@ -19,6 +20,7 @@ export function guildCommandBodies(db: Db, guildId: string) {
   const sb = sbConfigOf(db, guildId);
   const polls = pollConfigOf(db, guildId);
   const inv = invConfigOf(db, guildId);
+  const ev = evConfigOf(db, guildId);
   const all = [
     ...(sg.on ? sgCommandBodies(sg.config) : []),
     ...(bd.on ? bdCommandBodies(bd.config) : []),
@@ -26,6 +28,7 @@ export function guildCommandBodies(db: Db, guildId: string) {
     ...(sb.on ? sbCommandBodies(sb.config) : []),
     ...(polls.on ? pollCommandBodies(polls.config) : []),
     ...(inv.on ? invCommandBodies(inv.config) : []),
+    ...(ev.on ? evCommandBodies(ev.config) : []),
   ] as { name: string }[];
   const seen = new Set<string>();
   return all.filter((c) => !seen.has(c.name) && !!seen.add(c.name));
@@ -46,5 +49,6 @@ export const guildsWithCommands = (db: Db) => [
     ...sbGuilds(db),
     ...pollGuilds(db),
     ...invGuilds(db),
+    ...evGuilds(db),
   ]),
 ];

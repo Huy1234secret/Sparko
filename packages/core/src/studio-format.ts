@@ -906,6 +906,8 @@ export type StudioVariable = {
   question?: true;
   /** Filled in only by invite join and leave messages. */
   invite?: true;
+  /** Filled in only by event messages and their DMs. */
+  event?: true;
 };
 
 /** Variables people can write in Studio messages, in braces. */
@@ -1199,6 +1201,57 @@ export const studioVariables: StudioVariable[] = [
     name: 'join.type',
     about: 'How they joined: normal, vanity or unknown.',
     invite: true,
+  },
+  { name: 'event.title', about: 'The event’s title.', event: true },
+  {
+    name: 'event.description',
+    about: 'The event’s description.',
+    event: true,
+  },
+  { name: 'event.id', about: 'The event’s number, like #12.', event: true },
+  {
+    name: 'event.start',
+    about: 'When it starts, in each reader’s own time zone.',
+    event: true,
+  },
+  {
+    name: 'event.start.relative',
+    about: 'How soon it starts, like “in 2 hours”.',
+    event: true,
+  },
+  {
+    name: 'event.end',
+    about: 'When it ends, in each reader’s own time zone.',
+    event: true,
+  },
+  {
+    name: 'event.location',
+    about: 'Where it is: its voice channel and the place you wrote.',
+    event: true,
+  },
+  { name: 'event.host', about: 'Mentions who made the event.', event: true },
+  {
+    name: 'event.link',
+    about: 'A link to the event’s message, for DMs.',
+    event: true,
+  },
+  {
+    name: 'event.status',
+    about: 'Upcoming, Happening now, Ended or Cancelled.',
+    event: true,
+  },
+  { name: 'going.count', about: 'How many members are going.', event: true },
+  { name: 'maybe.count', about: 'How many answered Maybe.', event: true },
+  {
+    name: 'spots.left',
+    about: 'Spots left before the waitlist, or Unlimited.',
+    event: true,
+  },
+  {
+    name: 'going.list',
+    about:
+      'Mentions the first members going, like “@rhea, @ayo and 5 more”, without pinging them.',
+    event: true,
   },
 ];
 

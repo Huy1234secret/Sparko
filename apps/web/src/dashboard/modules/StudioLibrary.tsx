@@ -44,6 +44,7 @@ import starboardIcon from '../../../../../design-system/assets/icons/star.svg?ur
 import birthdayIcon from '../../../../../design-system/assets/icons/gift.svg?url';
 import questionIcon from '../../../../../design-system/assets/icons/circle-help.svg?url';
 import inviteIcon from '../../../../../design-system/assets/icons/link.svg?url';
+import eventIcon from '../../../../../design-system/assets/icons/calendar.svg?url';
 import { animIcons } from '../../ui';
 export const plusAnimations = animIcons.plus;
 const editAnim = animIcons.edit.hover;
@@ -83,6 +84,7 @@ const tagLook = {
   birthday: { label: 'Birthday', icon: birthdayIcon },
   question: { label: 'Q&A', icon: questionIcon },
   invite: { label: 'Invite', icon: inviteIcon },
+  event: { label: 'Event', icon: eventIcon },
 } as const;
 
 /** Tags for where else a template is used; hovering says exactly where. */
