@@ -32,6 +32,7 @@ import type { createAuth, DiscordGuild } from './auth.ts';
 import { BadRequest, json, readJson } from './http.ts';
 import type { Media } from './media.ts';
 import { arRoutes } from './ar-api.ts';
+import { pollRoutes } from './poll-api.ts';
 import { rrRoutes } from './rr-api.ts';
 import { sbRoutes } from './sb-api.ts';
 import { qaRoutes } from './qa-api.ts';
@@ -240,6 +241,7 @@ export function createApi({
     rest: discord,
     media,
   });
+  const polls = pollRoutes({ db, view: (id) => view(id), now });
   const reactionRoles = rrRoutes({ db, view: (id) => view(id), now });
   const starboard = sbRoutes({ db, view: (id) => view(id), now });
   const autoRoles = arRoutes({ db, view: (id) => view(id), now });
@@ -413,6 +415,16 @@ export function createApi({
         req,
         res,
         url,
+        method,
+        path: rest,
+        guildId,
+        user,
+      });
+      if (!handled) json(res, 404, { error: 'not_found' });
+    } else if (rest === '/polls' || rest.startsWith('/polls/')) {
+      const handled = await polls({
+        req,
+        res,
         method,
         path: rest,
         guildId,

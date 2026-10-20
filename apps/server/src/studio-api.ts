@@ -38,6 +38,7 @@ import {
   isLegacyWelcome,
   QA_MODULE,
   RR_MODULE,
+  POLL_MODULE,
   SB_MODULE,
   SG_MODULE,
   BD_MODULE,
@@ -46,6 +47,7 @@ import {
   type Birthdays,
   type Questions,
   type ReactionRole,
+  type Polls,
   type Starboard,
   type Suggestions,
   type WelcomeConfig,
@@ -120,7 +122,8 @@ export function studioRoutes({
           | 'suggestion'
           | 'birthday'
           | 'question'
-          | 'starboard';
+          | 'starboard'
+          | 'poll';
         where: string;
       }[]
     >();
@@ -132,7 +135,8 @@ export function studioRoutes({
         | 'suggestion'
         | 'birthday'
         | 'question'
-        | 'starboard',
+        | 'starboard'
+        | 'poll',
       where: string,
     ) => {
       if (!id) return;
@@ -191,6 +195,11 @@ export function studioRoutes({
     const sb = getModule<Starboard>(db, guildId, SB_MODULE).config;
     for (const b of sb?.boards ?? [])
       add(b.message, 'starboard', `Starboard (${b.name} posts)`);
+    const polls = getModule<Polls>(db, guildId, POLL_MODULE).config;
+    if (polls) {
+      add(polls.message ?? '', 'poll', 'Polls (the poll message)');
+      add(polls.results ?? '', 'poll', 'Polls (the results message)');
+    }
     return uses;
   };
 

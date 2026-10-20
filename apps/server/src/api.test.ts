@@ -1031,6 +1031,201 @@ describe('server API', () => {
     });
   });
 
+  it('saves polls, and makes, ends, rerolls and deletes them through the bot', async () => {
+    type PS = {
+      on: boolean;
+      config: Record<string, unknown> & {
+        commands: { name: string };
+        defaults: Record<string, unknown>;
+      };
+      limits: { options: number; active: number };
+      open: number;
+    };
+    /** The next job of a kind, finishing any others first. */
+    const next = (kind: string) => {
+      for (let job = claimJob(db); job; job = claimJob(db)) {
+        finishJob(db, job.id, null, Date.now());
+        if (job.kind === kind) return job;
+      }
+      return null;
+    };
+    const state = await body<PS>(await call('/9001/polls'));
+    expect(state).toMatchObject({
+      on: false,
+      limits: { options: 5, active: 3 },
+      open: 0,
+    });
+    const put = (config: unknown, on = true) =>
+      call('/9001/polls', {
+        method: 'PUT',
+        body: JSON.stringify({ on, config }),
+      });
+    expect(
+      (await body<{ message: string }>(await put(state.config))).message,
+    ).toContain('channel polls are posted in');
+    // Its command can't share a name with a suggestion command.
+    writeModule(
+      db,
+      '9001',
+      'suggestions',
+      { on: true, config: sgDefault('501') },
+      0,
+    );
+    expect(
+      (
+        await body<{ message: string }>(
+          await put({
+            ...state.config,
+            channel: '501',
+            commands: { ...state.config.commands, name: 'suggest' },
+          }),
+        )
+      ).message,
+    ).toContain('Suggestions already has a /suggest command');
+    expect((await put({ ...state.config, channel: '501' })).status).toBe(204);
+    expect(next('polls')).not.toBeNull();
+
+    // A poll made in the dashboard is saved, then posted by the bot.
+    const rules = {
+      style: 'buttons',
+      anonymous: false,
+      multiple: false,
+      maxPicks: 1,
+      changeVotes: true,
+      hideResults: false,
+      roles: [],
+      voteTarget: 0,
+      ping: '',
+    };
+    const draft = {
+      question: 'Movie or game night?',
+      options: [
+        { id: 'a', label: 'Movie', emoji: '🎬' },
+        { id: 'b', label: 'Game', emoji: '' },
+      ],
+      channel: '501',
+      rules,
+      end: { kind: 'after', duration: '1d' },
+      postAt: null,
+    };
+    const make = (d: unknown) =>
+      call('/9001/polls', {
+        method: 'POST',
+        body: JSON.stringify({ draft: d }),
+      });
+    expect(
+      (
+        await body<{ message: string }>(
+          await make({ ...draft, channel: '502' }),
+        )
+      ).message,
+    ).toContain('can’t post in that channel');
+    const made = await make(draft);
+    expect(made.status).toBe(201);
+    const { poll } = await body<{ poll: { id: number; status: string } }>(made);
+    expect(poll.status).toBe('scheduled');
+    expect(next('polls-post')?.payload).toEqual({ id: poll.id });
+    // One for later waits for the bot's sweep instead.
+    const later = await body<{ poll: { id: number } }>(
+      await make({ ...draft, postAt: Date.now() + 3_600_000 }),
+    );
+    expect(claimJob(db)).toBeUndefined();
+    expect(
+      (await call(`/9001/polls/${later.poll.id}/post`, { method: 'POST' }))
+        .status,
+    ).toBe(204);
+    expect(next('polls-post')?.payload).toEqual({ id: later.poll.id });
+
+    // Pretend the bot posted the first one and people voted.
+    db.prepare(
+      "UPDATE polls SET status = 'active', message_id = '88' WHERE guild_id = '9001' AND id = ?",
+    ).run(poll.id);
+    for (const [user, option] of [
+      ['u7', 'a'],
+      ['u8', 'b'],
+    ])
+      db.prepare(
+        `INSERT INTO poll_votes (guild_id, poll_id, user_id, user_name, option_id, at)
+         VALUES ('9001', ?, ?, ?, ?, 0)`,
+      ).run(poll.id, user!, `name-${user}`, option!);
+    type List = {
+      polls: { id: number; status: string; counts: Record<string, number> }[];
+      open: number;
+    };
+    const list = await body<List>(await call('/9001/polls/list'));
+    expect(list.open).toBe(2);
+    expect(list.polls[0]).toMatchObject({
+      id: poll.id,
+      status: 'active',
+      counts: { a: 1, b: 1 },
+    });
+    expect(
+      (
+        await body<{ voters: { userId: string; picks: string[] }[] }>(
+          await call(`/9001/polls/${poll.id}/voters`),
+        )
+      ).voters,
+    ).toMatchObject([
+      { userId: 'u7', picks: ['a'] },
+      { userId: 'u8', picks: ['b'] },
+    ]);
+
+    // Ending, then rerolling the tie, each have the bot edit the message.
+    expect(
+      (await call(`/9001/polls/${poll.id}/reroll`, { method: 'POST' })).status,
+    ).toBe(400);
+    expect(
+      (await call(`/9001/polls/${poll.id}/end`, { method: 'POST' })).status,
+    ).toBe(204);
+    expect(next('polls-refresh')?.payload).toEqual({ id: poll.id });
+    expect(
+      (await call(`/9001/polls/${poll.id}/end`, { method: 'POST' })).status,
+    ).toBe(400);
+    const reroll = await call(`/9001/polls/${poll.id}/reroll`, {
+      method: 'POST',
+    });
+    expect(
+      ['a', 'b'].includes(
+        (await body<{ picked: { id: string } }>(reroll)).picked.id,
+      ),
+    ).toBe(true);
+    expect(next('polls-refresh')).not.toBeNull();
+
+    // Deleting has the bot take the message down.
+    expect(
+      (await call(`/9001/polls/${poll.id}`, { method: 'DELETE' })).status,
+    ).toBe(204);
+    expect(next('polls-delete')?.payload).toEqual({
+      channelId: '501',
+      messageId: '88',
+    });
+    expect(
+      (await call(`/9001/polls/${poll.id}`, { method: 'DELETE' })).status,
+    ).toBe(404);
+    const log = (
+      await body<{ log: { action: string }[] }>(await call('/9001/polls'))
+    ).log.map((e) => e.action);
+    expect(log.slice(0, 4)).toEqual([
+      'deleted',
+      'rerolled',
+      'ended',
+      'created',
+    ]);
+
+    expect(
+      (
+        await call('/9001/polls/test', {
+          method: 'POST',
+          body: JSON.stringify({ channel: '501', kind: 'results' }),
+        })
+      ).status,
+    ).toBe(204);
+    expect(next('polls-test')?.payload).toMatchObject({
+      channel: '501',
+      kind: 'results',
+    });
+  });
+
   it('keeps templates in folders, in the order people put them', async () => {
     type Library = {
       templates: { id: string; name: string; folderId: string | null }[];

@@ -423,6 +423,51 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX sb_log_by_guild ON sb_log (guild_id, id DESC);`,
+  // Polls, their votes, and what happened to them.
+  `CREATE TABLE polls (
+    guild_id TEXT NOT NULL,
+    id INTEGER NOT NULL,
+    question TEXT NOT NULL,
+    options TEXT NOT NULL,
+    rules TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    message_id TEXT,
+    status TEXT NOT NULL DEFAULT 'scheduled',
+    post_at INTEGER NOT NULL,
+    ends_at INTEGER,
+    length_ms INTEGER,
+    ended_at INTEGER,
+    ended_why TEXT,
+    ended_by TEXT NOT NULL DEFAULT '',
+    picked TEXT,
+    author_id TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    author_avatar TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, id)
+  );
+  CREATE INDEX polls_by_message ON polls (message_id);
+  CREATE INDEX polls_due ON polls (guild_id, status, post_at);
+  CREATE TABLE poll_votes (
+    guild_id TEXT NOT NULL,
+    poll_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    option_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, poll_id, user_id, option_id)
+  );
+  CREATE TABLE poll_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    poll INTEGER,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX poll_log_by_guild ON poll_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

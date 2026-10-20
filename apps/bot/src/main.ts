@@ -54,6 +54,7 @@ import {
   pendingBefore,
   startAutoRoleSweep,
 } from './auto-roles.ts';
+import { pollsBot } from './polls.ts';
 import { starboardBot } from './starboard.ts';
 import { questionsBot } from './questions.ts';
 import { suggestionsBot } from './suggestions.ts';
@@ -108,6 +109,7 @@ const starboard = starboardBot(db, rest, {
     },
   },
 });
+const polls = pollsBot(db, rest, { appId: () => client?.application?.id });
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
 /** And only shares message text with the Message Content Intent on. */
@@ -143,6 +145,7 @@ const handlers: Handlers = {
     );
   },
   ...suggestions.handlers((id) => client.guilds.cache.get(id)),
+  ...polls.handlers((id) => client.guilds.cache.get(id)),
   ...starboard.handlers((id) => client.guilds.cache.get(id)),
   ...questions.handlers((id) => client.guilds.cache.get(id)),
   ...birthdays.handlers((id) => client.guilds.cache.get(id)),
@@ -288,6 +291,25 @@ function wire(c: Client) {
         interaction.customId.startsWith('sg:')
       ) {
         void suggestions.component(interaction);
+        return;
+      }
+      // Polls: the server's /poll command, its form and the votes.
+      if (interaction.isAutocomplete() && polls.autocomplete(interaction))
+        return;
+      if (interaction.isChatInputCommand() && polls.command(interaction))
+        return;
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId.startsWith('pl:')
+      ) {
+        void polls.modal(interaction);
+        return;
+      }
+      if (
+        (interaction.isButton() || interaction.isStringSelectMenu()) &&
+        interaction.customId.startsWith('pl:')
+      ) {
+        void polls.component(interaction);
         return;
       }
     }
@@ -775,6 +797,8 @@ questions.startSweep((id) => client.guilds.cache.has(id));
 suggestions.startSweep((id) => client.guilds.cache.has(id));
 // Birthdays at each server's hour, their roles and the monthly post.
 birthdays.startSweep((id) => client.guilds.cache.has(id));
+// Scheduled polls, and polls whose time is up.
+polls.startSweep((id) => client.guilds.cache.has(id));
 setStatus(
   db,
   'intents',

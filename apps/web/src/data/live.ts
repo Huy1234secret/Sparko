@@ -371,6 +371,46 @@ export function withBackend(
         return sample.testStarboard(id, board, channel);
       await call('POST', `${server(id)}/starboard/test`, { board, channel });
     },
+    async getPolls(id) {
+      if (!(await backend()).live) return sample.getPolls(id);
+      return getJson(`${server(id)}/polls`);
+    },
+    async savePolls(id, change) {
+      if (!(await backend()).live) return sample.savePolls(id, change);
+      await call('PUT', `${server(id)}/polls`, change);
+    },
+    async listPolls(id) {
+      if (!(await backend()).live) return sample.listPolls(id);
+      return getJson(`${server(id)}/polls/list`);
+    },
+    async createPoll(id, draft) {
+      if (!(await backend()).live) return sample.createPoll(id, draft);
+      return call('POST', `${server(id)}/polls`, { draft });
+    },
+    async endPoll(id, poll) {
+      if (!(await backend()).live) return sample.endPoll(id, poll);
+      await call('POST', `${server(id)}/polls/${poll}/end`);
+    },
+    async rerollPoll(id, poll) {
+      if (!(await backend()).live) return sample.rerollPoll(id, poll);
+      return call('POST', `${server(id)}/polls/${poll}/reroll`);
+    },
+    async postPollNow(id, poll) {
+      if (!(await backend()).live) return sample.postPollNow(id, poll);
+      await call('POST', `${server(id)}/polls/${poll}/post`);
+    },
+    async deletePoll(id, poll) {
+      if (!(await backend()).live) return sample.deletePoll(id, poll);
+      await call('DELETE', `${server(id)}/polls/${poll}`);
+    },
+    async pollVoters(id, poll) {
+      if (!(await backend()).live) return sample.pollVoters(id, poll);
+      return getJson(`${server(id)}/polls/${poll}/voters`);
+    },
+    async testPoll(id, channel, kind) {
+      if (!(await backend()).live) return sample.testPoll(id, channel, kind);
+      await call('POST', `${server(id)}/polls/test`, { channel, kind });
+    },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);
       return getJson(`${server(id)}/reaction-roles`);
