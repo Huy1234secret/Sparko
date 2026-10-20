@@ -60,6 +60,7 @@ import { questionsBot } from './questions.ts';
 import { suggestionsBot } from './suggestions.ts';
 import { birthdaysBot } from './birthdays.ts';
 import { invitesBot } from './invites.ts';
+import { eventsBot } from './events.ts';
 import { studioInfo } from './studio-info.ts';
 import { registerAllGuildCommands } from './guild-commands.ts';
 import {
@@ -114,6 +115,9 @@ const polls = pollsBot(db, rest, { appId: () => client?.application?.id });
 const invites = invitesBot(db, rest, {
   appId: () => client?.application?.id,
 });
+const events = eventsBot(db, rest, {
+  appId: () => client?.application?.id,
+});
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
 /** And only shares message text with the Message Content Intent on. */
@@ -154,6 +158,7 @@ const handlers: Handlers = {
   ...questions.handlers((id) => client.guilds.cache.get(id)),
   ...birthdays.handlers((id) => client.guilds.cache.get(id)),
   ...invites.handlers((id) => client.guilds.cache.get(id)),
+  ...events.handlers((id) => client.guilds.cache.get(id)),
   'rr-sync': (job) =>
     syncReactionRole(
       rest,
@@ -289,6 +294,22 @@ function wire(c: Client) {
       // Invite tracking: /invites.
       if (interaction.isChatInputCommand() && invites.command(interaction))
         return;
+      // Events: /event, its form, its number suggestions and RSVP buttons.
+      if (interaction.isAutocomplete() && events.autocomplete(interaction))
+        return;
+      if (interaction.isChatInputCommand() && events.command(interaction))
+        return;
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId.startsWith('ev:')
+      ) {
+        void events.modal(interaction);
+        return;
+      }
+      if (interaction.isButton() && interaction.customId.startsWith('ev:')) {
+        void events.component(interaction);
+        return;
+      }
       if (
         interaction.isModalSubmit() &&
         interaction.customId.startsWith('sg:')
@@ -821,6 +842,8 @@ suggestions.startSweep((id) => client.guilds.cache.has(id));
 birthdays.startSweep((id) => client.guilds.cache.has(id));
 // Scheduled polls, and polls whose time is up.
 polls.startSweep((id) => client.guilds.cache.has(id));
+// Events: posting, reminders, starts, ends, repeats and attending roles.
+events.startSweep((id) => client.guilds.cache.has(id));
 setStatus(
   db,
   'intents',

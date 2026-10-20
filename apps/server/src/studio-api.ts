@@ -50,6 +50,10 @@ import {
   invKinds,
   invKindNames,
   type Invites,
+  EV_MODULE,
+  evKinds,
+  evKindNames,
+  type Events,
   type ReactionRole,
   type Polls,
   type Starboard,
@@ -128,7 +132,8 @@ export function studioRoutes({
           | 'question'
           | 'starboard'
           | 'poll'
-          | 'invite';
+          | 'invite'
+          | 'event';
         where: string;
       }[]
     >();
@@ -142,7 +147,8 @@ export function studioRoutes({
         | 'question'
         | 'starboard'
         | 'poll'
-        | 'invite',
+        | 'invite'
+        | 'event',
       where: string,
     ) => {
       if (!id) return;
@@ -214,6 +220,10 @@ export function studioRoutes({
           'invite',
           `Invite tracking (${invKindNames[k]} message)`,
         );
+    const ev = getModule<Events>(db, guildId, EV_MODULE).config;
+    if (ev)
+      for (const k of evKinds)
+        add(ev.messages?.[k] ?? '', 'event', `Events (${evKindNames[k]})`);
     return uses;
   };
 

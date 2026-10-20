@@ -63,6 +63,12 @@ const rows = [
   '/invites list|Utility|Everyone|The members someone invited, newest first.|/invites list member:@rhea|member:Whose invited members (you if left empty)',
   '/invites bonus|Utility|Staff who can manage invites|Add or take away bonus invites.|/invites bonus member:@rhea amount:5|member:Who gets the bonus;amount:Bonus invites; a negative number takes some away',
   '/invites reset|Utility|Staff who can manage invites|Reset a member’s invites, or everyone’s. Who invited whom is kept.|/invites reset member:@rhea|member:Whose invites to reset;everyone:Reset everyone’s instead (optional)',
+  '/event create|Utility|Staff who manage events|Schedule an event. A form asks for the title, description, start, length and where.|/event create|',
+  '/event list|Utility|Everyone|The server’s upcoming events with their numbers.|/event list|',
+  '/event info|Utility|Everyone|An event’s details and who’s going.|/event info id:3|id:The event’s number, suggested as you type',
+  '/event rsvp|Utility|Everyone, unless limited|Answer an event: Going, Maybe or Can’t go.|/event rsvp id:3 choice:Going|id:The event’s number;choice:Your answer',
+  '/event cancel|Utility|Staff who manage events|Cancel an event. Everyone going gets a DM.|/event cancel id:3|id:The event’s number',
+  '/event remind|Utility|Staff who manage events|Send the reminder DM to everyone going, now.|/event remind id:3|id:The event’s number',
   '/rep|Fun|Everyone|Thank someone with +rep.|/rep user:@rhea|user:Who to thank',
 ];
 

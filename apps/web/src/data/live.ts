@@ -1,4 +1,4 @@
-import type { BdEntry } from './studio-format';
+import type { BdEntry, EvEvent, EvRsvp } from './studio-format';
 import type {
   ARMemberView,
   BDMemberFound,
@@ -464,6 +464,70 @@ export function withBackend(
     async testInvite(id, channel, kind) {
       if (!(await backend()).live) return sample.testInvite(id, channel, kind);
       await call('POST', `${server(id)}/invites/test`, { channel, kind });
+    },
+    async getEvents(id) {
+      if (!(await backend()).live) return sample.getEvents(id);
+      return getJson(`${server(id)}/events`);
+    },
+    async saveEvents(id, change) {
+      if (!(await backend()).live) return sample.saveEvents(id, change);
+      await call('PUT', `${server(id)}/events`, change);
+    },
+    async listEvents(id, when) {
+      if (!(await backend()).live) return sample.listEvents(id, when);
+      const r = await getJson<{ events: EvEvent[] }>(
+        `${server(id)}/events/items?when=${when}`,
+      );
+      return r.events;
+    },
+    async createEvent(id, details) {
+      if (!(await backend()).live) return sample.createEvent(id, details);
+      const r = await call<{ event: EvEvent }>(
+        'POST',
+        `${server(id)}/events/items`,
+        details,
+      );
+      return r.event;
+    },
+    async updateEvent(id, number, details) {
+      if (!(await backend()).live)
+        return sample.updateEvent(id, number, details);
+      const r = await call<{ event: EvEvent }>(
+        'PUT',
+        `${server(id)}/events/items/${number}`,
+        details,
+      );
+      return r.event;
+    },
+    async cancelEvent(id, number) {
+      if (!(await backend()).live) return sample.cancelEvent(id, number);
+      await call('POST', `${server(id)}/events/items/${number}/cancel`);
+    },
+    async deleteEvent(id, number) {
+      if (!(await backend()).live) return sample.deleteEvent(id, number);
+      await call('DELETE', `${server(id)}/events/items/${number}`);
+    },
+    async listRsvps(id, number) {
+      if (!(await backend()).live) return sample.listRsvps(id, number);
+      const r = await getJson<{ rsvps: EvRsvp[] }>(
+        `${server(id)}/events/items/${number}/rsvps`,
+      );
+      return r.rsvps;
+    },
+    async setNoShow(id, number, userId, noShow) {
+      if (!(await backend()).live)
+        return sample.setNoShow(id, number, userId, noShow);
+      await call(
+        'PUT',
+        `${server(id)}/events/items/${number}/rsvps/${userId}`,
+        {
+          noShow,
+        },
+      );
+    },
+    async testEvent(id, channel, kind) {
+      if (!(await backend()).live) return sample.testEvent(id, channel, kind);
+      await call('POST', `${server(id)}/events/test`, { channel, kind });
     },
     async getReactionRoles(id) {
       if (!(await backend()).live) return sample.getReactionRoles(id);

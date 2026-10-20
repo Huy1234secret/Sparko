@@ -30,6 +30,7 @@ export function VariablesButton({
   birthday,
   question,
   invite,
+  event,
   onPick,
 }: {
   /** Components V2 messages also have {separator}. */
@@ -48,6 +49,8 @@ export function VariablesButton({
   question?: boolean;
   /** Invite join and leave messages fill in who invited them. */
   invite?: boolean;
+  /** Event messages and their DMs fill in the event. */
+  event?: boolean;
   onPick: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -121,6 +124,12 @@ export function VariablesButton({
       on: invite,
       label: 'Invite',
       where: 'invite join and leave messages',
+    },
+    {
+      key: 'event',
+      on: event,
+      label: 'Event',
+      where: 'event messages and their DMs',
     },
   ] as const;
   const ownersOf = (v: (typeof all)[number]) =>

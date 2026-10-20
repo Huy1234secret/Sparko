@@ -28,6 +28,7 @@ import { AutoRolesModule } from './AutoRolesModule';
 import { BirthdaysModule } from './BirthdaysModule';
 import { StarboardModule } from './StarboardModule';
 import { InvitesModule } from './InvitesModule';
+import { EventsModule } from './EventsModule';
 import { ReactionRolesModule } from './ReactionRolesModule';
 import { QuestionsModule } from './QuestionsModule';
 import { StudioModule } from './StudioModule';
@@ -282,5 +283,7 @@ export function ModulePage() {
     return <QuestionsModule module={module} server={server} />;
   if (module.id === 'invites')
     return <InvitesModule module={module} server={server} />;
+  if (module.id === 'events')
+    return <EventsModule module={module} server={server} />;
   return <GenericModule module={module} server={server} />;
 }

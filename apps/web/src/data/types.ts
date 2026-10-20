@@ -15,6 +15,12 @@ import type {
   InvKind,
   InvLogEntry,
   Invites,
+  EvDetails,
+  EvEvent,
+  EvKind,
+  EvLogEntry,
+  EvRsvp,
+  Events,
   GreetKind,
   QaLogEntry,
   QaQuestion,
@@ -448,7 +454,8 @@ export type StudioTemplate = {
       | 'question'
       | 'starboard'
       | 'poll'
-      | 'invite';
+      | 'invite'
+      | 'event';
     where: string;
   }[];
 };
@@ -851,4 +858,53 @@ export interface PanelApi {
   resetInvites(serverId: string, userId: string | null): Promise<void>;
   /** Posts a made-up join or leave message in a channel, to see it. */
   testInvite(serverId: string, channel: string, kind: InvKind): Promise<void>;
+}
+
+/** A voice or stage channel an event can happen in. */
+export type VoiceChannel = {
+  id: string;
+  name: string;
+  category: string;
+  stage: boolean;
+};
+export type EVState = {
+  on: boolean;
+  config: Events;
+  /** Events still to come or happening, and past ones kept. */
+  upcoming: number;
+  past: number;
+  limits: { upcoming: number; reminders: number };
+  /** Sparko has Manage Events, so it can add events to Discord's list. */
+  canSync: boolean;
+  channels: Channel[];
+  voice: VoiceChannel[];
+  roles: RoleOption[];
+  log: EvLogEntry[];
+};
+
+export interface PanelApi {
+  getEvents(serverId: string): Promise<EVState>;
+  saveEvents(
+    serverId: string,
+    change: { on: boolean; config: Events },
+  ): Promise<void>;
+  listEvents(serverId: string, when: 'upcoming' | 'past'): Promise<EvEvent[]>;
+  createEvent(serverId: string, details: EvDetails): Promise<EvEvent>;
+  updateEvent(
+    serverId: string,
+    number: number,
+    details: EvDetails,
+  ): Promise<EvEvent>;
+  cancelEvent(serverId: string, number: number): Promise<void>;
+  deleteEvent(serverId: string, number: number): Promise<void>;
+  listRsvps(serverId: string, number: number): Promise<EvRsvp[]>;
+  /** Staff mark a Going member as not having come. */
+  setNoShow(
+    serverId: string,
+    number: number,
+    userId: string,
+    noShow: boolean,
+  ): Promise<void>;
+  /** Posts a made-up event message in a channel, to see it. */
+  testEvent(serverId: string, channel: string, kind: EvKind): Promise<void>;
 }

@@ -138,6 +138,7 @@ function StudioEditor({
           birthdayVariables={uses.includes('birthday')}
           questionVariables={uses.includes('question')}
           inviteVariables={uses.includes('invite')}
+          eventVariables={uses.includes('event')}
         />
 
         <div className="sp-stack sp-studio__side">

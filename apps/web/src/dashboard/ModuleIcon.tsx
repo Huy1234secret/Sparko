@@ -13,6 +13,7 @@ const animated: Record<string, RevealHover | undefined> = {
   birthdays: animIcons.sparkle,
   questions: animIcons.infoBook,
   invites: animIcons.joinMessage,
+  events: animIcons.joinMessage,
 };
 
 /**

@@ -26,6 +26,9 @@ import type {
   Birthdays,
   InvKind,
   Invites,
+  EvDetails,
+  EvKind,
+  Events,
   ReactionRole,
   Starboard,
   Suggestions,
@@ -85,6 +88,9 @@ export const keys = {
     ['inv', id, 'member', userId] as const,
   invCodes: (id: string) => ['inv', id, 'codes'] as const,
   invFind: (id: string, q: string) => ['inv', id, 'find', q] as const,
+  ev: (id: string) => ['ev', id] as const,
+  evList: (id: string, when: string) => ['ev', id, 'list', when] as const,
+  evRsvps: (id: string, number: number) => ['ev', id, 'rsvps', number] as const,
 };
 
 export const useSession = () =>
@@ -131,6 +137,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: keys.bd(serverId) }),
       client.invalidateQueries({ queryKey: keys.polls(serverId) }),
       client.invalidateQueries({ queryKey: keys.inv(serverId) }),
+      client.invalidateQueries({ queryKey: keys.ev(serverId) }),
     ]);
 }
 
@@ -684,6 +691,65 @@ export function useInviteActions(serverId: string) {
     test: useMutation({
       mutationFn: ({ channel, kind }: { channel: string; kind: InvKind }) =>
         api.testInvite(serverId, channel, kind),
+    }),
+  };
+}
+export const useEvents = (serverId: string) =>
+  useQuery({
+    queryKey: keys.ev(serverId),
+    queryFn: () => api.getEvents(serverId),
+  });
+/** Upcoming or past events, with their counts. */
+export const useEventList = (serverId: string, when: 'upcoming' | 'past') =>
+  useQuery({
+    queryKey: keys.evList(serverId, when),
+    queryFn: () => api.listEvents(serverId, when),
+  });
+/** Everyone who answered one event; nothing while none is open. */
+export const useEventRsvps = (serverId: string, number: number | null) =>
+  useQuery({
+    queryKey: keys.evRsvps(serverId, number ?? 0),
+    queryFn: () => api.listRsvps(serverId, number!),
+    enabled: number !== null,
+  });
+export function useEventActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: Events }) =>
+        api.saveEvents(serverId, change),
+      onSuccess: refresh,
+    }),
+    create: useMutation({
+      mutationFn: (details: EvDetails) => api.createEvent(serverId, details),
+      onSuccess: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({
+        number,
+        details,
+      }: {
+        number: number;
+        details: EvDetails;
+      }) => api.updateEvent(serverId, number, details),
+      onSuccess: refresh,
+    }),
+    cancel: useMutation({
+      mutationFn: (number: number) => api.cancelEvent(serverId, number),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({
+      mutationFn: (number: number) => api.deleteEvent(serverId, number),
+      onSuccess: refresh,
+    }),
+    noShow: useMutation({
+      mutationFn: (v: { number: number; userId: string; noShow: boolean }) =>
+        api.setNoShow(serverId, v.number, v.userId, v.noShow),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: ({ channel, kind }: { channel: string; kind: EvKind }) =>
+        api.testEvent(serverId, channel, kind),
     }),
   };
 }
