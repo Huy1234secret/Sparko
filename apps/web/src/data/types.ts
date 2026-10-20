@@ -10,6 +10,11 @@ import type {
   BdKind,
   BdLogEntry,
   Birthdays,
+  InvCode,
+  InvJoinType,
+  InvKind,
+  InvLogEntry,
+  Invites,
   GreetKind,
   QaLogEntry,
   QaQuestion,
@@ -442,7 +447,8 @@ export type StudioTemplate = {
       | 'birthday'
       | 'question'
       | 'starboard'
-      | 'poll';
+      | 'poll'
+      | 'invite';
     where: string;
   }[];
 };
@@ -752,4 +758,97 @@ export interface PanelApi {
     channel: string,
     kind: 'poll' | 'results',
   ): Promise<void>;
+}
+
+export type INVState = {
+  on: boolean;
+  config: Invites;
+  limits: { rewards: number };
+  /** How many inviters are on the leaderboard. */
+  count: number;
+  /** Sparko can see the server's invites (it needs Manage Server). */
+  canSeeInvites: boolean;
+  channels: Channel[];
+  roles: RoleOption[];
+  log: InvLogEntry[];
+};
+/** A row of the leaderboard; rank is null for members who only joined. */
+export type INVRow = {
+  rank: number | null;
+  userId: string;
+  name: string;
+  avatar: string;
+  regular: number;
+  left: number;
+  fake: number;
+  bonus: number;
+  total: number;
+};
+export type INVBoard = {
+  rows: INVRow[];
+  /** How many rows match, over every page. */
+  total: number;
+  count: number;
+  page: number;
+  pages: number;
+};
+/** One time someone joined, and who it counts for. */
+export type INVJoin = {
+  id: number;
+  userId: string;
+  userName: string;
+  avatar: string;
+  inviterId: string | null;
+  inviterName: string;
+  code: string;
+  type: InvJoinType;
+  fake: boolean;
+  counted: boolean;
+  joinedAt: number;
+  leftAt: number | null;
+};
+/** A member's counts, who invited them, and who they invited. */
+export type INVDetail = {
+  member: Omit<INVRow, 'rank'>;
+  invitedBy: INVJoin | null;
+  invited: INVJoin[];
+};
+export type INVCodes = {
+  codes: InvCode[];
+  vanity: { code: string; uses: number } | null;
+  syncedAt: number | null;
+  canSeeInvites: boolean;
+};
+/** A server member found to give a bonus to. */
+export type INVFound = {
+  userId: string;
+  name: string;
+  avatar: string;
+  total: number;
+};
+
+export interface PanelApi {
+  getInvites(serverId: string): Promise<INVState>;
+  saveInvites(
+    serverId: string,
+    change: { on: boolean; config: Invites },
+  ): Promise<void>;
+  inviteLeaderboard(
+    serverId: string,
+    query: string,
+    page: number,
+  ): Promise<INVBoard>;
+  inviteMember(serverId: string, userId: string): Promise<INVDetail>;
+  inviteCodes(serverId: string): Promise<INVCodes>;
+  findInviteMembers(serverId: string, query: string): Promise<INVFound[]>;
+  /** Staff add (or with a negative amount, take) bonus invites. */
+  giveInviteBonus(
+    serverId: string,
+    userId: string,
+    amount: number,
+  ): Promise<INVDetail>;
+  /** Resets one member's invites, or everyone's with null. */
+  resetInvites(serverId: string, userId: string | null): Promise<void>;
+  /** Posts a made-up join or leave message in a channel, to see it. */
+  testInvite(serverId: string, channel: string, kind: InvKind): Promise<void>;
 }

@@ -46,6 +46,10 @@ import {
   bdKindNames,
   type Birthdays,
   type Questions,
+  INV_MODULE,
+  invKinds,
+  invKindNames,
+  type Invites,
   type ReactionRole,
   type Polls,
   type Starboard,
@@ -123,7 +127,8 @@ export function studioRoutes({
           | 'birthday'
           | 'question'
           | 'starboard'
-          | 'poll';
+          | 'poll'
+          | 'invite';
         where: string;
       }[]
     >();
@@ -136,7 +141,8 @@ export function studioRoutes({
         | 'birthday'
         | 'question'
         | 'starboard'
-        | 'poll',
+        | 'poll'
+        | 'invite',
       where: string,
     ) => {
       if (!id) return;
@@ -200,6 +206,14 @@ export function studioRoutes({
       add(polls.message ?? '', 'poll', 'Polls (the poll message)');
       add(polls.results ?? '', 'poll', 'Polls (the results message)');
     }
+    const inv = getModule<Invites>(db, guildId, INV_MODULE).config;
+    if (inv)
+      for (const k of invKinds)
+        add(
+          inv[k]?.template ?? '',
+          'invite',
+          `Invite tracking (${invKindNames[k]} message)`,
+        );
     return uses;
   };
 
