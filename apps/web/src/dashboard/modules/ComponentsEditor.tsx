@@ -100,19 +100,6 @@ const VoteButtonsContext = createContext<{
 } | null>(null);
 export const VoteButtonsProvider = VoteButtonsContext.Provider;
 
-/** A suggestion's upvote or downvote button, placed among the others. */
-export const voteButton = (which: 'up' | 'down'): StudioButton => ({
-  id: `vote-${which}`,
-  type: 'button',
-  vote: which,
-  label: which === 'up' ? 'Upvote' : 'Downvote',
-  emoji: which === 'up' ? '👍' : '👎',
-  colour: which === 'up' ? 'green' : 'red',
-  link: false,
-  url: '',
-  actions: [],
-});
-
 export const MAX_ROWS = 5;
 export const newButton = (): StudioButton => ({
   id: newId(),

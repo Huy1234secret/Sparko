@@ -31,8 +31,7 @@ import {
   sgPresets,
   sgRatioColour,
   sgStatusName,
-  normaliseStudio,
-  sgVoteOrder,
+  sgWithVoteButtons,
   studioIssue,
   useStudio,
   useStudioActions,
@@ -68,7 +67,6 @@ import {
   ActionsEditor,
   StudioDataProvider,
   VoteButtonsProvider,
-  voteButton,
 } from './ComponentsEditor';
 import {
   AnimatedIconButton,
@@ -446,31 +444,6 @@ export function SuggestionsModule({
 
 // Edit ------------------------------------------------------------------------
 
-/** A message with the vote buttons placed, or taken out, as voting is set. */
-function withVoteButtons(
-  m: StudioMessage,
-  vote: Suggestions['vote'],
-): StudioMessage {
-  const isVote = (c: StudioMessage['components'][number]) =>
-    c.type === 'button' && !!c.vote;
-  if (vote.kind !== 'button')
-    return m.components.some(isVote)
-      ? normaliseStudio({
-          ...m,
-          components: m.components.filter((c) => !isVote(c)),
-        })
-      : m;
-  const missing = sgVoteOrder(vote, ['up', 'down'] as const).filter(
-    (w) => !m.components.some((c) => c.type === 'button' && c.vote === w),
-  );
-  return missing.length
-    ? normaliseStudio({
-        ...m,
-        components: [...m.components, ...missing.map(voteButton)],
-      })
-    : m;
-}
-
 /** The vote buttons, menu or reactions under the preview; click to edit. */
 function VotePreview({
   config,
@@ -615,7 +588,7 @@ function SGEdit({
   const message = id ? messageOf(id) : undefined;
   // Vote buttons sit among the message's own: added where they're missing,
   // and left out when people vote another way.
-  const shown = message && withVoteButtons(message, config.vote);
+  const shown = message && sgWithVoteButtons(message, config.vote);
   const voteButtons = {
     get: (w: 'up' | 'down') => {
       const o = config.vote[w];
