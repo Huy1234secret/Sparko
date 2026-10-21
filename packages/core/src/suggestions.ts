@@ -13,10 +13,12 @@ import {
   emojiPayload,
   hasVoteButtons,
   IS_COMPONENTS_V2,
+  normaliseStudio,
   studioPayload,
   v2Default,
   type ButtonColour,
   type StudioAction,
+  type StudioButton,
   type StudioMessage,
   type StudioVars,
 } from './studio-format.ts';
@@ -932,6 +934,48 @@ export const sgVoteOrder = <T>(
   pair: readonly [T, T],
 ) => (v.first === 'down' ? [pair[1], pair[0]] : [pair[0], pair[1]]);
 
+/** A suggestion's upvote or downvote button, placed among the others. */
+export const sgVoteButton = (which: 'up' | 'down'): StudioButton => ({
+  id: `vote-${which}`,
+  type: 'button',
+  vote: which,
+  label: which === 'up' ? 'Upvote' : 'Downvote',
+  emoji: which === 'up' ? '👍' : '👎',
+  colour: which === 'up' ? 'green' : 'red',
+  link: false,
+  url: '',
+  actions: [],
+});
+
+/**
+ * The message with its vote buttons placed, or taken out, as voting is
+ * set. Missing ones go where the dashboard shows them, at the end of the
+ * container, so the bot posts the message as it looks in the preview.
+ */
+export function sgWithVoteButtons(
+  m: StudioMessage,
+  vote: Suggestions['vote'],
+): StudioMessage {
+  const isVote = (c: StudioMessage['components'][number]) =>
+    c.type === 'button' && !!c.vote;
+  if (vote.kind !== 'button')
+    return m.components.some(isVote)
+      ? normaliseStudio({
+          ...m,
+          components: m.components.filter((c) => !isVote(c)),
+        })
+      : m;
+  const missing = sgVoteOrder(vote, ['up', 'down'] as const).filter(
+    (w) => !m.components.some((c) => c.type === 'button' && c.vote === w),
+  );
+  return missing.length
+    ? normaliseStudio({
+        ...m,
+        components: [...m.components, ...missing.map(sgVoteButton)],
+      })
+    : m;
+}
+
 /** Discord's vote buttons or menu for a suggestion. */
 export function sgVoteComponents(c: Suggestions, closed: boolean) {
   const v = c.vote;
@@ -1029,6 +1073,9 @@ export function sgPayloads(
   s: SgSuggestion,
   ctx: { now: number } & StudioVars,
 ) {
+  // Vote buttons go where the preview shows them, even when the saved
+  // template doesn't have them yet.
+  message = sgWithVoteButtons(message, c.vote);
   const { parts, extra } = sgVariables(c, s, message.layout);
   const user = c.anonymous
     ? undefined

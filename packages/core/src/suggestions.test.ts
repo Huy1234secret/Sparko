@@ -13,6 +13,7 @@ import {
   sgPayloads,
   sgPresets,
   sgRatioColour,
+  sgVoteButton,
   voteRatio,
   type SgSuggestion,
   type Suggestions,
@@ -359,6 +360,43 @@ describe('the message', () => {
       'sg:up',
       'sg:down',
     ]);
+  });
+  it('puts vote buttons a V2 template is missing where the preview shows them', () => {
+    // The Modern preset has no vote buttons saved: the dashboard shows them
+    // at the end of the container, so the bot posts them there too.
+    const { main } = sgPayloads(config(), sgPresets[2]!.message, suggestion(), {
+      now: 0,
+    });
+    const parts = main.components as {
+      type: number;
+      components: { type: number; components?: { custom_id?: string }[] }[];
+    }[];
+    expect(parts.map((p) => p.type)).toEqual([17]);
+    const row = parts[0]!.components.at(-1)!;
+    expect(row.type).toBe(1);
+    expect(row.components!.map((b) => b.custom_id)).toEqual([
+      'sg:up',
+      'sg:down',
+    ]);
+    // Placed below the container, they're posted below it.
+    const message = sgPresets[2]!.message;
+    const below = sgPayloads(
+      config(),
+      {
+        ...message,
+        components: [sgVoteButton('up'), sgVoteButton('down')],
+        v2: {
+          ...message.v2,
+          place: [
+            { id: 'vote-up', slot: { at: 'below' } },
+            { id: 'vote-down', slot: { at: 'below' } },
+          ],
+        },
+      },
+      suggestion(),
+      { now: 0 },
+    ).main.components as { type: number }[];
+    expect(below.map((p) => p.type)).toEqual([17, 1]);
   });
   it('adds the status box with the reason, and disables votes when closed', () => {
     const { main } = sgPayloads(
