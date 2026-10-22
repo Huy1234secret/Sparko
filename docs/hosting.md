@@ -24,7 +24,7 @@ On start the bot replaces its registered slash commands with the ones it answers
 
 ## Setting up a new server
 
-`infra/setup-server.sh` does everything on a fresh Ubuntu 24.04 server: swap, updates, firewall, nginx with HTTPS, Node 24, pnpm, pm2, the `deploy` user, the code, the settings, and starts Sparko so it comes back after reboots. It asks you for three things while it runs; secrets are pasted into the server only, never into chat.
+`infra/setup-server.sh` does everything on a fresh Ubuntu 24.04 server: swap, updates, firewall, nginx with HTTPS, Node 24, pnpm, pm2, the `deploy` user, the code, the settings, and starts Sparko so it comes back after reboots. It asks you for a few things while it runs; secrets are pasted into the server only, never into chat.
 
 **1. Create the server on Vultr**
 
@@ -47,11 +47,12 @@ The first time, it asks `Are you sure you want to continue connecting`; type `ye
 bash setup-server.sh
 ```
 
-It stops three times to ask for:
+It first asks for the website address (like `panel.example.com`), then stops to ask for:
 
-1. **A Cloudflare origin certificate.** In Cloudflare open your domain → **SSL/TLS → Origin Server → Create Certificate** (RSA, 15 years, hostname `panel.coin-sprite.com`). Paste the certificate, then type `END` on its own line. Do the same for the private key.
+1. **A Cloudflare origin certificate.** In Cloudflare open your domain → **SSL/TLS → Origin Server → Create Certificate** (RSA, 15 years, hostname: your website address). Paste the certificate, then type `END` on its own line. Do the same for the private key.
 2. **A deploy key on GitHub.** It prints a line starting with `ssh-ed25519`. On GitHub open the Sparko repository → **Settings → Deploy keys → Add deploy key**, paste it, leave **Allow write access** off, save, and press Enter.
 3. **The bot token.** On discord.com/developers open your app → **Bot → Reset Token**, copy it and paste it. It stays hidden while you paste.
+4. **The website's contact details:** the support email, the support server invite, and the name and country the Terms of Service give for whoever runs Sparko. They're saved in the server's env file, not in this repository.
 
 At the end it shows both processes `online`.
 
@@ -60,13 +61,26 @@ At the end it shows both processes `online`.
 - **DNS:** edit the `panel` record so it points to the new IP, with the orange cloud (Proxied) on.
 - **SSL/TLS → Overview:** set the mode to **Full (strict)**.
 
-Then open https://panel.coin-sprite.com and try `/ping` in Discord.
+Then open your website address and try `/ping` in Discord.
 
 From now on, log in as `deploy` instead of `root`:
 
 ```powershell
 ssh -i $HOME\.ssh\sparko-deploy deploy@NEW_IP
 ```
+
+## The website's contact details
+
+The support email, support server invite, and the operator name and country on the Terms and Privacy pages aren't kept in this repository. They're read from the server's env file when the site is built, and `update.sh` stops if any is missing. On a server set up before this, as `deploy`, run `nano /opt/sparko/shared/.env.production` and add (with your own values):
+
+```
+SUPPORT_EMAIL=you@example.com
+SUPPORT_DISCORD_INVITE=https://discord.gg/your-invite
+OPERATOR_NAME=Your name
+OPERATOR_COUNTRY=Your country
+```
+
+Save with Ctrl+O, Enter, then Ctrl+X, then run `bash /opt/sparko/app/infra/update.sh`. `PUBLIC_APP_URL` is already there from setup.
 
 ## Turning on Discord sign-in
 
@@ -75,7 +89,7 @@ The dashboard signs people in with Discord. On a server set up before sign-in ex
 1. On discord.com/developers open your app → **OAuth2**.
    - Copy the **Client ID**.
    - Press **Reset Secret** and copy the secret.
-   - Under **Redirects** add `https://panel.coin-sprite.com/api/v1/auth/discord/callback` and press **Save Changes**.
+   - Under **Redirects** add `https://<your website address>/api/v1/auth/discord/callback` and press **Save Changes**.
 2. On the server, as `deploy`, run `nano /opt/sparko/shared/.env.production` and add two lines with your values:
 
    ```

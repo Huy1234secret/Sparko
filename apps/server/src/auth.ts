@@ -23,7 +23,7 @@ export type AuthConfig = {
   clientId?: string | undefined;
   clientSecret?: string | undefined;
   botToken?: string | undefined;
-  /** The site's public origin, e.g. https://panel.coin-sprite.com */
+  /** The site's public origin, e.g. https://panel.example.com */
   publicUrl: string;
   /**
    * Before the dashboard opens, only these Discord users may use it. Leave

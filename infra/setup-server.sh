@@ -8,7 +8,7 @@
 # Safe to run again: finished steps are skipped.
 set -euo pipefail
 
-DOMAIN=${DOMAIN:-panel.coin-sprite.com}
+DOMAIN=${DOMAIN:-}
 REPO=${REPO:-git@github.com:Huy1234secret/Sparko.git}
 APP_USER=deploy
 ROOT=/opt/sparko
@@ -28,6 +28,9 @@ as_app() { sudo -u "$APP_USER" -H "$@"; }
 # shellcheck source=/dev/null
 . /etc/os-release
 [[ ${ID:-} == ubuntu ]] || die "this script is for Ubuntu (found ${ID:-unknown})."
+# The site's address is asked for, not kept in the repository.
+[[ -n $DOMAIN ]] || read -rp 'The website address, like panel.example.com: ' DOMAIN </dev/tty
+[[ $DOMAIN =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || die "\"$DOMAIN\" isn't a domain like panel.example.com."
 
 say 'Swap, so building the website has enough memory'
 if ! swapon --show=NAME --noheadings | grep -qx /swapfile; then
@@ -166,6 +169,21 @@ if [[ ! -s $ENV_FILE ]]; then
   chown "$APP_USER:$APP_USER" "$ENV_FILE.new"
   mv "$ENV_FILE.new" "$ENV_FILE"
 fi
+# The contact and operator details the website shows. They live here, not
+# in the repository; update.sh won't build without them.
+facts=(
+  'SUPPORT_EMAIL|The support email the website shows'
+  'SUPPORT_DISCORD_INVITE|The support server invite, like https://discord.gg/abc'
+  'OPERATOR_NAME|Who runs Sparko, as the Terms name you'
+  'OPERATOR_COUNTRY|The country you run it from'
+)
+for fact in "${facts[@]}"; do
+  key=${fact%%|*}
+  grep -Eq "^${key}=.+" "$ENV_FILE" && continue
+  read -rp "${fact#*|}: " value </dev/tty
+  [[ -n $value ]] || die "${key} was left empty. Run the script again."
+  printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
+done
 echo "In discord.com/developers > OAuth2 > Redirects, add: https://${DOMAIN}/api/v1/auth/discord/callback"
 
 say 'Build and start the website and bot'
