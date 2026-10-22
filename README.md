@@ -77,3 +77,7 @@ pnpm build
 ## Security
 
 Secrets (the bot token, OAuth secret and so on) live only in the server's env file. Discord access tokens are encrypted before they're stored, and the website's contact details are filled in at build time from the same env file. If you find a security problem, please report it privately through the support server linked on the website rather than in a public issue.
+
+## License
+
+Sparko is released under the [MIT License](LICENSE). Third-party assets, such as the animated icons in `design-system/assets/icons`, keep their own licenses.
