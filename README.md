@@ -16,3 +16,7 @@ pm2 start ecosystem.config.cjs   # website and bot, as on the server
 ```
 
 Node 24 and pnpm 11 are required. See `docs/frontend.md` for how the rebuild is organised and `docs/hosting.md` for running it on the server with pm2.
+
+## License
+
+Sparko's code is released under the [MIT License](LICENSE). Third-party assets, such as the animated icons in `design-system/assets/icons`, keep their own licenses.
