@@ -251,7 +251,7 @@
         <div><h3>Help</h3><ul><li><button class="sw-link" onClick="{{ noopToast }}">Docs</button></li><li><button class="sw-link" onClick="{{ noopToast }}">Status</button></li><li><button class="sw-link" onClick="{{ support }}">Support server</button></li></ul></div>
         <div><h3>Legal</h3><ul><li><button class="sw-link" onClick="{{ noopToast }}">Privacy Policy</button></li><li><button class="sw-link" onClick="{{ noopToast }}">Terms of Service</button></li></ul></div>
       </div>
-      <div class="sw-footer__base"><span>© 2026 Sparko. Not affiliated with Discord Inc.</span><span>panel.coin-sprite.com</span></div>
+      <div class="sw-footer__base"><span>© 2026 Sparko. Not affiliated with Discord Inc.</span><span>panel.example.com</span></div>
     </div>
   </footer>
 
@@ -346,7 +346,7 @@ class Component extends DCLogic {
       theme: s.theme, themeIcon: dark ? 'sun' : 'moon', themeLabel: dark ? 'Switch to light theme' : 'Switch to dark theme', toggleTheme: () => this.setState({ theme: dark ? 'light' : 'dark' }),
       links, menuOpen: s.menu, menuIcon: s.menu ? 'x' : 'menu', toggleMenu: () => this.setState({ menu: !s.menu }), sheetClass: 'sw-sheet' + (s.menu ? ' is-open' : ''),
       goHome: () => this.go('home'), goFeatures: () => this.go('features'), goPricing: () => this.go('pricing'), goCommands: () => this.go('commands'),
-      addBot: () => this.toast('Discord would open here', 'You’d pick a server and approve only the permissions Sparko needs.'), signIn: () => this.toast('Sign in with Discord', 'You’d land on your server picker at panel.coin-sprite.com.'), support: () => this.toast('Opening the support server', 'The Sparko team answers in #help.'), noopToast: () => this.toast('Coming in a later area', 'This page isn’t designed yet.'),
+      addBot: () => this.toast('Discord would open here', 'You’d pick a server and approve only the permissions Sparko needs.'), signIn: () => this.toast('Sign in with Discord', 'You’d land on your server picker.'), support: () => this.toast('Opening the support server', 'The Sparko team answers in #help.'), noopToast: () => this.toast('Coming in a later area', 'This page isn’t designed yet.'),
       isHome: s.page === 'home', isFeatures: s.page === 'features', isFeature: s.page === 'feature', isPricing: s.page === 'pricing', isCommands: s.page === 'commands',
       scenes: SCENES.map((x, i) => ({ label: x.label, sel: i === s.scene, pick: () => this.setState({ scene: i, manual: true }) })),
       scene: { ...sc, key: sc.k, userInitial: (sc.user || ' ')[0].toUpperCase(), fields: sc.fields.map(([n, v]) => ({ n, v })), buttons: sc.buttons.map(([label, t]) => ({ label, cls: 'dc-btn' + (t ? ' dc-btn--' + t : '') })) }, sceneUser: !!sc.user,
