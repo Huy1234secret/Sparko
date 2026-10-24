@@ -15,6 +15,7 @@ import {
 import type { SparkoModule } from '../../content/modules';
 import {
   arIssue,
+  arWithoutDeletedRoles,
   formatDuration,
   parseDuration,
   useARMemberActions,
@@ -90,12 +91,16 @@ export function AutoRolesModule({
   }, [issue]);
 
   const saved = ar.data?.config;
-  const current = draft ?? saved;
+  const source = draft ?? saved;
+  const current =
+    source && ar.data && ar.data.rolesAvailable !== false
+      ? arWithoutDeletedRoles(source, new Set(ar.data.roles.map((r) => r.id)))
+      : source;
   const savedOn = ar.data?.on ?? false;
   const isOn = on ?? savedOn;
   const dirty =
     (on !== null && on !== savedOn) ||
-    (!!draft && JSON.stringify(draft) !== JSON.stringify(saved));
+    (!!draft && JSON.stringify(current) !== JSON.stringify(saved));
 
   useEffect(() => {
     if (!dirty) return;
@@ -125,9 +130,25 @@ export function AutoRolesModule({
   const paused = !!server.paused;
 
   const doSave = async () => {
-    const found = arIssue(current, {
+    // Discord may have changed since the last poll or while this draft was open.
+    const fresh = await ar.refetch();
+    if (fresh.isError || !fresh.data || fresh.data.rolesAvailable === false) {
+      toast({
+        tone: 'danger',
+        title: 'Couldn’t refresh server roles',
+        body: 'Try saving again in a moment.',
+      });
+      return;
+    }
+    const config = arWithoutDeletedRoles(
+      current,
+      new Set(fresh.data.roles.map((r) => r.id)),
+    );
+    const found = arIssue(config, {
       plan: server.plan,
-      roles: new Map(data.roles.map((r) => [r.id, r.assignable !== false])),
+      roles: new Map(
+        fresh.data.roles.map((r) => [r.id, r.assignable !== false]),
+      ),
     });
     if (found) {
       setTab('settings');
@@ -135,9 +156,7 @@ export function AutoRolesModule({
       toast({ tone: 'danger', title: 'Can’t save yet', body: found.problem });
       return;
     }
-    const ok = await flow.run(() =>
-      save.mutateAsync({ on: isOn, config: current }),
-    );
+    const ok = await flow.run(() => save.mutateAsync({ on: isOn, config }));
     if (ok) {
       setDraft(null);
       setOn(null);

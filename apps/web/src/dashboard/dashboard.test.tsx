@@ -9,7 +9,7 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import {
   afterEach,
@@ -22,7 +22,7 @@ import {
 } from 'vitest';
 import { ToastProvider } from '../ui';
 import { routes } from '../router';
-import { createQueryClient } from '../data';
+import { api, createQueryClient } from '../data';
 import { resetMock, setMockDelay } from '../data/mock';
 import { resetBackend } from '../data/live';
 
@@ -429,6 +429,97 @@ describe('Reaction roles', () => {
 });
 
 describe('Automatic roles', () => {
+  it('refreshes deleted selections without losing edits and saves a recreated role', async () => {
+    const initial = await api.getAutoRoles('900000000000000001');
+    let state = {
+      ...initial,
+      config: {
+        ...initial.config,
+        join: { before: ['9201'], after: ['99990'] },
+      },
+      roles: [
+        ...initial.roles,
+        { id: '99990', name: 'Recreated role', color: null },
+      ],
+    };
+    const read = vi
+      .spyOn(api, 'getAutoRoles')
+      .mockImplementation(async () => state);
+    const save = vi.spyOn(api, 'saveAutoRoles');
+    try {
+      open(`${pixel}/autoroles`);
+      const after = await screen.findByRole(
+        'combobox',
+        { name: /^After verified/ },
+        { timeout: 4000 },
+      );
+      expect(after).toHaveTextContent('Recreated role');
+      const restart = screen.getByRole('checkbox', { name: /Restart when/ });
+      await userEvent.click(restart);
+      const restartOnLeave = (restart as HTMLInputElement).checked;
+      state = {
+        ...state,
+        roles: [
+          ...initial.roles,
+          { id: '99991', name: 'Recreated role', color: null },
+        ],
+      };
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+      await waitFor(() => expect(after).toHaveTextContent('No roles'));
+      expect(restart).toHaveProperty('checked', restartOnLeave);
+      await userEvent.click(after);
+      await userEvent.click(
+        screen.getByRole('option', { name: /Recreated role/ }),
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Save changes' }),
+      );
+      await waitFor(() =>
+        expect(save).toHaveBeenCalledWith('900000000000000001', {
+          on: true,
+          config: expect.objectContaining({
+            join: { before: ['9201'], after: ['99991'] },
+            restartOnLeave,
+          }),
+        }),
+      );
+      expect(read.mock.calls.length).toBeGreaterThanOrEqual(3);
+      expect(
+        await screen.findByText('Automatic roles are live'),
+      ).toBeInTheDocument();
+    } finally {
+      read.mockRestore();
+      save.mockRestore();
+      focusManager.setFocused(undefined);
+    }
+  });
+
+  it('keeps selections when Discord cannot supply a role list', async () => {
+    const initial = await api.getAutoRoles('900000000000000001');
+    const read = vi
+      .spyOn(api, 'getAutoRoles')
+      .mockResolvedValue({ ...initial, roles: [], rolesAvailable: false });
+    const save = vi.spyOn(api, 'saveAutoRoles');
+    try {
+      open(`${pixel}/autoroles`);
+      await screen.findByText('Join roles');
+      await userEvent.click(
+        screen.getByRole('checkbox', { name: /Restart when/ }),
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Save changes' }),
+      );
+      expect(
+        await screen.findByText('Couldn’t refresh server roles'),
+      ).toBeInTheDocument();
+      expect(save).not.toHaveBeenCalled();
+    } finally {
+      read.mockRestore();
+      save.mockRestore();
+    }
+  });
+
   it('adds a timed role, checks it before saving, and goes live', async () => {
     open(`${pixel}/autoroles`);
     expect(
@@ -1887,11 +1978,45 @@ describe('Message Studio', () => {
 });
 
 describe('Components V2 in the editor', () => {
+  it('converts the edited message in both directions', async () => {
+    await openEditor();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit title' }));
+    const title = screen.getByRole('textbox', { name: 'title' });
+    await userEvent.clear(title);
+    await userEvent.type(title, 'Edited title{Enter}');
+    await userEvent.click(screen.getByRole('radio', { name: 'V2 components' }));
+    expect(document.querySelector('.sp-v2-text__body')).toHaveTextContent(
+      'Edited title',
+    );
+    expect(document.querySelector('.sp-gallery img')).toHaveAttribute(
+      'src',
+      'https://pixelplaza.gg/img/jam-banner.png',
+    );
+    await userEvent.click(
+      screen.getAllByRole('button', { name: /^Edit text/ })[0]!,
+    );
+    const text = screen.getByRole('textbox', { name: /^text/ });
+    await userEvent.clear(text);
+    await userEvent.type(text, 'Edited in V2');
+    await userEvent.click(screen.getByRole('radio', { name: 'Embed message' }));
+    expect(document.querySelector('.dc-embed__desc')).toHaveTextContent(
+      'Edited in V2',
+    );
+    expect(document.querySelector('.dc-embed__title')).not.toHaveTextContent(
+      'Edited title',
+    );
+    expect(document.querySelector('.sp-comps')).toHaveTextContent('Jam rules');
+  });
+
   it('builds a container with text, a gallery and variables', async () => {
     await openEditor();
     const json = () =>
       (document.querySelector('.sp-code__text') as HTMLTextAreaElement).value;
     await userEvent.click(screen.getByRole('radio', { name: 'V2 components' }));
+    // The embed's banner carries over; start this gallery example empty.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove image 1' }),
+    );
 
     // The text is edited where it's shown, a stretch between dividers at a
     // time; {separator} draws a line.
@@ -1944,8 +2069,11 @@ describe('Components V2 in the editor', () => {
       json().indexOf('"type": 17'),
     );
     // A button can sit beside a line of the text.
-    screen.getByRole('button', { name: /Move button Jam rules/ }).focus();
-    await userEvent.keyboard('{ArrowUp}');
+    // Carried-over embed buttons start below the container.
+    for (let i = 0; i < 2; i++) {
+      screen.getByRole('button', { name: /Move button Jam rules/ }).focus();
+      await userEvent.keyboard('{ArrowUp}');
+    }
     expect(json()).toMatch(/"accessory": \{\s+"type": 2/);
     expect(
       document.querySelector('.sp-v2-text__side .sp-comp'),

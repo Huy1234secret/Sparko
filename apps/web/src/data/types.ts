@@ -191,6 +191,8 @@ export type RRState = {
 
 export type ARState = {
   on: boolean;
+  /** False when Discord could not supply roles; never prune using that list. */
+  rolesAvailable?: boolean;
   config: AutoRoles;
   limits: {
     timed: number;

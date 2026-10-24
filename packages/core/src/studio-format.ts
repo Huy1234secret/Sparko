@@ -237,6 +237,90 @@ export const studioDefault = (channel: string): StudioMessage => ({
   v2: v2Default(),
 });
 
+/** Carry the visible message into the other layout without truncating content. */
+export function switchStudioLayout(
+  message: StudioMessage,
+  layout: StudioMessage['layout'],
+): StudioMessage {
+  if (message.layout === layout) return message;
+  if (layout === 'v2') {
+    const first = message.embeds[0];
+    const thumbnail = message.embeds.find((e) => e.thumbnail)?.thumbnail ?? '';
+    const gallery = message.embeds.flatMap((e, i) =>
+      [
+        { id: `image-${i}`, url: e.image, description: '' },
+        {
+          id: `thumb-${i}`,
+          url: e.thumbnail === thumbnail ? '' : e.thumbnail,
+          description: '',
+        },
+        { id: `author-${i}`, url: e.authorIcon, description: '' },
+        { id: `footer-${i}`, url: e.footerIcon, description: '' },
+      ].filter((image) => image.url),
+    );
+    return {
+      ...message,
+      layout,
+      v2: {
+        accent: first?.color ?? '#FACC15',
+        shuffle: first?.shuffle ?? false,
+        text: [
+          message.content,
+          ...message.embeds.map((e) =>
+            [
+              e.author && e.authorUrl
+                ? `[${e.author}](${e.authorUrl})`
+                : e.author,
+              e.title,
+              e.description,
+              ...e.fields.flatMap((f) => [f.name, f.value]),
+              e.footer,
+              e.timestamp ? '{date} {time}' : '',
+            ]
+              .filter((text) => text.length > 0)
+              .join('\n\n'),
+          ),
+        ]
+          .filter((text) => text.length > 0)
+          .join('\n\n'),
+        thumbnail,
+        gallery,
+        place: message.components.map((c) => ({
+          id: c.id,
+          slot: { at: 'below' },
+        })),
+      },
+    };
+  }
+
+  const { v2 } = message;
+  // Flatten moved controls in their visible order into the embed's normal rows.
+  const rank = (slot: V2Slot) =>
+    slot.at === 'above'
+      ? -Infinity
+      : slot.at === 'below'
+        ? Infinity
+        : slot.line * 2 + (slot.at === 'beside' ? 0 : 1);
+  const order = placeOf(v2, message.components)
+    .filter((p) => p.id !== 'gallery')
+    .sort((a, b) => rank(a.slot) - rank(b.slot));
+  const byId = new Map(message.components.map((c) => [c.id, c]));
+  return {
+    ...message,
+    layout,
+    content: '',
+    embeds: Array.from({ length: Math.max(1, v2.gallery.length) }, (_, i) => ({
+      ...embedDefault(`e${i + 1}`),
+      description: i === 0 ? v2.text : '',
+      color: v2.accent,
+      shuffle: v2.shuffle ?? false,
+      thumbnail: i === 0 ? v2.thumbnail : '',
+      image: v2.gallery[i]?.url ?? '',
+    })),
+    components: order.map((p) => byId.get(p.id)!),
+  };
+}
+
 /** An embed with nothing in it, which Discord won't show. */
 export const embedIsEmpty = (e: StudioEmbed) =>
   !e.author.trim() &&

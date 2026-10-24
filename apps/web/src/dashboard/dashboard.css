@@ -1287,6 +1287,13 @@
   position: relative;
   max-width: none;
 }
+.sp-embed .dc-embed__main {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sp-embed .dc-embed__title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .sp-embed-bar {
   position: absolute;
   top: -1px;

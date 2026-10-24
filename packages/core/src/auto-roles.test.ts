@@ -5,6 +5,7 @@ import { writeModule } from './store.ts';
 import {
   arDefault,
   arIssue,
+  arWithoutDeletedRoles,
   formatDuration,
   parseDuration,
   ruleMet,
@@ -49,6 +50,29 @@ const rule = (patch: Partial<ARRule> = {}): ARRule => ({
   resetOnLeave: false,
   removeOnLoss: true,
   ...patch,
+});
+
+describe('deleted automatic roles', () => {
+  it('removes old IDs while retaining existing and unfinished triggers', () => {
+    const original = config({
+      join: { before: ['10'], after: ['11', '12'] },
+      timed: [...config().timed, { id: 'new', after: '', role: '' }],
+      rules: [
+        rule(),
+        rule({ id: 'deleted', role: '99' }),
+        rule({ id: 'new', role: '' }),
+      ],
+    });
+    const cleaned = arWithoutDeletedRoles(
+      original,
+      new Set(['10', '12', '21', '31']),
+    );
+    expect(cleaned.join).toEqual({ before: ['10'], after: ['12'] });
+    expect(cleaned.timed.map((t) => t.id)).toEqual(['t1', 'new']);
+    expect(cleaned.rules.map((r) => r.id)).toEqual(['r1', 'new']);
+    expect(original.join.after).toEqual(['11', '12']);
+    expect(original.timed).toHaveLength(3);
+  });
 });
 
 function fakeRest(fail?: string) {

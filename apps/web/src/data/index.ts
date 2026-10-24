@@ -343,6 +343,8 @@ export const useAutoRoles = (serverId: string) =>
   useQuery({
     queryKey: keys.ar(serverId),
     queryFn: () => api.getAutoRoles(serverId),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: 'always',
   });
 export function useSaveAutoRoles(serverId: string) {
   const refresh = useRefresh(serverId);
