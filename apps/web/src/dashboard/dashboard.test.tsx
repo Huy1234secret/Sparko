@@ -1524,6 +1524,82 @@ async function openEditor() {
 }
 
 describe('Message Studio', () => {
+  it('creates an empty template while a V2 message with media and buttons is open', async () => {
+    const serverId = '900000000000000001';
+    const studio = await api.getStudio(serverId);
+    const original = studio.templates.find(
+      (t) => t.name === 'Spring art jam announcement',
+    )!;
+    const source = {
+      ...original.message,
+      layout: 'v2' as const,
+      v2: {
+        ...original.message.v2,
+        text: 'Existing message content',
+        thumbnail: 'https://img.example/thumb.png',
+        gallery: [
+          {
+            id: 'old-image',
+            url: 'https://img.example/old.png',
+            description: 'Old image',
+          },
+        ],
+      },
+    };
+    await api.updateTemplate(serverId, original.id, { message: source });
+    await openEditor();
+    await userEvent.click(screen.getByRole('button', { name: /^Edit text/ }));
+    const text = screen.getByRole('textbox', { name: /^text/ });
+    await userEvent.clear(text);
+    await userEvent.type(text, 'Unsaved draft');
+    await userEvent.click(screen.getByRole('tab', { name: /Templates/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'New template' }));
+    const dialog = screen.getByRole('dialog', { name: 'New template' });
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveValue(
+      'Untitled',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await screen.findByText('Saved “Untitled”');
+
+    const after = await api.getStudio(serverId);
+    const created = after.templates.find((t) => t.name === 'Untitled')!;
+    expect(created.message.content).toBe('');
+    expect(created.message.components).toEqual([]);
+    expect(created.message.embeds).toHaveLength(1);
+    expect(created.message.embeds[0]).toMatchObject({
+      author: '',
+      authorIcon: '',
+      authorUrl: '',
+      title: '',
+      description: '',
+      image: '',
+      thumbnail: '',
+      footer: '',
+      footerIcon: '',
+      timestamp: false,
+      fields: [],
+    });
+    expect(created.message.v2).toMatchObject({
+      text: '',
+      thumbnail: '',
+      gallery: [],
+      place: [],
+    });
+    expect(after.templates.find((t) => t.id === original.id)?.message).toEqual(
+      source,
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit Untitled' }),
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'V2 components' }));
+    expect(
+      screen.getByRole('button', { name: /^Edit text/ }),
+    ).not.toHaveTextContent(/Big news|Existing message|Unsaved draft/);
+    expect(document.querySelector('.sp-gallery img')).toBeNull();
+    expect(document.querySelector('.sp-comp')).toBeNull();
+  }, 20_000);
+
   it('asks for a template first, then edits it right in the preview', async () => {
     open(`${pixel}/studio`);
     expect(
@@ -1874,14 +1950,12 @@ describe('Message Studio', () => {
     );
     await waitFor(() => expect(screen.queryByText('Server rules')).toBeNull());
 
-    // + Template saves what's in the editor.
+    // New templates start empty, with their own name.
     await userEvent.click(screen.getByRole('button', { name: 'New template' }));
     await userEvent.click(
       within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }),
     );
-    expect(
-      await screen.findByText('Saved “Spring art jam announcement (x2)”'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Saved “Untitled”')).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Clone Maintenance notice' }),

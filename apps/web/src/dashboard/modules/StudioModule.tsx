@@ -480,7 +480,7 @@ export function StudioModule({
         <StudioLibrary
           server={server}
           studio={studio.data}
-          current={message ?? studio.data.message}
+          channel={message?.channel ?? studio.data.message.channel}
           editingId={template?.id ?? null}
           onEdit={(t) => {
             open(t.id, { ...t.message, name: t.name });

@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
   arTrack,
+  blankStudioMessage,
   claimJob,
   finishJob,
   listVersions,
@@ -508,6 +509,36 @@ describe('server API', () => {
       (await body<{ templates: unknown[] }>(await call('/9001/studio')))
         .templates,
     ).toHaveLength(0);
+
+    const blank = await body<{ id: string }>(
+      await call('/9001/studio/templates', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Empty',
+          message: blankStudioMessage('501', 'Empty'),
+        }),
+      }),
+    );
+    const emptyState = await body<{
+      templates: {
+        id: string;
+        message: {
+          content: string;
+          embeds: { title: string; description: string }[];
+          components: unknown[];
+          v2: { text: string; gallery: unknown[] };
+        };
+      }[];
+    }>(await call('/9001/studio'));
+    expect(
+      emptyState.templates.find((t) => t.id === blank.id)?.message,
+    ).toMatchObject({
+      content: '',
+      embeds: [{ title: '', description: '' }],
+      components: [],
+      v2: { text: '', gallery: [] },
+    });
+    await call(`/9001/studio/templates/${blank.id}`, { method: 'DELETE' });
   });
 
   it('makes reaction roles, checks them, and has the bot post them', async () => {

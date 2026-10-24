@@ -18,6 +18,7 @@ import {
   useToast,
 } from '../../ui';
 import {
+  blankStudioMessage,
   folderContents,
   folderPath,
   itemsIn,
@@ -28,7 +29,6 @@ import {
   type LibraryMove,
   type Server,
   type StudioFolder,
-  type StudioMessage,
   type StudioState,
   type StudioTemplate,
 } from '../../data';
@@ -150,14 +150,14 @@ type Confirm =
 export function StudioLibrary({
   server,
   studio,
-  current,
+  channel,
   editingId,
   onEdit,
 }: {
   server: Server;
   studio: StudioState;
-  /** The message in the editor, for "+ Template". */
-  current: StudioMessage;
+  /** The channel selected for new templates. */
+  channel: string;
   /** The template being edited in the editor, if any. */
   editingId: string | null;
   onEdit: (t: StudioTemplate) => void;
@@ -513,7 +513,7 @@ export function StudioLibrary({
       // A name that's taken gets a number, as the server does.
       const saved = uniqueTemplateName(studio.templates, name);
       actions.saveTemplate.mutate(
-        { name, message: current, folderId },
+        { name, message: blankStudioMessage(channel, name), folderId },
         {
           onSuccess: () => {
             done();
@@ -610,7 +610,7 @@ export function StudioLibrary({
             onClick={() =>
               setNaming({
                 kind: 'template',
-                name: current.name.trim() || 'Untitled',
+                name: 'Untitled',
               })
             }
           >
@@ -828,11 +828,11 @@ export function StudioLibrary({
             ? 'Rename folder'
             : naming?.kind === 'folder'
               ? 'New folder'
-              : 'Save as a template'
+              : 'New template'
         }
         description={
           naming?.kind === 'template'
-            ? 'Saves the message that’s in the editor now.'
+            ? 'Start with an empty message.'
             : undefined
         }
         footer={
