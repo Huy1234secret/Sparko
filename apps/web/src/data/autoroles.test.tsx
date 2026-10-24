@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
 import { api, createQueryClient, useAutoRoles } from './index';
@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 it('refreshes automatic roles while the dashboard stays open', async () => {
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.useFakeTimers();
   const state = {
     on: true,
     config: arDefault(),
@@ -27,10 +27,11 @@ it('refreshes automatic roles while the dashboard stays open', async () => {
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     ),
   });
-  await waitFor(() => expect(result.current.data).toEqual(state));
+  await act(() => vi.advanceTimersByTimeAsync(10));
+  expect(result.current.data).toEqual(state);
   read.mockResolvedValue({ ...state, roles: [] });
-  act(() => vi.advanceTimersByTime(30_000));
-  await waitFor(() => expect(result.current.data?.roles).toEqual([]));
+  await act(() => vi.advanceTimersByTimeAsync(30_000));
+  expect(result.current.data?.roles).toEqual([]);
   expect(read).toHaveBeenCalledTimes(2);
   unmount();
   client.clear();
