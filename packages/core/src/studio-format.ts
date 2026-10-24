@@ -237,6 +237,20 @@ export const studioDefault = (channel: string): StudioMessage => ({
   v2: v2Default(),
 });
 
+/** A new template starts empty in both layouts. */
+export const blankStudioMessage = (
+  channel: string,
+  name = 'Untitled',
+): StudioMessage => ({
+  name,
+  channel,
+  layout: 'embed',
+  content: '',
+  embeds: [embedDefault()],
+  components: [],
+  v2: { ...v2Default(), text: '' },
+});
+
 /** Carry the visible message into the other layout without truncating content. */
 export function switchStudioLayout(
   message: StudioMessage,
