@@ -21,6 +21,7 @@ import {
   studioDefault,
   studioPayload,
   studioProblem,
+  switchStudioLayout,
   upsertGuild,
   getGuild,
   serverVars,
@@ -87,6 +88,129 @@ const v2: StudioMessage = {
     },
   ],
 };
+
+describe('switching message layouts', () => {
+  it('carries all embed text, pictures, colour and controls into V2 and back', () => {
+    const message: StudioMessage = {
+      ...base,
+      content: 'Message content',
+      embeds: [
+        {
+          ...base.embeds[0]!,
+          author: 'Author',
+          authorUrl: 'https://example.com/author',
+          title: 'Title',
+          description: 'Description {user}',
+          footer: 'Footer',
+          fields: [
+            {
+              id: 'f1',
+              name: 'Field name',
+              value: 'Field value',
+              inline: true,
+            },
+          ],
+          color: '#123456',
+          shuffle: true,
+          timestamp: true,
+          thumbnail: 'https://img.example/thumb.png',
+          image: 'https://img.example/banner.png',
+        },
+      ],
+      components: v2.components,
+    };
+    const converted = switchStudioLayout(message, 'v2');
+    expect(converted.v2.text).toBe(
+      'Message content\n\n[Author](https://example.com/author)\n\nTitle\n\nDescription {user}\n\nField name\n\nField value\n\nFooter\n\n{date} {time}',
+    );
+    expect(converted.v2).toMatchObject({
+      accent: '#123456',
+      shuffle: true,
+      thumbnail: message.embeds[0]!.thumbnail,
+    });
+    expect(converted.v2.gallery.map((i) => i.url)).toEqual([
+      message.embeds[0]!.image,
+    ]);
+    expect(converted.components).toEqual(message.components);
+    expect(studioProblem(converted)).toBeNull();
+
+    const edited = {
+      ...converted,
+      v2: {
+        ...converted.v2,
+        text: 'Updated in V2\n{separator}\nHello {user}',
+        accent: '#654321',
+      },
+    };
+    const back = switchStudioLayout(edited, 'embed');
+    expect(back.content).toBe('');
+    expect(back.embeds[0]).toMatchObject({
+      title: '',
+      author: '',
+      footer: '',
+      fields: [],
+      description: edited.v2.text,
+      color: '#654321',
+      shuffle: true,
+      image: message.embeds[0]!.image,
+      thumbnail: message.embeds[0]!.thumbnail,
+    });
+    expect(back.components).toEqual(message.components);
+    expect(studioProblem(back)).toBeNull();
+    expect(switchStudioLayout(back, 'v2').v2.text).toBe(edited.v2.text);
+    expect(message).toMatchObject({
+      layout: 'embed',
+      content: 'Message content',
+    });
+  });
+
+  it('keeps every gallery image and moves placed buttons into normal embed rows', () => {
+    const first = v2.components[0]!;
+    const second = { ...first, id: 'second' };
+    const third = { ...first, id: 'third' };
+    const message: StudioMessage = {
+      ...v2,
+      components: [first, second, third],
+      v2: {
+        ...v2.v2,
+        gallery: [
+          v2.v2.gallery[0]!,
+          { id: 'i2', url: 'https://img.example/2.png', description: 'Two' },
+        ],
+        place: [
+          { id: first.id, slot: { at: 'below' } },
+          { id: second.id, slot: { at: 'beside', line: 0 } },
+          { id: third.id, slot: { at: 'above' } },
+        ],
+      },
+    };
+    const back = switchStudioLayout(message, 'embed');
+    expect(back.embeds.map((e) => e.image)).toEqual(
+      message.v2.gallery.map((i) => i.url),
+    );
+    expect(back.components.map((c) => c.id)).toEqual([
+      'third',
+      'second',
+      first.id,
+    ]);
+    const payload = studioPayload(back, { now: 1, raw: true });
+    expect(payload.components).toEqual([expect.objectContaining({ type: 1 })]);
+    expect(studioProblem(back)).toBeNull();
+  });
+
+  it('keeps oversized text for validation instead of silently cutting it', () => {
+    const message = {
+      ...base,
+      content: 'x'.repeat(2000),
+      embeds: [{ ...base.embeds[0]!, description: 'y'.repeat(4096) }],
+    };
+    const converted = switchStudioLayout(message, 'v2');
+    expect(converted.v2.text).toContain(message.content);
+    expect(converted.v2.text).toContain(message.embeds[0]!.description);
+    expect(studioProblem(converted)).toMatch(/4,000/);
+    expect(switchStudioLayout(message, 'embed')).toBe(message);
+  });
+});
 
 describe('Message Studio messages', () => {
   it('builds a classic message with embeds and link buttons', () => {

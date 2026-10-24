@@ -3,6 +3,7 @@ import { Icon, Segmented } from '../../ui';
 import {
   planProblem,
   studioProblem,
+  switchStudioLayout,
   type Server,
   type StudioMessage,
 } from '../../data';
@@ -260,14 +261,7 @@ export function MessageCanvas({
         label="Message type"
         className="sp-studio__type"
         value={message.layout}
-        onChange={(layout) => {
-          // A locked message always has its one embed.
-          onChange(
-            locked && layout === 'embed' && !message.embeds.length
-              ? { layout, embeds: [newEmbed()] }
-              : { layout },
-          );
-        }}
+        onChange={(layout) => onChange(switchStudioLayout(message, layout))}
         options={[
           { value: 'embed', label: 'Embed message' },
           { value: 'v2', label: 'V2 components' },

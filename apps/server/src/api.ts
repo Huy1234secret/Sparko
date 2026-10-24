@@ -247,7 +247,7 @@ export function createApi({
   const polls = pollRoutes({ db, view: (id) => view(id), now });
   const reactionRoles = rrRoutes({ db, view: (id) => view(id), now });
   const starboard = sbRoutes({ db, view: (id) => view(id), now });
-  const autoRoles = arRoutes({ db, view: (id) => view(id), now });
+  const autoRoles = arRoutes({ db, view: (id) => view(id, true), now });
   const questions = qaRoutes({ db, view: (id) => view(id), now });
   const suggestions = sgRoutes({ db, view: (id) => view(id), now });
   const birthdays = bdRoutes({

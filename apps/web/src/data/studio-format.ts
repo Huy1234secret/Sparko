@@ -15,6 +15,7 @@ export {
   studioPayload,
   studioProblem,
   studioIssue,
+  switchStudioLayout,
   planIssue,
   type StudioIssue,
 } from '../../../../packages/core/src/studio-format.ts';
@@ -70,6 +71,7 @@ export {
   arLimits,
   arLogText,
   arRanges,
+  arWithoutDeletedRoles,
   formatDuration,
   parseDuration,
   type ARCondition,

@@ -62,6 +62,22 @@ export const arDefault = (): AutoRoles => ({
   rules: [],
 });
 
+/** Drop deleted role references, keeping unfinished triggers and existing roles. */
+export function arWithoutDeletedRoles(
+  config: AutoRoles,
+  roles: ReadonlySet<string>,
+): AutoRoles {
+  return {
+    ...config,
+    join: {
+      before: config.join.before.filter((id) => roles.has(id)),
+      after: config.join.after.filter((id) => roles.has(id)),
+    },
+    timed: config.timed.filter((t) => !t.role || roles.has(t.role)),
+    rules: config.rules.filter((r) => !r.role || roles.has(r.role)),
+  };
+}
+
 /** How many timed roles and rules each plan has. */
 export const arLimits = (plan?: string | null) =>
   plan === 'plus'

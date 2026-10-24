@@ -72,6 +72,7 @@ export function arRoutes({
       json(res, 200, {
         on,
         config,
+        rolesAvailable: v !== undefined,
         limits: arLimits(plan),
         roles: (v?.roles ?? []).map(
           ({ id, name, color, color2, assignable }) => ({

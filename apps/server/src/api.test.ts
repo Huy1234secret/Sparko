@@ -17,7 +17,7 @@ import {
   type GuildView,
   type Rest,
 } from '@sparko/core';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,6 +71,8 @@ const view = (): GuildView => ({
     },
   ],
 });
+const cachedView = vi.fn(async () => view());
+const freshView = vi.fn(async () => view());
 /** Signed in as Quinn, who manages server 9001 only. */
 const auth = {
   access: async (req: { headers: { cookie?: string } }, id: string) =>
@@ -126,7 +128,7 @@ beforeAll(async () => {
   const api = createApi({
     db,
     auth: auth as never,
-    views: { get: async () => view(), refresh: async () => view() },
+    views: { get: cachedView, refresh: freshView },
     discord: fakeDiscord,
     publicUrl: site,
     media,
@@ -578,14 +580,20 @@ describe('server API', () => {
   });
 
   it('saves automatic roles, checks them, and lets staff edit member data', async () => {
+    const cachedReads = cachedView.mock.calls.length;
+    const freshReads = freshView.mock.calls.length;
     type AR = {
       on: boolean;
+      rolesAvailable: boolean;
       config: { timed: unknown[] };
       limits: { timed: number; rules: number };
       roles: { id: string; assignable: boolean }[];
     };
     const state = await body<AR>(await call('/9001/autoroles'));
+    expect(freshView.mock.calls.length).toBe(freshReads + 1);
+    expect(cachedView.mock.calls.length).toBe(cachedReads);
     expect(state.on).toBe(false);
+    expect(state.rolesAvailable).toBe(true);
     expect(state.limits).toMatchObject({ timed: 3, rules: 10 });
     const config = {
       join: { before: [], after: ['301'] },
@@ -610,6 +618,7 @@ describe('server API', () => {
       body: JSON.stringify({ on: true, config }),
     });
     expect(ok.status).toBe(204);
+    expect(freshView.mock.calls.length).toBe(freshReads + 3);
     let job = claimJob(db)!;
     while (job.kind !== 'autoroles') {
       finishJob(db, job.id, null, Date.now());
