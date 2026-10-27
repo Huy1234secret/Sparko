@@ -621,6 +621,46 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX tv_log_by_guild ON tv_log (guild_id, id DESC);`,
+  // Levels & XP: each member's XP, the crates that dropped, and the log.
+  `CREATE TABLE lv_members (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    avatar TEXT NOT NULL DEFAULT '',
+    xp INTEGER NOT NULL DEFAULT 0,
+    messages INTEGER NOT NULL DEFAULT 0,
+    voice_minutes INTEGER NOT NULL DEFAULT 0,
+    last_message_at INTEGER,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );
+  CREATE INDEX lv_members_by_xp ON lv_members (guild_id, xp DESC);
+  CREATE TABLE lv_crates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    message_id TEXT,
+    xp INTEGER NOT NULL,
+    state TEXT NOT NULL DEFAULT 'open',
+    dropped_at INTEGER NOT NULL,
+    ends_at INTEGER NOT NULL,
+    claimed_by TEXT,
+    claimed_name TEXT NOT NULL DEFAULT '',
+    claimed_at INTEGER
+  );
+  CREATE INDEX lv_crates_by_channel ON lv_crates (guild_id, channel_id, dropped_at DESC);
+  CREATE INDEX lv_crates_by_message ON lv_crates (message_id);
+  CREATE INDEX lv_crates_open ON lv_crates (state, ends_at);
+  CREATE TABLE lv_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX lv_log_by_guild ON lv_log (guild_id, id DESC);`,
 ];
 
 export function openDb(path: string): Db {

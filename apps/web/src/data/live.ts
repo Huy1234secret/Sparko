@@ -4,6 +4,8 @@ import type {
   BDMemberFound,
   INVDetail,
   INVFound,
+  LVDetail,
+  LVFound,
   AvatarColor,
   PanelApi,
   Server,
@@ -464,6 +466,61 @@ export function withBackend(
     async testInvite(id, channel, kind) {
       if (!(await backend()).live) return sample.testInvite(id, channel, kind);
       await call('POST', `${server(id)}/invites/test`, { channel, kind });
+    },
+    async getLevels(id) {
+      if (!(await backend()).live) return sample.getLevels(id);
+      return getJson(`${server(id)}/levels`);
+    },
+    async saveLevels(id, change) {
+      if (!(await backend()).live) return sample.saveLevels(id, change);
+      await call('PUT', `${server(id)}/levels`, change);
+    },
+    async levelLeaderboard(id, query, page) {
+      if (!(await backend()).live)
+        return sample.levelLeaderboard(id, query, page);
+      return getJson(
+        `${server(id)}/levels/leaderboard?q=${encodeURIComponent(query)}&page=${page}`,
+      );
+    },
+    async levelMember(id, userId) {
+      if (!(await backend()).live) return sample.levelMember(id, userId);
+      return getJson(`${server(id)}/levels/members/${userId}`);
+    },
+    async levelCrates(id) {
+      if (!(await backend()).live) return sample.levelCrates(id);
+      return getJson(`${server(id)}/levels/crates`);
+    },
+    async findLevelMembers(id, query) {
+      if (!(await backend()).live) return sample.findLevelMembers(id, query);
+      const r = await getJson<{ members: LVFound[] }>(
+        `${server(id)}/levels/find?q=${encodeURIComponent(query)}`,
+      );
+      return r.members;
+    },
+    async changeXp(id, userId, mode, amount) {
+      if (!(await backend()).live)
+        return sample.changeXp(id, userId, mode, amount);
+      return call<LVDetail>(
+        'POST',
+        `${server(id)}/levels/members/${userId}/xp`,
+        {
+          mode,
+          amount,
+        },
+      );
+    },
+    async resetXp(id, userId) {
+      if (!(await backend()).live) return sample.resetXp(id, userId);
+      await call(
+        'POST',
+        userId
+          ? `${server(id)}/levels/members/${userId}/reset`
+          : `${server(id)}/levels/reset`,
+      );
+    },
+    async testLevels(id, channel, kind) {
+      if (!(await backend()).live) return sample.testLevels(id, channel, kind);
+      await call('POST', `${server(id)}/levels/test`, { channel, kind });
     },
     async getEvents(id) {
       if (!(await backend()).live) return sample.getEvents(id);

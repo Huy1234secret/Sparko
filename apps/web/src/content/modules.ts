@@ -68,10 +68,7 @@ const table: [ModuleGroup, string[]][] = [
   [
     'Engagement',
     [
-      'levels|Levels & XP|trending-up|Members earn XP for chatting and level up over time.|Set XP rules',
-      'crates|XP crates|gift|Surprise drops members open for bonus XP or items.|Create a crate',
-      'reward-roles|Reward roles|award|Give a role when someone reaches a level.|Add a reward',
-      'rank-cards|Rank cards|image|Design the card members see when they use /rank.|Design a card',
+      'levels|Levels & XP|trending-up|Members earn XP for chatting and voice, level up, win XP crates and get reward roles.|Set XP rules',
       'counting|Counting|hash|A channel where members count up together, one number at a time.|Pick a counting channel',
       'giveaways|Giveaways|party-popper|Run giveaways with entry rules and fair, random winners.|Start a giveaway',
       'seasons|Seasons|sun|Reset leaderboards on a schedule and reward the top members.|Plan a season',

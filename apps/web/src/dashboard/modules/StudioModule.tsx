@@ -140,6 +140,7 @@ function StudioEditor({
           inviteVariables={uses.includes('invite')}
           eventVariables={uses.includes('event')}
           voiceVariables={uses.includes('voice')}
+          levelVariables={uses.includes('level')}
         />
 
         <div className="sp-stack sp-studio__side">

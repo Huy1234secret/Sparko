@@ -41,6 +41,7 @@ import { bdRoutes } from './bd-api.ts';
 import { invRoutes } from './inv-api.ts';
 import { evRoutes } from './ev-api.ts';
 import { tvRoutes } from './tv-api.ts';
+import { lvRoutes } from './lv-api.ts';
 import { studioRoutes } from './studio-api.ts';
 import { ticketRoutes } from './tickets-api.ts';
 
@@ -269,6 +270,12 @@ export function createApi({
     now,
     waitMs: applyWaitMs,
   });
+  const levels = lvRoutes({
+    db,
+    rest: discord,
+    view: (id) => view(id),
+    now,
+  });
   const tickets = ticketRoutes({
     db,
     rest: discord,
@@ -471,6 +478,17 @@ export function createApi({
       if (!handled) json(res, 404, { error: 'not_found' });
     } else if (rest.startsWith('/temp-voice')) {
       const handled = await tempVoice({
+        req,
+        res,
+        url,
+        method,
+        path: rest,
+        guildId,
+        user,
+      });
+      if (!handled) json(res, 404, { error: 'not_found' });
+    } else if (rest === '/levels' || rest.startsWith('/levels/')) {
+      const handled = await levels({
         req,
         res,
         url,
