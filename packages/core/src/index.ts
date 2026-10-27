@@ -22,4 +22,6 @@ export * from './tickets.ts';
 export * from './ticket-actions.ts';
 export * from './studio.ts';
 export * from './templates.ts';
+export * from './images.ts';
+export * from './image-store.ts';
 export * from './studio-actions.ts';

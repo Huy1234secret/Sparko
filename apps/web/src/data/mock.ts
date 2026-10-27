@@ -25,6 +25,7 @@ import { createSuggestionsMock } from './mock-suggestions';
 import { createBirthdaysMock } from './mock-birthdays';
 import { createInvitesMock } from './mock-invites';
 import { createLevelsMock } from './mock-levels';
+import { createImagesMock } from './mock-images';
 import { createEventsMock } from './mock-events';
 import { createTempVoiceMock } from './mock-temp-voice';
 
@@ -517,6 +518,7 @@ export function resetMock() {
   resetEvents();
   resetTempVoice();
   resetLevels();
+  resetImages();
 }
 
 const {
@@ -713,6 +715,11 @@ const {
   },
   you: () => session.user,
 });
+const { api: imagesApi, reset: resetImages } = createImagesMock({
+  wait: <T>(value: T) => wait(value),
+  copy,
+  server: serverById,
+});
 export const mockApi: PanelApi = {
   ...coreApi,
   ...supportApi,
@@ -726,4 +733,5 @@ export const mockApi: PanelApi = {
   ...eventsApi,
   ...tempVoiceApi,
   ...levelsApi,
+  ...imagesApi,
 };

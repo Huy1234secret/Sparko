@@ -36,6 +36,7 @@ import type {
   TempVoice,
   Suggestions,
   WelcomeConfig,
+  ImageDesign,
 } from './studio-format';
 
 export * from './types';
@@ -65,6 +66,7 @@ export const keys = {
   ticket: (id: string, n: number) => ['tickets', id, 'one', n] as const,
   ticketsConfig: (id: string) => ['tickets', id, 'config'] as const,
   studio: (id: string) => ['studio', id] as const,
+  images: (id: string) => ['studio', id, 'images'] as const,
   rr: (id: string) => ['rr', id] as const,
   polls: (id: string) => ['polls', id] as const,
   pollList: (id: string) => ['polls', id, 'list'] as const,
@@ -259,6 +261,45 @@ export const useServerEmojis = (serverId: string, enabled = true) =>
     enabled,
     staleTime: 5 * 60_000,
   });
+export const useStudioImages = (serverId: string) =>
+  useQuery({
+    queryKey: keys.images(serverId),
+    queryFn: () => api.getImages(serverId),
+  });
+export function useImageActions(serverId: string) {
+  const client = useQueryClient();
+  const toRefresh = {
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: keys.images(serverId) }),
+  };
+  return {
+    save: useMutation({
+      mutationFn: (i: { name: string; design: ImageDesign; url: string }) =>
+        api.saveImage(serverId, i),
+      ...toRefresh,
+    }),
+    update: useMutation({
+      mutationFn: ({
+        id,
+        ...change
+      }: {
+        id: string;
+        name?: string;
+        design?: ImageDesign;
+        url?: string;
+      }) => api.updateImage(serverId, id, change),
+      ...toRefresh,
+    }),
+    clone: useMutation({
+      mutationFn: (id: string) => api.cloneImage(serverId, id),
+      ...toRefresh,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => api.deleteImage(serverId, id),
+      ...toRefresh,
+    }),
+  };
+}
 export function useStudioActions(serverId: string) {
   const refresh = useRefresh(serverId);
   const client = useQueryClient();

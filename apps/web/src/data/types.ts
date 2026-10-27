@@ -41,6 +41,7 @@ import type {
   Starboard,
   Suggestions,
   WelcomeConfig,
+  ImageDesign,
 } from './studio-format';
 
 /**
@@ -498,6 +499,24 @@ export type StudioState = {
   versions: Version<StudioMessage>[];
 };
 
+/** An image made in Image studio. */
+export type StudioImage = {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  /** The PNG drawn from the design when it was last saved. */
+  url: string;
+  /** "Saved 5 min ago by Rhea". */
+  meta: string;
+  design: ImageDesign;
+};
+export type ImagesState = {
+  images: StudioImage[];
+  /** How many images this plan can keep. */
+  limit: number;
+};
+
 export interface PanelApi {
   listTickets(serverId: string): Promise<Ticket[]>;
   getTicket(serverId: string, number: number): Promise<TicketDetail>;
@@ -554,6 +573,20 @@ export interface PanelApi {
   /** Uploads a picture (up to 5 MB) and returns a link Discord can load. */
   uploadImage(serverId: string, file: File): Promise<string>;
   listServerEmojis(serverId: string): Promise<ServerEmoji[]>;
+  getImages(serverId: string): Promise<ImagesState>;
+  /** Saves a new image: its design and the PNG uploaded from it. */
+  saveImage(
+    serverId: string,
+    image: { name: string; design: ImageDesign; url: string },
+  ): Promise<{ id: string }>;
+  /** Renames an image, or saves a new design together with its PNG. */
+  updateImage(
+    serverId: string,
+    id: string,
+    change: { name?: string; design?: ImageDesign; url?: string },
+  ): Promise<void>;
+  cloneImage(serverId: string, id: string): Promise<void>;
+  deleteImage(serverId: string, id: string): Promise<void>;
 }
 
 export type SGStorage = {
