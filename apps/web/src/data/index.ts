@@ -26,6 +26,8 @@ import type {
   Birthdays,
   InvKind,
   Invites,
+  Levels,
+  LvKind,
   EvDetails,
   EvKind,
   Events,
@@ -92,6 +94,13 @@ export const keys = {
   ev: (id: string) => ['ev', id] as const,
   evList: (id: string, when: string) => ['ev', id, 'list', when] as const,
   evRsvps: (id: string, number: number) => ['ev', id, 'rsvps', number] as const,
+  lv: (id: string) => ['lv', id] as const,
+  lvBoard: (id: string, q: string, page: number) =>
+    ['lv', id, 'board', q, page] as const,
+  lvMember: (id: string, userId: string) =>
+    ['lv', id, 'member', userId] as const,
+  lvCrates: (id: string) => ['lv', id, 'crates'] as const,
+  lvFind: (id: string, q: string) => ['lv', id, 'find', q] as const,
   tv: (id: string) => ['tv', id] as const,
   tvRooms: (id: string) => ['tv', id, 'rooms'] as const,
   tvPrefs: (id: string, q: string) => ['tv', id, 'prefs', q] as const,
@@ -143,6 +152,7 @@ function useRefresh(serverId: string) {
       client.invalidateQueries({ queryKey: keys.inv(serverId) }),
       client.invalidateQueries({ queryKey: keys.ev(serverId) }),
       client.invalidateQueries({ queryKey: keys.tv(serverId) }),
+      client.invalidateQueries({ queryKey: keys.lv(serverId) }),
     ]);
 }
 
@@ -801,3 +811,65 @@ export function useTempVoiceActions(serverId: string) {
   };
 }
 export * from './studio-format';
+
+export const useLevels = (serverId: string) =>
+  useQuery({
+    queryKey: keys.lv(serverId),
+    queryFn: () => api.getLevels(serverId),
+  });
+/** A page of the leaderboard, or members matching what staff typed. */
+export const useLevelBoard = (serverId: string, query: string, page: number) =>
+  useQuery({
+    queryKey: keys.lvBoard(serverId, query.trim(), page),
+    queryFn: () => api.levelLeaderboard(serverId, query.trim(), page),
+    placeholderData: (previous) => previous,
+  });
+/** A member's XP, level progress and rewards. */
+export const useLevelMember = (serverId: string, userId: string | null) =>
+  useQuery({
+    queryKey: keys.lvMember(serverId, userId ?? ''),
+    queryFn: () => api.levelMember(serverId, userId!),
+    enabled: !!userId,
+  });
+export const useLevelCrates = (serverId: string) =>
+  useQuery({
+    queryKey: keys.lvCrates(serverId),
+    queryFn: () => api.levelCrates(serverId),
+  });
+/** Server members to change XP for; nothing until something is typed. */
+export const useLevelFind = (serverId: string, query: string) =>
+  useQuery({
+    queryKey: keys.lvFind(serverId, query.trim()),
+    queryFn: () => api.findLevelMembers(serverId, query.trim()),
+    enabled: query.trim().length > 0,
+  });
+export function useLevelActions(serverId: string) {
+  const refresh = useRefresh(serverId);
+  return {
+    save: useMutation({
+      mutationFn: (change: { on: boolean; config: Levels }) =>
+        api.saveLevels(serverId, change),
+      onSuccess: refresh,
+    }),
+    change: useMutation({
+      mutationFn: ({
+        userId,
+        mode,
+        amount,
+      }: {
+        userId: string;
+        mode: 'give' | 'take' | 'set';
+        amount: number;
+      }) => api.changeXp(serverId, userId, mode, amount),
+      onSuccess: refresh,
+    }),
+    reset: useMutation({
+      mutationFn: (userId: string | null) => api.resetXp(serverId, userId),
+      onSuccess: refresh,
+    }),
+    test: useMutation({
+      mutationFn: ({ channel, kind }: { channel: string; kind: LvKind }) =>
+        api.testLevels(serverId, channel, kind),
+    }),
+  };
+}

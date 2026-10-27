@@ -23,6 +23,9 @@ import type {
   Events,
   TempVoice,
   TvLogEntry,
+  Levels,
+  LvKind,
+  LvLogEntry,
   TvPrefs,
   TvRoom,
   GreetKind,
@@ -462,7 +465,8 @@ export type StudioTemplate = {
       | 'poll'
       | 'invite'
       | 'event'
-      | 'voice';
+      | 'voice'
+      | 'level';
     where: string;
   }[];
 };
@@ -950,4 +954,105 @@ export interface PanelApi {
   closeVoiceRoom(serverId: string, channelId: string): Promise<void>;
   listVoicePrefs(serverId: string, query: string): Promise<TVPrefsList>;
   resetVoicePrefs(serverId: string, userId: string): Promise<void>;
+}
+
+export type LVState = {
+  on: boolean;
+  config: Levels;
+  limits: { rewards: number; boosts: number };
+  /** How many members have XP. */
+  count: number;
+  /** Crates dropped and opened so far, and the XP they gave. */
+  crates: { dropped: number; opened: number; xp: number };
+  channels: Channel[];
+  roles: RoleOption[];
+  log: LvLogEntry[];
+};
+/** A row of the leaderboard; rank is null for members with no XP. */
+export type LVRow = {
+  rank: number | null;
+  userId: string;
+  name: string;
+  avatar: string;
+  xp: number;
+  messages: number;
+  voiceMinutes: number;
+  level: number;
+  /** How far into their level, 0 to 100. */
+  percent: number;
+};
+export type LVBoard = {
+  rows: LVRow[];
+  /** How many rows match, over every page. */
+  total: number;
+  count: number;
+  page: number;
+  pages: number;
+};
+/** One member: their XP, level progress, place and rewards. */
+export type LVDetail = {
+  userId: string;
+  name: string;
+  avatar: string;
+  xp: number;
+  messages: number;
+  voiceMinutes: number;
+  rank: number | null;
+  level: number;
+  into: number;
+  need: number;
+  next: number;
+  percent: number;
+  max: boolean;
+  rewards: { level: number; role: string }[];
+};
+/** A crate that dropped, and who opened it. */
+export type LVCrate = {
+  id: number;
+  channelId: string;
+  messageId: string | null;
+  xp: number;
+  state: 'open' | 'claimed' | 'expired';
+  droppedAt: number;
+  endsAt: number;
+  claimedBy: string | null;
+  claimedName: string;
+  claimedAt: number | null;
+};
+/** A server member found to change their XP. */
+export type LVFound = {
+  userId: string;
+  name: string;
+  avatar: string;
+  xp: number;
+  level: number;
+};
+
+export interface PanelApi {
+  getLevels(serverId: string): Promise<LVState>;
+  saveLevels(
+    serverId: string,
+    change: { on: boolean; config: Levels },
+  ): Promise<void>;
+  levelLeaderboard(
+    serverId: string,
+    query: string,
+    page: number,
+  ): Promise<LVBoard>;
+  levelMember(serverId: string, userId: string): Promise<LVDetail>;
+  levelCrates(
+    serverId: string,
+  ): Promise<{ crates: LVCrate[]; stats: LVState['crates'] }>;
+  findLevelMembers(serverId: string, query: string): Promise<LVFound[]>;
+  /** Staff give, take or set a member's XP. */
+  changeXp(
+    serverId: string,
+    userId: string,
+    mode: 'give' | 'take' | 'set',
+    amount: number,
+  ): Promise<LVDetail>;
+  /** Resets one member's XP, or everyone's with null. */
+  resetXp(serverId: string, userId: string | null): Promise<void>;
+  /** Posts a made-up level-up, rank card or crate in a channel, to see it. */
+  testLevels(serverId: string, channel: string, kind: LvKind): Promise<void>;
 }

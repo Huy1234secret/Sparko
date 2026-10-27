@@ -24,6 +24,7 @@ import { createQuestionsMock } from './mock-questions';
 import { createSuggestionsMock } from './mock-suggestions';
 import { createBirthdaysMock } from './mock-birthdays';
 import { createInvitesMock } from './mock-invites';
+import { createLevelsMock } from './mock-levels';
 import { createEventsMock } from './mock-events';
 import { createTempVoiceMock } from './mock-temp-voice';
 
@@ -109,7 +110,6 @@ const firstServerOn: Record<string, boolean> = {
   workflows: true,
   commands: true,
   social: true,
-  'rank-cards': true,
   economy: true,
   polls: true,
   events: true,
@@ -516,6 +516,7 @@ export function resetMock() {
   resetInvites();
   resetEvents();
   resetTempVoice();
+  resetLevels();
 }
 
 const {
@@ -547,6 +548,7 @@ const {
   inviteUses: (serverId) => inviteUses(serverId),
   eventUses: (serverId) => eventUses(serverId),
   voiceUses: (serverId) => voiceUses(serverId),
+  levelUses: (serverId) => levelUses(serverId),
 });
 const { api: autoRolesApi, reset: resetAutoRoles } = createAutoRolesMock({
   wait: <T>(value: T) => wait(value),
@@ -694,6 +696,23 @@ const {
   },
   you: () => session.user,
 });
+const {
+  api: levelsApi,
+  reset: resetLevels,
+  uses: levelUses,
+} = createLevelsMock({
+  wait: <T>(value: T) => wait(value),
+  copy,
+  server: serverById,
+  channels: (serverId) => channelsFor(stateOf(serverId)),
+  roles: (serverId) => rolesOf(serverId),
+  templates: (serverId) => templateIds(serverId),
+  isOn: (serverId) => !!stateOf(serverId).on['levels'],
+  setOn: (serverId, on) => {
+    stateOf(serverId).on['levels'] = on;
+  },
+  you: () => session.user,
+});
 export const mockApi: PanelApi = {
   ...coreApi,
   ...supportApi,
@@ -706,4 +725,5 @@ export const mockApi: PanelApi = {
   ...invitesApi,
   ...eventsApi,
   ...tempVoiceApi,
+  ...levelsApi,
 };

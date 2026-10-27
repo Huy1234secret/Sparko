@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -28,6 +28,7 @@ import { AutoRolesModule } from './AutoRolesModule';
 import { BirthdaysModule } from './BirthdaysModule';
 import { StarboardModule } from './StarboardModule';
 import { InvitesModule } from './InvitesModule';
+import { LevelsModule } from './LevelsModule';
 import { EventsModule } from './EventsModule';
 import { ReactionRolesModule } from './ReactionRolesModule';
 import { QuestionsModule } from './QuestionsModule';
@@ -230,12 +231,22 @@ function GenericModule({
   );
 }
 
+/** Pages that became tabs of another module, and where they went. */
+const movedTo: Record<string, string> = {
+  crates: 'levels?tab=crates',
+  'reward-roles': 'levels?tab=rewards',
+  'rank-cards': 'levels?tab=rank',
+};
+
 export function ModulePage() {
   const { moduleId = '' } = useParams();
   const { server } = useCurrentServer();
   const module = moduleById(moduleId);
   useDashboardTitle(module?.label ?? 'Not found', server?.name);
   if (!server) return null;
+  const moved = movedTo[moduleId];
+  if (moved)
+    return <Navigate replace to={`/dashboard/${server.id}/${moved}`} />;
   if (!module)
     return (
       <div className="sp-card">
@@ -286,6 +297,8 @@ export function ModulePage() {
     return <InvitesModule module={module} server={server} />;
   if (module.id === 'events')
     return <EventsModule module={module} server={server} />;
+  if (module.id === 'levels')
+    return <LevelsModule module={module} server={server} />;
   if (module.id === 'temp-voice')
     return <TempVoiceModule module={module} server={server} />;
   return <GenericModule module={module} server={server} />;

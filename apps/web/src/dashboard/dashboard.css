@@ -4695,6 +4695,292 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
   }
 }
 
+/* Levels & XP -------------------------------------------------------------- */
+.sp-lv-trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin-top: 10px;
+}
+.sp-lv-trio .sp-field,
+.sp-lv-boost .sp-field {
+  margin: 0;
+}
+.sp-sg-command.is-off .sp-lv-trio {
+  opacity: 0.6;
+}
+.sp-lv-max {
+  max-width: 220px;
+}
+.sp-lv-curve {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+}
+.sp-lv-curve__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 96px;
+  padding: 8px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-lv-curve__bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  height: var(--h);
+  border-radius: 2px 2px 0 0;
+  background: var(--sp-brand-soft);
+  box-shadow: inset 0 0 0 1px var(--sp-brand-line);
+  transition: height var(--sp-dur-base) var(--sp-ease-out);
+}
+.sp-lv-curve__bar.is-mark {
+  background: var(--sp-brand);
+}
+.sp-lv-miles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+.sp-lv-mile {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: var(--sp-radius-control);
+  background: var(--sp-raised);
+}
+.sp-lv-mile dt {
+  color: var(--sp-muted);
+  font: 500 12px/16px var(--sp-font-sans);
+}
+.sp-lv-mile dd {
+  display: grid;
+  margin: 0;
+  font: 600 14px/20px var(--sp-font-sans);
+}
+.sp-lv-boosts {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.sp-lv-boosts__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sp-lv-boost {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(100px, 140px) auto;
+  gap: 10px 12px;
+  align-items: end;
+}
+.sp-lv-boost > .sp-seg {
+  align-self: end;
+  margin-bottom: 2px;
+}
+
+/* The reward ladder: each reward on a track from level 0 to the top. */
+.sp-lv-ladder {
+  position: relative;
+  height: 104px;
+  margin: 4px 14px 18px;
+}
+.sp-lv-ladder__track {
+  position: absolute;
+  inset: 50px 0 auto;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--sp-brand-soft),
+    var(--sp-brand) 100%
+  );
+}
+.sp-lv-ladder__step {
+  position: absolute;
+  top: 44px;
+  left: var(--at);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
+}
+/* Every other label sits above the track, so close levels don't collide. */
+.sp-lv-ladder__step.is-up {
+  top: auto;
+  bottom: calc(100% - 60px);
+  flex-direction: column-reverse;
+}
+.sp-lv-ladder__dot {
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--sp-surface);
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 1px var(--sp-line-strong);
+}
+.sp-lv-ladder__label {
+  display: grid;
+  justify-items: center;
+  max-width: 96px;
+  font: 500 12px/16px var(--sp-font-sans);
+  white-space: nowrap;
+}
+.sp-lv-ladder__label span {
+  overflow: hidden;
+  max-width: 96px;
+  color: var(--sp-muted);
+  text-overflow: ellipsis;
+}
+
+/* Crates. */
+.sp-card.is-off .sp-card__body {
+  opacity: 0.7;
+}
+.sp-lv-crate-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--sp-success);
+  background: var(--sp-raised);
+  box-shadow: inset 0 0 0 1px var(--sp-line);
+}
+
+/* The leaderboard and a member's level. */
+.sp-lv-bar {
+  display: block;
+  overflow: hidden;
+  min-width: 80px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sp-raised);
+  box-shadow: inset 0 0 0 1px var(--sp-line);
+}
+.sp-lv-bar::after {
+  content: '';
+  display: block;
+  width: var(--p);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sp-brand);
+  transition: width var(--sp-dur-base) var(--sp-ease-out);
+}
+.sp-lv-board__bar {
+  width: 28%;
+}
+.sp-lv-rank {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 999px;
+}
+.sp-lv-rank.is-gold,
+.sp-lv-rank.is-silver,
+.sp-lv-rank.is-bronze {
+  color: #1a1a1a;
+  font-weight: 700;
+}
+.sp-lv-rank.is-gold {
+  background: #facc15;
+}
+.sp-lv-rank.is-silver {
+  background: #cbd5e1;
+}
+.sp-lv-rank.is-bronze {
+  background: #e3a06b;
+}
+.sp-lv-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sp-lv-ring {
+  --p: 0;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--sp-brand) calc(var(--p) * 1%),
+    var(--sp-raised) 0
+  );
+}
+.sp-lv-ring img {
+  width: 54px;
+  height: 54px;
+  border: 3px solid var(--sp-surface);
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--sp-raised);
+}
+.sp-lv-hero__text {
+  display: grid;
+  gap: 2px;
+}
+.sp-lv-hero__level {
+  font: 700 20px/26px var(--sp-font-sans);
+}
+.sp-lv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp-lv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--sp-line);
+  border-radius: 999px;
+  color: var(--sp-text);
+  background: var(--sp-raised);
+  font: 600 12px/20px var(--sp-font-sans);
+}
+.sp-lv-chip::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+}
+@media (max-width: 720px) {
+  .sp-lv-trio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp-lv-boost {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sp-lv-boost > .sp-seg,
+  .sp-lv-boost > .sp-field:first-of-type {
+    grid-column: 1 / -1;
+  }
+  .sp-lv-ladder__label span {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-lv-curve__bar,
+  .sp-lv-bar::after {
+    transition: none;
+  }
+}
+
 /* Events & RSVP ------------------------------------------------------------ */
 .sp-ev-narrow {
   max-width: 460px;

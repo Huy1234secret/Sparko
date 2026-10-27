@@ -52,6 +52,8 @@ type Helpers = {
   eventUses?: (serverId: string) => { id: string; where: string }[];
   /** The template the temporary voice panel uses. */
   voiceUses?: (serverId: string) => { id: string; where: string }[];
+  /** Templates Levels & XP use, and for which message. */
+  levelUses?: (serverId: string) => { id: string; where: string }[];
 };
 
 type SupportApi = Pick<
@@ -806,7 +808,8 @@ export function createSupportMock(h: Helpers) {
           | 'poll'
           | 'invite'
           | 'event'
-          | 'voice',
+          | 'voice'
+          | 'level',
         where: string,
       ) => {
         if (!id) return;
@@ -831,6 +834,8 @@ export function createSupportMock(h: Helpers) {
         add(u.id, 'event', u.where);
       for (const u of h.voiceUses?.(serverId) ?? [])
         add(u.id, 'voice', u.where);
+      for (const u of h.levelUses?.(serverId) ?? [])
+        add(u.id, 'level', u.where);
       for (const r of s.rr.templates)
         for (const t of [
           r.config.message,

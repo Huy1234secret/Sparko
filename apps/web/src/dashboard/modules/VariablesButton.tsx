@@ -32,6 +32,7 @@ export function VariablesButton({
   invite,
   event,
   voice,
+  level,
   onPick,
 }: {
   /** Components V2 messages also have {separator}. */
@@ -54,6 +55,8 @@ export function VariablesButton({
   event?: boolean;
   /** The temporary voice panel fills in the room, inside one. */
   voice?: boolean;
+  /** Level-up messages, rank cards and XP crates fill in levels and XP. */
+  level?: boolean;
   onPick: (text: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -139,6 +142,12 @@ export function VariablesButton({
       on: voice,
       label: 'Voice panel',
       where: 'the temporary voice panel, inside a room',
+    },
+    {
+      key: 'level',
+      on: level,
+      label: 'Levels',
+      where: 'level-up messages, rank cards and XP crates',
     },
   ] as const;
   const ownersOf = (v: (typeof all)[number]) =>
