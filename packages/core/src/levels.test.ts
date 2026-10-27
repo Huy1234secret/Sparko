@@ -399,6 +399,17 @@ describe('checks', () => {
     // The old curve's numbers carry over exactly.
     expect(lvNeed(old.formula, 5)).toBe(8 * 25 + 80 * 5 + 150);
   });
+
+  it('uses the picture rank card unless a rank message was picked', () => {
+    expect(lvDefault().rank.card).toBe(true);
+    expect(lvUpgrade({ rank: { template: '' } } as never).rank.card).toBe(true);
+    expect(lvUpgrade({ rank: { template: 'tpl1' } } as never).rank.card).toBe(
+      false,
+    );
+    const c = base();
+    delete (c.rank as Partial<Levels['rank']>).card;
+    expect(lvIssue(c)).not.toBeNull();
+  });
 });
 
 describe('commands', () => {

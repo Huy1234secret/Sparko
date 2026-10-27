@@ -92,6 +92,8 @@ export type Levels = {
     template: string;
   };
   rank: {
+    /** Sparko's picture card on the banner, or the message template. */
+    card: boolean;
     template: string;
     /** /rank answers for everyone to see, or only the member. */
     public: boolean;
@@ -141,7 +143,7 @@ export const lvDefault = (channel = ''): Levels => ({
     time: 60,
     template: '',
   },
-  rank: { template: '', public: true },
+  rank: { card: true, template: '', public: true },
   staff: [],
   commands: lvDefaultCommands(),
 });
@@ -728,7 +730,12 @@ export function lvIssue(
   if (crateTemplate) return crateTemplate;
 
   const k = x.rank;
-  if (!k || typeof k !== 'object' || typeof k.public !== 'boolean')
+  if (
+    !k ||
+    typeof k !== 'object' ||
+    typeof k.public !== 'boolean' ||
+    typeof k.card !== 'boolean'
+  )
     return missing;
   const rankTemplate = tpl(k.template, 'rank');
   if (rankTemplate) return rankTemplate;
@@ -822,7 +829,11 @@ export function cleanLevels(c: Levels): Levels {
       time: c.crates.time,
       template: c.crates.template,
     },
-    rank: { template: c.rank.template, public: c.rank.public },
+    rank: {
+      card: c.rank.card,
+      template: c.rank.template,
+      public: c.rank.public,
+    },
     staff: [...new Set(c.staff)],
     commands: {
       rank: cmd('rank'),
@@ -854,7 +865,12 @@ export function lvUpgrade(saved: Partial<Levels> | null | undefined): Levels {
     voice: { ...base.voice, ...saved.voice },
     levelUp: { ...base.levelUp, ...saved.levelUp },
     crates: { ...base.crates, ...saved.crates },
-    rank: { ...base.rank, ...saved.rank },
+    // A server that picked a rank message before the picture card keeps it.
+    rank: {
+      ...base.rank,
+      card: !saved.rank?.template,
+      ...saved.rank,
+    },
     commands: {
       rank: { ...base.commands.rank, ...saved.commands?.rank },
       leaderboard: {

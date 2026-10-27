@@ -198,7 +198,10 @@ describe('levels API', () => {
       await problem(
         await put('/9001/levels', {
           on: true,
-          config: { ...config, rank: { template: '42', public: true } },
+          config: {
+            ...config,
+            rank: { card: false, template: '42', public: true },
+          },
         }),
       ),
     ).toMatch(/rank card template was deleted/);

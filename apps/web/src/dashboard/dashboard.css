@@ -5685,3 +5685,23 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
 .sp-img-layers .is-off {
   opacity: 0.45;
 }
+
+/* Levels: Sparko's rank card preview */
+.sp-lv-rankcard {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.sp-lv-rankcard canvas {
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+  aspect-ratio: 1200 / 424;
+  border-radius: 16px;
+  background: #050505;
+  box-shadow: 0 0 0 1px var(--sp-line);
+}
+.sp-lv-rankcard figcaption {
+  font-size: 13px;
+  color: var(--sp-muted);
+}

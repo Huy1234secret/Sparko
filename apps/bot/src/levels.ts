@@ -38,6 +38,7 @@ import {
   type Rest,
 } from '@sparko/core';
 import { Explained } from './jobs.ts';
+import { rankCardPng } from './rank-card.ts';
 import { registerGuildCommands } from './guild-commands.ts';
 
 const EPHEMERAL = MessageFlags.Ephemeral;
@@ -340,6 +341,13 @@ export function levelsBot(
           const target = i.options.getMember('member') ?? i.member;
           if (target.user.bot) return await say(i, 'Bots don’t earn XP.');
           await i.deferReply(c.rank.public ? {} : { flags: EPHEMERAL });
+          if (c.rank.card) {
+            const png = await rankCardPng(db, i.guildId, personOf(target));
+            await i.editReply({
+              files: [{ attachment: png, name: 'rank.png' }],
+            });
+            return;
+          }
           // Sent as Discord's own JSON, so Components V2 cards work too.
           await rest.patch(
             `/webhooks/${i.applicationId}/${i.token}/messages/@original`,

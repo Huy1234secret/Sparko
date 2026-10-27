@@ -12,6 +12,7 @@ import {
   Button,
   Checkbox,
   Combobox,
+  RadioCards,
   EmptyState,
   Icon,
   Input,
@@ -26,6 +27,9 @@ import {
   LV_FORMULA,
   LV_FORMULA_MAX,
   LV_MAX_CHANGE,
+  RANK_CARD,
+  RANK_CARD_FONT,
+  drawRankCard,
   lvFormulaIssue,
   lvNeed,
   lvRanges,
@@ -35,6 +39,7 @@ import {
   useLevelCrates,
   useLevelFind,
   useLevelMember,
+  useSession,
   type Channel,
   type LVFound,
   type LVRow,
@@ -48,6 +53,7 @@ import { AnimatedIconButton, InfoTip } from './EditorBits';
 import { DurationInput, Used } from './ARTriggers';
 import { ChannelPicker, newId, roleItems } from './parts';
 import { plusAnimations } from './StudioLibrary';
+import rankBanner from '../../../../../design-system/assets/images/Rank_card_default.png';
 
 /** A label with an (i) beside it that says more on hover. */
 const tipped = (text: string, tip: string): ReactNode => (
@@ -1167,6 +1173,26 @@ export function LVRankSettings({
         </div>
       </div>
       <div className="sp-card__body">
+        <RadioCards
+          name="lv-rank-style"
+          legend="What /rank sends"
+          value={rank.card ? 'card' : 'message'}
+          onChange={(v) => onChange({ rank: { ...rank, card: v === 'card' } })}
+          options={[
+            {
+              value: 'card',
+              title: 'Sparko’s rank card',
+              description:
+                'A picture with their avatar, name, level, rank, XP and progress bar.',
+            },
+            {
+              value: 'message',
+              title: 'A message',
+              description: 'Your own message, made in the message editor.',
+            },
+          ]}
+        />
+        {rank.card && <RankCardPreview config={config} />}
         <Checkbox
           checked={rank.public}
           onChange={(pub) => onChange({ rank: { ...rank, public: pub } })}
@@ -1175,6 +1201,62 @@ export function LVRankSettings({
         />
       </div>
     </section>
+  );
+}
+
+const loadPicture = (src: string) =>
+  new Promise<HTMLImageElement | null>((done) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => done(img);
+    img.onerror = () => done(null);
+    img.src = src;
+  });
+
+/** The rank card as you'd see it at level 12, drawn like the bot draws it. */
+function RankCardPreview({ config }: { config: Levels }) {
+  const session = useSession().data;
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const name = session?.user.name ?? 'Member';
+  const avatar = session?.user.avatarUrl ?? '';
+  const level = Math.min(12, config.maxLevel);
+  const top = level >= config.maxLevel;
+  const need = top ? 0 : lvNeed(config.formula, level);
+  const into = Math.round(need * 0.62);
+  const xp = lvTotalFor(config.formula, level) + into;
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const [banner, face] = await Promise.all([
+        loadPicture(rankBanner),
+        avatar ? loadPicture(avatar) : null,
+        document.fonts?.load(`700 54px ${RANK_CARD_FONT}`).catch(() => {}),
+      ]);
+      const ctx = canvas.current?.getContext('2d');
+      if (!live || !ctx) return;
+      drawRankCard(
+        ctx as never,
+        { banner, avatar: face },
+        { name, level, rank: 3, into, need, xp },
+      );
+    })();
+    return () => {
+      live = false;
+    };
+  }, [name, avatar, level, into, need, xp]);
+  return (
+    <figure className="sp-lv-rankcard">
+      <canvas
+        ref={canvas}
+        width={RANK_CARD.width}
+        height={RANK_CARD.height}
+        role="img"
+        aria-label={`Rank card preview: ${name}, level ${level}, rank #3, ${n(into)} of ${n(need)} XP`}
+      />
+      <figcaption>
+        A preview with your name. Members see their own avatar and numbers.
+      </figcaption>
+    </figure>
   );
 }
 

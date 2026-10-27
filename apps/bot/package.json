@@ -8,6 +8,8 @@
     "start": "node --disable-warning=ExperimentalWarning src/main.ts"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.2.5",
+    "@napi-rs/canvas": "0.1.80",
     "@sparko/core": "workspace:*",
     "discord.js": "14.27.0"
   }

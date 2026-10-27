@@ -457,3 +457,9 @@ export {
   type LvPreset,
   type LvReward,
 } from '../../../../packages/core/src/levels.ts';
+export {
+  RANK_CARD,
+  RANK_CARD_FONT,
+  drawRankCard,
+  type RankCardFacts,
+} from '../../../../packages/core/src/rank-card.ts';

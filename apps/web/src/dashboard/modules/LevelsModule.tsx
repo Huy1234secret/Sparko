@@ -491,13 +491,20 @@ export function LevelsModule({
                   <LVCrateStats server={server} channels={data.channels} />,
                 )}
               {tab === 'rank' &&
-                editor(
-                  'rank',
+                (current.rank.card ? (
                   <fieldset className="sp-fieldset" disabled={paused}>
                     <legend className="sp-sr-only">Rank card settings</legend>
                     <LVRankSettings config={current} onChange={edit} />
-                  </fieldset>,
-                )}
+                  </fieldset>
+                ) : (
+                  editor(
+                    'rank',
+                    <fieldset className="sp-fieldset" disabled={paused}>
+                      <legend className="sp-sr-only">Rank card settings</legend>
+                      <LVRankSettings config={current} onChange={edit} />
+                    </fieldset>,
+                  )
+                ))}
               {tab === 'leaderboard' && (
                 <LVLeaderboard
                   server={server}
