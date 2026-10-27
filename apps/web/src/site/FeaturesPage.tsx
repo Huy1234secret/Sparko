@@ -498,7 +498,7 @@ export function FeaturePage() {
                 className="sp-card__foot"
                 style={{ justifyContent: 'space-between' }}
               >
-                <span className="sp-hint">3 of 10 templates on Free</span>
+                <span className="sp-hint">3 of 100 templates on Free</span>
                 <div
                   className="sp-progress sp-progress--sm"
                   style={{ width: 120 }}

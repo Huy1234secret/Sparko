@@ -188,7 +188,7 @@ export const planLimits: [string, string, string][] = [
     `All ${modules.length}`,
   ],
   ['Multi-server tools', '—', 'Included'],
-  ['Message templates', '10', '100'],
+  ['Message templates', '100', '500'],
   ['Storage', '10 MB', '100 MB'],
   ['Steps per workflow', '10', '25'],
   ['Ticket transcripts kept', '7 days', '30 days'],
@@ -196,7 +196,7 @@ export const planLimits: [string, string, string][] = [
 ];
 export const freeFeatures = [
   'All modules except multi-server tools',
-  '10 message templates',
+  '100 message templates',
   '10 MB storage',
   '10 steps per workflow',
   'Ticket transcripts kept 7 days',
@@ -204,7 +204,7 @@ export const freeFeatures = [
 export const plusFeatures = [
   'Everything in Free',
   'Multi-server tools: copy settings with a preview',
-  '100 message templates',
+  '500 message templates',
   '100 MB storage',
   '25 steps per workflow',
   'Ticket transcripts kept 30 days',

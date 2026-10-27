@@ -17,6 +17,7 @@ import { resetBackend } from '../data/live';
 import { routes } from '../router';
 import { modules } from '../content/modules';
 import { commands } from '../content/commands';
+import { featureDetails } from '../content/features';
 import { setTheme } from '../state/theme';
 
 beforeAll(async () => {
@@ -287,13 +288,30 @@ describe('public site', () => {
     expect(
       screen.queryByRole('heading', { name: 'Get started', level: 1 }),
     ).toBeNull();
-    expect(screen.getByText('/ticket claim')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Working a ticket' }),
+    ).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('link', { name: /Next.*Message Studio/ }),
     );
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Message Studio' }),
     ).toBeInTheDocument();
+  });
+
+  it('has a guide for every ready module, with its commands', async () => {
+    open('/docs/suggestions');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Suggestions' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('/suggestion-status').length).toBeGreaterThan(0);
+    const nav = screen.getByRole('navigation', { name: 'Docs' });
+    // Levels & XP gets its docs page in its own pull request.
+    for (const id of Object.keys(featureDetails).filter((i) => i !== 'levels'))
+      expect(
+        nav.querySelector(`a[href="/docs/${id}"]`),
+        `a docs page for ${id}`,
+      ).not.toBeNull();
   });
 
   it('filters features by group from the address', async () => {
