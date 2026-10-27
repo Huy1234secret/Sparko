@@ -484,7 +484,7 @@ export const featureDetails: Record<string, FeatureDetail> = {
       {
         icon: 'gift',
         title: 'XP crates',
-        body: 'Now and then a message drops a crate with an Open button. The first member to press it wins the XP inside. Pick the channels, how often they drop and how much they hold.',
+        body: 'Add your own crates, each with a picture, a name and how many members can claim it. Now and then a message drops one with an Open button, and the crate message updates to show who claimed it and how many claims are left.',
       },
       {
         icon: 'image',

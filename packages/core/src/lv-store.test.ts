@@ -12,7 +12,10 @@ import {
   lvCrates,
   lvDefault,
   lvDetail,
+  lvClaimPayload,
+  lvCrateBody,
   lvDropCrate,
+  lvNewCrate,
   lvGuilds,
   lvLeaderboard,
   lvMember,
@@ -338,13 +341,15 @@ describe('the leaderboard and staff changes', () => {
 });
 
 describe('XP crates', () => {
-  const crates = {
-    ...lvDefault().crates,
-    on: true,
+  const one = {
+    ...lvNewCrate('crate1', 'Pebble'),
     chance: 100,
     min: 40,
     max: 40,
   };
+  const crates = { on: true, list: [one] };
+  const kit = { id: '1', name: 'kit', avatar: '', roles: [] };
+  const rhea = { id: '2', name: 'rhea', avatar: '', roles: [] };
 
   it('drops one by chance, then waits for the cooldown', async () => {
     const { db, rest, posts } = setup({ crates });
@@ -353,61 +358,103 @@ describe('XP crates', () => {
         rest,
         db,
         G,
-        { id: '1', name: 'm1', avatar: '', roles: [] },
+        kit,
+        { channelId: '100' },
         {
-          channelId: '100',
+          now: at,
+          random: () => roll,
         },
-        { now: at, random: () => roll },
       );
-    expect((await drop(NOW, 0))?.crate).toMatchObject({ xp: 40 });
+    expect((await drop(NOW, 0))?.crate).toMatchObject({ name: 'Pebble' });
     expect((await drop(NOW + 60_000, 0))?.crate).toBeNull();
     expect((await drop(NOW + 11 * 60_000, 0))?.crate).toMatchObject({
-      xp: 40,
+      name: 'Pebble',
     });
     const body = posts().at(-1)!.body as { components: object[] };
     expect(JSON.stringify(body.components.at(-1))).toContain('lv:crate');
+    expect(JSON.stringify(body)).toContain('Pebble dropped!');
     expect(lvCrates(db, G)).toHaveLength(2);
+  });
+
+  it('tries each crate in turn, each with its own cooldown', async () => {
+    const gold = { ...lvNewCrate('gold', 'Gold'), chance: 100 };
+    const { db, rest } = setup({
+      crates: { on: true, list: [{ ...one, chance: 1 }, gold] },
+    });
+    const drop = (at: number) =>
+      lvOnMessage(
+        rest,
+        db,
+        G,
+        kit,
+        { channelId: '100' },
+        {
+          now: at,
+          random: () => 0.5,
+        },
+      );
+    expect((await drop(NOW))?.crate).toMatchObject({ name: 'Gold' });
+    expect((await drop(NOW + 1000))?.crate).toBeNull();
+    expect(lvCrates(db, G)[0]).toMatchObject({ typeId: 'gold', claims: 1 });
   });
 
   it('goes to the first to open it, once', async () => {
     const { db, rest } = setup({ crates });
-    await lvDropCrate(rest, db, G, '100', { now: NOW });
+    await lvDropCrate(rest, db, G, '100', one, { now: NOW });
     const messageId = lvCrates(db, G)[0]!.messageId!;
-    const first = await lvOpenCrate(
-      rest,
-      db,
-      G,
-      messageId,
-      {
-        id: '1',
-        name: 'kit',
-        avatar: '',
-        roles: [],
-      },
-      { now: NOW + 1000 },
-    );
+    const first = await lvOpenCrate(rest, db, G, messageId, kit, {
+      now: NOW + 1000,
+    });
     expect(first).toMatchObject({ result: 'won', won: 40, total: 40 });
-    const second = await lvOpenCrate(
-      rest,
-      db,
-      G,
-      messageId,
-      {
-        id: '2',
-        name: 'rhea',
-        avatar: '',
-        roles: [],
-      },
-      { now: NOW + 2000 },
-    );
-    expect(second).toEqual({ result: 'taken', by: 'kit' });
+    const second = await lvOpenCrate(rest, db, G, messageId, rhea, {
+      now: NOW + 2000,
+    });
+    expect(second).toMatchObject({ result: 'taken', by: ['kit'] });
     expect(lvMember(db, G, '1')?.xp).toBe(40);
+    expect(lvCrateStats(db, G)).toEqual({ dropped: 1, opened: 1, xp: 40 });
+    const crate = lvCrates(db, G)[0]!;
+    expect(crate.state).toBe('claimed');
+    expect(JSON.stringify(lvCrateBody(db, G, crate, NOW))).toContain(
+      'kit got 40 XP',
+    );
+  });
+
+  it('lets several members claim, each once, and lists who did', async () => {
+    const shared = { ...one, claims: 2, min: 10, max: 30 };
+    const { db, rest } = setup({ crates: { on: true, list: [shared] } });
+    await lvDropCrate(rest, db, G, '100', shared, { now: NOW });
+    const messageId = lvCrates(db, G)[0]!.messageId!;
+    const open = (who: typeof kit, roll: number) =>
+      lvOpenCrate(rest, db, G, messageId, who, {
+        now: NOW + 1000,
+        random: () => roll,
+      });
+    const a = await open(kit, 0);
+    expect(a).toMatchObject({ result: 'won', won: 10 });
+    expect(await open(kit, 0)).toMatchObject({ result: 'already' });
+    if (a.result !== 'won') throw new Error('expected a claim');
+    const body = JSON.stringify(lvCrateBody(db, G, a.crate, NOW));
+    expect(body).toContain('**Claimed by:** kit');
+    expect(body).toContain('1 left');
+    expect(body).toContain('Open · 1 left');
+    const b = await open(rhea, 0.99);
+    expect(b).toMatchObject({ result: 'won', won: 30 });
+    if (b.result !== 'won') throw new Error('expected a claim');
+    expect(b.crate.state).toBe('claimed');
+    const after = JSON.stringify(lvCrateBody(db, G, b.crate, NOW));
+    expect(after).toContain('kit, rhea');
+    expect(after).toContain('All 2 claimed');
+    expect(
+      await open({ id: '3', name: 'ayo', avatar: '', roles: [] }, 0),
+    ).toMatchObject({ result: 'taken', by: ['kit', 'rhea'] });
+    const claim = JSON.stringify(lvClaimPayload(db, G, b.crate, rhea, 30, NOW));
+    expect(claim).toContain('+30 XP');
     expect(lvCrateStats(db, G)).toEqual({ dropped: 1, opened: 1, xp: 40 });
   });
 
   it('vanishes after its time, and its button greys out', async () => {
     const { db, rest, calls } = setup({ crates });
-    await lvDropCrate(rest, db, G, '100', { now: NOW });
+    await lvDropCrate(rest, db, G, '100', one, { now: NOW });
     expect(await lvCrateSweep(rest, db, NOW + 30_000)).toBe(0);
     expect(await lvCrateSweep(rest, db, NOW + 60_000)).toBe(1);
     expect(lvCrates(db, G)[0]!.state).toBe('expired');
@@ -418,7 +465,7 @@ describe('XP crates', () => {
       db,
       G,
       lvCrates(db, G)[0]!.messageId!,
-      { id: '1', name: 'kit', avatar: '', roles: [] },
+      kit,
       { now: NOW + 61_000 },
     );
     expect(late).toEqual({ result: 'gone' });

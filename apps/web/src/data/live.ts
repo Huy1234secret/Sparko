@@ -518,9 +518,14 @@ export function withBackend(
           : `${server(id)}/levels/reset`,
       );
     },
-    async testLevels(id, channel, kind) {
-      if (!(await backend()).live) return sample.testLevels(id, channel, kind);
-      await call('POST', `${server(id)}/levels/test`, { channel, kind });
+    async testLevels(id, channel, kind, crate) {
+      if (!(await backend()).live)
+        return sample.testLevels(id, channel, kind, crate);
+      await call('POST', `${server(id)}/levels/test`, {
+        channel,
+        kind,
+        ...(crate ? { crate } : {}),
+      });
     },
     async getEvents(id) {
       if (!(await backend()).live) return sample.getEvents(id);

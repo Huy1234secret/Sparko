@@ -17,6 +17,7 @@ import {
   lvIssue,
   lvKinds,
   lvLimits,
+  lvNewCrate,
   lvProgress,
   type Levels,
   type LvLogEntry,
@@ -135,27 +136,47 @@ export function createLevelsMock(h: Helpers) {
     ];
     if (plus) {
       config.rewards.push({ id: 'r4', level: 30, role: rewardRoles[3]!.id });
-      config.crates = { ...config.crates, on: true };
+      config.crates = {
+        on: true,
+        list: [
+          { ...config.crates.list[0]!, channels: [channel('general')] },
+          {
+            ...lvNewCrate('crate2', 'Golden crate'),
+            claims: 3,
+            chance: 0.5,
+            cooldown: '1h',
+            time: 300,
+            min: 200,
+            max: 500,
+          },
+        ],
+      };
       config.levelUp = { ...config.levelUp, where: 'channel', every: 1 };
     }
     const members = new Map(sample(plus).map((p) => [p.userId, p]));
     const who = (i: number) => sample(plus)[i]!;
     const crate = (
       id: number,
-      i: number | null,
-      xp: number,
+      typeId: string,
+      claims: number,
+      won: [number, number][],
       ago: number,
     ): LVCrate => ({
       id,
+      typeId,
       channelId: channel('general'),
       messageId: `88${id}`,
-      xp,
-      state: i === null ? 'expired' : 'claimed',
+      xp: won.reduce((n, [, xp]) => n + xp, 0),
+      claims,
+      state: won.length >= claims ? 'claimed' : 'expired',
       droppedAt: now - ago,
-      endsAt: now - ago + config.crates.time * 1000,
-      claimedBy: i === null ? null : who(i).userId,
-      claimedName: i === null ? '' : who(i).name,
-      claimedAt: i === null ? null : now - ago + 4000 + id * 1000,
+      endsAt: now - ago + 60_000,
+      claimed: won.map(([i, xp], k) => ({
+        userId: who(i).userId,
+        name: who(i).name,
+        xp,
+        at: now - ago + 4000 + k * 1500,
+      })),
     });
     const entry = (
       n: number,
@@ -176,10 +197,21 @@ export function createLevelsMock(h: Helpers) {
       members,
       crates: plus
         ? [
-            crate(4, 2, 118, 25 * M),
-            crate(3, null, 0, 3 * H),
-            crate(2, 0, 74, 9 * H),
-            crate(1, 6, 140, 2 * D),
+            crate(
+              5,
+              'crate2',
+              3,
+              [
+                [2, 412],
+                [0, 230],
+                [6, 305],
+              ],
+              20 * M,
+            ),
+            crate(4, 'crate1', 1, [[2, 118]], 25 * M),
+            crate(3, 'crate1', 1, [], 3 * H),
+            crate(2, 'crate2', 3, [[0, 274]], 9 * H),
+            crate(1, 'crate1', 1, [[6, 140]], 2 * D),
           ]
         : [],
       log: [
@@ -268,7 +300,7 @@ export function createLevelsMock(h: Helpers) {
   const api: Api = {
     async getLevels(serverId) {
       const s = of(serverId);
-      const claimed = s.crates.filter((c) => c.state === 'claimed');
+      const claimed = s.crates.filter((c) => c.claimed.length);
       return h.wait(
         h.copy<LVState>({
           on: h.isOn(serverId),
@@ -326,7 +358,7 @@ export function createLevelsMock(h: Helpers) {
     },
     async levelCrates(serverId) {
       const s = of(serverId);
-      const claimed = s.crates.filter((c) => c.state === 'claimed');
+      const claimed = s.crates.filter((c) => c.claimed.length);
       return h.wait(
         h.copy({
           crates: s.crates,
@@ -413,12 +445,14 @@ export function createLevelsMock(h: Helpers) {
       });
       return h.wait(undefined);
     },
-    async testLevels(serverId, channel, kind) {
+    async testLevels(serverId, channel, kind, crate) {
       guard(serverId);
       if (!lvKinds.includes(kind))
         throw new Error(
-          'Pick the level-up message, the rank card or the XP crate to test.',
+          'Pick the level-up message, the rank card, or a crate or claim message to test.',
         );
+      if (crate && !of(serverId).config.crates.list.some((k) => k.id === crate))
+        throw new Error('Save the new crate first, then send a test.');
       const c = h.channels(serverId).find((x) => x.id === channel);
       if (!c) throw new Error('Pick a channel to send the test message to.');
       if (!c.canPost)
@@ -435,7 +469,13 @@ export function createLevelsMock(h: Helpers) {
       return [
         { id: c.levelUp.template, where: 'Levels & XP (level-up message)' },
         { id: c.rank.template, where: 'Levels & XP (rank card)' },
-        { id: c.crates.template, where: 'Levels & XP (XP crate)' },
+        ...c.crates.list.flatMap((k) => [
+          { id: k.template, where: `Levels & XP (${k.name}: crate message)` },
+          {
+            id: k.claimTemplate,
+            where: `Levels & XP (${k.name}: claim message)`,
+          },
+        ]),
       ].filter((u) => u.id);
     },
   };

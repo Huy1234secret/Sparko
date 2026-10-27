@@ -1,4 +1,4 @@
-import type { Db } from './db.ts';
+import { transaction, type Db } from './db.ts';
 import { DiscordCodes, DiscordError, type Rest } from './discord.ts';
 import { getGuild, getModule, serverVars } from './store.ts';
 import { normaliseStudio, type StudioMessage } from './studio-format.ts';
@@ -11,6 +11,7 @@ import {
   lvCrateCanDrop,
   lvCrateRow,
   lvDefaultMessage,
+  lvNewCrate,
   lvEarns,
   lvLevelOf,
   lvMessageXp,
@@ -22,6 +23,9 @@ import {
   lvShouldAnnounce,
   lvUpgrade,
   type Levels,
+  type LvCrateFacts,
+  type LvCrateState,
+  type LvCrateType,
   type LvFacts,
   type LvKind,
   type LvLogEntry,
@@ -348,13 +352,24 @@ export async function lvApplyRewards(
 // Messages --------------------------------------------------------------------
 
 /** A level message: the server's template, or Sparko's own. */
-export function lvMessage(db: Db, guildId: string, c: Levels, kind: LvKind) {
+export function lvMessage(
+  db: Db,
+  guildId: string,
+  c: Levels,
+  kind: LvKind,
+  /** For a crate or claim message: which crate; the first if left out. */
+  crateId?: string,
+) {
+  const k =
+    c.crates.list.find((x) => x.id === crateId) ?? c.crates.list[0] ?? null;
   const id =
     kind === 'levelup'
       ? c.levelUp.template
       : kind === 'rank'
         ? c.rank.template
-        : c.crates.template;
+        : kind === 'crate'
+          ? (k?.template ?? '')
+          : (k?.claimTemplate ?? '');
   const t = id
     ? getTemplate<StudioMessage>(db, guildId, 'studio', id)
     : undefined;
@@ -679,31 +694,51 @@ export function lvReset(
 
 // XP crates -------------------------------------------------------------------
 
+export type LvClaim = { userId: string; name: string; xp: number; at: number };
 export type LvCrate = {
   id: number;
+  /** Which of the server's crates it is. */
+  typeId: string;
   channelId: string;
   messageId: string | null;
+  /** XP given out from it so far. */
   xp: number;
+  /** How many members can claim it. */
+  claims: number;
   state: 'open' | 'claimed' | 'expired';
   droppedAt: number;
   endsAt: number;
-  claimedBy: string | null;
-  claimedName: string;
-  claimedAt: number | null;
+  claimed: LvClaim[];
 };
 
-const crateOf = (r: Row): LvCrate => ({
+const crateOf = (r: Row, claimed: LvClaim[]): LvCrate => ({
   id: r.id as number,
+  typeId: r.type_id as string,
   channelId: r.channel_id as string,
   messageId: (r.message_id as string | null) ?? null,
   xp: r.xp as number,
+  claims: r.claims as number,
   state: r.state as LvCrate['state'],
   droppedAt: r.dropped_at as number,
   endsAt: r.ends_at as number,
-  claimedBy: (r.claimed_by as string | null) ?? null,
-  claimedName: r.claimed_name as string,
-  claimedAt: (r.claimed_at as number | null) ?? null,
+  claimed,
 });
+
+const claimsOf = (db: Db, crateId: number): LvClaim[] =>
+  (
+    db
+      .prepare(
+        'SELECT * FROM lv_crate_claims WHERE crate_id = ? ORDER BY at, rowid',
+      )
+      .all(crateId) as Row[]
+  ).map((r) => ({
+    userId: r.user_id as string,
+    name: r.user_name as string,
+    xp: r.xp as number,
+    at: r.at as number,
+  }));
+
+const loadCrate = (db: Db, r: Row) => crateOf(r, claimsOf(db, r.id as number));
 
 /** Crates that dropped in a server, newest first. */
 export function lvCrates(db: Db, guildId: string, limit = 50) {
@@ -713,17 +748,18 @@ export function lvCrates(db: Db, guildId: string, limit = 50) {
         'SELECT * FROM lv_crates WHERE guild_id = ? ORDER BY id DESC LIMIT ?',
       )
       .all(guildId, limit) as Row[]
-  ).map(crateOf);
+  ).map((r) => loadCrate(db, r));
 }
 
-/** How many crates dropped, and how many were opened, in all. */
+/** How many crates dropped, how many were claimed, and the XP they gave. */
 export function lvCrateStats(db: Db, guildId: string) {
   const r = db
     .prepare(
       `SELECT COUNT(*) AS dropped,
-         SUM(CASE WHEN state = 'claimed' THEN 1 ELSE 0 END) AS opened,
-         SUM(CASE WHEN state = 'claimed' THEN xp ELSE 0 END) AS xp
-       FROM lv_crates WHERE guild_id = ?`,
+         SUM(CASE WHEN EXISTS (SELECT 1 FROM lv_crate_claims k WHERE k.crate_id = c.id)
+           THEN 1 ELSE 0 END) AS opened,
+         SUM(c.xp) AS xp
+       FROM lv_crates c WHERE c.guild_id = ?`,
     )
     .get(guildId) as Row;
   return {
@@ -733,55 +769,124 @@ export function lvCrateStats(db: Db, guildId: string) {
   };
 }
 
-const lastDrop = (db: Db, guildId: string, channelId: string) =>
+const lastDrop = (db: Db, guildId: string, channelId: string, typeId: string) =>
   ((
     db
       .prepare(
-        'SELECT MAX(dropped_at) AS at FROM lv_crates WHERE guild_id = ? AND channel_id = ?',
+        'SELECT MAX(dropped_at) AS at FROM lv_crates WHERE guild_id = ? AND channel_id = ? AND type_id = ?',
       )
-      .get(guildId, channelId) as Row
+      .get(guildId, channelId, typeId) as Row
   ).at as number | null) ?? null;
 
-/** Posts a crate in a channel and remembers it. */
+/** Sparko's crate picture, served by the dashboard. */
+export function lvDefaultCrateImage() {
+  const site = (process.env.PUBLIC_APP_URL ?? '').replace(/\/$/, '');
+  return site.startsWith('https://') ? `${site}/brand/crate.png` : '';
+}
+
+/** What a crate message fills in about a crate. */
+export function lvCrateFacts(
+  k: LvCrateType,
+  crate: Pick<LvCrate, 'endsAt' | 'claims' | 'claimed'>,
+  won?: number,
+): LvCrateFacts {
+  return {
+    name: k.name,
+    image: k.image.startsWith('https://') ? k.image : lvDefaultCrateImage(),
+    min: k.min,
+    max: k.max,
+    endsAt: crate.endsAt,
+    claims: crate.claims,
+    claimed: crate.claimed.map((x) => ({ id: x.userId, name: x.name })),
+    won,
+  };
+}
+
+/** The crate's settings, or Sparko's if the server deleted that crate. */
+const typeOf = (c: Levels, typeId: string) =>
+  c.crates.list.find((k) => k.id === typeId) ?? {
+    ...lvNewCrate(typeId),
+    name: 'XP crate',
+  };
+
+/** The crate's button as it stands. */
+export function lvCrateState(crate: LvCrate): LvCrateState {
+  const count = crate.claimed.length;
+  if (crate.state === 'expired') return { gone: true, claimed: count };
+  if (crate.state === 'claimed')
+    return crate.claims === 1 && crate.claimed[0]
+      ? { claimedBy: crate.claimed[0].name, xp: crate.claimed[0].xp }
+      : { full: count };
+  // A crate for one member just says Open; a shared one counts down.
+  return crate.claims > 1
+    ? { open: true, left: crate.claims - count }
+    : { open: true };
+}
+
+/** A crate's message as it should look now, for posting or editing. */
+export function lvCrateBody(
+  db: Db,
+  guildId: string,
+  crate: LvCrate,
+  now = Date.now(),
+) {
+  const { config: c } = lvConfigOf(db, guildId);
+  const k = typeOf(c, crate.typeId);
+  return lvPayload(
+    lvMessage(db, guildId, c, 'crate', k.id),
+    c,
+    {
+      xp: 0,
+      rank: 0,
+      messages: 0,
+      voiceMinutes: 0,
+      crate: lvCrateFacts(k, crate),
+    },
+    {
+      now,
+      server: serverVars(getGuild(db, guildId)),
+      channel: crate.channelId,
+    },
+    lvCrateState(crate),
+  );
+}
+
+/** Posts one of the server's crates in a channel and remembers it. */
 export async function lvDropCrate(
   rest: Rest,
   db: Db,
   guildId: string,
   channelId: string,
-  { now = Date.now(), random = Math.random } = {},
+  k: LvCrateType,
+  { now = Date.now() } = {},
 ) {
-  const { config: c } = lvConfigOf(db, guildId);
-  const xp = lvRoll(c.crates.min, c.crates.max, random);
-  const endsAt = now + c.crates.time * 1000;
+  const endsAt = now + k.time * 1000;
   const id = Number(
     db
       .prepare(
-        `INSERT INTO lv_crates (guild_id, channel_id, xp, dropped_at, ends_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO lv_crates (guild_id, channel_id, type_id, claims, xp, dropped_at, ends_at)
+         VALUES (?, ?, ?, ?, 0, ?, ?)`,
       )
-      .run(guildId, channelId, xp, now, endsAt).lastInsertRowid,
+      .run(guildId, channelId, k.id, k.claims, now, endsAt).lastInsertRowid,
   );
-  const message = lvMessage(db, guildId, c, 'crate');
+  const crate = crateOf(
+    {
+      id,
+      type_id: k.id,
+      channel_id: channelId,
+      message_id: null,
+      xp: 0,
+      claims: k.claims,
+      state: 'open',
+      dropped_at: now,
+      ends_at: endsAt,
+    },
+    [],
+  );
   try {
     const sent = await rest.post<{ id: string }>(
       `/channels/${channelId}/messages`,
-      lvPayload(
-        message,
-        c,
-        {
-          xp: 0,
-          rank: 0,
-          messages: 0,
-          voiceMinutes: 0,
-          crate: { min: c.crates.min, max: c.crates.max, endsAt },
-        },
-        {
-          now,
-          server: serverVars(getGuild(db, guildId)),
-          channel: channelId,
-        },
-        { open: true },
-      ),
+      lvCrateBody(db, guildId, crate, now),
     );
     db.prepare('UPDATE lv_crates SET message_id = ? WHERE id = ?').run(
       sent.id,
@@ -791,7 +896,7 @@ export async function lvDropCrate(
       action: 'crate-dropped',
       userId: '0',
       userName: 'Sparko',
-      detail: `A crate with ${n(xp)} XP dropped in <#${channelId}>`,
+      detail: `${k.name} dropped in <#${channelId}>`,
       at: now,
     });
   } catch (e) {
@@ -809,10 +914,13 @@ export async function lvDropCrate(
     `DELETE FROM lv_crates WHERE guild_id = ? AND id <= (
        SELECT id FROM lv_crates WHERE guild_id = ? ORDER BY id DESC LIMIT 1 OFFSET ?)`,
   ).run(guildId, guildId, KEEP_CRATES);
-  return { id, xp, endsAt };
+  return { id, name: k.name, endsAt };
 }
 
-/** A message might drop a crate: by chance, and not too soon after the last. */
+/**
+ * A message might drop a crate: each of the server's crates gets its own
+ * chance, in order, and at most one drops.
+ */
 export async function lvMaybeDrop(
   rest: Rest,
   db: Db,
@@ -822,15 +930,19 @@ export async function lvMaybeDrop(
 ) {
   const { config: c } = lvConfigOf(db, guildId);
   if (!c.crates.on) return null;
-  if (!lvCrateCanDrop(c, place, lastDrop(db, guildId, place.channelId), now))
-    return null;
-  if (random() * 100 >= c.crates.chance) return null;
-  return lvDropCrate(rest, db, guildId, place.channelId, { now, random });
+  for (const k of c.crates.list) {
+    const last = lastDrop(db, guildId, place.channelId, k.id);
+    if (!lvCrateCanDrop(c, k, place, last, now)) continue;
+    if (random() * 100 >= k.chance) continue;
+    return lvDropCrate(rest, db, guildId, place.channelId, k, { now });
+  }
+  return null;
 }
 
 /**
- * Someone pressed Open: the first press wins the crate's XP. Says what
- * happened, so the bot can answer and change the button.
+ * Someone pressed Open: they claim a random amount of the crate's XP, as
+ * long as it has claims left and they haven't claimed it already. Says what
+ * happened, so the bot can answer and update the crate.
  */
 export async function lvOpenCrate(
   rest: Rest,
@@ -840,40 +952,80 @@ export async function lvOpenCrate(
   member: LvPerson & { roles: string[] },
   {
     now = Date.now(),
+    random = Math.random,
     roleName,
-  }: { now?: number; roleName?: (id: string) => string | undefined } = {},
+  }: {
+    now?: number;
+    random?: () => number;
+    roleName?: (id: string) => string | undefined;
+  } = {},
 ) {
   const r = db
     .prepare('SELECT * FROM lv_crates WHERE guild_id = ? AND message_id = ?')
     .get(guildId, messageId) as Row | undefined;
   if (!r) return { result: 'gone' as const };
-  const crate = crateOf(r);
+  const crate = loadCrate(db, r);
+  if (crate.claimed.some((x) => x.userId === member.id))
+    return { result: 'already' as const, crate };
   if (crate.state === 'claimed')
-    return { result: 'taken' as const, by: crate.claimedName };
+    return {
+      result: 'taken' as const,
+      by: crate.claimed.map((x) => x.name),
+      crate,
+    };
   if (crate.state === 'expired' || crate.endsAt <= now) {
     lvExpire(db, guildId, crate, now);
     return { result: 'gone' as const };
   }
-  const won = db
-    .prepare(
-      `UPDATE lv_crates SET state = 'claimed', claimed_by = ?, claimed_name = ?, claimed_at = ?
-       WHERE id = ? AND state = 'open'`,
-    )
-    .run(member.id, member.name, now, crate.id);
-  if (!Number(won.changes))
-    return {
-      result: 'taken' as const,
-      by:
-        lvCrates(db, guildId).find((x) => x.id === crate.id)?.claimedName ?? '',
-    };
+  const { config: c } = lvConfigOf(db, guildId);
+  const k = typeOf(c, crate.typeId);
+  const won = lvRoll(k.min, k.max, random);
+  // node:sqlite is synchronous, so nobody can claim between the count and
+  // the insert; the key stops a member claiming twice all the same.
+  const claimed = transaction(db, () => {
+    const count = Number(
+      (
+        db
+          .prepare(
+            'SELECT COUNT(*) AS n FROM lv_crate_claims WHERE crate_id = ?',
+          )
+          .get(crate.id) as Row
+      ).n,
+    );
+    if (count >= crate.claims) return false;
+    const added = db
+      .prepare(
+        `INSERT OR IGNORE INTO lv_crate_claims (crate_id, user_id, user_name, xp, at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(crate.id, member.id, member.name, won, now);
+    if (!Number(added.changes)) return false;
+    db.prepare(
+      `UPDATE lv_crates SET xp = xp + ?, state = CASE WHEN ? THEN 'claimed' ELSE state END
+       WHERE id = ?`,
+    ).run(won, count + 1 >= crate.claims ? 1 : 0, crate.id);
+    return true;
+  });
+  const after = loadCrate(
+    db,
+    db.prepare('SELECT * FROM lv_crates WHERE id = ?').get(crate.id) as Row,
+  );
+  if (!claimed)
+    return after.claimed.some((x) => x.userId === member.id)
+      ? { result: 'already' as const, crate: after }
+      : {
+          result: 'taken' as const,
+          by: after.claimed.map((x) => x.name),
+          crate: after,
+        };
   addLvLog(db, guildId, {
     action: 'crate-opened',
     userId: member.id,
     userName: member.name,
-    detail: `+${n(crate.xp)} XP in <#${crate.channelId}>`,
+    detail: `+${n(won)} XP from ${k.name} in <#${crate.channelId}>`,
     at: now,
   });
-  const gained = await lvGain(rest, db, guildId, member, crate.xp, {
+  const gained = await lvGain(rest, db, guildId, member, won, {
     now,
     source: 'crate',
     place: { channelId: crate.channelId },
@@ -882,11 +1034,39 @@ export async function lvOpenCrate(
   });
   return {
     result: 'won' as const,
-    won: crate.xp,
+    won,
     total: gained.xp,
     from: gained.from,
     to: gained.to,
+    crate: after,
   };
+}
+
+/** What the member who claimed a crate sees. */
+export function lvClaimPayload(
+  db: Db,
+  guildId: string,
+  crate: LvCrate,
+  member: LvPerson & { createdAt?: number; joinedAt?: number },
+  won: number,
+  now = Date.now(),
+) {
+  const { config: c } = lvConfigOf(db, guildId);
+  const k = typeOf(c, crate.typeId);
+  return lvPayload(
+    lvMessage(db, guildId, c, 'claim', k.id),
+    c,
+    {
+      ...lvFactsOf(db, guildId, member.id),
+      crate: lvCrateFacts(k, crate, won),
+    },
+    {
+      now,
+      user: member,
+      server: serverVars(getGuild(db, guildId)),
+      channel: crate.channelId,
+    },
+  );
 }
 
 function lvExpire(db: Db, guildId: string, crate: LvCrate, now: number) {
@@ -895,21 +1075,23 @@ function lvExpire(db: Db, guildId: string, crate: LvCrate, now: number) {
       `UPDATE lv_crates SET state = 'expired' WHERE id = ? AND state = 'open'`,
     )
     .run(crate.id);
-  if (Number(done.changes))
-    addLvLog(db, guildId, {
-      action: 'crate-expired',
-      userId: '0',
-      userName: 'Sparko',
-      detail: `Nobody opened the ${n(crate.xp)} XP crate in <#${crate.channelId}>`,
-      at: now,
-    });
+  if (!Number(done.changes)) return;
+  const { config: c } = lvConfigOf(db, guildId);
+  const name = typeOf(c, crate.typeId).name;
+  const count = claimsOf(db, crate.id).length;
+  addLvLog(db, guildId, {
+    action: 'crate-expired',
+    userId: '0',
+    userName: 'Sparko',
+    detail: count
+      ? `${name} in <#${crate.channelId}> closed after ${count} ${count === 1 ? 'claim' : 'claims'}`
+      : `Nobody opened ${name} in <#${crate.channelId}>`,
+    at: now,
+  });
 }
 
 /** Swaps a crate's button row for what it is now, keeping the rest. */
-export function lvSwapCrateRow(
-  components: object[],
-  state: Parameters<typeof lvCrateRow>[0],
-) {
+export function lvSwapCrateRow(components: object[], state: LvCrateState) {
   const isCrate = (row: object) =>
     ((row as { components?: { custom_id?: string }[] }).components ?? []).some(
       (c) => c.custom_id === LV_CRATE_ID,
@@ -925,7 +1107,7 @@ export async function lvCrateSweep(rest: Rest, db: Db, now = Date.now()) {
         `SELECT * FROM lv_crates WHERE state = 'open' AND ends_at <= ? ORDER BY ends_at LIMIT 50`,
       )
       .all(now) as Row[]
-  ).map((r) => ({ guildId: r.guild_id as string, crate: crateOf(r) }));
+  ).map((r) => ({ guildId: r.guild_id as string, crate: loadCrate(db, r) }));
   for (const { guildId, crate } of due) {
     lvExpire(db, guildId, crate, now);
     if (!crate.messageId) continue;
@@ -933,7 +1115,10 @@ export async function lvCrateSweep(rest: Rest, db: Db, now = Date.now()) {
       const path = `/channels/${crate.channelId}/messages/${crate.messageId}`;
       const msg = await rest.get<{ components?: object[] }>(path);
       await rest.patch(path, {
-        components: lvSwapCrateRow(msg.components ?? [], { gone: true }),
+        components: lvSwapCrateRow(msg.components ?? [], {
+          gone: true,
+          claimed: crate.claimed.length,
+        }),
       });
     } catch {
       // A deleted crate or channel has nothing left to grey out.
@@ -973,9 +1158,16 @@ export async function lvTestPost(
   kind: LvKind,
   by: LvPerson,
   now = Date.now(),
+  /** For a crate or claim message: which crate; the first if left out. */
+  crateId?: string,
 ) {
   const { config: c } = lvConfigOf(db, guildId);
-  const message = lvMessage(db, guildId, c, kind);
+  const message = lvMessage(db, guildId, c, kind, crateId);
+  const k =
+    c.crates.list.find((x) => x.id === crateId) ??
+    c.crates.list[0] ??
+    lvNewCrate('crate1');
+  const claims = Math.max(k.claims, 2);
   const xp = Math.max(lvMember(db, guildId, by.id)?.xp ?? 0, 4675);
   const body = lvPayload(
     message,
@@ -987,11 +1179,15 @@ export async function lvTestPost(
       voiceMinutes: 260,
       previous: lvLevelOf(c, xp) - 1,
       rewards: [],
-      crate: {
-        min: c.crates.min,
-        max: c.crates.max,
-        endsAt: now + c.crates.time * 1000,
-      },
+      crate: lvCrateFacts(
+        k,
+        {
+          endsAt: now + k.time * 1000,
+          claims,
+          claimed: [{ userId: by.id, name: by.name, xp: k.min, at: now }],
+        },
+        k.min,
+      ),
     },
     {
       now,
@@ -1035,4 +1231,5 @@ const lvKindWords: Record<LvKind, string> = {
   levelup: 'level-up message',
   rank: 'rank card',
   crate: 'XP crate',
+  claim: 'crate claim message',
 };

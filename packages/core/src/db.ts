@@ -674,6 +674,23 @@ const migrations = [
     updated_at INTEGER NOT NULL
   );
   CREATE INDEX studio_images_by_guild ON studio_images (guild_id, updated_at DESC);`,
+  // Levels & XP: servers add their own crates, and more than one member can
+  // claim each. Crates already claimed keep their one claim.
+  `ALTER TABLE lv_crates ADD COLUMN type_id TEXT NOT NULL DEFAULT 'crate1';
+  ALTER TABLE lv_crates ADD COLUMN claims INTEGER NOT NULL DEFAULT 1;
+  CREATE TABLE lv_crate_claims (
+    crate_id INTEGER NOT NULL REFERENCES lv_crates (id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    xp INTEGER NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (crate_id, user_id)
+  );
+  INSERT INTO lv_crate_claims (crate_id, user_id, user_name, xp, at)
+    SELECT id, claimed_by, claimed_name, xp, COALESCE(claimed_at, dropped_at)
+    FROM lv_crates WHERE state = 'claimed' AND claimed_by IS NOT NULL;
+  DROP INDEX lv_crates_by_channel;
+  CREATE INDEX lv_crates_by_channel ON lv_crates (guild_id, channel_id, type_id, dropped_at DESC);`,
 ];
 
 export function openDb(path: string): Db {

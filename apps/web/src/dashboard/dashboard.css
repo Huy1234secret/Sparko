@@ -5705,3 +5705,152 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
   font-size: 13px;
   color: var(--sp-muted);
 }
+
+/* Levels: XP crates as cards */
+.sp-lv-crate-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 1100px) {
+  .sp-lv-crate-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sp-lv-crate {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  margin: 0;
+  box-shadow: inset 0 0 0 1px var(--sp-line);
+  transition: box-shadow var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-lv-crate.is-editing {
+  box-shadow:
+    inset 0 0 0 1px var(--sp-brand-line),
+    var(--sp-shadow-sm);
+}
+.sp-lv-crate__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+.sp-lv-crate__head > .sp-icon-btn {
+  margin-top: 26px;
+}
+.sp-lv-crate__art {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.sp-lv-crate__pic {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sp-radius-card);
+  background: var(--sp-raised);
+  box-shadow: inset 0 0 0 1px var(--sp-line);
+  overflow: hidden;
+  cursor: pointer;
+}
+.sp-lv-crate__pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sp-lv-crate__pic-edit {
+  position: absolute;
+  inset: auto 4px 4px auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--sp-ink);
+  background: var(--sp-paper);
+  box-shadow: var(--sp-shadow-sm);
+  opacity: 0;
+  transition: opacity var(--sp-dur-fast) var(--sp-ease-out);
+}
+.sp-lv-crate__pic:hover .sp-lv-crate__pic-edit,
+.sp-lv-crate__pic:focus-visible .sp-lv-crate__pic-edit,
+.sp-lv-crate__pic:disabled .sp-lv-crate__pic-edit {
+  opacity: 1;
+}
+.sp-lv-crate__pic:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-lv-crate__name .sp-field {
+  margin: 0;
+}
+.sp-lv-crate__body {
+  display: grid;
+  gap: 10px;
+}
+.sp-lv-crate__body .sp-lv-trio {
+  margin-top: 0;
+}
+.sp-lv-crate__msgs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: auto;
+}
+.sp-lv-crate__msg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--sp-radius-control);
+  color: var(--sp-text);
+  background: var(--sp-raised);
+  box-shadow: inset 0 0 0 1px var(--sp-line);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.sp-lv-crate__msg:hover {
+  background: var(--sp-raised-hover);
+}
+.sp-lv-crate__msg.is-on {
+  background: var(--sp-brand-soft);
+  box-shadow: inset 0 0 0 1px var(--sp-brand-line);
+}
+.sp-lv-crate__msg:focus-visible {
+  outline: none;
+  box-shadow: var(--sp-ring);
+}
+.sp-lv-crate__msg-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.sp-lv-crate__msg-label {
+  font-weight: var(--sp-weight-semibold);
+  font-size: 13px;
+}
+.sp-lv-crate__msg-name {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--sp-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .sp-lv-crate__msgs,
+  .sp-lv-crate .sp-lv-trio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

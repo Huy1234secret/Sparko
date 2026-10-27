@@ -26,7 +26,8 @@ import {
   lvRankPayload,
   lvReset,
   lvRewardTargets,
-  lvSwapCrateRow,
+  lvCrateBody,
+  lvClaimPayload,
   lvTestPost,
   lvVoiceMinute,
   type Db,
@@ -155,7 +156,8 @@ export function levelsBot(
     if (config.levelUp.where === 'channel')
       canPost(config.levelUp.channel, 'level-up');
     if (config.crates.on)
-      for (const id of config.crates.channels) canPost(id, 'XP crate');
+      for (const k of config.crates.list)
+        for (const id of k.channels) canPost(id, k.name);
     if (!config.rewards.length) return;
     if (!me.permissions.has(PermissionFlagsBits.ManageRoles))
       throw new Explained('Sparko needs Manage Roles to give reward roles.');
@@ -191,15 +193,21 @@ export function levelsBot(
         const p = job.payload as {
           channel: string;
           kind: LvKind;
+          crate?: string;
           userId: string;
           userName: string;
           avatar?: string;
         };
-        return lvTestPost(rest, db, job.guildId, p.channel, p.kind, {
-          id: p.userId,
-          name: p.userName,
-          avatar: p.avatar ?? '',
-        });
+        return lvTestPost(
+          rest,
+          db,
+          job.guildId,
+          p.channel,
+          p.kind,
+          { id: p.userId, name: p.userName, avatar: p.avatar ?? '' },
+          Date.now(),
+          p.crate,
+        );
       },
       'levels-rewards': async (job: Job) => {
         const p = job.payload as { userIds?: string[] };
@@ -291,25 +299,39 @@ export function levelsBot(
         { ...personOf(i.member), roles: [...i.member.roles.cache.keys()] },
         { roleName: roleName(i.guildId) },
       );
-      const rows = i.message.components.map((c) => c.toJSON() as object);
       if (done.result === 'won') {
-        await i.update({
-          components: lvSwapCrateRow(rows, {
-            claimedBy: i.member.displayName,
-            xp: done.won,
-          }) as never,
+        // Sent as Discord's own JSON, so Components V2 crates work too. The
+        // crate message updates to show who claimed it and what's left.
+        await rest.post(`/interactions/${i.id}/${i.token}/callback`, {
+          type: 7,
+          data: lvCrateBody(db, i.guildId, done.crate),
         });
-        await i.followUp({
-          content: `🎉 You opened the crate: **+${n(done.won)} XP**.${done.to > done.from ? ` You’re level **${n(done.to)}** now!` : ''}`,
-          flags: EPHEMERAL,
+        const claim = lvClaimPayload(
+          db,
+          i.guildId,
+          done.crate,
+          {
+            ...personOf(i.member),
+            createdAt: i.user.createdTimestamp,
+            ...(i.member.joinedTimestamp
+              ? { joinedAt: i.member.joinedTimestamp }
+              : {}),
+          },
+          done.won,
+        ) as { flags?: number };
+        await rest.post(`/webhooks/${i.applicationId}/${i.token}`, {
+          ...claim,
+          flags: (claim.flags ?? 0) | EPHEMERAL,
         });
         return;
       }
       await i.reply({
         content:
-          done.result === 'taken'
-            ? `Too slow! ${done.by || 'Someone'} opened this crate first.`
-            : 'This crate already vanished.',
+          done.result === 'already'
+            ? 'You already claimed this crate.'
+            : done.result === 'taken'
+              ? `Too slow! ${done.by.join(', ') || 'Others'} claimed every bit of this crate.`
+              : 'This crate already vanished.',
         flags: EPHEMERAL,
         allowedMentions: { parse: [] },
       });
