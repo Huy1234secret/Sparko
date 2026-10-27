@@ -2,7 +2,17 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   addAudit,
   addFolder,
+  addImage,
   addTemplate,
+  cleanDesign,
+  cloneImage,
+  countImages,
+  deleteImage,
+  imageLimits,
+  imageProblem,
+  listImages,
+  updateImage,
+  type ImageDesign,
   addVersion,
   ago,
   cloneTemplate,
@@ -50,6 +60,8 @@ import {
   invKinds,
   invKindNames,
   type Invites,
+  LV_MODULE,
+  type Levels,
   EV_MODULE,
   evKinds,
   evKindNames,
@@ -121,6 +133,22 @@ export function studioRoutes({
     return m;
   };
 
+  const designOf = (value: unknown) => {
+    const problem = imageProblem(value);
+    if (problem) throw new BadRequest(problem);
+    return cleanDesign(value as ImageDesign);
+  };
+  /** The PNG drawn from a design; it's uploaded first, like other pictures. */
+  const pngOf = (value: unknown) => {
+    if (
+      typeof value === 'string' &&
+      value.length <= 2048 &&
+      /^https?:\/\/\S+$/.test(value)
+    )
+      return value;
+    throw new BadRequest('The image’s picture didn’t upload. Try again.');
+  };
+
   /** Where each template is used outside Message Studio, for its tags. */
   const templateUses = (guildId: string) => {
     const uses = new Map<
@@ -136,7 +164,8 @@ export function studioRoutes({
           | 'poll'
           | 'invite'
           | 'event'
-          | 'voice';
+          | 'voice'
+          | 'level';
         where: string;
       }[]
     >();
@@ -152,7 +181,8 @@ export function studioRoutes({
         | 'poll'
         | 'invite'
         | 'event'
-        | 'voice',
+        | 'voice'
+        | 'level',
       where: string,
     ) => {
       if (!id) return;
@@ -230,6 +260,16 @@ export function studioRoutes({
         add(ev.messages?.[k] ?? '', 'event', `Events (${evKindNames[k]})`);
     const tv = getModule<TempVoice>(db, guildId, TV_MODULE).config;
     add(tv?.panel?.message ?? '', 'voice', 'Temporary voice (control panel)');
+    const lv = getModule<Levels>(db, guildId, LV_MODULE).config;
+    if (lv) {
+      add(
+        lv.levelUp?.template ?? '',
+        'level',
+        'Levels & XP (level-up message)',
+      );
+      add(lv.rank?.template ?? '', 'level', 'Levels & XP (rank card)');
+      add(lv.crates?.template ?? '', 'level', 'Levels & XP (XP crate)');
+    }
     return uses;
   };
 
@@ -458,6 +498,81 @@ export function studioRoutes({
       if (!media)
         throw new BadRequest('Uploads aren’t set up on this server yet.');
       json(res, 200, await media.save(req, guildId));
+      return true;
+    }
+    if (path === '/studio/images' && method === 'GET') {
+      json(res, 200, {
+        images: listImages(db, guildId).map((i) => ({
+          id: i.id,
+          name: i.name,
+          width: i.width,
+          height: i.height,
+          url: i.url,
+          meta: savedLine(i.at, now(), i.who === user.name ? 'you' : i.who),
+          design: i.design,
+        })),
+        limit: imageLimits(getGuild(db, guildId)?.plan),
+      });
+      return true;
+    }
+    if (path === '/studio/images' && method === 'POST') {
+      const body = await readJson<{
+        name?: unknown;
+        design?: unknown;
+        url?: unknown;
+      }>(req);
+      const name = nameOf(body?.name, 'image');
+      const design = designOf(body?.design);
+      const url = pngOf(body?.url);
+      if (countImages(db, guildId) >= imageLimits(getGuild(db, guildId)?.plan))
+        throw new BadRequest('You’ve used every image on this plan.');
+      const id = addImage(
+        db,
+        { guildId, name, who: user.name, design, url },
+        now(),
+      );
+      json(res, 200, { id });
+      return true;
+    }
+    const imageClone = path.match(/^\/studio\/images\/(\d{1,12})\/clone$/);
+    if (imageClone && method === 'POST') {
+      if (countImages(db, guildId) >= imageLimits(getGuild(db, guildId)?.plan))
+        throw new BadRequest('You’ve used every image on this plan.');
+      cloneImage(db, guildId, imageClone[1]!, user.name, now());
+      res.writeHead(204).end();
+      return true;
+    }
+    const image = path.match(/^\/studio\/images\/(\d{1,12})$/);
+    if (image && method === 'PATCH') {
+      const body = await readJson<{
+        name?: unknown;
+        design?: unknown;
+        url?: unknown;
+      }>(req);
+      // A new design always comes with the PNG drawn from it.
+      if ((body?.design === undefined) !== (body?.url === undefined))
+        throw new BadRequest('Save the design and its picture together.');
+      updateImage(
+        db,
+        guildId,
+        image[1]!,
+        {
+          ...(body?.name === undefined
+            ? {}
+            : { name: nameOf(body.name, 'image') }),
+          ...(body?.design === undefined
+            ? {}
+            : { design: designOf(body.design), url: pngOf(body.url) }),
+          who: user.name,
+        },
+        now(),
+      );
+      res.writeHead(204).end();
+      return true;
+    }
+    if (image && method === 'DELETE') {
+      deleteImage(db, guildId, image[1]!);
+      res.writeHead(204).end();
       return true;
     }
     if (path === '/studio/emojis' && method === 'GET') {

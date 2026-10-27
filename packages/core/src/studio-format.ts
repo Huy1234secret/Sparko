@@ -1008,6 +1008,8 @@ export type StudioVariable = {
   event?: true;
   /** Filled in only by the temporary voice panel, inside a room. */
   voice?: true;
+  /** Filled in only by level-up messages, rank cards and XP crates. */
+  level?: true;
 };
 
 /** Variables people can write in Studio messages, in braces. */
@@ -1369,6 +1371,64 @@ export const studioVariables: StudioVariable[] = [
     name: 'room.limit',
     about: 'How many can join the room, or “No limit”.',
     voice: true,
+  },
+  { name: 'level', about: 'The member’s level.', level: true },
+  {
+    name: 'level.previous',
+    about: 'The level they were before this level-up.',
+    level: true,
+  },
+  { name: 'xp', about: 'The member’s total XP.', level: true },
+  {
+    name: 'xp.next',
+    about: 'The total XP the next level needs.',
+    level: true,
+  },
+  {
+    name: 'xp.left',
+    about: 'How much more XP they need for the next level.',
+    level: true,
+  },
+  {
+    name: 'rank',
+    about: 'Their place on the leaderboard, like #3.',
+    level: true,
+  },
+  {
+    name: 'progress.bar',
+    about: 'A bar of how far they are into this level, like ▰▰▰▰▱▱▱▱▱▱.',
+    level: true,
+  },
+  {
+    name: 'progress.percent',
+    about: 'How far they are into this level, like 40%.',
+    level: true,
+  },
+  {
+    name: 'messages',
+    about: 'How many messages have earned them XP.',
+    level: true,
+  },
+  {
+    name: 'voice.time',
+    about: 'How long they’ve earned XP in voice, like 3h 20m.',
+    level: true,
+  },
+  {
+    name: 'reward.role',
+    about:
+      'Mentions the reward role this level gave, without pinging, or nothing.',
+    level: true,
+  },
+  {
+    name: 'crate.range',
+    about: 'How much XP an XP crate can hold, like 50–150 XP.',
+    level: true,
+  },
+  {
+    name: 'crate.ends',
+    about: 'When an XP crate vanishes if nobody opens it, as a relative time.',
+    level: true,
   },
 ];
 

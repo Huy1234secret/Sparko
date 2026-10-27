@@ -44,6 +44,7 @@ import starboardIcon from '../../../../../design-system/assets/icons/star.svg?ur
 import birthdayIcon from '../../../../../design-system/assets/icons/gift.svg?url';
 import questionIcon from '../../../../../design-system/assets/icons/circle-help.svg?url';
 import inviteIcon from '../../../../../design-system/assets/icons/link.svg?url';
+import levelIcon from '../../../../../design-system/assets/icons/trending-up.svg?url';
 import eventIcon from '../../../../../design-system/assets/icons/calendar.svg?url';
 import voiceIcon from '../../../../../design-system/assets/icons/volume-2.svg?url';
 import { animIcons } from '../../ui';
@@ -87,6 +88,7 @@ const tagLook = {
   invite: { label: 'Invite', icon: inviteIcon },
   event: { label: 'Event', icon: eventIcon },
   voice: { label: 'Voice panel', icon: voiceIcon },
+  level: { label: 'Levels', icon: levelIcon },
 } as const;
 
 /** Tags for where else a template is used; hovering says exactly where. */

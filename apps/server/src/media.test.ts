@@ -46,6 +46,7 @@ describe('uploaded pictures', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/gif');
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
     expect(Buffer.from(await res.arrayBuffer()).equals(gif)).toBe(true);
   });
 

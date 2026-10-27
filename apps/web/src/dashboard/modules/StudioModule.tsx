@@ -30,6 +30,7 @@ import {
 import { variablesAnimations } from './VariablesButton';
 import { JsonPanel, jsonAnimations } from './JsonPanel';
 import { StudioLibrary } from './StudioLibrary';
+import { ImageStudio } from './ImageStudio';
 import { ChannelPicker, VersionHistory } from './parts';
 import { MessageCanvas, forChecks } from './MessageCanvas';
 import { StudioDataProvider } from './ComponentsEditor';
@@ -140,6 +141,7 @@ function StudioEditor({
           inviteVariables={uses.includes('invite')}
           eventVariables={uses.includes('event')}
           voiceVariables={uses.includes('voice')}
+          levelVariables={uses.includes('level')}
         />
 
         <div className="sp-stack sp-studio__side">
@@ -245,6 +247,9 @@ export function StudioModule({
   const checkChannel = useCheckChannel(server.id);
   const flow = useSaveFlow(server.id, 'studio');
   const [tab, setTab] = useModuleTab();
+  // Image studio stays open once visited, so switching tabs keeps its work.
+  const [imagesSeen, setImagesSeen] = useState(tab === 'images');
+  if (tab === 'images' && !imagesSeen) setImagesSeen(true);
   // The template open in the editor, and its unsaved changes.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<StudioMessage | null>(null);
@@ -408,8 +413,12 @@ export function StudioModule({
         module={module}
         tab={tab}
         onChange={setTab}
-        labels={['Editor', 'Templates', 'Versions']}
-        icons={editorTabIcons.slice(0, 2)}
+        labels={['Editor', 'Templates', 'Versions', 'Image studio']}
+        icons={[
+          ...editorTabIcons.slice(0, 2),
+          undefined,
+          { icon: 'image', anim: undefined },
+        ]}
         counts={[
           undefined,
           studio.data.templates.length,
@@ -513,6 +522,12 @@ export function StudioModule({
             });
           }}
         />
+      )}
+
+      {imagesSeen && (
+        <div hidden={tab !== 'images'}>
+          <ImageStudio server={server} />
+        </div>
       )}
 
       <FixPermissionModal

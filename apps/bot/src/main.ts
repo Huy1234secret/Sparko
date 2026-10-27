@@ -62,6 +62,7 @@ import { birthdaysBot } from './birthdays.ts';
 import { invitesBot } from './invites.ts';
 import { eventsBot } from './events.ts';
 import { isTempVoiceId, tempVoiceBot } from './temp-voice.ts';
+import { levelsBot } from './levels.ts';
 import { studioInfo } from './studio-info.ts';
 import { registerAllGuildCommands } from './guild-commands.ts';
 import {
@@ -123,6 +124,7 @@ const tempVoice = tempVoiceBot(db, rest, {
   appId: () => client?.application?.id,
   inGuild: (id) => !!client?.guilds.cache.has(id),
 });
+const levels = levelsBot(db, rest, { appId: () => client?.application?.id });
 /** Discord only sends member joins with the Server Members Intent on. */
 let membersIntent = true;
 /** And only shares message text with the Message Content Intent on. */
@@ -165,6 +167,7 @@ const handlers: Handlers = {
   ...invites.handlers((id) => client.guilds.cache.get(id)),
   ...events.handlers((id) => client.guilds.cache.get(id)),
   ...tempVoice.handlers((id) => client.guilds.cache.get(id)),
+  ...levels.handlers((id) => client.guilds.cache.get(id)),
   'rr-sync': (job) =>
     syncReactionRole(
       rest,
@@ -322,6 +325,13 @@ function wire(c: Client) {
         void events.component(interaction);
         return;
       }
+      // Levels & XP: /rank, /leaderboard, /xp and the crates' Open button.
+      if (interaction.isChatInputCommand() && levels.command(interaction))
+        return;
+      if (interaction.isButton() && levels.isCrate(interaction.customId)) {
+        void levels.crate(interaction);
+        return;
+      }
       // Temporary voice: /voice, the panel's buttons, menus and forms.
       if (interaction.isChatInputCommand() && tempVoice.command(interaction))
         return;
@@ -459,6 +469,12 @@ function wire(c: Client) {
       );
       return;
     }
+    // Levels & XP: chatting earns XP, and sometimes drops a crate.
+    levels
+      .message(message)
+      .catch((error: unknown) =>
+        console.error(`XP for a message in ${message.guildId} failed`, error),
+      );
     if (message.author.bot || !message.channel.isThread()) return;
     const file = message.attachments.first()?.name ?? null;
     tickets.recordMessage({
@@ -884,6 +900,8 @@ polls.startSweep((id) => client.guilds.cache.has(id));
 events.startSweep((id) => client.guilds.cache.has(id));
 // Empty temporary voice rooms.
 tempVoice.startSweep();
+// Voice XP every minute, and XP crates nobody opened in time.
+levels.startSweep((id) => client.guilds.cache.has(id));
 setStatus(
   db,
   'intents',

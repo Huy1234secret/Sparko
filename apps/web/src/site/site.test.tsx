@@ -240,6 +240,7 @@ describe('public site', () => {
       '/features/birthdays',
       '/features/events',
       '/features/invites',
+      '/features/levels',
       '/features/polls',
       '/features/questions',
       '/features/role-menus',

@@ -4,6 +4,8 @@ import type {
   BDMemberFound,
   INVDetail,
   INVFound,
+  LVDetail,
+  LVFound,
   AvatarColor,
   PanelApi,
   Server,
@@ -465,6 +467,61 @@ export function withBackend(
       if (!(await backend()).live) return sample.testInvite(id, channel, kind);
       await call('POST', `${server(id)}/invites/test`, { channel, kind });
     },
+    async getLevels(id) {
+      if (!(await backend()).live) return sample.getLevels(id);
+      return getJson(`${server(id)}/levels`);
+    },
+    async saveLevels(id, change) {
+      if (!(await backend()).live) return sample.saveLevels(id, change);
+      await call('PUT', `${server(id)}/levels`, change);
+    },
+    async levelLeaderboard(id, query, page) {
+      if (!(await backend()).live)
+        return sample.levelLeaderboard(id, query, page);
+      return getJson(
+        `${server(id)}/levels/leaderboard?q=${encodeURIComponent(query)}&page=${page}`,
+      );
+    },
+    async levelMember(id, userId) {
+      if (!(await backend()).live) return sample.levelMember(id, userId);
+      return getJson(`${server(id)}/levels/members/${userId}`);
+    },
+    async levelCrates(id) {
+      if (!(await backend()).live) return sample.levelCrates(id);
+      return getJson(`${server(id)}/levels/crates`);
+    },
+    async findLevelMembers(id, query) {
+      if (!(await backend()).live) return sample.findLevelMembers(id, query);
+      const r = await getJson<{ members: LVFound[] }>(
+        `${server(id)}/levels/find?q=${encodeURIComponent(query)}`,
+      );
+      return r.members;
+    },
+    async changeXp(id, userId, mode, amount) {
+      if (!(await backend()).live)
+        return sample.changeXp(id, userId, mode, amount);
+      return call<LVDetail>(
+        'POST',
+        `${server(id)}/levels/members/${userId}/xp`,
+        {
+          mode,
+          amount,
+        },
+      );
+    },
+    async resetXp(id, userId) {
+      if (!(await backend()).live) return sample.resetXp(id, userId);
+      await call(
+        'POST',
+        userId
+          ? `${server(id)}/levels/members/${userId}/reset`
+          : `${server(id)}/levels/reset`,
+      );
+    },
+    async testLevels(id, channel, kind) {
+      if (!(await backend()).live) return sample.testLevels(id, channel, kind);
+      await call('POST', `${server(id)}/levels/test`, { channel, kind });
+    },
     async getEvents(id) {
       if (!(await backend()).live) return sample.getEvents(id);
       return getJson(`${server(id)}/events`);
@@ -659,6 +716,27 @@ export function withBackend(
           info.message ?? 'The picture didn’t upload. Try again.',
         );
       return info.url;
+    },
+    async getImages(id) {
+      if (!(await backend()).live) return sample.getImages(id);
+      return getJson(`${server(id)}/studio/images`);
+    },
+    async saveImage(id, image) {
+      if (!(await backend()).live) return sample.saveImage(id, image);
+      return call<{ id: string }>('POST', `${server(id)}/studio/images`, image);
+    },
+    async updateImage(id, imageId, change) {
+      if (!(await backend()).live)
+        return sample.updateImage(id, imageId, change);
+      await call('PATCH', `${server(id)}/studio/images/${imageId}`, change);
+    },
+    async cloneImage(id, imageId) {
+      if (!(await backend()).live) return sample.cloneImage(id, imageId);
+      await call('POST', `${server(id)}/studio/images/${imageId}/clone`);
+    },
+    async deleteImage(id, imageId) {
+      if (!(await backend()).live) return sample.deleteImage(id, imageId);
+      await call('DELETE', `${server(id)}/studio/images/${imageId}`);
     },
     async listServerEmojis(id) {
       if (!(await backend()).live) return sample.listServerEmojis(id);

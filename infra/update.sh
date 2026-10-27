@@ -18,6 +18,15 @@ if ((${#missing[@]})); then
 fi
 
 git pull --ff-only
+# package.json sets the lowest Node allowed; stop with a clear message
+# instead of a pnpm engine error when the server's Node is older.
+need=$(node -p "require('./package.json').engines.node.match(/>=([0-9.]+)/)[1]")
+have=$(node -v | sed 's/^v//')
+if [[ $(printf '%s\n' "$need" "$have" | sort -V | head -n1) != "$need" ]]; then
+  echo "Stopped: this server runs Node $have but Sparko needs $need or later." >&2
+  echo 'As root, run  bash /opt/sparko/app/infra/setup-server.sh  to upgrade Node, then run this again.' >&2
+  exit 1
+fi
 pnpm install --frozen-lockfile
 NODE_OPTIONS=--max-old-space-size=2048 pnpm build
 pm2 restart ecosystem.config.cjs --update-env

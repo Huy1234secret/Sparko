@@ -291,13 +291,16 @@ export function SavePipeline({
   );
 }
 
-export type ModuleTab = 'settings' | 'items' | 'history';
+export type ModuleTab = 'settings' | 'items' | 'history' | 'images';
 /** The module's tab, kept in the address so links and Back work. */
 export function useModuleTab(defaultTab: ModuleTab = 'settings') {
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab');
   const tab: ModuleTab =
-    raw === 'settings' || raw === 'items' || raw === 'history'
+    raw === 'settings' ||
+    raw === 'items' ||
+    raw === 'history' ||
+    raw === 'images'
       ? raw
       : defaultTab;
   const setTab = (next: ModuleTab) => {
@@ -319,21 +322,22 @@ export function ModuleTabs({
   module: SparkoModule;
   tab: ModuleTab;
   onChange: (tab: ModuleTab) => void;
-  labels?: [string, string, string];
+  /** Three tabs, or four where a page has an extra one (Image studio). */
+  labels?: [string, string, string] | [string, string, string, string];
   counts?: (number | undefined)[];
   /** Animated icons for the tabs, with still ones to stand in. */
-  icons?: { icon: string; anim: RevealHover | undefined }[];
+  icons?: ({ icon: string; anim: RevealHover | undefined } | undefined)[];
 }) {
-  const values: ModuleTab[] = ['settings', 'items', 'history'];
+  const values: ModuleTab[] = ['settings', 'items', 'history', 'images'];
   return (
     <Tabs
       label={module.label}
       value={tab}
       onChange={onChange}
-      tabs={values.map((value, i) => ({
+      tabs={values.slice(0, labels.length).map((value, i) => ({
         value,
         label: labels[i]!,
-        ...(icons[i] ? { icon: icons[i].icon, anim: icons[i].anim } : {}),
+        ...(icons[i] ? { icon: icons[i]!.icon, anim: icons[i]!.anim } : {}),
         ...(counts[i] != null ? { count: counts[i] } : {}),
       }))}
     />

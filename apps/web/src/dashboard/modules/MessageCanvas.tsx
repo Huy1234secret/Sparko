@@ -49,6 +49,7 @@ function PreviewTools({
   inviteVariables,
   eventVariables,
   voiceVariables,
+  levelVariables,
 }: {
   serverId: string;
   items: PlusItem[];
@@ -63,6 +64,7 @@ function PreviewTools({
   inviteVariables: boolean;
   eventVariables: boolean;
   voiceVariables: boolean;
+  levelVariables: boolean;
 }) {
   const target = useInsertTarget();
   // Goes where the person was last writing, or at the end of the text.
@@ -84,6 +86,7 @@ function PreviewTools({
         invite={inviteVariables}
         event={eventVariables}
         voice={voiceVariables}
+        level={levelVariables}
         onPick={put}
       />
       <EmojiButton serverId={serverId} onPick={put} />
@@ -114,6 +117,7 @@ export function MessageCanvas({
   pollVariables,
   inviteVariables,
   eventVariables,
+  levelVariables,
   locked,
   maxRows: rowLimit,
   rowsNote,
@@ -146,6 +150,8 @@ export function MessageCanvas({
   rowsNote?: string;
   /** Lists the variables invite join and leave messages fill in. */
   inviteVariables?: boolean;
+  /** Lists the variables level-up messages, rank cards and crates fill in. */
+  levelVariables?: boolean;
   /** Lists the variables event messages fill in. */
   eventVariables?: boolean;
   /** Lists the variables the temporary voice panel fills in. */
@@ -283,6 +289,7 @@ export function MessageCanvas({
           inviteVariables={!!inviteVariables}
           eventVariables={!!eventVariables}
           voiceVariables={!!voiceVariables}
+          levelVariables={!!levelVariables}
           items={items}
           v2={v2}
           onEmoji={(text) =>

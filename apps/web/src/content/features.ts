@@ -463,6 +463,44 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     pairs: ['welcome', 'autoroles'],
   },
+  levels: {
+    headline: 'Give members something to chat for.',
+    points: [
+      'XP for chatting and time in voice, with anti-spam cooldowns',
+      'Reward roles, XP crates and boosts for roles and channels',
+      'Rank cards, level-up messages and crates you design in Message Studio',
+    ],
+    how: [
+      {
+        icon: 'trending-up',
+        title: 'XP and levels',
+        body: 'Each message earns a random amount of XP once per cooldown, and voice earns XP every minute when someone else is in the channel. Pick a gentle, standard or steep curve, see how long each level takes, and leave out channels and roles that shouldn’t earn.',
+      },
+      {
+        icon: 'award',
+        title: 'Reward roles',
+        body: 'Give a role at level 5, another at 10, and keep them all or only the highest. Sparko takes them back if staff lower someone’s XP, if you like. Free has 5 rewards; Plus has 50.',
+      },
+      {
+        icon: 'gift',
+        title: 'XP crates',
+        body: 'Now and then a message drops a crate with an Open button. The first member to press it wins the XP inside. Pick the channels, how often they drop and how much they hold.',
+      },
+      {
+        icon: 'image',
+        title: 'Rank cards and level-ups',
+        body: 'The /rank card, the level-up message and the crate are templates you edit in Message Studio, with variables like {level}, {xp} and {progress.bar}. Announce level-ups where members chatted, in one channel or by DM.',
+      },
+    ],
+    steps: [
+      'Open Levels & XP and switch it on.',
+      'Set how much XP chatting and voice give, and pick a curve.',
+      'Add reward roles, and turn on XP crates if you like.',
+      'Save. Sparko adds /rank, /leaderboard and /xp to your server.',
+    ],
+    commands: ['/rank', '/leaderboard', '/xp give', '/xp set', '/xp reset'],
+    pairs: ['studio', 'autoroles'],
+  },
   events: {
     headline: 'Events people show up to.',
     points: [
