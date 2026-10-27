@@ -67,7 +67,7 @@ function NeedsPlus({ server }: { server: Server }) {
         <ul className="sp-price__features" style={{ border: 0, padding: 0 }}>
           {[
             'Copy settings to your other servers, with a preview first',
-            '100 message templates and 100 MB storage',
+            '500 message templates and 100 MB storage',
             '25 steps per workflow, transcripts kept 30 days',
           ].map((f) => (
             <li key={f}>
