@@ -50,6 +50,8 @@ import {
   invKinds,
   invKindNames,
   type Invites,
+  LV_MODULE,
+  type Levels,
   EV_MODULE,
   evKinds,
   evKindNames,
@@ -136,7 +138,8 @@ export function studioRoutes({
           | 'poll'
           | 'invite'
           | 'event'
-          | 'voice';
+          | 'voice'
+          | 'level';
         where: string;
       }[]
     >();
@@ -152,7 +155,8 @@ export function studioRoutes({
         | 'poll'
         | 'invite'
         | 'event'
-        | 'voice',
+        | 'voice'
+        | 'level',
       where: string,
     ) => {
       if (!id) return;
@@ -230,6 +234,16 @@ export function studioRoutes({
         add(ev.messages?.[k] ?? '', 'event', `Events (${evKindNames[k]})`);
     const tv = getModule<TempVoice>(db, guildId, TV_MODULE).config;
     add(tv?.panel?.message ?? '', 'voice', 'Temporary voice (control panel)');
+    const lv = getModule<Levels>(db, guildId, LV_MODULE).config;
+    if (lv) {
+      add(
+        lv.levelUp?.template ?? '',
+        'level',
+        'Levels & XP (level-up message)',
+      );
+      add(lv.rank?.template ?? '', 'level', 'Levels & XP (rank card)');
+      add(lv.crates?.template ?? '', 'level', 'Levels & XP (XP crate)');
+    }
     return uses;
   };
 
