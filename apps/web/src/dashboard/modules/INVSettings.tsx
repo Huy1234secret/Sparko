@@ -207,6 +207,7 @@ export function INVSettings({
               n={config.rewards.length}
               max={limits.rewards}
               what="reward roles"
+              icon="gift"
             />
             <AnimatedIconButton
               size="sm"

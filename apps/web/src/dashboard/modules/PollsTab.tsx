@@ -235,6 +235,7 @@ function PollBuilder({
           n={data.open}
           max={data.limits.active}
           what="polls running or scheduled"
+          icon="poll"
         />
       </div>
       <fieldset className="sp-fieldset" disabled={paused}>
@@ -266,7 +267,12 @@ function PollBuilder({
                   text={`From 2 up to ${maxOptions} on this plan. Each one is a button or a menu option, with an emoji if you like.`}
                 />
               </span>
-              <Used n={b.options.length} max={maxOptions} what="options" />
+              <Used
+                n={b.options.length}
+                max={maxOptions}
+                what="options"
+                icon="status"
+              />
             </div>
             <ol className="sp-pl-options">
               {b.options.map((o, i) => (

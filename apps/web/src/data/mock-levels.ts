@@ -237,7 +237,7 @@ export function createLevelsMock(h: Helpers) {
       .filter((m) => m.xp > 0)
       .sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name, 'en'));
   const rowOf = (s: MockState, m: Person, rank: number | null): LVRow => {
-    const p = lvProgress(s.config.curve, m.xp, s.config.maxLevel);
+    const p = lvProgress(s.config.formula, m.xp, s.config.maxLevel);
     return { rank, ...m, level: p.level, percent: p.percent };
   };
   const anyone = (userId: string) =>
@@ -252,7 +252,7 @@ export function createLevelsMock(h: Helpers) {
       messages: 0,
       voiceMinutes: 0,
     };
-    const p = lvProgress(s.config.curve, base.xp, s.config.maxLevel);
+    const p = lvProgress(s.config.formula, base.xp, s.config.maxLevel);
     const at = ranked(s).findIndex((r) => r.userId === userId);
     return {
       ...base,

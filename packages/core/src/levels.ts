@@ -1,6 +1,6 @@
 /**
  * Levels & XP: members earn XP for chatting and for time in voice, climb
- * levels on a curve the server picks, get reward roles at the levels it
+ * levels by an XP equation the server writes, get reward roles at the levels it
  * sets, and race to open XP crates that drop in chat. Level-ups, rank cards
  * and crates are Message Studio templates. Nothing here touches the
  * database or the network, so the dashboard imports this file too.
@@ -21,10 +21,6 @@ export const LV_MODULE = 'levels';
 /** The three messages: a level-up, the /rank card, and an XP crate drop. */
 export type LvKind = 'levelup' | 'rank' | 'crate';
 export const lvKinds: LvKind[] = ['levelup', 'rank', 'crate'];
-
-/** How steeply the XP each level needs grows. */
-export type LvCurve = 'gentle' | 'standard' | 'steep';
-export const lvCurves: LvCurve[] = ['gentle', 'standard', 'steep'];
 
 /** Where a level-up is announced. */
 export type LvAnnounce = 'off' | 'same' | 'channel' | 'dm';
@@ -58,7 +54,8 @@ export type Levels = {
     /** Not while muted or deafened. */
     skipMuted: boolean;
   };
-  curve: LvCurve;
+  /** The XP each level needs, with x for the level, like 5*x^2 + 40*x + 55. */
+  formula: string;
   /** The highest level; XP still counts past it. */
   maxLevel: number;
   /** Channels (and their threads) and roles that never earn XP. */
@@ -125,7 +122,7 @@ export const lvDefaultCommands = (): Levels['commands'] => ({
 export const lvDefault = (channel = ''): Levels => ({
   message: { on: true, min: 15, max: 25, cooldown: 60 },
   voice: { on: true, perMinute: 5, needOthers: true, skipMuted: true },
-  curve: 'standard',
+  formula: LV_FORMULA,
   maxLevel: 100,
   noXpChannels: [],
   noXpRoles: [],
@@ -171,47 +168,183 @@ export const LV_MAX_CHANGE = 10_000_000;
 /** Leaderboard rows per page in Discord. */
 export const LV_PAGE = 10;
 
-// The curve -------------------------------------------------------------------
+// The XP equation -------------------------------------------------------------
 
-export const lvCurveNames: Record<LvCurve, string> = {
-  gentle: 'Gentle',
-  standard: 'Standard',
-  steep: 'Steep',
-};
-export const lvCurveAbout: Record<LvCurve, string> = {
-  gentle: 'Levels come quickly. Good for small or quiet servers.',
-  standard: 'The curve most level bots use. Level 10 takes a few days of chat.',
-  steep: 'Each level is a real achievement. Good for big, busy servers.',
-};
-const curveParts: Record<LvCurve, [number, number, number]> = {
-  gentle: [3, 30, 75],
-  standard: [5, 50, 100],
-  steep: [8, 80, 150],
+/** The XP a level needs, written with x for the level. */
+export const LV_FORMULA = '5*x^2 + 40*x + 55';
+/** The longest equation, and the most XP one level can need. */
+export const LV_FORMULA_MAX = 120;
+export const LV_LEVEL_MAX_XP = 100_000_000;
+
+type Node = (x: number) => number;
+type Parsed = { fn: Node } | { problem: string };
+
+/**
+ * Reads an equation like `5*x^2 + 40*x + 55`: numbers, x, + - * / % ^ and
+ * brackets. Nothing is evaluated as code, so any text is safe to read.
+ */
+export function lvParseFormula(source: string): Parsed {
+  const src = source.trim();
+  if (!src)
+    return { problem: 'Write an equation for the XP each level needs.' };
+  if (src.length > LV_FORMULA_MAX)
+    return { problem: `Keep the equation under ${LV_FORMULA_MAX} characters.` };
+  const tokens =
+    src.match(/\d+(?:\.\d+)?|\.\d+|\*\*|[xX]|[-+*/%^()]|\S/g) ?? [];
+  let at = 0;
+  let usesX = false;
+  class Bad extends Error {}
+  const fail = (why: string): never => {
+    throw new Bad(why);
+  };
+  const peek = () => tokens[at];
+  const near = () => (peek() === undefined ? 'at the end' : `near “${peek()}”`);
+
+  // expr := term (('+' | '-') term)*
+  const expr = (): Node => {
+    let left = term();
+    for (let op = peek(); op === '+' || op === '-'; op = peek()) {
+      at++;
+      const a = left;
+      const b = term();
+      left = op === '+' ? (x) => a(x) + b(x) : (x) => a(x) - b(x);
+    }
+    return left;
+  };
+  // term := unary (('*' | '/' | '%') unary)*
+  const term = (): Node => {
+    let left = unary();
+    for (let op = peek(); op === '*' || op === '/' || op === '%'; op = peek()) {
+      at++;
+      const a = left;
+      const b = unary();
+      left =
+        op === '*'
+          ? (x) => a(x) * b(x)
+          : op === '/'
+            ? (x) => a(x) / b(x)
+            : (x) => a(x) % b(x);
+    }
+    return left;
+  };
+  // unary := ('-' | '+') unary | power
+  const unary = (): Node => {
+    const op = peek();
+    if (op === '-' || op === '+') {
+      at++;
+      const a = unary();
+      return op === '-' ? (x) => -a(x) : a;
+    }
+    return power();
+  };
+  // power := primary (('^' | '**') unary)?, so 2^3^2 is 2^(3^2).
+  const power = (): Node => {
+    const base = primary();
+    const op = peek();
+    if (op !== '^' && op !== '**') return base;
+    at++;
+    const exp = unary();
+    return (x) => base(x) ** exp(x);
+  };
+  // primary := number | x | '(' expr ')'
+  const primary = (): Node => {
+    const t = peek();
+    if (t === undefined) return fail('The equation ends too soon.');
+    at++;
+    if (t === 'x' || t === 'X') {
+      usesX = true;
+      return (x) => x;
+    }
+    if (/^(\d|\.\d)/.test(t)) {
+      const v = Number(t);
+      return () => v;
+    }
+    if (t === '(') {
+      const inner = expr();
+      if (peek() !== ')') return fail(`A bracket isn’t closed ${near()}.`);
+      at++;
+      return inner;
+    }
+    at--;
+    return fail(
+      /^[a-z]/i.test(t)
+        ? `Use x for the level. “${t}” isn’t something the equation knows.`
+        : `Something’s missing ${near()}.`,
+    );
+  };
+
+  try {
+    const fn = expr();
+    if (at < tokens.length) return { problem: `Something’s off ${near()}.` };
+    if (!usesX)
+      return { problem: 'Use x for the level somewhere, like 100*x.' };
+    return { fn };
+  } catch (e) {
+    if (e instanceof Bad) return { problem: e.message };
+    throw e;
+  }
+}
+
+const compiled = new Map<string, Node | null>();
+/** The equation as a function, or null when it can't be read. Cached. */
+function formulaFn(formula: string): Node | null {
+  let fn = compiled.get(formula);
+  if (fn === undefined) {
+    const p = lvParseFormula(formula);
+    fn = 'fn' in p ? p.fn : null;
+    if (compiled.size > 500) compiled.clear();
+    compiled.set(formula, fn);
+  }
+  return fn;
+}
+
+/**
+ * XP to go from `level` to the next one: the equation at x = level + 1,
+ * rounded, at least 1. An equation that can't be read uses Sparko's own.
+ */
+export const lvNeed = (formula: string, level: number) => {
+  const fn = formulaFn(formula) ?? formulaFn(LV_FORMULA)!;
+  const v = Math.round(fn(level + 1));
+  return Number.isFinite(v)
+    ? Math.min(LV_LEVEL_MAX_XP, Math.max(1, v))
+    : LV_LEVEL_MAX_XP;
 };
 
-/** XP to go from `level` to the next one. */
-export const lvNeed = (curve: LvCurve, level: number) => {
-  const [a, b, c] = curveParts[curve];
-  return a * level * level + b * level + c;
-};
+/** Problems with an equation for these levels, or null. */
+export function lvFormulaIssue(formula: unknown, maxLevel: number) {
+  if (typeof formula !== 'string')
+    return 'Write an equation for the XP each level needs.';
+  const p = lvParseFormula(formula);
+  if ('problem' in p) return p.problem;
+  for (let x = 1; x <= maxLevel; x++) {
+    const v = Math.round(p.fn(x));
+    if (!Number.isFinite(v))
+      return `Level ${x} can’t be worked out with this equation, like a division by 0.`;
+    if (v < 1)
+      return `Level ${x} would need ${v} XP. Every level has to need at least 1.`;
+    if (v > LV_LEVEL_MAX_XP)
+      return `Level ${x} would need over ${LV_LEVEL_MAX_XP.toLocaleString('en-US')} XP. Make the equation grow slower.`;
+  }
+  return null;
+}
 
 /** The total XP a level takes, from 0. */
-export function lvTotalFor(curve: LvCurve, level: number) {
+export function lvTotalFor(formula: string, level: number) {
   let total = 0;
-  for (let l = 0; l < level; l++) total += lvNeed(curve, l);
+  for (let l = 0; l < level; l++) total += lvNeed(formula, l);
   return total;
 }
 
 /** Where someone with this much XP is: level, XP into it, XP it needs. */
-export function lvProgress(curve: LvCurve, xp: number, maxLevel = 500) {
+export function lvProgress(formula: string, xp: number, maxLevel = 500) {
   let level = 0;
   let floor = 0;
-  while (level < maxLevel && xp >= floor + lvNeed(curve, level)) {
-    floor += lvNeed(curve, level);
+  while (level < maxLevel && xp >= floor + lvNeed(formula, level)) {
+    floor += lvNeed(formula, level);
     level++;
   }
   const max = level >= maxLevel;
-  const need = max ? 0 : lvNeed(curve, level);
+  const need = max ? 0 : lvNeed(formula, level);
   const into = xp - floor;
   return {
     level,
@@ -228,26 +361,13 @@ export function lvProgress(curve: LvCurve, xp: number, maxLevel = 500) {
 
 /** The level for an amount of XP. */
 export const lvLevelOf = (c: Levels, xp: number) =>
-  lvProgress(c.curve, xp, c.maxLevel).level;
+  lvProgress(c.formula, xp, c.maxLevel).level;
 
 /** A 10-step bar for how far into a level someone is. */
 export const lvBar = (percent: number, width = 10) => {
   const full = Math.floor((Math.max(0, Math.min(100, percent)) / 100) * width);
   return '▰'.repeat(full) + '▱'.repeat(width - full);
 };
-
-/**
- * Roughly how long a level takes for a member who chats every few minutes
- * and spends some time in voice, for the dashboard's curve preview.
- */
-export function lvDaysTo(c: Levels, level: number, perDay = 40) {
-  const average = (c.message.min + c.message.max) / 2;
-  // Each message past the cooldown earns; assume they're spread out.
-  const fromChat = c.message.on ? perDay * average : 0;
-  const fromVoice = c.voice.on ? 30 * c.voice.perMinute : 0;
-  const daily = fromChat + fromVoice;
-  return daily ? lvTotalFor(c.curve, level) / daily : null;
-}
 
 // Earning ---------------------------------------------------------------------
 
@@ -412,12 +532,13 @@ export function lvIssue(
       `Voice XP has to be from ${r.perMinute.min} to ${r.perMinute.max} a minute.`,
     );
 
-  if (!lvCurves.includes(x.curve as LvCurve)) return missing;
   if (!int(x.maxLevel, r.maxLevel.min, r.maxLevel.max))
     return at(
       'maxLevel',
       `The highest level has to be from ${r.maxLevel.min} to ${r.maxLevel.max}.`,
     );
+  const formula = lvFormulaIssue(x.formula, x.maxLevel as number);
+  if (formula) return at('formula', formula);
 
   const idList = (
     list: unknown,
@@ -672,7 +793,7 @@ export function cleanLevels(c: Levels): Levels {
       needOthers: c.voice.needOthers,
       skipMuted: c.voice.skipMuted,
     },
-    curve: c.curve,
+    formula: c.formula.trim(),
     maxLevel: c.maxLevel,
     noXpChannels: [...new Set(c.noXpChannels)],
     noXpRoles: [...new Set(c.noXpRoles)],
@@ -711,13 +832,24 @@ export function cleanLevels(c: Levels): Levels {
   };
 }
 
+/** The three curves servers used to pick from, as equations. */
+const oldCurves: Record<string, string> = {
+  gentle: '3*x^2 + 24*x + 48',
+  standard: LV_FORMULA,
+  steep: '8*x^2 + 64*x + 78',
+};
+
 /** Settings saved by an older version, with anything added since filled in. */
 export function lvUpgrade(saved: Partial<Levels> | null | undefined): Levels {
   const base = lvDefault();
   if (!saved) return base;
+  // Before the equation, servers picked one of three curves.
+  const { curve, ...rest } = saved as Partial<Levels> & { curve?: string };
   return {
     ...base,
-    ...saved,
+    ...rest,
+    formula:
+      rest.formula ?? (curve ? oldCurves[curve] : undefined) ?? base.formula,
     message: { ...base.message, ...saved.message },
     voice: { ...base.voice, ...saved.voice },
     levelUp: { ...base.levelUp, ...saved.levelUp },
@@ -930,7 +1062,7 @@ export type LvFacts = {
 
 /** The level variables: {level}, {xp}, {progress.bar}… */
 export function lvVariables(c: Levels, f: LvFacts): Record<string, string> {
-  const p = lvProgress(c.curve, f.xp, c.maxLevel);
+  const p = lvProgress(c.formula, f.xp, c.maxLevel);
   return {
     level: n(p.level),
     'level.previous': n(f.previous ?? Math.max(0, p.level - 1)),

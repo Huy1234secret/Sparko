@@ -204,10 +204,10 @@ export function lvRoutes({
         at,
       );
       // The bot registers the commands, checks channels and roles, and
-      // brings reward roles in line when the rewards or the curve changed.
+      // brings reward roles in line when the rewards or the XP equation changed.
       const rewardsChanged =
-        JSON.stringify([before.rewards, before.curve, before.maxLevel]) !==
-        JSON.stringify([config.rewards, config.curve, config.maxLevel]);
+        JSON.stringify([before.rewards, before.formula, before.maxLevel]) !==
+        JSON.stringify([config.rewards, config.formula, config.maxLevel]);
       enqueueJob(
         db,
         {

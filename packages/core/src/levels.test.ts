@@ -14,7 +14,10 @@ import {
   lvMessageIssue,
   lvMessageXp,
   lvMultiplier,
+  LV_FORMULA,
+  lvFormulaIssue,
   lvNeed,
+  lvParseFormula,
   lvPayload,
   lvProgress,
   lvRewardPlan,
@@ -32,24 +35,66 @@ const base = (patch: Partial<Levels> = {}): Levels => ({
 });
 
 describe('the curve', () => {
-  it('needs more XP for each level, steeper on steeper curves', () => {
-    expect(lvNeed('standard', 0)).toBe(100);
-    expect(lvNeed('standard', 1)).toBe(155);
-    expect(lvTotalFor('standard', 2)).toBe(255);
-    expect(lvNeed('gentle', 5)).toBeLessThan(lvNeed('standard', 5));
-    expect(lvNeed('steep', 5)).toBeGreaterThan(lvNeed('standard', 5));
+  it('needs more XP for each level, from the equation', () => {
+    expect(lvNeed(LV_FORMULA, 0)).toBe(100);
+    expect(lvNeed(LV_FORMULA, 1)).toBe(155);
+    expect(lvTotalFor(LV_FORMULA, 2)).toBe(255);
+    expect(lvNeed('100 * x', 4)).toBe(500);
+    expect(lvNeed('(x + 1) ^ 2 % 7 + 2 * -(-3)', 1)).toBe(8);
+    expect(lvNeed('2 ** 3 ^ 2 / x', 0)).toBe(512);
+    // Never under 1, and an equation that can't be read uses Sparko's own.
+    expect(lvNeed('x - 10', 0)).toBe(1);
+    expect(lvNeed('nope', 0)).toBe(100);
+  });
+
+  it('reads equations safely and says what’s wrong', () => {
+    expect(lvParseFormula('5*x^2 + 40*x + 55')).toHaveProperty('fn');
+    expect(lvParseFormula('')).toEqual({
+      problem: 'Write an equation for the XP each level needs.',
+    });
+    expect(lvParseFormula('100')).toEqual({
+      problem: 'Use x for the level somewhere, like 100*x.',
+    });
+    expect(lvParseFormula('(x + 1')).toEqual({
+      problem: 'A bracket isn’t closed at the end.',
+    });
+    expect(lvParseFormula('x + ')).toEqual({
+      problem: 'The equation ends too soon.',
+    });
+    expect(lvParseFormula('level * 2')).toEqual({
+      problem: 'Use x for the level. “l” isn’t something the equation knows.',
+    });
+    expect(lvParseFormula('x 2')).toEqual({
+      problem: 'Something’s off near “2”.',
+    });
+    expect(lvParseFormula('alert(1)')).toHaveProperty('problem');
+  });
+
+  it('checks every level the equation gives', () => {
+    expect(lvFormulaIssue(LV_FORMULA, 500)).toBeNull();
+    expect(lvFormulaIssue('600 / (3 - x)', 10)).toMatch(
+      /^Level 3 can’t be worked out/,
+    );
+    expect(lvFormulaIssue('50 - x', 100)).toBe(
+      'Level 50 would need 0 XP. Every level has to need at least 1.',
+    );
+    expect(lvFormulaIssue('10^x', 100)).toMatch(/^Level 9 would need over/);
+    expect(lvIssue(base({ formula: 'x +' }))).toEqual({
+      at: 'formula',
+      problem: 'The equation ends too soon.',
+    });
   });
 
   it('says where someone is inside a level', () => {
-    expect(lvProgress('standard', 0)).toMatchObject({
+    expect(lvProgress(LV_FORMULA, 0)).toMatchObject({
       level: 0,
       into: 0,
       need: 100,
       next: 100,
       percent: 0,
     });
-    expect(lvProgress('standard', 100)).toMatchObject({ level: 1, into: 0 });
-    expect(lvProgress('standard', 177)).toMatchObject({
+    expect(lvProgress(LV_FORMULA, 100)).toMatchObject({ level: 1, into: 0 });
+    expect(lvProgress(LV_FORMULA, 177)).toMatchObject({
       level: 1,
       into: 77,
       need: 155,
@@ -59,7 +104,7 @@ describe('the curve', () => {
   });
 
   it('stops at the highest level, while XP still counts', () => {
-    const p = lvProgress('standard', 1_000_000, 3);
+    const p = lvProgress(LV_FORMULA, 1_000_000, 3);
     expect(p).toMatchObject({ level: 3, max: true, percent: 100, need: 0 });
     expect(lvLevelOf(base({ maxLevel: 3 }), 1_000_000)).toBe(3);
   });
@@ -345,10 +390,14 @@ describe('checks', () => {
   it('keeps only known fields, and fills in older settings', () => {
     const c = { ...base(), extra: 1 } as Levels;
     expect(cleanLevels(c)).not.toHaveProperty('extra');
-    expect(lvUpgrade({ curve: 'steep' } as Partial<Levels>)).toMatchObject({
-      curve: 'steep',
+    const old = lvUpgrade({ curve: 'steep' } as Partial<Levels>);
+    expect(old).toMatchObject({
+      formula: '8*x^2 + 64*x + 78',
       crates: { on: false },
     });
+    expect(old).not.toHaveProperty('curve');
+    // The old curve's numbers carry over exactly.
+    expect(lvNeed(old.formula, 5)).toBe(8 * 25 + 80 * 5 + 150);
   });
 });
 

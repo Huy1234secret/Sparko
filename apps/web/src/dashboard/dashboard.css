@@ -4712,55 +4712,117 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
 .sp-lv-max {
   max-width: 220px;
 }
-.sp-lv-curve {
-  display: grid;
-  gap: 6px;
-  margin: 4px 0 0;
-}
-.sp-lv-curve__bars {
+.sp-lv-formula {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
-  height: 96px;
-  padding: 8px;
-  border: 1px solid var(--sp-line);
-  border-radius: var(--sp-radius-control);
-  background: var(--sp-raised);
+  gap: 8px;
 }
-.sp-lv-curve__bar {
-  flex: 1 1 0;
-  min-width: 2px;
-  height: var(--h);
-  border-radius: 2px 2px 0 0;
-  background: var(--sp-brand-soft);
-  box-shadow: inset 0 0 0 1px var(--sp-brand-line);
-  transition: height var(--sp-dur-base) var(--sp-ease-out);
-}
-.sp-lv-curve__bar.is-mark {
-  background: var(--sp-brand);
-}
-.sp-lv-miles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 6px;
+.sp-lv-formula .sp-field {
+  flex: 1 1 auto;
   margin: 0;
 }
-.sp-lv-mile {
+.sp-lv-formula input {
+  font-family: var(--sp-font-mono);
+}
+.sp-lv-formula > .sp-btn {
+  margin-bottom: 4px;
+}
+/* The XP each level needs: a line, hoverable at every level. */
+.sp-lv-chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  margin: 4px 0 0;
+}
+.sp-lv-chart__y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--sp-muted);
+  font: 500 11px/14px var(--sp-font-sans);
+  text-align: right;
+}
+.sp-lv-chart__x {
+  display: flex;
+  grid-column: 2;
+  justify-content: space-between;
+  color: var(--sp-muted);
+  font: 500 11px/14px var(--sp-font-sans);
+}
+.sp-lv-chart__plot {
+  position: relative;
+  height: 200px;
+  border-bottom: 1px solid var(--sp-line-strong);
+  border-left: 1px solid var(--sp-line-strong);
+  cursor: crosshair;
+  touch-action: none;
+}
+.sp-lv-chart__plot:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--sp-ring);
+  outline-offset: 4px;
+}
+.sp-lv-chart__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.sp-lv-chart__line {
+  fill: none;
+  stroke: var(--sp-brand);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.sp-lv-chart__guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--sp-line-strong);
+  pointer-events: none;
+}
+.sp-lv-chart__dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--sp-surface);
+  border-radius: 50%;
+  background: var(--sp-brand);
+  box-shadow: 0 0 0 1px var(--sp-brand-edge);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.sp-lv-chart__tip {
+  position: absolute;
+  top: 8px;
+  z-index: 1;
   display: grid;
   gap: 2px;
   padding: 8px 10px;
   border: 1px solid var(--sp-line);
   border-radius: var(--sp-radius-control);
-  background: var(--sp-raised);
-}
-.sp-lv-mile dt {
-  color: var(--sp-muted);
+  background: var(--sp-surface);
+  box-shadow: var(--sp-shadow-overlay);
   font: 500 12px/16px var(--sp-font-sans);
+  white-space: nowrap;
+  transform: translateX(12px);
+  pointer-events: none;
 }
-.sp-lv-mile dd {
+.sp-lv-chart__tip.is-left {
+  transform: translateX(calc(-100% - 12px));
+}
+.sp-lv-chart__tip b {
+  font-size: 13px;
+}
+.sp-lv-chart__empty {
   display: grid;
-  margin: 0;
-  font: 600 14px/20px var(--sp-font-sans);
+  place-items: center;
+  height: 120px;
+  border: 1px dashed var(--sp-line-strong);
+  border-radius: var(--sp-radius-control);
 }
 .sp-lv-boosts {
   display: grid;
@@ -4785,61 +4847,24 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
   margin-bottom: 2px;
 }
 
-/* The reward ladder: each reward on a track from level 0 to the top. */
-.sp-lv-ladder {
-  position: relative;
-  height: 104px;
-  margin: 4px 14px 18px;
-}
-.sp-lv-ladder__track {
-  position: absolute;
-  inset: 50px 0 auto;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--sp-brand-soft),
-    var(--sp-brand) 100%
-  );
-}
-.sp-lv-ladder__step {
-  position: absolute;
-  top: 44px;
-  left: var(--at);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  transform: translateX(-50%);
-}
-/* Every other label sits above the track, so close levels don't collide. */
-.sp-lv-ladder__step.is-up {
-  top: auto;
-  bottom: calc(100% - 60px);
-  flex-direction: column-reverse;
-}
-.sp-lv-ladder__dot {
-  width: 16px;
-  height: 16px;
-  border: 3px solid var(--sp-surface);
-  border-radius: 50%;
-  background: var(--c);
-  box-shadow: 0 0 0 1px var(--sp-line-strong);
-}
-.sp-lv-ladder__label {
+/* Reward roles, two to a row. */
+.sp-lv-rewards {
   display: grid;
-  justify-items: center;
-  max-width: 96px;
-  font: 500 12px/16px var(--sp-font-sans);
-  white-space: nowrap;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
-.sp-lv-ladder__label span {
-  overflow: hidden;
-  max-width: 96px;
-  color: var(--sp-muted);
-  text-overflow: ellipsis;
+.sp-lv-reward {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
 }
-
+.sp-lv-reward .sp-field {
+  margin: 0;
+}
+.sp-lv-reward > .sp-icon-btn {
+  margin-top: 26px;
+}
 /* Crates. */
 .sp-card.is-off .sp-card__body {
   opacity: 0.7;
@@ -4970,12 +4995,11 @@ a.sp-sb-card__open:hover .sp-sg-card__name {
   .sp-lv-boost > .sp-field:first-of-type {
     grid-column: 1 / -1;
   }
-  .sp-lv-ladder__label span {
-    display: none;
+  .sp-lv-rewards {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sp-lv-curve__bar,
   .sp-lv-bar::after {
     transition: none;
   }

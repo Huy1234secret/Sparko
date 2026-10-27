@@ -1,4 +1,12 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import {
   Badge,
   Button,
@@ -15,11 +23,10 @@ import {
   type ComboItem,
 } from '../../ui';
 import {
+  LV_FORMULA,
+  LV_FORMULA_MAX,
   LV_MAX_CHANGE,
-  lvCurveAbout,
-  lvCurveNames,
-  lvCurves,
-  lvDaysTo,
+  lvFormulaIssue,
   lvNeed,
   lvRanges,
   lvTotalFor,
@@ -69,47 +76,119 @@ const roleName = (roles: RoleOption[], id: string) =>
   roles.find((r) => r.id === id)?.name ?? 'deleted role';
 const roleColour = (roles: RoleOption[], id: string) =>
   roles.find((r) => r.id === id)?.color ?? '#99AAB5';
-const daysText = (days: number | null) =>
-  days === null
-    ? 'Never: nothing earns XP'
-    : days < 1
-      ? 'Under a day'
-      : days < 60
-        ? `About ${Math.round(days)} ${Math.round(days) === 1 ? 'day' : 'days'}`
-        : `About ${Math.round(days / 30)} months`;
-
 // Settings: how XP is earned --------------------------------------------------
 
-/** XP for each level, drawn as bars, to see the curve's shape. */
+/**
+ * The XP each level needs, as a line. Hovering anywhere (or the arrow keys)
+ * picks the nearest level and says what it needs.
+ */
 function CurveChart({ config }: { config: Levels }) {
-  const top = Math.min(config.maxLevel, 50);
-  const levels = Array.from({ length: top }, (_, i) => i);
-  const most = lvNeed(config.curve, top - 1);
+  const top = Math.max(1, config.maxLevel);
+  const needs = useMemo(
+    () => Array.from({ length: top }, (_, i) => lvNeed(config.formula, i)),
+    [config.formula, top],
+  );
+  const [level, setLevel] = useState<number | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const most = Math.max(...needs);
+  const xOf = (lv: number) => (top === 1 ? 50 : ((lv - 1) / (top - 1)) * 100);
+  const yOf = (v: number) => 100 - (v / most) * 100;
+  const line = needs
+    .map((v, i) => `${i ? 'L' : 'M'}${xOf(i + 1) * 10},${yOf(v) * 2.4}`)
+    .join(' ');
+  const total = (lv: number) => needs.slice(0, lv).reduce((a, b) => a + b, 0);
+  const pick = (clientX: number) => {
+    const r = box.current?.getBoundingClientRect();
+    if (!r || !r.width) return;
+    const at = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    setLevel(Math.round(1 + at * (top - 1)));
+  };
+  const keys = (e: KeyboardEvent) => {
+    const step = e.shiftKey ? 10 : 1;
+    const now = level ?? 1;
+    const next =
+      e.key === 'ArrowRight' || e.key === 'ArrowUp'
+        ? now + step
+        : e.key === 'ArrowLeft' || e.key === 'ArrowDown'
+          ? now - step
+          : e.key === 'Home'
+            ? 1
+            : e.key === 'End'
+              ? top
+              : null;
+    if (next === null) return;
+    e.preventDefault();
+    setLevel(Math.min(top, Math.max(1, next)));
+  };
+  const shown = level ?? null;
+  const tipLeft = shown ? xOf(shown) : 0;
   return (
-    <figure className="sp-lv-curve">
-      <div className="sp-lv-curve__bars" aria-hidden="true">
-        {levels.map((l) => (
-          <span
-            key={l}
-            className={cx('sp-lv-curve__bar', (l + 1) % 10 === 0 && 'is-mark')}
-            style={
-              {
-                '--h': `${Math.max(4, (lvNeed(config.curve, l) / most) * 100)}%`,
-              } as CSSProperties
-            }
-            title={`Level ${l + 1}: ${n(lvNeed(config.curve, l))} XP`}
-          />
-        ))}
+    <figure className="sp-lv-chart">
+      <div className="sp-lv-chart__y" aria-hidden="true">
+        <span>{n(most)} XP</span>
+        <span>0</span>
       </div>
-      <figcaption className="sp-hint">
-        XP each level takes, from level 1 to {top}. Level {top} needs {n(most)}{' '}
-        XP on its own.
-      </figcaption>
+      <div
+        ref={box}
+        className="sp-lv-chart__plot"
+        role="slider"
+        tabIndex={0}
+        aria-label="XP each level needs"
+        aria-valuemin={1}
+        aria-valuemax={top}
+        aria-valuenow={shown ?? 1}
+        aria-valuetext={`Level ${shown ?? 1} needs ${n(needs[(shown ?? 1) - 1]!)} XP`}
+        onPointerMove={(e) => pick(e.clientX)}
+        onPointerDown={(e) => pick(e.clientX)}
+        onPointerLeave={() => setLevel(null)}
+        onFocus={() => setLevel((l) => l ?? 1)}
+        onBlur={() => setLevel(null)}
+        onKeyDown={keys}
+      >
+        <svg
+          className="sp-lv-chart__svg"
+          viewBox="0 0 1000 240"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path className="sp-lv-chart__line" d={line} />
+        </svg>
+        {shown && (
+          <>
+            <span
+              className="sp-lv-chart__guide"
+              style={{ left: `${tipLeft}%` }}
+            />
+            <span
+              className="sp-lv-chart__dot"
+              style={{
+                left: `${tipLeft}%`,
+                top: `${yOf(needs[shown - 1]!)}%`,
+              }}
+            />
+            <span
+              className={cx('sp-lv-chart__tip', tipLeft > 70 && 'is-left')}
+              style={{ left: `${tipLeft}%` }}
+              aria-hidden="true"
+            >
+              <b>Level {shown}</b>
+              <span>
+                {n(needs[shown - 1]!)} XP from level {shown - 1}
+              </span>
+              <span className="sp-hint">{n(total(shown))} XP in all</span>
+            </span>
+          </>
+        )}
+      </div>
+      <div className="sp-lv-chart__x" aria-hidden="true">
+        <span>Level 1</span>
+        <span>Level {top}</span>
+      </div>
     </figure>
   );
 }
 
-/** The Settings tab: XP for chat and voice, the curve, where XP is earned. */
+/** The Settings tab: XP for chat and voice, levels, where XP is earned. */
 export function LVRules({
   config,
   channels,
@@ -131,7 +210,10 @@ export function LVRules({
     onChange({
       boosts: config.boosts.map((b) => (b.id === id ? { ...b, ...patch } : b)),
     });
-  const milestones = [5, 10, 25, 50, 100].filter((l) => l <= config.maxLevel);
+  const formulaIssue = lvFormulaIssue(
+    config.formula,
+    Math.min(Math.max(config.maxLevel, 1), lvRanges.maxLevel.max),
+  );
   return (
     <div className="sp-stack sp-ar sp-lv">
       <section className="sp-card" aria-labelledby="lv-earn">
@@ -285,45 +367,42 @@ export function LVRules({
             <h2 className="sp-card__title" id="lv-curve">
               Levels
             </h2>
-            <p className="sp-card__sub">
-              How fast levels come. Each one takes a little more XP than the
-              last.
-            </p>
           </div>
         </div>
         <div className="sp-card__body">
-          <Segmented
-            label="Curve"
-            value={config.curve}
-            onChange={(curve) => onChange({ curve })}
-            options={lvCurves.map((c) => ({
-              value: c,
-              label: lvCurveNames[c],
-            }))}
-          />
-          <p className="sp-hint">{lvCurveAbout[config.curve]}</p>
-          <CurveChart config={config} />
-          {milestones.length > 0 && (
-            <dl className="sp-lv-miles" aria-label="Time to reach a level">
-              {milestones.map((l) => (
-                <div key={l} className="sp-lv-mile">
-                  <dt>Level {l}</dt>
-                  <dd>
-                    <span className="sp-tnum">
-                      {n(lvTotalFor(config.curve, l))} XP
-                    </span>
-                    <span className="sp-hint">
-                      {daysText(lvDaysTo(config, l))}
-                    </span>
-                  </dd>
-                </div>
-              ))}
-            </dl>
+          <div data-issue="formula" className="sp-lv-formula">
+            <Input
+              label={tipped(
+                'XP to reach level x',
+                'Use x for the level, numbers, + − * / % ^ and brackets. Level x needs this much XP more than level x − 1. Sparko’s own is 5*x^2 + 40*x + 55.',
+              )}
+              aria-label="XP to reach level x"
+              spellCheck={false}
+              autoComplete="off"
+              maxLength={LV_FORMULA_MAX}
+              placeholder={LV_FORMULA}
+              value={config.formula}
+              onChange={(e) => onChange({ formula: e.target.value })}
+              {...(formulaIssue ? { error: formulaIssue } : {})}
+            />
+            {config.formula.trim() !== LV_FORMULA && (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="rotate-ccw"
+                onClick={() => onChange({ formula: LV_FORMULA })}
+              >
+                Use Sparko’s
+              </Button>
+            )}
+          </div>
+          {formulaIssue ? (
+            <p className="sp-hint sp-lv-chart__empty">
+              Fix the equation to see each level’s XP.
+            </p>
+          ) : (
+            <CurveChart config={config} />
           )}
-          <p className="sp-hint">
-            Times are for a member who chats about 40 times a day and spends
-            half an hour in voice.
-          </p>
           <div data-issue="maxLevel" className="sp-lv-max">
             <Input
               label={tipped(
@@ -397,6 +476,7 @@ export function LVRules({
                   n={config.boosts.length}
                   max={limits.boosts}
                   what="boosts"
+                  icon="boost"
                 />
                 <AnimatedIconButton
                   size="sm"
@@ -644,38 +724,6 @@ export function LVLevelUpSettings({
 
 // Reward roles ----------------------------------------------------------------
 
-/** The ladder: each reward as a step on the way to the highest level. */
-function Ladder({ config, roles }: { config: Levels; roles: RoleOption[] }) {
-  const steps = [...config.rewards]
-    .filter((r) => r.level > 0)
-    .sort((a, b) => a.level - b.level);
-  if (!steps.length) return null;
-  const top = Math.max(config.maxLevel, ...steps.map((s) => s.level));
-  return (
-    <div className="sp-lv-ladder" aria-label="Reward ladder">
-      <div className="sp-lv-ladder__track" aria-hidden="true" />
-      {steps.map((s, i) => (
-        <span
-          key={s.id}
-          className={cx('sp-lv-ladder__step', i % 2 === 1 && 'is-up')}
-          style={
-            {
-              '--at': `${(s.level / top) * 100}%`,
-              '--c': roleColour(roles, s.role),
-            } as CSSProperties
-          }
-        >
-          <span className="sp-lv-ladder__dot" />
-          <span className="sp-lv-ladder__label">
-            <b>Lv {s.level}</b>
-            <span>@{roleName(roles, s.role)}</span>
-          </span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 /** The Reward roles tab: roles members get at a level. */
 export function LVRewards({
   config,
@@ -717,6 +765,7 @@ export function LVRewards({
               n={config.rewards.length}
               max={limits.rewards}
               what="reward roles"
+              icon="status"
             />
             <AnimatedIconButton
               size="sm"
@@ -746,22 +795,20 @@ export function LVRewards({
           </div>
         </div>
         <div className="sp-card__body">
-          <Ladder config={config} roles={roles} />
           {config.rewards.length ? (
-            <ul className="sp-ar__list">
+            <ul className="sp-ar__list sp-lv-rewards">
               {config.rewards.map((r, i) => (
                 <li
                   key={r.id}
-                  className="sp-ar__item sp-ar__timed"
+                  className="sp-ar__item sp-lv-reward"
                   aria-label={`Reward ${i + 1}`}
                   data-issue={`reward:${r.id}`}
                 >
-                  <h3 className="sp-ar__item-title">Reward {i + 1}</h3>
                   <Input
                     label={tipped(
                       'Level',
                       r.level
-                        ? `Level ${r.level} takes ${n(lvTotalFor(config.curve, r.level))} XP in all. Pick from 1 to ${config.maxLevel}.`
+                        ? `Level ${r.level} takes ${n(lvTotalFor(config.formula, r.level))} XP in all. Pick from 1 to ${config.maxLevel}.`
                         : `The level that gives it, from 1 to ${config.maxLevel}.`,
                     )}
                     aria-label="Level"

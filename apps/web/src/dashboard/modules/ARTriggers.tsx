@@ -1,13 +1,5 @@
-import { Fragment, useState, type CSSProperties } from 'react';
-import {
-  Checkbox,
-  Combobox,
-  Icon,
-  Input,
-  LottieIcon,
-  animIcons,
-  svgIcons,
-} from '../../ui';
+import { Fragment, type CSSProperties } from 'react';
+import { Checkbox, Combobox, Icon, Input, svgIcons } from '../../ui';
 import {
   arBadges,
   arConditionNames,
@@ -87,28 +79,39 @@ export function Used({
   n: number;
   max: number;
   what: string;
-  icon?: 'sand' | 'gear' | 'status';
+  /** Sand clock by default; a cog, tag, star, ballot box, party popper, speaker, rocket or gift. */
+  icon?:
+    | 'sand'
+    | 'gear'
+    | 'status'
+    | 'star'
+    | 'poll'
+    | 'party'
+    | 'voice'
+    | 'boost'
+    | 'gift';
 }) {
-  const [play, setPlay] = useState(0);
-  const mask =
-    icon === 'status' && svgIcons.status ? svgIcons.status : svgIcons.sandClock;
+  const masks = {
+    sand: svgIcons.sandClock,
+    gear: svgIcons.cog,
+    status: svgIcons.status,
+    star: svgIcons.star,
+    poll: svgIcons.poll,
+    party: svgIcons.party,
+    voice: svgIcons.voice,
+    boost: svgIcons.boost,
+    gift: svgIcons.gift,
+  };
+  const mask = masks[icon] || svgIcons.sandClock;
   return (
-    <span
-      className="sp-ar__used"
-      title={`${n} of ${max} ${what} used`}
-      onPointerEnter={() => setPlay((k) => k + 1)}
-    >
+    <span className="sp-ar__used" title={`${n} of ${max} ${what} used`}>
       {n}/{max}
-      {icon === 'gear' && animIcons.gear ? (
-        <LottieIcon src={animIcons.gear} size={16} playKey={play} />
-      ) : (
-        <span
-          className="sp-mask-icon"
-          role="img"
-          aria-label="used"
-          style={{ '--sp-mask': `url("${mask}")` } as CSSProperties}
-        />
-      )}
+      <span
+        className="sp-mask-icon"
+        role="img"
+        aria-label="used"
+        style={{ '--sp-mask': `url("${mask}")` } as CSSProperties}
+      />
     </span>
   );
 }

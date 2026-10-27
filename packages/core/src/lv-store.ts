@@ -176,7 +176,7 @@ export function lvLeaderboard(
   ).map(memberOf);
   const ranked = all.filter((m) => m.xp > 0);
   const row = (m: LvMemberRow, rank: number | null): LvRow => {
-    const p = lvProgress(c.curve, m.xp, c.maxLevel);
+    const p = lvProgress(c.formula, m.xp, c.maxLevel);
     return {
       rank,
       userId: m.userId,
@@ -219,7 +219,7 @@ export function lvDetail(db: Db, guildId: string, userId: string) {
   const { config: c } = lvConfigOf(db, guildId);
   const m = lvMember(db, guildId, userId);
   const xp = m?.xp ?? 0;
-  const p = lvProgress(c.curve, xp, c.maxLevel);
+  const p = lvProgress(c.formula, xp, c.maxLevel);
   return {
     userId,
     name: m?.name || userId,

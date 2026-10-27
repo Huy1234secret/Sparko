@@ -147,4 +147,11 @@ export const svgIcons = {
   welcomeTag: svg('tag-welcome-message'),
   sandClock: svg('sand-clock-icon'),
   status: svg('status-icon'),
+  cog: svg('count-cog'),
+  star: svg('count-star'),
+  poll: svg('count-poll'),
+  party: svg('count-party'),
+  voice: svg('count-voice'),
+  boost: svg('count-boost'),
+  gift: svg('count-gift'),
 };

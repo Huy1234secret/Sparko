@@ -254,7 +254,12 @@ export function TVSettings({
             </p>
           </div>
           <div className="sp-ar__head-actions">
-            <Used n={config.hubs.length} max={limits.hubs} what="hubs" />
+            <Used
+              n={config.hubs.length}
+              max={limits.hubs}
+              what="hubs"
+              icon="voice"
+            />
             <AnimatedIconButton
               size="sm"
               {...plusAnimations}

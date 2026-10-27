@@ -90,7 +90,12 @@ function BoardList({
           </p>
         </div>
         <div className="sp-ar__head-actions">
-          <Used n={config.boards.length} max={limit} what="boards" />
+          <Used
+            n={config.boards.length}
+            max={limit}
+            what="boards"
+            icon="star"
+          />
           <AnimatedIconButton
             size="sm"
             {...plusAnimations}

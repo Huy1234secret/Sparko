@@ -417,7 +417,7 @@ export {
   type TvRoomStyle,
 } from '../../../../packages/core/src/temp-voice.ts';
 
-// Levels & XP share their curve, checks, rewards and messages with the bot.
+// Levels & XP share their XP equation, checks, rewards and messages with the bot.
 export {
   LV_MAX_CHANGE,
   LV_MODULE,
@@ -425,10 +425,9 @@ export {
   lvBar,
   lvCommandAbout,
   lvCommandKeys,
-  lvCurveAbout,
-  lvCurveNames,
-  lvCurves,
-  lvDaysTo,
+  LV_FORMULA,
+  LV_FORMULA_MAX,
+  lvFormulaIssue,
   lvDefault,
   lvDefaultMessage,
   lvIssue,
@@ -451,7 +450,6 @@ export {
   type LvBoost,
   type LvCommand,
   type LvCommandKey,
-  type LvCurve,
   type LvIssue,
   type LvKind,
   type LvLogAction,

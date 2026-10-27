@@ -474,7 +474,7 @@ export const featureDetails: Record<string, FeatureDetail> = {
       {
         icon: 'trending-up',
         title: 'XP and levels',
-        body: 'Each message earns a random amount of XP once per cooldown, and voice earns XP every minute when someone else is in the channel. Pick a gentle, standard or steep curve, see how long each level takes, and leave out channels and roles that shouldn’t earn.',
+        body: 'Each message earns a random amount of XP once per cooldown, and voice earns XP every minute when someone else is in the channel. Write the XP each level needs as an equation like 5*x^2 + 40*x + 55, hover the chart to see any level, and leave out channels and roles that shouldn’t earn.',
       },
       {
         icon: 'award',
@@ -494,7 +494,7 @@ export const featureDetails: Record<string, FeatureDetail> = {
     ],
     steps: [
       'Open Levels & XP and switch it on.',
-      'Set how much XP chatting and voice give, and pick a curve.',
+      'Set how much XP chatting and voice give, and the equation for each level.',
       'Add reward roles, and turn on XP crates if you like.',
       'Save. Sparko adds /rank, /leaderboard and /xp to your server.',
     ],

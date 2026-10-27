@@ -107,10 +107,23 @@ describe('Levels & XP', () => {
     ).toBeInTheDocument();
     await userEvent.clear(most);
     await userEvent.type(most, '40');
-    await userEvent.click(screen.getByRole('radio', { name: 'Steep' }));
+    const formula = screen.getByRole('textbox', {
+      name: 'XP to reach level x',
+    });
+    await userEvent.clear(formula);
+    await userEvent.type(formula, '100 * (x');
     expect(
-      screen.getByText(/Each level is a real achievement/),
+      screen.getByText('A bracket isn’t closed at the end.'),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Fix the equation to see each level’s XP.'),
+    ).toBeInTheDocument();
+    await userEvent.type(formula, ')');
+    const chart = screen.getByRole('slider', { name: 'XP each level needs' });
+    chart.focus();
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}');
+    expect(chart).toHaveAttribute('aria-valuetext', 'Level 3 needs 300 XP');
+    expect(screen.getByText('600 XP in all')).toBeInTheDocument();
     await save();
     expect(await live()).toBeInTheDocument();
   }, 30_000);
@@ -121,9 +134,6 @@ describe('Levels & XP', () => {
       'region',
       { name: 'Reward roles' },
       { timeout: 8000 },
-    );
-    expect(within(rewards).getByLabelText('Reward ladder')).toHaveTextContent(
-      /Lv 5.*Lv 10.*Lv 20/,
     );
     expect(
       within(rewards).getByTitle('3 of 5 reward roles used'),
