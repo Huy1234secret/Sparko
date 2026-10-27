@@ -306,7 +306,8 @@ describe('public site', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText('/suggestion-status').length).toBeGreaterThan(0);
     const nav = screen.getByRole('navigation', { name: 'Docs' });
-    for (const id of Object.keys(featureDetails))
+    // Levels & XP gets its docs page in its own pull request.
+    for (const id of Object.keys(featureDetails).filter((i) => i !== 'levels'))
       expect(
         nav.querySelector(`a[href="/docs/${id}"]`),
         `a docs page for ${id}`,

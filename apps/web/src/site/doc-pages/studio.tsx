@@ -15,7 +15,7 @@ export const studioDoc: DocPage = {
   group: 'Modules',
   title: 'Message Studio',
   icon: 'message-square-text',
-  lede: 'Build Discord messages visually, see them exactly as members will, then post, reuse and edit them. Every other module’s messages are Studio templates too.',
+  lede: 'Build Discord messages visually, see them exactly as members will, then post, reuse and edit them. Every other module’s messages are Studio templates too, and Image studio makes the pictures.',
   body: () => (
     <>
       <p>
@@ -221,6 +221,71 @@ export const studioDoc: DocPage = {
         alt="Message Studio’s Versions tab, with three versions and a Restore button on each."
         caption="Versions: every post is kept, and any of them can be restored."
       />
+      <h2>Image studio tab</h2>
+      <p>
+        Make pictures right in the dashboard, for embeds, welcome cards, banners
+        or emoji. Each image keeps its design, so you can open it and change it
+        again later. Saving turns it into a PNG you can use anywhere a picture
+        goes.
+      </p>
+      <Steps
+        items={[
+          <>
+            Open <b>Image studio</b> and press <b>New image</b>.
+          </>,
+          <>
+            Pick a size: <b>Embed image</b> (1200×630), <b>Welcome card</b>{' '}
+            (1024×500), <b>Server banner</b> (960×540),{' '}
+            <b>Server icon or emoji</b> (512×512) or <b>Square post</b>{' '}
+            (1080×1080). Or type your own width and height, from 16 to 2,048
+            pixels, or <b>Edit a picture</b> to start from one you upload.
+          </>,
+          <>
+            Set the <b>Background</b>: a colour, a gradient (from, to and angle)
+            or a picture.
+          </>,
+          <>
+            Add <b>Text</b>, a <b>Rectangle</b>, a <b>Circle</b> or a{' '}
+            <b>Picture</b>. Drag to move, use the handles to resize and rotate,
+            or type exact values.
+          </>,
+          <>Name it and save.</>,
+        ]}
+      />
+      <SettingsTable
+        noDefault
+        rows={[
+          [
+            'Text',
+            'Up to 2,000 characters, with font, size (1 to 1,000), colour, alignment, line height, letter spacing and an outline.',
+          ],
+          [
+            'Rectangle and circle',
+            'A fill, a border with its colour, and rounded corners for rectangles.',
+          ],
+          ['Picture', 'Any picture you upload, with rounded corners.'],
+          [
+            'Every layer',
+            'A name, X and Y, width, height, rotation and opacity. Show, hide or lock it in the Layers list.',
+          ],
+        ]}
+      />
+      <TermTable
+        head={['Shortcut', 'What it does']}
+        rows={[
+          ['Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z)', 'Undo and redo.'],
+          ['Ctrl+D', 'Duplicate the selected layer.'],
+          ['Delete or Backspace', 'Delete the selected layer.'],
+          ['Arrow keys', 'Nudge it 1 pixel, or 10 with Shift.'],
+          ['Esc', 'Deselect.'],
+        ]}
+      />
+      <p>
+        Saved images are cards you can search, <b>Edit</b>, <b>Duplicate</b>,{' '}
+        <b>Download</b> or <b>Delete</b>. An image can have up to 100 layers.
+      </p>
+      <LimitTable rows={[['Images', '25', '200']]} />
+
       <h2>Permissions Sparko needs</h2>
       <p>
         <b>View Channel</b>, <b>Send Messages</b> and <b>Embed Links</b> where

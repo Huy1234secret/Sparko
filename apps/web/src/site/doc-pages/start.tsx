@@ -473,6 +473,7 @@ export const startDocs: DocPage[] = [
             ['Message Studio templates', '100', '500'],
             ['Message Studio folders', '20', '100'],
             ['Templates one Send message action sends', '1', '10'],
+            ['Image studio images', '25', '200'],
             ['Reaction role messages', '10', '50'],
             ['Automatic roles: join roles', '5', '10'],
             ['Automatic roles: timed roles', '3', '10'],
