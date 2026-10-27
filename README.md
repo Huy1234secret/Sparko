@@ -39,7 +39,7 @@ The dashboard saves a setting, the API stores it and queues a job, and the bot a
 
 ## Getting started
 
-Node 24 and pnpm 11 are required.
+Node 24 (24.22.1 or later) and pnpm 11 are required.
 
 ```sh
 pnpm install

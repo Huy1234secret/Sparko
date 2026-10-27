@@ -56,7 +56,11 @@ apt-get install "${apt_opts[@]}" ca-certificates curl git nginx ufw unattended-u
 dpkg-reconfigure -f noninteractive unattended-upgrades
 
 say 'Node 24, pnpm and pm2'
-if ! node -v 2>/dev/null | grep -q '^v24\.'; then
+# 24.22.1 is the first 24.x release with the eMudhra certificate fix, so an
+# older 24.x is upgraded too, not just a missing or different major.
+node_min=24.22.1
+node_now=$(node -v 2>/dev/null | sed 's/^v//')
+if [[ $node_now != 24.* || $(printf '%s\n' "$node_min" "$node_now" | sort -V | head -n1) != "$node_min" ]]; then
   curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
   apt-get install "${apt_opts[@]}" nodejs
 fi
