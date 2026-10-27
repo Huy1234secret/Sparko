@@ -122,6 +122,7 @@ export const animIcons = {
   events: pair('event-icon', true),
   birthdays: pair('birthday-icon', true),
   tempVoice: pair('temporary-voice-icon', true),
+  leveling: pair('leveling-icon', true),
   /** The gear that plays beside a rule count. */
   gear: maybe('setting-icon-hover'),
   upload: set('upload-button', ['reveal', 'hover', 'select']),
