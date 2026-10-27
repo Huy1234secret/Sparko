@@ -25,6 +25,24 @@ export {
   jsonErrorLine,
 } from '../../../../packages/core/src/studio-import.ts';
 export {
+  IMAGE_MAX_LAYERS,
+  IMAGE_MAX_SIDE,
+  IMAGE_MIN_SIDE,
+  blankDesign,
+  imageFonts,
+  imageProblem,
+  imageSizes,
+  newLayer,
+  pictureDesign,
+  type ImageBackground,
+  type ImageDesign,
+  type ImageFill,
+  type ImageLayer,
+  type PictureLayer,
+  type ShapeLayer,
+  type TextLayer,
+} from '../../../../packages/core/src/images.ts';
+export {
   isPictureVariable,
   pictureVariables,
 } from '../../../../packages/core/src/studio-format.ts';

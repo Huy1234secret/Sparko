@@ -661,6 +661,19 @@ const migrations = [
     at INTEGER NOT NULL
   );
   CREATE INDEX lv_log_by_guild ON lv_log (guild_id, id DESC);`,
+  // Image studio: each image's design and the PNG drawn from it.
+  `CREATE TABLE studio_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    json TEXT NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    url TEXT NOT NULL DEFAULT '',
+    who_name TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX studio_images_by_guild ON studio_images (guild_id, updated_at DESC);`,
 ];
 
 export function openDb(path: string): Db {

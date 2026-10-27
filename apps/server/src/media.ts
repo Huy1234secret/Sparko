@@ -87,6 +87,9 @@ export function createMedia({
       'Content-Length': info.size,
       'Cache-Control': 'public, max-age=31536000, immutable',
       'X-Content-Type-Options': 'nosniff',
+      // Image studio draws uploads onto a canvas and saves it, which the
+      // browser only allows for pictures shared this way.
+      'Access-Control-Allow-Origin': '*',
       'Content-Security-Policy': "default-src 'none'; sandbox",
     });
     if (req.method === 'HEAD') res.end();

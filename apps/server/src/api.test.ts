@@ -2,7 +2,9 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
   arTrack,
+  blankDesign,
   blankStudioMessage,
+  newLayer,
   claimJob,
   finishJob,
   listVersions,
@@ -1471,5 +1473,87 @@ describe('server API', () => {
         url: 'https://cdn.discordapp.com/emojis/77.gif?size=48',
       },
     ]);
+  });
+  it('saves Image studio images, checks them, copies and deletes them', async () => {
+    const empty = await body<{ images: unknown[]; limit: number }>(
+      await call('/9001/studio/images'),
+    );
+    expect(empty).toEqual({ images: [], limit: 25 });
+    const design = {
+      ...blankDesign(1200, 630),
+      layers: [newLayer('text', blankDesign(1200, 630), 'l1')],
+    };
+    const png = 'https://panel.example/media/9001-aaaaaaaaaaaaaaaaaaaaaaaa.png';
+    // A design that doesn't fit is refused.
+    const huge = await call('/9001/studio/images', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Huge',
+        design: { ...design, width: 9000 },
+        url: png,
+      }),
+    });
+    expect(huge.status).toBe(400);
+    expect((await body<{ message: string }>(huge)).message).toContain(
+      '16 to 2048',
+    );
+    const made = await call('/9001/studio/images', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Banner',
+        design: { ...design, extra: 'dropped' },
+        url: png,
+      }),
+    });
+    const { id } = await body<{ id: string }>(made);
+    await call(`/9001/studio/images/${id}/clone`, { method: 'POST' });
+    // A design without its picture is refused.
+    const half = await call(`/9001/studio/images/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ design }),
+    });
+    expect(half.status).toBe(400);
+    const renamed = await call(`/9001/studio/images/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: 'Banner (copy)' }),
+    });
+    expect((await body<{ message: string }>(renamed)).message).toContain(
+      'already exists',
+    );
+    await call(`/9001/studio/images/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        name: 'Welcome banner',
+        design: { ...design, width: 960, height: 540 },
+        url: png.replace('.png', '.webp'),
+      }),
+    });
+    const list = await body<{
+      images: {
+        id: string;
+        name: string;
+        width: number;
+        url: string;
+        meta: string;
+        design: Record<string, unknown>;
+      }[];
+    }>(await call('/9001/studio/images'));
+    expect(list.images.map((i) => i.name)).toEqual([
+      'Welcome banner',
+      'Banner (copy)',
+    ]);
+    expect(list.images[0]).toMatchObject({
+      id,
+      width: 960,
+      url: png.replace('.png', '.webp'),
+      meta: 'Saved just now by you',
+    });
+    expect(list.images[1]!.design).not.toHaveProperty('extra');
+    for (const i of list.images)
+      await call(`/9001/studio/images/${i.id}`, { method: 'DELETE' });
+    expect(
+      (await body<{ images: unknown[] }>(await call('/9001/studio/images')))
+        .images,
+    ).toEqual([]);
   });
 });

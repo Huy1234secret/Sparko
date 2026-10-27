@@ -717,6 +717,27 @@ export function withBackend(
         );
       return info.url;
     },
+    async getImages(id) {
+      if (!(await backend()).live) return sample.getImages(id);
+      return getJson(`${server(id)}/studio/images`);
+    },
+    async saveImage(id, image) {
+      if (!(await backend()).live) return sample.saveImage(id, image);
+      return call<{ id: string }>('POST', `${server(id)}/studio/images`, image);
+    },
+    async updateImage(id, imageId, change) {
+      if (!(await backend()).live)
+        return sample.updateImage(id, imageId, change);
+      await call('PATCH', `${server(id)}/studio/images/${imageId}`, change);
+    },
+    async cloneImage(id, imageId) {
+      if (!(await backend()).live) return sample.cloneImage(id, imageId);
+      await call('POST', `${server(id)}/studio/images/${imageId}/clone`);
+    },
+    async deleteImage(id, imageId) {
+      if (!(await backend()).live) return sample.deleteImage(id, imageId);
+      await call('DELETE', `${server(id)}/studio/images/${imageId}`);
+    },
     async listServerEmojis(id) {
       if (!(await backend()).live) return sample.listServerEmojis(id);
       return getJson(`${server(id)}/studio/emojis`);
