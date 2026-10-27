@@ -909,8 +909,15 @@ export function useLevelActions(serverId: string) {
       onSuccess: refresh,
     }),
     test: useMutation({
-      mutationFn: ({ channel, kind }: { channel: string; kind: LvKind }) =>
-        api.testLevels(serverId, channel, kind),
+      mutationFn: ({
+        channel,
+        kind,
+        crate,
+      }: {
+        channel: string;
+        kind: LvKind;
+        crate?: string;
+      }) => api.testLevels(serverId, channel, kind, crate),
     }),
   };
 }

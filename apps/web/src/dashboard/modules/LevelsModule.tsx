@@ -130,7 +130,23 @@ const kindTab: Record<LvKind, Tab> = {
   levelup: 'levelup',
   rank: 'rank',
   crate: 'crates',
+  claim: 'crates',
 };
+
+/** A crate's message being edited: the drop, or the reply to a claim. */
+type CrateSlot = { kind: 'crate' | 'claim'; crate: string };
+/** Where a message's problems point: crate messages name their crate. */
+const messageAt = (k: LvKind, crate?: string) =>
+  crate ? `message:${k}:${crate}` : `message:${k}`;
+/** Every message the settings use, with the template each one picks. */
+const slotsOf = (c: Levels) => [
+  { kind: 'levelup' as LvKind, crate: undefined, id: c.levelUp.template },
+  { kind: 'rank' as LvKind, crate: undefined, id: c.rank.template },
+  ...c.crates.list.flatMap((k) => [
+    { kind: 'crate' as LvKind, crate: k.id, id: k.template },
+    { kind: 'claim' as LvKind, crate: k.id, id: k.claimTemplate },
+  ]),
+];
 
 /** The open tab, kept in the address so links and Back work. */
 function useTab() {
@@ -148,8 +164,9 @@ function useTab() {
 
 /** Which tab a settings problem is on. */
 const tabOf = (at: string): Tab => {
-  const kind = lvKinds.find((k) => at === `message:${k}`);
-  if (kind) return kindTab[kind];
+  const kind = lvKinds.find((k) => at.split(':')[1] === k);
+  if (at.startsWith('message:') && kind) return kindTab[kind];
+  if (at === 'crates' || at.startsWith('crate:')) return 'crates';
   if (at.startsWith('levelUp:')) return 'levelup';
   if (at.startsWith('reward')) return 'rewards';
   if (at.startsWith('crates:')) return 'crates';
@@ -158,18 +175,34 @@ const tabOf = (at: string): Tab => {
 };
 
 /** The template a message uses, and the change that picks another. */
-const templateOf = (c: Levels, k: LvKind) =>
-  k === 'levelup'
-    ? c.levelUp.template
-    : k === 'rank'
-      ? c.rank.template
-      : c.crates.template;
-const withTemplate = (c: Levels, k: LvKind, template: string) =>
+const templateOf = (c: Levels, k: LvKind, crate?: string) => {
+  if (k === 'levelup') return c.levelUp.template;
+  if (k === 'rank') return c.rank.template;
+  const found = c.crates.list.find((x) => x.id === crate);
+  return (k === 'crate' ? found?.template : found?.claimTemplate) ?? '';
+};
+const withTemplate = (
+  c: Levels,
+  k: LvKind,
+  template: string,
+  crate?: string,
+): Partial<Levels> =>
   k === 'levelup'
     ? { levelUp: { ...c.levelUp, template } }
     : k === 'rank'
       ? { rank: { ...c.rank, template } }
-      : { crates: { ...c.crates, template } };
+      : {
+          crates: {
+            ...c.crates,
+            list: c.crates.list.map((x) =>
+              x.id !== crate
+                ? x
+                : k === 'crate'
+                  ? { ...x, template }
+                  : { ...x, claimTemplate: template },
+            ),
+          },
+        };
 
 /** A template's problems as one of these messages, ignoring its channel. */
 const messageProblem = (m: StudioMessage, kind: LvKind, server: Server) =>
@@ -205,6 +238,8 @@ export function LevelsModule({
   const [messages, setMessages] = useState<Record<string, StudioMessage>>({});
   const [tried, setTried] = useState(false);
   const [issue, setIssue] = useState<ShownIssue | null>(null);
+  // The crate message being edited on the XP crates tab.
+  const [slot, setSlot] = useState<CrateSlot | null>(null);
 
   useEffect(() => {
     preloadCombobox();
@@ -287,17 +322,25 @@ export function LevelsModule({
   const point = (at: string, to: Tab, title: string, problem: string) => {
     setTried(true);
     setTab(to);
+    const [, kind, crate] = at.split(':');
+    if (
+      at.startsWith('message:') &&
+      crate &&
+      (kind === 'crate' || kind === 'claim')
+    )
+      setSlot({ kind, crate });
     setIssue((i) => ({ at, n: (i?.n ?? 0) + 1 }));
     toast({ tone: 'danger', title, body: problem });
   };
 
   const doSave = async () => {
     for (const [id, m] of changedMessages) {
-      const k = lvKinds.find((x) => templateOf(current, x) === id);
+      const used = slotsOf(current).find((x) => x.id === id);
+      const k = used?.kind;
       const found = messageProblem(m, k ?? 'levelup', server);
       if (found)
         return point(
-          k ? `message:${k}` : found.at,
+          k ? messageAt(k, used.crate) : found.at,
           k ? kindTab[k] : tab,
           `Can’t save “${m.name}” yet`,
           found.problem,
@@ -326,14 +369,19 @@ export function LevelsModule({
   };
 
   /** Adds a Studio template for a message and uses it. */
-  const startFrom = async (k: LvKind, m: StudioMessage, name: string) => {
+  const startFrom = async (
+    k: LvKind,
+    m: StudioMessage,
+    name: string,
+    crate?: string,
+  ) => {
     try {
       const { id } = await studioActions.saveTemplate.mutateAsync({
         name,
         message: { ...m, name, channel: current.levelUp.channel },
         folderId: null,
       });
-      edit(withTemplate(current, k, id));
+      edit(withTemplate(current, k, id, crate));
       toast({
         title: `Added “${name}” to your templates`,
         body: 'Edit it in the preview. It’s in Message Studio too. Save to use it.',
@@ -347,11 +395,18 @@ export function LevelsModule({
     }
   };
 
-  const editor = (kind: LvKind, above: ReactNode, below?: ReactNode) => (
+  const editor = (
+    kind: LvKind,
+    above: ReactNode,
+    below?: ReactNode,
+    crate?: string,
+  ) => (
     <LVMessage
+      key={crate ? `${kind}:${crate}` : kind}
       server={server}
       config={current}
       kind={kind}
+      crate={crate}
       above={above}
       below={below}
       studio={studio.data}
@@ -363,10 +418,10 @@ export function LevelsModule({
       messageOf={messageOf}
       onChange={edit}
       onMessage={editMessage}
-      onStart={(m, name) => void startFrom(kind, m, name)}
+      onStart={(m, name) => void startFrom(kind, m, name, crate)}
       onTest={(channelId) =>
         actions.test.mutate(
-          { channel: channelId, kind },
+          { channel: channelId, kind, ...(crate ? { crate } : {}) },
           {
             onSuccess: () =>
               toast({
@@ -478,26 +533,72 @@ export function LevelsModule({
                 </fieldset>
               )}
               {tab === 'crates' &&
-                editor(
-                  'crate',
-                  <fieldset className="sp-fieldset" disabled={paused}>
-                    <legend className="sp-sr-only">XP crate settings</legend>
-                    <LVCrateSettings
+                (() => {
+                  const first = current.crates.list[0];
+                  const open =
+                    slot && current.crates.list.some((k) => k.id === slot.crate)
+                      ? slot
+                      : first
+                        ? { kind: 'crate' as const, crate: first.id }
+                        : null;
+                  const settings = (
+                    <fieldset className="sp-fieldset" disabled={paused}>
+                      <legend className="sp-sr-only">XP crate settings</legend>
+                      <LVCrateSettings
+                        server={server}
+                        config={current}
+                        channels={data.channels}
+                        limit={data.limits.crates}
+                        editing={open}
+                        templateName={(id) =>
+                          id ? messageOf(id)?.name : undefined
+                        }
+                        onEdit={(next) => {
+                          setSlot(next);
+                          requestAnimationFrame(() =>
+                            document
+                              .getElementById('lv-crate-editor')
+                              ?.scrollIntoView?.({
+                                behavior: 'smooth',
+                                block: 'start',
+                              }),
+                          );
+                        }}
+                        onChange={edit}
+                      />
+                    </fieldset>
+                  );
+                  const stats = (
+                    <LVCrateStats
+                      server={server}
                       config={current}
                       channels={data.channels}
-                      onChange={edit}
                     />
-                  </fieldset>,
-                  <LVCrateStats server={server} channels={data.channels} />,
-                )}
+                  );
+                  if (!open)
+                    return (
+                      <div className="sp-stack">
+                        {settings}
+                        {stats}
+                      </div>
+                    );
+                  return editor(open.kind, settings, stats, open.crate);
+                })()}
               {tab === 'rank' &&
-                editor(
-                  'rank',
+                (current.rank.card ? (
                   <fieldset className="sp-fieldset" disabled={paused}>
                     <legend className="sp-sr-only">Rank card settings</legend>
                     <LVRankSettings config={current} onChange={edit} />
-                  </fieldset>,
-                )}
+                  </fieldset>
+                ) : (
+                  editor(
+                    'rank',
+                    <fieldset className="sp-fieldset" disabled={paused}>
+                      <legend className="sp-sr-only">Rank card settings</legend>
+                      <LVRankSettings config={current} onChange={edit} />
+                    </fieldset>,
+                  )
+                ))}
               {tab === 'leaderboard' && (
                 <LVLeaderboard
                   server={server}
@@ -608,14 +709,15 @@ function PresetPicker({
 }
 
 /** The Open button Sparko adds under every crate. */
-function CrateButton() {
+function CrateButton({ claims }: { claims: number }) {
   return (
     <div className="sp-rr-preview" aria-label="Crate button">
       <div className="sp-qa-fixed">
         <span className="dc-btn dc-btn--success">
-          <span className="dc-emoji">🎁</span>Open
+          <span className="dc-emoji">🎁</span>
+          {claims > 1 ? `Open · ${claims} left` : 'Open'}
         </span>
-        <InfoTip text="Sparko adds this under every crate. The first member to press it wins the XP, and the button changes to say who." />
+        <InfoTip text="Sparko adds this under every crate. Members press it to claim some XP, and the message updates to show who did. Once every claim is used, or time runs out, the button greys out." />
       </div>
     </div>
   );
@@ -626,6 +728,7 @@ const short: Record<LvKind, string> = {
   levelup: 'Level-up',
   rank: 'Rank',
   crate: 'Crate',
+  claim: 'Claim',
 };
 const presetName = (k: LvKind, p: LvPreset) =>
   p.name.toLowerCase().includes(short[k].toLowerCase())
@@ -636,7 +739,7 @@ const presetName = (k: LvKind, p: LvPreset) =>
 const offNote = (c: Levels, k: LvKind) =>
   k === 'levelup' && c.levelUp.where === 'off'
     ? 'Level-ups aren’t announced, so this isn’t sent. Pick where above.'
-    : k === 'crate' && !c.crates.on
+    : (k === 'crate' || k === 'claim') && !c.crates.on
       ? 'Crates are off, so none drop. Turn them on above.'
       : k === 'rank' && !c.commands.rank.on
         ? `/${c.commands.rank.name} is off, so nobody sees this. Turn it on in Commands.`
@@ -646,6 +749,7 @@ function LVMessage({
   server,
   config,
   kind,
+  crate,
   above,
   below,
   studio,
@@ -663,6 +767,8 @@ function LVMessage({
   server: Server;
   config: Levels;
   kind: LvKind;
+  /** For a crate or claim message: which crate. */
+  crate?: string | undefined;
   /** The message's own settings, shown above it. */
   above: ReactNode;
   /** More about it, shown under the editor. */
@@ -680,23 +786,31 @@ function LVMessage({
   onTest: (channel: string) => void;
 }) {
   const [presets, setPresets] = useState(false);
+  const crateType = config.crates.list.find((k) => k.id === crate);
   const [testChannel, setTestChannel] = useState(
-    config.levelUp.channel ||
+    crateType?.channels[0] ||
+      config.levelUp.channel ||
       channels.find((c) => c.canPost)?.id ||
       channels[0]?.id ||
       '',
   );
-  const id = templateOf(config, kind);
+  const id = templateOf(config, kind, crate);
   const message = id ? messageOf(id) : undefined;
   const paused = !!server.paused;
+  // A crate's messages carry its name: "Golden crate: claim message".
+  const title = crateType
+    ? `${crateType.name}: ${lvKindNames[kind].toLowerCase()}`
+    : lvKindNames[kind];
   // "XP" keeps its capitals mid-sentence.
-  const name = lvKindNames[kind].toLowerCase().replace('xp', 'XP');
+  const name = crateType
+    ? `${lvKindNames[kind].toLowerCase()} for ${crateType.name}`
+    : lvKindNames[kind].toLowerCase().replace('xp', 'XP');
   const sparko = lvPresets.find((p) => p.kind === kind)!;
   const pick = (v: string) =>
-    onChange(withTemplate(config, kind, v === NONE ? '' : v));
+    onChange(withTemplate(config, kind, v === NONE ? '' : v, crate));
   const own = (): StudioMessage => ({
     ...sparko.message,
-    name: lvKindNames[kind],
+    name: title,
   });
   const note = offNote(config, kind);
   const banner = note && (
@@ -725,7 +839,11 @@ function LVMessage({
       <div className="sp-stack">
         {above}
         {banner}
-        <section className="sp-card sp-greet-empty" aria-label="Live preview">
+        <section
+          className="sp-card sp-greet-empty"
+          aria-label="Live preview"
+          id={crate ? 'lv-crate-editor' : undefined}
+        >
           <EmptyState
             icon={<EditingIcon />}
             title={
@@ -741,7 +859,7 @@ function LVMessage({
                   select={plusAnimations.select}
                   disabled={paused}
                   loading={busy}
-                  onClick={() => onStart(own(), lvKindNames[kind])}
+                  onClick={() => onStart(own(), title)}
                 >
                   Create your own
                 </AnimatedIconButton>
@@ -781,9 +899,12 @@ function LVMessage({
     <div className="sp-stack">
       {above}
       {banner}
-      <div className="sp-studio__grid">
+      <div
+        className="sp-studio__grid"
+        id={crate ? 'lv-crate-editor' : undefined}
+      >
         <fieldset className="sp-fieldset" disabled={paused}>
-          <legend className="sp-sr-only">{lvKindNames[kind]}</legend>
+          <legend className="sp-sr-only">{title}</legend>
           <MessageCanvas
             key={id}
             server={server}
@@ -796,7 +917,11 @@ function LVMessage({
               : {})}
             check={(m) => ({ ...m, channel: '1' })}
             onChange={(patch) => onMessage(id, patch)}
-            below={kind === 'crate' ? <CrateButton /> : undefined}
+            below={
+              kind === 'crate' ? (
+                <CrateButton claims={crateType?.claims ?? 1} />
+              ) : undefined
+            }
             above={
               <p className="sp-edit-banner" role="status">
                 <Icon name="info" size="sm" />
@@ -805,8 +930,16 @@ function LVMessage({
                   {lvKindAbout[kind]}{' '}
                   {kind === 'crate' ? (
                     <>
-                      Use <code>{'{crate.range}'}</code> for the XP inside and{' '}
-                      <code>{'{crate.ends}'}</code> for when it vanishes.
+                      Use <code>{'{crate.name}'}</code>,{' '}
+                      <code>{'{crate.range}'}</code>,{' '}
+                      <code>{'{remaining}'}</code> and{' '}
+                      <code>{'{claimed.users}'}</code>. It updates each time
+                      someone claims it.
+                    </>
+                  ) : kind === 'claim' ? (
+                    <>
+                      Use <code>{'{crate.xp}'}</code> for the XP they got and{' '}
+                      <code>{'{level}'}</code> for their level now.
                     </>
                   ) : (
                     <>
@@ -827,7 +960,7 @@ function LVMessage({
           <div className="sp-card__head">
             <div className="sp-card__titles">
               <h2 className="sp-card__title" id="lv-message">
-                {lvKindNames[kind]}
+                {title}
               </h2>
               <p className="sp-card__sub">
                 Pick the template, send a test, or edit its JSON.
@@ -835,7 +968,7 @@ function LVMessage({
             </div>
           </div>
           <div className="sp-card__body">
-            <div data-issue={`message:${kind}`}>
+            <div data-issue={messageAt(kind, crate)}>
               <Combobox
                 label={
                   <>

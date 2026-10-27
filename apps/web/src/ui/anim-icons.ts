@@ -122,6 +122,7 @@ export const animIcons = {
   events: pair('event-icon', true),
   birthdays: pair('birthday-icon', true),
   tempVoice: pair('temporary-voice-icon', true),
+  leveling: pair('leveling-icon', true),
   /** The gear that plays beside a rule count. */
   gear: maybe('setting-icon-hover'),
   upload: set('upload-button', ['reveal', 'hover', 'select']),
@@ -147,4 +148,11 @@ export const svgIcons = {
   welcomeTag: svg('tag-welcome-message'),
   sandClock: svg('sand-clock-icon'),
   status: svg('status-icon'),
+  cog: svg('count-cog'),
+  star: svg('count-star'),
+  poll: svg('count-poll'),
+  party: svg('count-party'),
+  voice: svg('count-voice'),
+  boost: svg('count-boost'),
+  gift: svg('count-gift'),
 };

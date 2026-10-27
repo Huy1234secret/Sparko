@@ -25,3 +25,4 @@ export * from './templates.ts';
 export * from './images.ts';
 export * from './image-store.ts';
 export * from './studio-actions.ts';
+export * from './rank-card.ts';

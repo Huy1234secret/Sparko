@@ -204,10 +204,10 @@ export function lvRoutes({
         at,
       );
       // The bot registers the commands, checks channels and roles, and
-      // brings reward roles in line when the rewards or the curve changed.
+      // brings reward roles in line when the rewards or the XP equation changed.
       const rewardsChanged =
-        JSON.stringify([before.rewards, before.curve, before.maxLevel]) !==
-        JSON.stringify([config.rewards, config.curve, config.maxLevel]);
+        JSON.stringify([before.rewards, before.formula, before.maxLevel]) !==
+        JSON.stringify([config.rewards, config.formula, config.maxLevel]);
       enqueueJob(
         db,
         {
@@ -339,15 +339,23 @@ export function lvRoutes({
       return true;
     }
     if (path === '/levels/test' && method === 'POST') {
-      const body = await readJson<{ channel?: unknown; kind?: unknown }>(req);
+      const body = await readJson<{
+        channel?: unknown;
+        kind?: unknown;
+        crate?: unknown;
+      }>(req);
       const channel = typeof body?.channel === 'string' ? body.channel : '';
       if (!snowflake.test(channel))
         throw new BadRequest('Pick a channel to send the test message to.');
       const kind = body?.kind as LvKind;
       if (!lvKinds.includes(kind))
         throw new BadRequest(
-          'Pick the level-up message, the rank card or the XP crate to test.',
+          'Pick the level-up message, the rank card, or a crate or claim message to test.',
         );
+      const crate =
+        typeof body?.crate === 'string' && /^[\w-]{1,40}$/.test(body.crate)
+          ? body.crate
+          : undefined;
       enqueueJob(
         db,
         {
@@ -357,6 +365,7 @@ export function lvRoutes({
           payload: {
             channel,
             kind,
+            ...(crate ? { crate } : {}),
             userId: user.id,
             userName: user.name,
             avatar: user.avatarUrl,

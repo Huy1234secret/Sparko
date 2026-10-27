@@ -825,6 +825,7 @@ export function EVEvents({
               n={counts.upcoming}
               max={limits.upcoming}
               what="upcoming events"
+              icon="party"
             />
             <Button
               size="sm"

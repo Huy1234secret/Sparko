@@ -268,7 +268,10 @@ export function studioRoutes({
         'Levels & XP (level-up message)',
       );
       add(lv.rank?.template ?? '', 'level', 'Levels & XP (rank card)');
-      add(lv.crates?.template ?? '', 'level', 'Levels & XP (XP crate)');
+      for (const k of lv.crates?.list ?? []) {
+        add(k.template, 'level', `Levels & XP (${k.name}: crate message)`);
+        add(k.claimTemplate, 'level', `Levels & XP (${k.name}: claim message)`);
+      }
     }
     return uses;
   };

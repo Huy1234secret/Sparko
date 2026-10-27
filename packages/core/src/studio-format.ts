@@ -560,6 +560,7 @@ export const pictureVariables = [
   '{server.icon}',
   '{author.avatar}',
   '{message.image}',
+  '{crate.image}',
 ] as const;
 export const isPictureVariable = (url: unknown) =>
   (pictureVariables as readonly unknown[]).includes(url);
@@ -1427,7 +1428,39 @@ export const studioVariables: StudioVariable[] = [
   },
   {
     name: 'crate.ends',
-    about: 'When an XP crate vanishes if nobody opens it, as a relative time.',
+    about: 'When an XP crate vanishes, as a relative time.',
+    level: true,
+  },
+  {
+    name: 'crate.name',
+    about: 'The XP crate’s name, like Golden crate.',
+    level: true,
+  },
+  {
+    name: 'crate.image',
+    about: 'The XP crate’s picture: the one you uploaded, or Sparko’s crate.',
+    level: true,
+  },
+  {
+    name: 'crate.xp',
+    about: 'In a claim message: the XP the member just got from the crate.',
+    level: true,
+  },
+  {
+    name: 'claimed.users',
+    about:
+      'The names of everyone who claimed the crate. The crate message updates as members claim it.',
+    level: true,
+  },
+  {
+    name: 'claimed.users.mention',
+    about:
+      'Everyone who claimed the crate, as mentions. Mentions here never ping.',
+    level: true,
+  },
+  {
+    name: 'remaining',
+    about: 'How many more members can still claim the crate.',
     level: true,
   },
 ];

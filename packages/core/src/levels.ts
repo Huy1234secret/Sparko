@@ -1,6 +1,6 @@
 /**
  * Levels & XP: members earn XP for chatting and for time in voice, climb
- * levels on a curve the server picks, get reward roles at the levels it
+ * levels by an XP equation the server writes, get reward roles at the levels it
  * sets, and race to open XP crates that drop in chat. Level-ups, rank cards
  * and crates are Message Studio templates. Nothing here touches the
  * database or the network, so the dashboard imports this file too.
@@ -18,13 +18,12 @@ import {
 
 export const LV_MODULE = 'levels';
 
-/** The three messages: a level-up, the /rank card, and an XP crate drop. */
-export type LvKind = 'levelup' | 'rank' | 'crate';
-export const lvKinds: LvKind[] = ['levelup', 'rank', 'crate'];
-
-/** How steeply the XP each level needs grows. */
-export type LvCurve = 'gentle' | 'standard' | 'steep';
-export const lvCurves: LvCurve[] = ['gentle', 'standard', 'steep'];
+/**
+ * The messages: a level-up, the /rank card, an XP crate drop, and what a
+ * member sees when they claim a crate.
+ */
+export type LvKind = 'levelup' | 'rank' | 'crate' | 'claim';
+export const lvKinds: LvKind[] = ['levelup', 'rank', 'crate', 'claim'];
 
 /** Where a level-up is announced. */
 export type LvAnnounce = 'off' | 'same' | 'channel' | 'dm';
@@ -43,6 +42,30 @@ export type LvBoost = {
 /** "Level N → role". */
 export type LvReward = { id: string; level: number; role: string };
 
+/** One kind of XP crate a server can drop. */
+export type LvCrateType = {
+  id: string;
+  name: string;
+  /** An uploaded picture's link; '' for Sparko's crate. */
+  image: string;
+  /** Where it can drop; [] for anywhere members earn XP. */
+  channels: string[];
+  /** How many members can claim one before it's gone. */
+  claims: number;
+  /** The chance a message drops one, in percent. */
+  chance: number;
+  /** The shortest time between drops in a channel, like "10mi". */
+  cooldown: string;
+  /** Seconds before it vanishes. */
+  time: number;
+  /** Each member who claims it gets a random amount from min to max. */
+  min: number;
+  max: number;
+  /** Studio templates: the drop, and the reply to a claim; '' for Sparko's. */
+  template: string;
+  claimTemplate: string;
+};
+
 export type LvCommandKey = 'rank' | 'leaderboard' | 'xp';
 export type LvCommand = { on: boolean; name: string; description: string };
 
@@ -58,7 +81,8 @@ export type Levels = {
     /** Not while muted or deafened. */
     skipMuted: boolean;
   };
-  curve: LvCurve;
+  /** The XP each level needs, with x for the level, like 5*x^2 + 40*x + 55. */
+  formula: string;
   /** The highest level; XP still counts past it. */
   maxLevel: number;
   /** Channels (and their threads) and roles that never earn XP. */
@@ -79,22 +103,11 @@ export type Levels = {
   stackRewards: boolean;
   /** Take a reward back when someone drops below its level. */
   removeRewards: boolean;
-  /** XP crates: surprise drops the first member to open wins. */
-  crates: {
-    on: boolean;
-    /** Where they can drop; [] for anywhere members earn XP. */
-    channels: string[];
-    /** The chance a message drops one, in percent. */
-    chance: number;
-    /** The shortest time between drops in a channel, like "10mi". */
-    cooldown: string;
-    min: number;
-    max: number;
-    /** Seconds before an unopened crate vanishes. */
-    time: number;
-    template: string;
-  };
+  /** XP crates: surprise drops members race to claim. */
+  crates: { on: boolean; list: LvCrateType[] };
   rank: {
+    /** Sparko's picture card on the banner, or the message template. */
+    card: boolean;
     template: string;
     /** /rank answers for everyone to see, or only the member. */
     public: boolean;
@@ -122,10 +135,26 @@ export const lvDefaultCommands = (): Levels['commands'] => ({
   xp: { on: true, name: 'xp', description: 'Staff: change members’ XP' },
 });
 
+/** A new crate with Sparko's settings. */
+export const lvNewCrate = (id: string, name = 'XP crate'): LvCrateType => ({
+  id,
+  name,
+  image: '',
+  channels: [],
+  claims: 1,
+  chance: 2,
+  cooldown: '10mi',
+  time: 60,
+  min: 50,
+  max: 150,
+  template: '',
+  claimTemplate: '',
+});
+
 export const lvDefault = (channel = ''): Levels => ({
   message: { on: true, min: 15, max: 25, cooldown: 60 },
   voice: { on: true, perMinute: 5, needOthers: true, skipMuted: true },
-  curve: 'standard',
+  formula: LV_FORMULA,
   maxLevel: 100,
   noXpChannels: [],
   noXpRoles: [],
@@ -134,24 +163,17 @@ export const lvDefault = (channel = ''): Levels => ({
   rewards: [],
   stackRewards: true,
   removeRewards: true,
-  crates: {
-    on: false,
-    channels: [],
-    chance: 2,
-    cooldown: '10mi',
-    min: 50,
-    max: 150,
-    time: 60,
-    template: '',
-  },
-  rank: { template: '', public: true },
+  crates: { on: false, list: [lvNewCrate('crate1')] },
+  rank: { card: true, template: '', public: true },
   staff: [],
   commands: lvDefaultCommands(),
 });
 
 /** What each plan allows. */
 export const lvLimits = (plan?: string | null) =>
-  plan === 'plus' ? { rewards: 50, boosts: 25 } : { rewards: 5, boosts: 3 };
+  plan === 'plus'
+    ? { rewards: 50, boosts: 25, crates: 10 }
+    : { rewards: 5, boosts: 3, crates: 2 };
 
 const MINUTE = 60_000;
 export const lvRanges = {
@@ -164,54 +186,191 @@ export const lvRanges = {
   chance: { min: 0.1, max: 25 },
   crateCooldown: { min: MINUTE, max: 24 * 60 * MINUTE, label: '1mi and 1d' },
   crateXp: { min: 1, max: 100_000 },
-  crateTime: { min: 10, max: 600 },
+  crateTime: { min: 10, max: 3600 },
+  claims: { min: 1, max: 100 },
 } as const;
 /** The most XP staff can give, take or set at once. */
 export const LV_MAX_CHANGE = 10_000_000;
 /** Leaderboard rows per page in Discord. */
 export const LV_PAGE = 10;
 
-// The curve -------------------------------------------------------------------
+// The XP equation -------------------------------------------------------------
 
-export const lvCurveNames: Record<LvCurve, string> = {
-  gentle: 'Gentle',
-  standard: 'Standard',
-  steep: 'Steep',
-};
-export const lvCurveAbout: Record<LvCurve, string> = {
-  gentle: 'Levels come quickly. Good for small or quiet servers.',
-  standard: 'The curve most level bots use. Level 10 takes a few days of chat.',
-  steep: 'Each level is a real achievement. Good for big, busy servers.',
-};
-const curveParts: Record<LvCurve, [number, number, number]> = {
-  gentle: [3, 30, 75],
-  standard: [5, 50, 100],
-  steep: [8, 80, 150],
+/** The XP a level needs, written with x for the level. */
+export const LV_FORMULA = '5*x^2 + 40*x + 55';
+/** The longest equation, and the most XP one level can need. */
+export const LV_FORMULA_MAX = 120;
+export const LV_LEVEL_MAX_XP = 100_000_000;
+
+type Node = (x: number) => number;
+type Parsed = { fn: Node } | { problem: string };
+
+/**
+ * Reads an equation like `5*x^2 + 40*x + 55`: numbers, x, + - * / % ^ and
+ * brackets. Nothing is evaluated as code, so any text is safe to read.
+ */
+export function lvParseFormula(source: string): Parsed {
+  const src = source.trim();
+  if (!src)
+    return { problem: 'Write an equation for the XP each level needs.' };
+  if (src.length > LV_FORMULA_MAX)
+    return { problem: `Keep the equation under ${LV_FORMULA_MAX} characters.` };
+  const tokens =
+    src.match(/\d+(?:\.\d+)?|\.\d+|\*\*|[xX]|[-+*/%^()]|\S/g) ?? [];
+  let at = 0;
+  let usesX = false;
+  class Bad extends Error {}
+  const fail = (why: string): never => {
+    throw new Bad(why);
+  };
+  const peek = () => tokens[at];
+  const near = () => (peek() === undefined ? 'at the end' : `near “${peek()}”`);
+
+  // expr := term (('+' | '-') term)*
+  const expr = (): Node => {
+    let left = term();
+    for (let op = peek(); op === '+' || op === '-'; op = peek()) {
+      at++;
+      const a = left;
+      const b = term();
+      left = op === '+' ? (x) => a(x) + b(x) : (x) => a(x) - b(x);
+    }
+    return left;
+  };
+  // term := unary (('*' | '/' | '%') unary)*
+  const term = (): Node => {
+    let left = unary();
+    for (let op = peek(); op === '*' || op === '/' || op === '%'; op = peek()) {
+      at++;
+      const a = left;
+      const b = unary();
+      left =
+        op === '*'
+          ? (x) => a(x) * b(x)
+          : op === '/'
+            ? (x) => a(x) / b(x)
+            : (x) => a(x) % b(x);
+    }
+    return left;
+  };
+  // unary := ('-' | '+') unary | power
+  const unary = (): Node => {
+    const op = peek();
+    if (op === '-' || op === '+') {
+      at++;
+      const a = unary();
+      return op === '-' ? (x) => -a(x) : a;
+    }
+    return power();
+  };
+  // power := primary (('^' | '**') unary)?, so 2^3^2 is 2^(3^2).
+  const power = (): Node => {
+    const base = primary();
+    const op = peek();
+    if (op !== '^' && op !== '**') return base;
+    at++;
+    const exp = unary();
+    return (x) => base(x) ** exp(x);
+  };
+  // primary := number | x | '(' expr ')'
+  const primary = (): Node => {
+    const t = peek();
+    if (t === undefined) return fail('The equation ends too soon.');
+    at++;
+    if (t === 'x' || t === 'X') {
+      usesX = true;
+      return (x) => x;
+    }
+    if (/^(\d|\.\d)/.test(t)) {
+      const v = Number(t);
+      return () => v;
+    }
+    if (t === '(') {
+      const inner = expr();
+      if (peek() !== ')') return fail(`A bracket isn’t closed ${near()}.`);
+      at++;
+      return inner;
+    }
+    at--;
+    return fail(
+      /^[a-z]/i.test(t)
+        ? `Use x for the level. “${t}” isn’t something the equation knows.`
+        : `Something’s missing ${near()}.`,
+    );
+  };
+
+  try {
+    const fn = expr();
+    if (at < tokens.length) return { problem: `Something’s off ${near()}.` };
+    if (!usesX)
+      return { problem: 'Use x for the level somewhere, like 100*x.' };
+    return { fn };
+  } catch (e) {
+    if (e instanceof Bad) return { problem: e.message };
+    throw e;
+  }
+}
+
+const compiled = new Map<string, Node | null>();
+/** The equation as a function, or null when it can't be read. Cached. */
+function formulaFn(formula: string): Node | null {
+  let fn = compiled.get(formula);
+  if (fn === undefined) {
+    const p = lvParseFormula(formula);
+    fn = 'fn' in p ? p.fn : null;
+    if (compiled.size > 500) compiled.clear();
+    compiled.set(formula, fn);
+  }
+  return fn;
+}
+
+/**
+ * XP to go from `level` to the next one: the equation at x = level + 1,
+ * rounded, at least 1. An equation that can't be read uses Sparko's own.
+ */
+export const lvNeed = (formula: string, level: number) => {
+  const fn = formulaFn(formula) ?? formulaFn(LV_FORMULA)!;
+  const v = Math.round(fn(level + 1));
+  return Number.isFinite(v)
+    ? Math.min(LV_LEVEL_MAX_XP, Math.max(1, v))
+    : LV_LEVEL_MAX_XP;
 };
 
-/** XP to go from `level` to the next one. */
-export const lvNeed = (curve: LvCurve, level: number) => {
-  const [a, b, c] = curveParts[curve];
-  return a * level * level + b * level + c;
-};
+/** Problems with an equation for these levels, or null. */
+export function lvFormulaIssue(formula: unknown, maxLevel: number) {
+  if (typeof formula !== 'string')
+    return 'Write an equation for the XP each level needs.';
+  const p = lvParseFormula(formula);
+  if ('problem' in p) return p.problem;
+  for (let x = 1; x <= maxLevel; x++) {
+    const v = Math.round(p.fn(x));
+    if (!Number.isFinite(v))
+      return `Level ${x} can’t be worked out with this equation, like a division by 0.`;
+    if (v < 1)
+      return `Level ${x} would need ${v} XP. Every level has to need at least 1.`;
+    if (v > LV_LEVEL_MAX_XP)
+      return `Level ${x} would need over ${LV_LEVEL_MAX_XP.toLocaleString('en-US')} XP. Make the equation grow slower.`;
+  }
+  return null;
+}
 
 /** The total XP a level takes, from 0. */
-export function lvTotalFor(curve: LvCurve, level: number) {
+export function lvTotalFor(formula: string, level: number) {
   let total = 0;
-  for (let l = 0; l < level; l++) total += lvNeed(curve, l);
+  for (let l = 0; l < level; l++) total += lvNeed(formula, l);
   return total;
 }
 
 /** Where someone with this much XP is: level, XP into it, XP it needs. */
-export function lvProgress(curve: LvCurve, xp: number, maxLevel = 500) {
+export function lvProgress(formula: string, xp: number, maxLevel = 500) {
   let level = 0;
   let floor = 0;
-  while (level < maxLevel && xp >= floor + lvNeed(curve, level)) {
-    floor += lvNeed(curve, level);
+  while (level < maxLevel && xp >= floor + lvNeed(formula, level)) {
+    floor += lvNeed(formula, level);
     level++;
   }
   const max = level >= maxLevel;
-  const need = max ? 0 : lvNeed(curve, level);
+  const need = max ? 0 : lvNeed(formula, level);
   const into = xp - floor;
   return {
     level,
@@ -228,26 +387,13 @@ export function lvProgress(curve: LvCurve, xp: number, maxLevel = 500) {
 
 /** The level for an amount of XP. */
 export const lvLevelOf = (c: Levels, xp: number) =>
-  lvProgress(c.curve, xp, c.maxLevel).level;
+  lvProgress(c.formula, xp, c.maxLevel).level;
 
 /** A 10-step bar for how far into a level someone is. */
 export const lvBar = (percent: number, width = 10) => {
   const full = Math.floor((Math.max(0, Math.min(100, percent)) / 100) * width);
   return '▰'.repeat(full) + '▱'.repeat(width - full);
 };
-
-/**
- * Roughly how long a level takes for a member who chats every few minutes
- * and spends some time in voice, for the dashboard's curve preview.
- */
-export function lvDaysTo(c: Levels, level: number, perDay = 40) {
-  const average = (c.message.min + c.message.max) / 2;
-  // Each message past the cooldown earns; assume they're spread out.
-  const fromChat = c.message.on ? perDay * average : 0;
-  const fromVoice = c.voice.on ? 30 * c.voice.perMinute : 0;
-  const daily = fromChat + fromVoice;
-  return daily ? lvTotalFor(c.curve, level) / daily : null;
-}
 
 // Earning ---------------------------------------------------------------------
 
@@ -327,22 +473,23 @@ export function lvRewardPlan(c: Levels, level: number, has: Set<string>) {
   return { give, take };
 }
 
-/** Whether a crate can drop here, at this moment. */
+/** Whether this crate can drop here, at this moment. */
 export function lvCrateCanDrop(
   c: Levels,
+  crate: LvCrateType,
   place: LvPlace,
   lastDrop: number | null,
   now: number,
 ) {
   if (!c.crates.on) return false;
-  const where = c.crates.channels;
+  const where = crate.channels;
   if (
     where.length &&
     !where.includes(place.channelId) &&
     !(place.parentId && where.includes(place.parentId))
   )
     return false;
-  const gap = parseDuration(c.crates.cooldown) ?? 10 * MINUTE;
+  const gap = parseDuration(crate.cooldown) ?? 10 * MINUTE;
   return lastDrop === null || now - lastDrop >= gap;
 }
 
@@ -412,12 +559,13 @@ export function lvIssue(
       `Voice XP has to be from ${r.perMinute.min} to ${r.perMinute.max} a minute.`,
     );
 
-  if (!lvCurves.includes(x.curve as LvCurve)) return missing;
   if (!int(x.maxLevel, r.maxLevel.min, r.maxLevel.max))
     return at(
       'maxLevel',
       `The highest level has to be from ${r.maxLevel.min} to ${r.maxLevel.max}.`,
     );
+  const formula = lvFormulaIssue(x.formula, x.maxLevel as number);
+  if (formula) return at('formula', formula);
 
   const idList = (
     list: unknown,
@@ -499,12 +647,16 @@ export function lvIssue(
   if (!int(u.every, r.every.min, r.every.max))
     return at('levelUp:every', `Announce every 1 to ${r.every.max} levels.`);
 
-  const tpl = (id: unknown, kind: LvKind): LvIssue | null => {
+  const tpl = (
+    id: unknown,
+    kind: LvKind,
+    where = `message:${kind}`,
+  ): LvIssue | null => {
     if (typeof id !== 'string') return missing;
     if (id && !templateId.test(id)) return missing;
     if (id && templates && !templates.has(id))
       return at(
-        `message:${kind}`,
+        where,
         `The ${lvKindNames[kind].toLowerCase()} template was deleted. Pick or make another one.`,
       );
     return null;
@@ -556,58 +708,103 @@ export function lvIssue(
 
   const c = x.crates;
   if (!c || typeof c !== 'object' || typeof c.on !== 'boolean') return missing;
-  const crateChannels = idList(
-    c.channels,
-    'crates:channels',
-    'crate channels',
-    channels,
-  );
-  if (crateChannels) return crateChannels;
-  if (
-    typeof c.chance !== 'number' ||
-    !Number.isFinite(c.chance) ||
-    c.chance < r.chance.min ||
-    c.chance > r.chance.max
-  )
+  if (!Array.isArray(c.list)) return missing;
+  if (c.list.length > limits.crates)
     return at(
-      'crates:chance',
-      `The drop chance has to be from ${r.chance.min}% to ${r.chance.max}%.`,
+      'crates',
+      `This plan has up to ${limits.crates} ${limits.crates === 1 ? 'crate' : 'crates'}.`,
     );
-  if (typeof c.cooldown !== 'string') return missing;
-  const gap = parseDuration(c.cooldown);
-  if (gap === null)
-    return at(
-      'crates:cooldown',
-      'Write the time between crates with mi, h or d, like 10mi.',
+  if (c.on && !c.list.length)
+    return at('crates', 'Add a crate, or turn crates off.');
+  const crateIds = new Set<string>();
+  for (const [i, k] of c.list.entries()) {
+    if (!k || typeof k !== 'object' || typeof k.id !== 'string') return missing;
+    if (!itemId.test(k.id) || crateIds.has(k.id)) return missing;
+    crateIds.add(k.id);
+    const where = (field: string) => `crate:${k.id}:${field}`;
+    const label =
+      typeof k.name === 'string' && k.name.trim()
+        ? `“${k.name.trim()}”`
+        : `crate ${i + 1}`;
+    if (typeof k.name !== 'string' || !k.name.trim())
+      return at(where('name'), `Give crate ${i + 1} a name.`);
+    if (k.name.length > 40)
+      return at(where('name'), `Keep ${label}’s name under 40 characters.`);
+    if (
+      typeof k.image !== 'string' ||
+      (k.image && !/^(https|blob):/.test(k.image)) ||
+      k.image.length > 500
+    )
+      return at(where('image'), `Upload ${label}’s picture again.`);
+    const crateChannels = idList(
+      k.channels,
+      where('channels'),
+      'drop channels',
+      channels,
     );
-  if (gap < r.crateCooldown.min || gap > r.crateCooldown.max)
-    return at(
-      'crates:cooldown',
-      `The time between crates has to be between ${r.crateCooldown.label}.`,
+    if (crateChannels) return crateChannels;
+    if (!int(k.claims, r.claims.min, r.claims.max))
+      return at(
+        where('claims'),
+        `${label} can be claimed by ${r.claims.min} to ${r.claims.max} members.`,
+      );
+    if (
+      typeof k.chance !== 'number' ||
+      !Number.isFinite(k.chance) ||
+      k.chance < r.chance.min ||
+      k.chance > r.chance.max
+    )
+      return at(
+        where('chance'),
+        `${label}’s drop chance has to be from ${r.chance.min}% to ${r.chance.max}%.`,
+      );
+    if (typeof k.cooldown !== 'string') return missing;
+    const gap = parseDuration(k.cooldown);
+    if (gap === null)
+      return at(
+        where('cooldown'),
+        `Write ${label}’s cooldown with mi, h or d, like 10mi.`,
+      );
+    if (gap < r.crateCooldown.min || gap > r.crateCooldown.max)
+      return at(
+        where('cooldown'),
+        `${label}’s cooldown has to be between ${r.crateCooldown.label}.`,
+      );
+    if (!int(k.time, r.crateTime.min, r.crateTime.max))
+      return at(
+        where('time'),
+        `${label} has to stay open for 10 seconds to 1 hour.`,
+      );
+    if (
+      !int(k.min, r.crateXp.min, r.crateXp.max) ||
+      !int(k.max, r.crateXp.min, r.crateXp.max)
+    )
+      return at(
+        where('xp'),
+        `${label} gives a whole number of XP from ${r.crateXp.min} to ${n(r.crateXp.max)}.`,
+      );
+    if (k.min > k.max)
+      return at(
+        where('xp'),
+        `${label}’s smallest amount of XP can’t be more than its largest.`,
+      );
+    const crateTemplate = tpl(k.template, 'crate', `message:crate:${k.id}`);
+    if (crateTemplate) return crateTemplate;
+    const claimTemplate = tpl(
+      k.claimTemplate,
+      'claim',
+      `message:claim:${k.id}`,
     );
-  if (
-    !int(c.min, r.crateXp.min, r.crateXp.max) ||
-    !int(c.max, r.crateXp.min, r.crateXp.max)
-  )
-    return at(
-      'crates:xp',
-      `A crate holds a whole number of XP from ${r.crateXp.min} to ${n(r.crateXp.max)}.`,
-    );
-  if (c.min > c.max)
-    return at(
-      'crates:xp',
-      'The smallest crate can’t hold more XP than the largest.',
-    );
-  if (!int(c.time, r.crateTime.min, r.crateTime.max))
-    return at(
-      'crates:time',
-      `Crates last ${r.crateTime.min} to ${r.crateTime.max} seconds.`,
-    );
-  const crateTemplate = tpl(c.template, 'crate');
-  if (crateTemplate) return crateTemplate;
+    if (claimTemplate) return claimTemplate;
+  }
 
   const k = x.rank;
-  if (!k || typeof k !== 'object' || typeof k.public !== 'boolean')
+  if (
+    !k ||
+    typeof k !== 'object' ||
+    typeof k.public !== 'boolean' ||
+    typeof k.card !== 'boolean'
+  )
     return missing;
   const rankTemplate = tpl(k.template, 'rank');
   if (rankTemplate) return rankTemplate;
@@ -672,7 +869,7 @@ export function cleanLevels(c: Levels): Levels {
       needOthers: c.voice.needOthers,
       skipMuted: c.voice.skipMuted,
     },
-    curve: c.curve,
+    formula: c.formula.trim(),
     maxLevel: c.maxLevel,
     noXpChannels: [...new Set(c.noXpChannels)],
     noXpRoles: [...new Set(c.noXpRoles)],
@@ -693,15 +890,26 @@ export function cleanLevels(c: Levels): Levels {
     removeRewards: c.removeRewards,
     crates: {
       on: c.crates.on,
-      channels: [...new Set(c.crates.channels)],
-      chance: c.crates.chance,
-      cooldown: c.crates.cooldown.trim(),
-      min: c.crates.min,
-      max: c.crates.max,
-      time: c.crates.time,
-      template: c.crates.template,
+      list: c.crates.list.map((k) => ({
+        id: k.id,
+        name: k.name.trim(),
+        image: k.image,
+        channels: [...new Set(k.channels)],
+        claims: k.claims,
+        chance: k.chance,
+        cooldown: k.cooldown.trim(),
+        time: k.time,
+        min: k.min,
+        max: k.max,
+        template: k.template,
+        claimTemplate: k.claimTemplate,
+      })),
     },
-    rank: { template: c.rank.template, public: c.rank.public },
+    rank: {
+      card: c.rank.card,
+      template: c.rank.template,
+      public: c.rank.public,
+    },
     staff: [...new Set(c.staff)],
     commands: {
       rank: cmd('rank'),
@@ -711,18 +919,51 @@ export function cleanLevels(c: Levels): Levels {
   };
 }
 
+/** The three curves servers used to pick from, as equations. */
+const oldCurves: Record<string, string> = {
+  gentle: '3*x^2 + 24*x + 48',
+  standard: LV_FORMULA,
+  steep: '8*x^2 + 64*x + 78',
+};
+
+type OldCrates = Partial<Omit<LvCrateType, 'id' | 'name'>> & {
+  on?: boolean;
+  list?: Partial<LvCrateType>[];
+};
+
+/** Before servers could add crates, they had one set of crate settings. */
+function upgradeCrates(saved: OldCrates | undefined): Levels['crates'] {
+  if (!saved) return lvDefault().crates;
+  const { on = false, list, ...one } = saved;
+  if (list)
+    return {
+      on,
+      list: list.map((k, i) => ({ ...lvNewCrate(`crate${i + 1}`), ...k })),
+    };
+  return { on, list: [{ ...lvNewCrate('crate1'), ...one }] };
+}
+
 /** Settings saved by an older version, with anything added since filled in. */
 export function lvUpgrade(saved: Partial<Levels> | null | undefined): Levels {
   const base = lvDefault();
   if (!saved) return base;
+  // Before the equation, servers picked one of three curves.
+  const { curve, ...rest } = saved as Partial<Levels> & { curve?: string };
   return {
     ...base,
-    ...saved,
+    ...rest,
+    formula:
+      rest.formula ?? (curve ? oldCurves[curve] : undefined) ?? base.formula,
     message: { ...base.message, ...saved.message },
     voice: { ...base.voice, ...saved.voice },
     levelUp: { ...base.levelUp, ...saved.levelUp },
-    crates: { ...base.crates, ...saved.crates },
-    rank: { ...base.rank, ...saved.rank },
+    crates: upgradeCrates(saved.crates),
+    // A server that picked a rank message before the picture card keeps it.
+    rank: {
+      ...base.rank,
+      card: !saved.rank?.template,
+      ...saved.rank,
+    },
     commands: {
       rank: { ...base.commands.rank, ...saved.commands?.rank },
       leaderboard: {
@@ -743,12 +984,15 @@ export const lvIsStaff = (c: Levels, member: Set<string>, manager: boolean) =>
 export const lvKindNames: Record<LvKind, string> = {
   levelup: 'Level-up message',
   rank: 'Rank card',
-  crate: 'XP crate',
+  crate: 'Crate message',
+  claim: 'Claim message',
 };
 export const lvKindAbout: Record<LvKind, string> = {
   levelup: 'Posted when a member reaches a new level.',
   rank: 'What members see when they use /rank.',
-  crate: 'Dropped in chat. The first member to press Open gets the XP.',
+  crate:
+    'Dropped in chat. Members press Open to claim it, and it updates as they do.',
+  claim: 'Only the member who claimed the crate sees this.',
 };
 
 const embedMessage = (
@@ -877,11 +1121,13 @@ export const lvPresets: LvPreset[] = [
     id: 'lv-crate',
     kind: 'crate',
     name: 'Crate drop',
-    about: 'An embed with how much XP it holds and when it vanishes.',
+    about:
+      'An embed with the crate, its XP, who claimed it and when it vanishes.',
     message: embedMessage('XP crate drop', '', {
-      title: '🎁 An XP crate dropped!',
+      title: '🎁 {crate.name} dropped!',
       description:
-        'The first to press **Open** gets **{crate.range}**.\nIt vanishes {crate.ends}.',
+        'Press **Open** to claim **{crate.range}**. {remaining} left.\nIt vanishes {crate.ends}.\n\n**Claimed by:** {claimed.users}',
+      thumbnail: '{crate.image}',
       color: '#57F287',
     }),
   },
@@ -893,8 +1139,8 @@ export const lvPresets: LvPreset[] = [
     message: v2Message(
       'Modern XP crate',
       '#57F287',
-      '### 🎁 XP crate\nFirst to open it wins **{crate.range}**.\n-# Vanishes {crate.ends}',
-      '',
+      '### 🎁 {crate.name}\nOpen it for **{crate.range}**. **{remaining}** left.\n-# Vanishes {crate.ends}\n{claimed.users.mention}',
+      '{crate.image}',
     ),
   },
   {
@@ -904,7 +1150,42 @@ export const lvPresets: LvPreset[] = [
     about: 'A single line, no embed.',
     message: textMessage(
       'XP crate line',
-      '🎁 A crate with **{crate.range}** dropped! Open it before it vanishes {crate.ends}.',
+      '🎁 **{crate.name}** with **{crate.range}** dropped! {remaining} left, gone {crate.ends}. {claimed.users}',
+    ),
+  },
+  {
+    id: 'lv-claim',
+    kind: 'claim',
+    name: 'Claimed',
+    about: 'A short note with the XP they got and their level.',
+    message: textMessage(
+      'XP crate claimed',
+      '🎉 You opened **{crate.name}**: **+{crate.xp} XP**. You’re level **{level}** with {xp} XP.',
+    ),
+  },
+  {
+    id: 'lv-claim-embed',
+    kind: 'claim',
+    name: 'Claim card',
+    about: 'An embed with the crate’s picture and their progress.',
+    message: embedMessage('XP crate claim card', '', {
+      title: '🎉 +{crate.xp} XP',
+      description:
+        'You opened **{crate.name}**.\nLevel **{level}** · {progress.bar} {progress.percent}',
+      thumbnail: '{crate.image}',
+      color: '#57F287',
+    }),
+  },
+  {
+    id: 'lv-claim-v2',
+    kind: 'claim',
+    name: 'Modern claim',
+    about: 'A Components V2 card in green.',
+    message: v2Message(
+      'Modern XP crate claim',
+      '#57F287',
+      '### 🎉 +{crate.xp} XP\nFrom **{crate.name}**. {remaining} left for others.\n-# Level {level} · {xp.left} XP to the next',
+      '{crate.image}',
     ),
   },
 ];
@@ -912,6 +1193,19 @@ export const lvPresets: LvPreset[] = [
 /** Sparko's own message for a kind, used until the server picks one. */
 export const lvDefaultMessage = (kind: LvKind) =>
   lvPresets.find((p) => p.kind === kind)!.message;
+
+export type LvCrateFacts = {
+  name: string;
+  /** The picture's link: the upload, or Sparko's crate. */
+  image: string;
+  min: number;
+  max: number;
+  endsAt: number;
+  claimed: { id: string; name: string }[];
+  claims: number;
+  /** The XP the member just got from it. */
+  won?: number | undefined;
+};
 
 /** What a level message fills in about the member. */
 export type LvFacts = {
@@ -924,13 +1218,13 @@ export type LvFacts = {
   previous?: number | undefined;
   /** Reward roles this level gave. */
   rewards?: string[] | undefined;
-  /** A crate: its range, and when it vanishes. */
-  crate?: { min: number; max: number; endsAt: number } | undefined;
+  /** A crate that dropped: what it is, who claimed it, and what's left. */
+  crate?: LvCrateFacts | undefined;
 };
 
 /** The level variables: {level}, {xp}, {progress.bar}… */
 export function lvVariables(c: Levels, f: LvFacts): Record<string, string> {
-  const p = lvProgress(c.curve, f.xp, c.maxLevel);
+  const p = lvProgress(c.formula, f.xp, c.maxLevel);
   return {
     level: n(p.level),
     'level.previous': n(f.previous ?? Math.max(0, p.level - 1)),
@@ -943,23 +1237,43 @@ export function lvVariables(c: Levels, f: LvFacts): Record<string, string> {
     messages: n(f.messages),
     'voice.time': formatDuration(f.voiceMinutes * MINUTE),
     'reward.role': (f.rewards ?? []).map((r) => `<@&${r}>`).join(' '),
-    'crate.range': f.crate
-      ? f.crate.min === f.crate.max
-        ? `${n(f.crate.min)} XP`
-        : `${n(f.crate.min)}–${n(f.crate.max)} XP`
-      : `${n(c.crates.min)}–${n(c.crates.max)} XP`,
-    'crate.ends': f.crate
-      ? `<t:${Math.floor(f.crate.endsAt / 1000)}:R>`
-      : 'soon',
+    ...crateVariables(c, f.crate),
+  };
+}
+
+/** {crate.name}, {claimed.users}, {remaining}… for a crate, or the first. */
+function crateVariables(c: Levels, f: LvCrateFacts | undefined) {
+  const k = c.crates.list[0];
+  const min = f?.min ?? k?.min ?? 0;
+  const max = f?.max ?? k?.max ?? 0;
+  const claimed = f?.claimed ?? [];
+  const left = Math.max(0, (f?.claims ?? k?.claims ?? 1) - claimed.length);
+  return {
+    'crate.name': f?.name ?? k?.name ?? 'XP crate',
+    'crate.image': f?.image ?? '',
+    'crate.range': min === max ? `${n(min)} XP` : `${n(min)}–${n(max)} XP`,
+    'crate.xp': n(f?.won ?? 0),
+    'crate.ends': f ? `<t:${Math.floor(f.endsAt / 1000)}:R>` : 'soon',
+    'claimed.users': claimed.length
+      ? claimed.map((u) => u.name).join(', ')
+      : 'nobody yet',
+    'claimed.users.mention': claimed.length
+      ? claimed.map((u) => `<@${u.id}>`).join(' ')
+      : 'nobody yet',
+    remaining: n(left),
   };
 }
 
 export const LV_CRATE_ID = 'lv:crate';
 
+export type LvCrateState =
+  | { open: true; left?: number }
+  | { claimedBy: string; xp: number }
+  | { full: number }
+  | { gone: true; claimed?: number };
+
 /** The Open button under a crate, or what it became. */
-export function lvCrateRow(
-  state: { open: true } | { claimedBy: string; xp: number } | { gone: true },
-) {
+export function lvCrateRow(state: LvCrateState) {
   const button =
     'open' in state
       ? {
@@ -967,18 +1281,22 @@ export function lvCrateRow(
           style: 3,
           custom_id: LV_CRATE_ID,
           emoji: { name: '🎁' },
-          label: 'Open',
+          label: state.left ? `Open · ${n(state.left)} left` : 'Open',
         }
       : {
           type: 2,
           style: 2,
           custom_id: LV_CRATE_ID,
           disabled: true,
-          emoji: { name: 'gone' in state ? '💨' : '🎉' },
-          label:
-            'gone' in state
-              ? 'Nobody opened it in time'
-              : `${state.claimedBy} got ${n(state.xp)} XP`.slice(0, 80),
+          emoji: { name: 'gone' in state && !state.claimed ? '💨' : '🎉' },
+          label: ('gone' in state
+            ? state.claimed
+              ? `Closed · ${n(state.claimed)} claimed`
+              : 'Nobody opened it in time'
+            : 'full' in state
+              ? `All ${n(state.full)} claimed`
+              : `${state.claimedBy} got ${n(state.xp)} XP`
+          ).slice(0, 80),
         };
   return { type: 1, components: [button] };
 }
@@ -994,7 +1312,7 @@ export function lvPayload(
   c: Levels,
   facts: LvFacts,
   ctx: { now: number; ping?: string | undefined } & StudioVars,
-  crate?: Parameters<typeof lvCrateRow>[0],
+  crate?: LvCrateState,
 ) {
   const body = studioPayload(message, {
     ...ctx,

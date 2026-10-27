@@ -1,25 +1,38 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import {
   Badge,
   Button,
   Checkbox,
   Combobox,
+  RadioCards,
   EmptyState,
   Icon,
   Input,
   Modal,
   Segmented,
+  Spinner,
   Switch,
   cx,
   useToast,
   type ComboItem,
 } from '../../ui';
 import {
+  LV_FORMULA,
+  LV_FORMULA_MAX,
   LV_MAX_CHANGE,
-  lvCurveAbout,
-  lvCurveNames,
-  lvCurves,
-  lvDaysTo,
+  RANK_CARD,
+  RANK_CARD_FONT,
+  drawRankCard,
+  lvFormulaIssue,
+  lvNewCrate,
   lvNeed,
   lvRanges,
   lvTotalFor,
@@ -28,12 +41,15 @@ import {
   useLevelCrates,
   useLevelFind,
   useLevelMember,
+  useSession,
+  useStudioActions,
   type Channel,
   type LVFound,
   type LVRow,
   type LVState,
   type Levels,
   type LvAnnounce,
+  type LvCrateType,
   type RoleOption,
   type Server,
 } from '../../data';
@@ -41,6 +57,10 @@ import { AnimatedIconButton, InfoTip } from './EditorBits';
 import { DurationInput, Used } from './ARTriggers';
 import { ChannelPicker, newId, roleItems } from './parts';
 import { plusAnimations } from './StudioLibrary';
+import rankBanner from '../../../../../design-system/assets/images/Rank_card_default.png';
+
+/** Sparko's crate picture, for crates without their own. */
+const defaultCrate = '/brand/crate.png';
 
 /** A label with an (i) beside it that says more on hover. */
 const tipped = (text: string, tip: string): ReactNode => (
@@ -69,47 +89,119 @@ const roleName = (roles: RoleOption[], id: string) =>
   roles.find((r) => r.id === id)?.name ?? 'deleted role';
 const roleColour = (roles: RoleOption[], id: string) =>
   roles.find((r) => r.id === id)?.color ?? '#99AAB5';
-const daysText = (days: number | null) =>
-  days === null
-    ? 'Never: nothing earns XP'
-    : days < 1
-      ? 'Under a day'
-      : days < 60
-        ? `About ${Math.round(days)} ${Math.round(days) === 1 ? 'day' : 'days'}`
-        : `About ${Math.round(days / 30)} months`;
-
 // Settings: how XP is earned --------------------------------------------------
 
-/** XP for each level, drawn as bars, to see the curve's shape. */
+/**
+ * The XP each level needs, as a line. Hovering anywhere (or the arrow keys)
+ * picks the nearest level and says what it needs.
+ */
 function CurveChart({ config }: { config: Levels }) {
-  const top = Math.min(config.maxLevel, 50);
-  const levels = Array.from({ length: top }, (_, i) => i);
-  const most = lvNeed(config.curve, top - 1);
+  const top = Math.max(1, config.maxLevel);
+  const needs = useMemo(
+    () => Array.from({ length: top }, (_, i) => lvNeed(config.formula, i)),
+    [config.formula, top],
+  );
+  const [level, setLevel] = useState<number | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const most = Math.max(...needs);
+  const xOf = (lv: number) => (top === 1 ? 50 : ((lv - 1) / (top - 1)) * 100);
+  const yOf = (v: number) => 100 - (v / most) * 100;
+  const line = needs
+    .map((v, i) => `${i ? 'L' : 'M'}${xOf(i + 1) * 10},${yOf(v) * 2.4}`)
+    .join(' ');
+  const total = (lv: number) => needs.slice(0, lv).reduce((a, b) => a + b, 0);
+  const pick = (clientX: number) => {
+    const r = box.current?.getBoundingClientRect();
+    if (!r || !r.width) return;
+    const at = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    setLevel(Math.round(1 + at * (top - 1)));
+  };
+  const keys = (e: KeyboardEvent) => {
+    const step = e.shiftKey ? 10 : 1;
+    const now = level ?? 1;
+    const next =
+      e.key === 'ArrowRight' || e.key === 'ArrowUp'
+        ? now + step
+        : e.key === 'ArrowLeft' || e.key === 'ArrowDown'
+          ? now - step
+          : e.key === 'Home'
+            ? 1
+            : e.key === 'End'
+              ? top
+              : null;
+    if (next === null) return;
+    e.preventDefault();
+    setLevel(Math.min(top, Math.max(1, next)));
+  };
+  const shown = level ?? null;
+  const tipLeft = shown ? xOf(shown) : 0;
   return (
-    <figure className="sp-lv-curve">
-      <div className="sp-lv-curve__bars" aria-hidden="true">
-        {levels.map((l) => (
-          <span
-            key={l}
-            className={cx('sp-lv-curve__bar', (l + 1) % 10 === 0 && 'is-mark')}
-            style={
-              {
-                '--h': `${Math.max(4, (lvNeed(config.curve, l) / most) * 100)}%`,
-              } as CSSProperties
-            }
-            title={`Level ${l + 1}: ${n(lvNeed(config.curve, l))} XP`}
-          />
-        ))}
+    <figure className="sp-lv-chart">
+      <div className="sp-lv-chart__y" aria-hidden="true">
+        <span>{n(most)} XP</span>
+        <span>0</span>
       </div>
-      <figcaption className="sp-hint">
-        XP each level takes, from level 1 to {top}. Level {top} needs {n(most)}{' '}
-        XP on its own.
-      </figcaption>
+      <div
+        ref={box}
+        className="sp-lv-chart__plot"
+        role="slider"
+        tabIndex={0}
+        aria-label="XP each level needs"
+        aria-valuemin={1}
+        aria-valuemax={top}
+        aria-valuenow={shown ?? 1}
+        aria-valuetext={`Level ${shown ?? 1} needs ${n(needs[(shown ?? 1) - 1]!)} XP`}
+        onPointerMove={(e) => pick(e.clientX)}
+        onPointerDown={(e) => pick(e.clientX)}
+        onPointerLeave={() => setLevel(null)}
+        onFocus={() => setLevel((l) => l ?? 1)}
+        onBlur={() => setLevel(null)}
+        onKeyDown={keys}
+      >
+        <svg
+          className="sp-lv-chart__svg"
+          viewBox="0 0 1000 240"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path className="sp-lv-chart__line" d={line} />
+        </svg>
+        {shown && (
+          <>
+            <span
+              className="sp-lv-chart__guide"
+              style={{ left: `${tipLeft}%` }}
+            />
+            <span
+              className="sp-lv-chart__dot"
+              style={{
+                left: `${tipLeft}%`,
+                top: `${yOf(needs[shown - 1]!)}%`,
+              }}
+            />
+            <span
+              className={cx('sp-lv-chart__tip', tipLeft > 70 && 'is-left')}
+              style={{ left: `${tipLeft}%` }}
+              aria-hidden="true"
+            >
+              <b>Level {shown}</b>
+              <span>
+                {n(needs[shown - 1]!)} XP from level {shown - 1}
+              </span>
+              <span className="sp-hint">{n(total(shown))} XP in all</span>
+            </span>
+          </>
+        )}
+      </div>
+      <div className="sp-lv-chart__x" aria-hidden="true">
+        <span>Level 1</span>
+        <span>Level {top}</span>
+      </div>
     </figure>
   );
 }
 
-/** The Settings tab: XP for chat and voice, the curve, where XP is earned. */
+/** The Settings tab: XP for chat and voice, levels, where XP is earned. */
 export function LVRules({
   config,
   channels,
@@ -131,7 +223,10 @@ export function LVRules({
     onChange({
       boosts: config.boosts.map((b) => (b.id === id ? { ...b, ...patch } : b)),
     });
-  const milestones = [5, 10, 25, 50, 100].filter((l) => l <= config.maxLevel);
+  const formulaIssue = lvFormulaIssue(
+    config.formula,
+    Math.min(Math.max(config.maxLevel, 1), lvRanges.maxLevel.max),
+  );
   return (
     <div className="sp-stack sp-ar sp-lv">
       <section className="sp-card" aria-labelledby="lv-earn">
@@ -285,45 +380,42 @@ export function LVRules({
             <h2 className="sp-card__title" id="lv-curve">
               Levels
             </h2>
-            <p className="sp-card__sub">
-              How fast levels come. Each one takes a little more XP than the
-              last.
-            </p>
           </div>
         </div>
         <div className="sp-card__body">
-          <Segmented
-            label="Curve"
-            value={config.curve}
-            onChange={(curve) => onChange({ curve })}
-            options={lvCurves.map((c) => ({
-              value: c,
-              label: lvCurveNames[c],
-            }))}
-          />
-          <p className="sp-hint">{lvCurveAbout[config.curve]}</p>
-          <CurveChart config={config} />
-          {milestones.length > 0 && (
-            <dl className="sp-lv-miles" aria-label="Time to reach a level">
-              {milestones.map((l) => (
-                <div key={l} className="sp-lv-mile">
-                  <dt>Level {l}</dt>
-                  <dd>
-                    <span className="sp-tnum">
-                      {n(lvTotalFor(config.curve, l))} XP
-                    </span>
-                    <span className="sp-hint">
-                      {daysText(lvDaysTo(config, l))}
-                    </span>
-                  </dd>
-                </div>
-              ))}
-            </dl>
+          <div data-issue="formula" className="sp-lv-formula">
+            <Input
+              label={tipped(
+                'XP to reach level x',
+                'Use x for the level, numbers, + − * / % ^ and brackets. Level x needs this much XP more than level x − 1. Sparko’s own is 5*x^2 + 40*x + 55.',
+              )}
+              aria-label="XP to reach level x"
+              spellCheck={false}
+              autoComplete="off"
+              maxLength={LV_FORMULA_MAX}
+              placeholder={LV_FORMULA}
+              value={config.formula}
+              onChange={(e) => onChange({ formula: e.target.value })}
+              {...(formulaIssue ? { error: formulaIssue } : {})}
+            />
+            {config.formula.trim() !== LV_FORMULA && (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="rotate-ccw"
+                onClick={() => onChange({ formula: LV_FORMULA })}
+              >
+                Use Sparko’s
+              </Button>
+            )}
+          </div>
+          {formulaIssue ? (
+            <p className="sp-hint sp-lv-chart__empty">
+              Fix the equation to see each level’s XP.
+            </p>
+          ) : (
+            <CurveChart config={config} />
           )}
-          <p className="sp-hint">
-            Times are for a member who chats about 40 times a day and spends
-            half an hour in voice.
-          </p>
           <div data-issue="maxLevel" className="sp-lv-max">
             <Input
               label={tipped(
@@ -397,6 +489,7 @@ export function LVRules({
                   n={config.boosts.length}
                   max={limits.boosts}
                   what="boosts"
+                  icon="boost"
                 />
                 <AnimatedIconButton
                   size="sm"
@@ -644,38 +737,6 @@ export function LVLevelUpSettings({
 
 // Reward roles ----------------------------------------------------------------
 
-/** The ladder: each reward as a step on the way to the highest level. */
-function Ladder({ config, roles }: { config: Levels; roles: RoleOption[] }) {
-  const steps = [...config.rewards]
-    .filter((r) => r.level > 0)
-    .sort((a, b) => a.level - b.level);
-  if (!steps.length) return null;
-  const top = Math.max(config.maxLevel, ...steps.map((s) => s.level));
-  return (
-    <div className="sp-lv-ladder" aria-label="Reward ladder">
-      <div className="sp-lv-ladder__track" aria-hidden="true" />
-      {steps.map((s, i) => (
-        <span
-          key={s.id}
-          className={cx('sp-lv-ladder__step', i % 2 === 1 && 'is-up')}
-          style={
-            {
-              '--at': `${(s.level / top) * 100}%`,
-              '--c': roleColour(roles, s.role),
-            } as CSSProperties
-          }
-        >
-          <span className="sp-lv-ladder__dot" />
-          <span className="sp-lv-ladder__label">
-            <b>Lv {s.level}</b>
-            <span>@{roleName(roles, s.role)}</span>
-          </span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 /** The Reward roles tab: roles members get at a level. */
 export function LVRewards({
   config,
@@ -717,6 +778,7 @@ export function LVRewards({
               n={config.rewards.length}
               max={limits.rewards}
               what="reward roles"
+              icon="status"
             />
             <AnimatedIconButton
               size="sm"
@@ -746,22 +808,20 @@ export function LVRewards({
           </div>
         </div>
         <div className="sp-card__body">
-          <Ladder config={config} roles={roles} />
           {config.rewards.length ? (
-            <ul className="sp-ar__list">
+            <ul className="sp-ar__list sp-lv-rewards">
               {config.rewards.map((r, i) => (
                 <li
                   key={r.id}
-                  className="sp-ar__item sp-ar__timed"
+                  className="sp-ar__item sp-lv-reward"
                   aria-label={`Reward ${i + 1}`}
                   data-issue={`reward:${r.id}`}
                 >
-                  <h3 className="sp-ar__item-title">Reward {i + 1}</h3>
                   <Input
                     label={tipped(
                       'Level',
                       r.level
-                        ? `Level ${r.level} takes ${n(lvTotalFor(config.curve, r.level))} XP in all. Pick from 1 to ${config.maxLevel}.`
+                        ? `Level ${r.level} takes ${n(lvTotalFor(config.formula, r.level))} XP in all. Pick from 1 to ${config.maxLevel}.`
                         : `The level that gives it, from 1 to ${config.maxLevel}.`,
                     )}
                     aria-label="Level"
@@ -837,18 +897,23 @@ const ago = (at: number, now: number) => {
         : `${Math.round(m / 1440)}d ago`;
 };
 
-/** Crates dropped so far: how many, opened, and the XP they gave. */
+/** Crates dropped so far: how many, claimed, and the XP they gave. */
 export function LVCrateStats({
   server,
+  config,
   channels,
 }: {
   server: Server;
+  config: Levels;
   channels: Channel[];
 }) {
   const crates = useLevelCrates(server.id);
   const [now] = useState(() => Date.now());
   const d = crates.data;
   const rate = d && d.stats.dropped ? d.stats.opened / d.stats.dropped : 0;
+  const claims = d?.crates.reduce((t, c) => t + c.claimed.length, 0) ?? 0;
+  const crateName = (typeId: string) =>
+    config.crates.list.find((k) => k.id === typeId)?.name ?? 'Deleted crate';
   return (
     <section className="sp-card" aria-labelledby="lv-crate-stats">
       <div className="sp-card__head">
@@ -856,7 +921,7 @@ export function LVCrateStats({
           <h2 className="sp-card__title" id="lv-crate-stats">
             Recent crates
           </h2>
-          <p className="sp-card__sub">The latest drops and who opened them.</p>
+          <p className="sp-card__sub">The latest drops and who claimed them.</p>
         </div>
       </div>
       {!d ? (
@@ -869,13 +934,11 @@ export function LVCrateStats({
             {(
               [
                 ['Dropped', n(d.stats.dropped)],
-                ['Opened', n(d.stats.opened)],
-                ['Opened in time', `${Math.round(rate * 100)}%`],
+                ['Claimed', n(d.stats.opened)],
+                ['Claimed in time', `${Math.round(rate * 100)}%`],
                 [
-                  'Average win',
-                  d.stats.opened
-                    ? n(Math.round(d.stats.xp / d.stats.opened))
-                    : '–',
+                  'Average claim',
+                  claims ? n(Math.round(d.stats.xp / claims)) : '–',
                 ],
               ] as const
             ).map(([label, v]) => (
@@ -891,44 +954,50 @@ export function LVCrateStats({
           </dl>
           {d.crates.length ? (
             <ul className="sp-bd-rows sp-lv-crates" aria-label="Recent crates">
-              {d.crates.slice(0, 8).map((c) => (
-                <li
-                  key={c.id}
-                  className={cx(
-                    'sp-bd-row',
-                    c.state === 'expired' && 'is-left',
-                  )}
-                >
-                  <span className="sp-lv-crate-icon" aria-hidden="true">
-                    <Icon name="gift" size="sm" />
-                  </span>
-                  <span className="sp-bd-row__main">
-                    <span className="sp-bd-row__line">
-                      <span className="sp-bd-row__name">
-                        {c.state === 'claimed'
-                          ? `${c.claimedName} won ${n(c.xp)} XP`
-                          : c.state === 'open'
-                            ? 'Waiting to be opened'
-                            : 'Nobody opened it'}
+              {d.crates.slice(0, 8).map((c) => {
+                const who = c.claimed.map((x) => x.name);
+                const first = c.claimed[0];
+                return (
+                  <li
+                    key={c.id}
+                    className={cx(
+                      'sp-bd-row',
+                      !c.claimed.length && c.state !== 'open' && 'is-left',
+                    )}
+                  >
+                    <span className="sp-lv-crate-icon" aria-hidden="true">
+                      <Icon name="gift" size="sm" />
+                    </span>
+                    <span className="sp-bd-row__main">
+                      <span className="sp-bd-row__line">
+                        <span className="sp-bd-row__name">
+                          {crateName(c.typeId)}:{' '}
+                          {who.length
+                            ? `${who.length > 2 ? `${who.slice(0, 2).join(', ')} and ${who.length - 2} more` : who.join(' and ')} got ${n(c.xp)} XP`
+                            : c.state === 'open'
+                              ? 'waiting to be claimed'
+                              : 'nobody claimed it'}
+                        </span>
+                        {c.state === 'open' && (
+                          <Badge size="sm" tone="success">
+                            Live
+                          </Badge>
+                        )}
                       </span>
-                      {c.state === 'open' && (
-                        <Badge size="sm" tone="success">
-                          Live
-                        </Badge>
-                      )}
+                      <span className="sp-hint sp-bd-row__meta">
+                        #
+                        {channels.find((x) => x.id === c.channelId)?.name ??
+                          'deleted-channel'}{' '}
+                        · {ago(c.droppedAt, now)} · {c.claimed.length}/
+                        {c.claims} claimed
+                        {first
+                          ? ` · first in ${Math.max(1, Math.round((first.at - c.droppedAt) / 1000))}s`
+                          : ''}
+                      </span>
                     </span>
-                    <span className="sp-hint sp-bd-row__meta">
-                      #
-                      {channels.find((x) => x.id === c.channelId)?.name ??
-                        'deleted-channel'}{' '}
-                      · {ago(c.droppedAt, now)}
-                      {c.claimedAt
-                        ? ` · opened in ${Math.max(1, Math.round((c.claimedAt - c.droppedAt) / 1000))}s`
-                        : ''}
-                    </span>
-                  </span>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <EmptyState icon="gift" title="No crates yet">
@@ -942,26 +1011,311 @@ export function LVCrateStats({
   );
 }
 
-/** The crate settings: on, where, how often and how much. */
+/** One crate as a card: its picture, name, where and how it drops. */
+function CrateCard({
+  server,
+  crate: k,
+  index,
+  channels,
+  off,
+  editing,
+  templateName,
+  onEdit,
+  onChange,
+  onRemove,
+}: {
+  server: Server;
+  crate: LvCrateType;
+  index: number;
+  channels: Channel[];
+  off: boolean;
+  editing: 'crate' | 'claim' | null;
+  templateName: (id: string) => string | undefined;
+  onEdit: (kind: 'crate' | 'claim') => void;
+  onChange: (patch: Partial<LvCrateType>) => void;
+  onRemove: () => void;
+}) {
+  const r = lvRanges;
+  const upload = useStudioActions(server.id).upload;
+  const toast = useToast();
+  const file = useRef<HTMLInputElement>(null);
+  const at = (field: string) => `crate:${k.id}:${field}`;
+  const label = k.name.trim() || `Crate ${index + 1}`;
+  const every = k.chance > 0 ? Math.round(100 / k.chance) : 0;
+  const pickPicture = (f: File | undefined) => {
+    if (!f) return;
+    upload.mutate(f, {
+      onSuccess: (image) => onChange({ image }),
+      onError: (e) =>
+        toast({
+          tone: 'danger',
+          title: 'Couldn’t upload the picture',
+          body: e.message,
+        }),
+    });
+  };
+  const message = (kind: 'crate' | 'claim') => {
+    const id = kind === 'crate' ? k.template : k.claimTemplate;
+    return (
+      <button
+        type="button"
+        className={cx('sp-lv-crate__msg', editing === kind && 'is-on')}
+        aria-pressed={editing === kind}
+        data-issue={`message:${kind}:${k.id}`}
+        onClick={() => onEdit(kind)}
+      >
+        <Icon name={kind === 'crate' ? 'gift' : 'party-popper'} size="sm" />
+        <span className="sp-lv-crate__msg-text">
+          <span className="sp-lv-crate__msg-label">
+            {kind === 'crate' ? 'Crate message' : 'Claim message'}
+          </span>
+          <span className="sp-lv-crate__msg-name">
+            {id
+              ? (templateName(id) ?? 'Deleted template')
+              : 'Sparko’s template'}
+          </span>
+        </span>
+        <Icon name="pencil" size="sm" />
+      </button>
+    );
+  };
+  return (
+    <li
+      className={cx('sp-card sp-lv-crate', editing && 'is-editing')}
+      aria-label={label}
+    >
+      <div className="sp-lv-crate__head">
+        <div className="sp-lv-crate__art" data-issue={at('image')}>
+          <button
+            type="button"
+            className="sp-lv-crate__pic"
+            aria-label={`Upload a picture for ${label}`}
+            disabled={upload.isPending}
+            onClick={() => file.current?.click()}
+          >
+            <img src={k.image || defaultCrate} alt="" />
+            <span className="sp-lv-crate__pic-edit" aria-hidden="true">
+              {upload.isPending ? (
+                <Spinner />
+              ) : (
+                <Icon name="upload" size="sm" />
+              )}
+            </span>
+          </button>
+          <input
+            ref={file}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            hidden
+            onChange={(e) => {
+              pickPicture(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+          {k.image ? (
+            <button
+              type="button"
+              className="sp-link-btn"
+              onClick={() => onChange({ image: '' })}
+            >
+              Use Sparko’s
+            </button>
+          ) : (
+            <span className="sp-hint">Sparko’s crate</span>
+          )}
+        </div>
+        <div className="sp-lv-crate__name" data-issue={at('name')}>
+          <Input
+            label="Crate name"
+            maxLength={40}
+            value={k.name}
+            placeholder="Golden crate"
+            onChange={(e) => onChange({ name: e.target.value })}
+          />
+        </div>
+        <button
+          type="button"
+          className="sp-icon-btn sp-icon-btn--danger"
+          aria-label={`Remove ${label}`}
+          onClick={onRemove}
+        >
+          <Icon name="trash-2" size="sm" />
+        </button>
+      </div>
+      <div className="sp-lv-crate__body">
+        <div data-issue={at('channels')}>
+          <Combobox
+            label={tipped(
+              'Drop channels',
+              'This crate only drops here. Leave it empty for anywhere members earn XP.',
+            )}
+            multiple
+            disabled={off}
+            placeholder="Anywhere members earn XP"
+            searchPlaceholder="Search channels"
+            value={k.channels}
+            onChange={(list) => onChange({ channels: list })}
+            items={channels.map((c) => ({
+              value: c.id,
+              label: c.name,
+              icon: 'hash',
+              group: c.category,
+              disabled: !c.canPost && !k.channels.includes(c.id),
+              ...(c.canPost ? {} : { note: 'Sparko can’t post' }),
+            }))}
+          />
+        </div>
+        <div className="sp-lv-trio">
+          <div data-issue={at('claims')}>
+            <Input
+              label={tipped(
+                'Claim amount',
+                `How many members can claim it, from ${r.claims.min} to ${r.claims.max}. Each gets their own XP.`,
+              )}
+              aria-label="Claim amount"
+              type="number"
+              min={r.claims.min}
+              max={r.claims.max}
+              disabled={off}
+              value={k.claims ? String(k.claims) : ''}
+              onChange={(e) =>
+                onChange({ claims: whole(e.target.value, r.claims.max) })
+              }
+            />
+          </div>
+          <div data-issue={at('chance')}>
+            <Input
+              label={tipped(
+                'Drop chance (%)',
+                `The chance each message drops it, from ${r.chance.min}% to ${r.chance.max}%.`,
+              )}
+              aria-label="Drop chance (%)"
+              type="number"
+              step={0.1}
+              min={r.chance.min}
+              max={r.chance.max}
+              disabled={off}
+              value={String(k.chance)}
+              onChange={(e) =>
+                onChange({
+                  chance:
+                    Math.round(
+                      Math.min(
+                        r.chance.max,
+                        Math.max(0, Number(e.target.value) || 0),
+                      ) * 10,
+                    ) / 10,
+                })
+              }
+            />
+          </div>
+          <div data-issue={at('cooldown')}>
+            <DurationInput
+              label="Cooldown"
+              tip="The shortest time between this crate’s drops in a channel, like 10mi or 1h."
+              value={k.cooldown}
+              placeholder="10mi"
+              range={r.crateCooldown}
+              format="Use mi, h and d, like 10mi or 1h."
+              onChange={(cooldown) => onChange({ cooldown })}
+            />
+          </div>
+        </div>
+        <div className="sp-lv-trio">
+          <div data-issue={at('time')}>
+            <Input
+              label={tipped(
+                'Open within',
+                `Seconds members have to claim it before it vanishes, from ${r.crateTime.min} to ${n(r.crateTime.max)}.`,
+              )}
+              aria-label="Open within (seconds)"
+              type="number"
+              min={r.crateTime.min}
+              max={r.crateTime.max}
+              disabled={off}
+              value={k.time ? String(k.time) : ''}
+              onChange={(e) =>
+                onChange({ time: whole(e.target.value, r.crateTime.max) })
+              }
+            />
+          </div>
+          <div data-issue={at('xp')}>
+            <Input
+              label="Min XP"
+              type="number"
+              min={r.crateXp.min}
+              max={r.crateXp.max}
+              disabled={off}
+              value={k.min ? String(k.min) : ''}
+              onChange={(e) =>
+                onChange({ min: whole(e.target.value, r.crateXp.max) })
+              }
+            />
+          </div>
+          <Input
+            label="Max XP"
+            type="number"
+            min={r.crateXp.min}
+            max={r.crateXp.max}
+            disabled={off}
+            value={k.max ? String(k.max) : ''}
+            onChange={(e) =>
+              onChange({ max: whole(e.target.value, r.crateXp.max) })
+            }
+          />
+        </div>
+        {every > 0 && (
+          <p className="sp-hint">
+            About 1 in {n(every)} messages drops it, at most once per channel
+            every {k.cooldown || 'cooldown'}.{' '}
+            {k.claims > 1
+              ? `Up to ${n(k.claims)} members claim ${n(k.min)} to ${n(k.max)} XP each`
+              : `One member claims ${n(k.min)} to ${n(k.max)} XP`}{' '}
+            within {k.time} seconds.
+          </p>
+        )}
+      </div>
+      <div className="sp-lv-crate__msgs">
+        {message('crate')}
+        {message('claim')}
+      </div>
+    </li>
+  );
+}
+
+/** The server's crates, each a card with its own settings and messages. */
 export function LVCrateSettings({
+  server,
   config,
   channels,
+  limit,
+  editing,
+  templateName,
+  onEdit,
   onChange,
 }: {
+  server: Server;
   config: Levels;
   channels: Channel[];
+  limit: number;
+  /** The crate message open in the editor below. */
+  editing: { kind: 'crate' | 'claim'; crate: string } | null;
+  templateName: (id: string) => string | undefined;
+  onEdit: (slot: { kind: 'crate' | 'claim'; crate: string }) => void;
   onChange: (patch: Partial<Levels>) => void;
 }) {
   const k = config.crates;
-  const r = lvRanges;
+  const full = k.list.length >= limit;
   const set = (patch: Partial<Levels['crates']>) =>
     onChange({ crates: { ...k, ...patch } });
-  const every = k.chance > 0 ? Math.round(100 / k.chance) : 0;
+  const edit = (id: string, patch: Partial<LvCrateType>) =>
+    set({ list: k.list.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
   return (
     <div className="sp-stack sp-ar sp-lv">
       <section
         className={cx('sp-card', !k.on && 'is-off')}
         aria-labelledby="lv-crates"
+        data-issue="crates"
       >
         <div className="sp-card__head">
           <div className="sp-card__titles">
@@ -969,125 +1323,63 @@ export function LVCrateSettings({
               XP crates
             </h2>
             <p className="sp-card__sub">
-              Now and then a message drops a crate. The first member to press
-              Open wins the XP inside.
+              Now and then a message drops a crate. Members press Open to claim
+              the XP inside.
             </p>
           </div>
-          <Switch
-            checked={k.on}
-            onChange={(on) => set({ on })}
-            description="XP crates on or off"
-          />
+          <div className="sp-ar__head-actions">
+            <Used n={k.list.length} max={limit} what="crates" icon="gift" />
+            <AnimatedIconButton
+              size="sm"
+              {...plusAnimations}
+              disabled={full}
+              title={full ? `This plan has up to ${limit} crates.` : undefined}
+              onClick={() => {
+                const id = newId();
+                set({
+                  list: [
+                    ...k.list,
+                    lvNewCrate(id, `Crate ${k.list.length + 1}`),
+                  ],
+                });
+                onEdit({ kind: 'crate', crate: id });
+              }}
+            >
+              Crate
+            </AnimatedIconButton>
+            <Switch
+              checked={k.on}
+              onChange={(on) => set({ on })}
+              description="XP crates on or off"
+            />
+          </div>
         </div>
         <div className="sp-card__body">
-          <div data-issue="crates:channels">
-            <Combobox
-              label={tipped(
-                'Channels',
-                'Crates only drop here. Leave it empty for anywhere members earn XP.',
-              )}
-              multiple
-              disabled={!k.on}
-              placeholder="Anywhere members earn XP"
-              searchPlaceholder="Search channels"
-              value={k.channels}
-              onChange={(list) => set({ channels: list })}
-              items={channels.map((c) => ({
-                value: c.id,
-                label: c.name,
-                icon: 'hash',
-                group: c.category,
-                disabled: !c.canPost && !k.channels.includes(c.id),
-                ...(c.canPost ? {} : { note: 'Sparko can’t post' }),
-              }))}
-            />
-          </div>
-          <div className="sp-lv-trio">
-            <div data-issue="crates:chance">
-              <Input
-                label={tipped(
-                  'Drop chance (%)',
-                  `The chance each message drops one, from ${r.chance.min}% to ${r.chance.max}%.`,
-                )}
-                aria-label="Drop chance (%)"
-                type="number"
-                step={0.1}
-                min={r.chance.min}
-                max={r.chance.max}
-                disabled={!k.on}
-                value={String(k.chance)}
-                onChange={(e) =>
-                  set({
-                    chance:
-                      Math.round(
-                        Math.min(
-                          r.chance.max,
-                          Math.max(0, Number(e.target.value) || 0),
-                        ) * 10,
-                      ) / 10,
-                  })
-                }
-              />
-            </div>
-            <div data-issue="crates:cooldown">
-              <DurationInput
-                label="Cooldown"
-                tip="The shortest time between drops in a channel, like 10mi or 1h."
-                value={k.cooldown}
-                placeholder="10mi"
-                range={r.crateCooldown}
-                format="Use mi, h and d, like 10mi or 1h."
-                onChange={(cooldown) => set({ cooldown })}
-              />
-            </div>
-            <div data-issue="crates:time">
-              <Input
-                label={tipped(
-                  'Open within (seconds)',
-                  `Seconds before an unopened crate vanishes, from ${r.crateTime.min} to ${r.crateTime.max}.`,
-                )}
-                aria-label="Open within (seconds)"
-                type="number"
-                min={r.crateTime.min}
-                max={r.crateTime.max}
-                disabled={!k.on}
-                value={k.time ? String(k.time) : ''}
-                onChange={(e) =>
-                  set({ time: whole(e.target.value, r.crateTime.max) })
-                }
-              />
-            </div>
-          </div>
-          <div className="sp-ar__pair" data-issue="crates:xp">
-            <Input
-              label="Least XP inside"
-              type="number"
-              min={r.crateXp.min}
-              max={r.crateXp.max}
-              disabled={!k.on}
-              value={k.min ? String(k.min) : ''}
-              onChange={(e) =>
-                set({ min: whole(e.target.value, r.crateXp.max) })
-              }
-            />
-            <Input
-              label="Most XP inside"
-              type="number"
-              min={r.crateXp.min}
-              max={r.crateXp.max}
-              disabled={!k.on}
-              value={k.max ? String(k.max) : ''}
-              onChange={(e) =>
-                set({ max: whole(e.target.value, r.crateXp.max) })
-              }
-            />
-          </div>
-          {every > 0 && (
-            <p className="sp-hint">
-              About 1 in {n(every)} messages drops a crate, at most one per
-              channel every {k.cooldown || 'cooldown'}. Each holds {n(k.min)} to{' '}
-              {n(k.max)} XP and lasts {k.time} seconds.
-            </p>
+          {k.list.length ? (
+            <ul className="sp-lv-crate-grid" aria-label="Crates">
+              {k.list.map((x, i) => (
+                <CrateCard
+                  key={x.id}
+                  server={server}
+                  crate={x}
+                  index={i}
+                  channels={channels}
+                  off={!k.on}
+                  editing={editing?.crate === x.id ? editing.kind : null}
+                  templateName={templateName}
+                  onEdit={(kind) => onEdit({ kind, crate: x.id })}
+                  onChange={(patch) => edit(x.id, patch)}
+                  onRemove={() =>
+                    set({ list: k.list.filter((y) => y.id !== x.id) })
+                  }
+                />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon="gift" title="No crates yet">
+              Add a crate to drop XP in chat now and then. Give it a picture, a
+              name, and how many members can claim it.
+            </EmptyState>
           )}
         </div>
       </section>
@@ -1120,6 +1412,26 @@ export function LVRankSettings({
         </div>
       </div>
       <div className="sp-card__body">
+        <RadioCards
+          name="lv-rank-style"
+          legend="What /rank sends"
+          value={rank.card ? 'card' : 'message'}
+          onChange={(v) => onChange({ rank: { ...rank, card: v === 'card' } })}
+          options={[
+            {
+              value: 'card',
+              title: 'Sparko’s rank card',
+              description:
+                'A picture with their avatar, name, level, rank, XP and progress bar.',
+            },
+            {
+              value: 'message',
+              title: 'A message',
+              description: 'Your own message, made in the message editor.',
+            },
+          ]}
+        />
+        {rank.card && <RankCardPreview config={config} />}
         <Checkbox
           checked={rank.public}
           onChange={(pub) => onChange({ rank: { ...rank, public: pub } })}
@@ -1128,6 +1440,62 @@ export function LVRankSettings({
         />
       </div>
     </section>
+  );
+}
+
+const loadPicture = (src: string) =>
+  new Promise<HTMLImageElement | null>((done) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => done(img);
+    img.onerror = () => done(null);
+    img.src = src;
+  });
+
+/** The rank card as you'd see it at level 12, drawn like the bot draws it. */
+function RankCardPreview({ config }: { config: Levels }) {
+  const session = useSession().data;
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const name = session?.user.name ?? 'Member';
+  const avatar = session?.user.avatarUrl ?? '';
+  const level = Math.min(12, config.maxLevel);
+  const top = level >= config.maxLevel;
+  const need = top ? 0 : lvNeed(config.formula, level);
+  const into = Math.round(need * 0.62);
+  const xp = lvTotalFor(config.formula, level) + into;
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const [banner, face] = await Promise.all([
+        loadPicture(rankBanner),
+        avatar ? loadPicture(avatar) : null,
+        document.fonts?.load(`700 54px ${RANK_CARD_FONT}`).catch(() => {}),
+      ]);
+      const ctx = canvas.current?.getContext('2d');
+      if (!live || !ctx) return;
+      drawRankCard(
+        ctx as never,
+        { banner, avatar: face },
+        { name, level, rank: 3, into, need, xp },
+      );
+    })();
+    return () => {
+      live = false;
+    };
+  }, [name, avatar, level, into, need, xp]);
+  return (
+    <figure className="sp-lv-rankcard">
+      <canvas
+        ref={canvas}
+        width={RANK_CARD.width}
+        height={RANK_CARD.height}
+        role="img"
+        aria-label={`Rank card preview: ${name}, level ${level}, rank #3, ${n(into)} of ${n(need)} XP`}
+      />
+      <figcaption>
+        A preview with your name. Members see their own avatar and numbers.
+      </figcaption>
+    </figure>
   );
 }
 

@@ -15,6 +15,7 @@ const animated: Record<string, RevealHover | undefined> = {
   invites: animIcons.joinMessage,
   events: animIcons.events,
   'temp-voice': animIcons.tempVoice,
+  levels: animIcons.leveling,
 };
 
 /**

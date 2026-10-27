@@ -107,10 +107,23 @@ describe('Levels & XP', () => {
     ).toBeInTheDocument();
     await userEvent.clear(most);
     await userEvent.type(most, '40');
-    await userEvent.click(screen.getByRole('radio', { name: 'Steep' }));
+    const formula = screen.getByRole('textbox', {
+      name: 'XP to reach level x',
+    });
+    await userEvent.clear(formula);
+    await userEvent.type(formula, '100 * (x');
     expect(
-      screen.getByText(/Each level is a real achievement/),
+      screen.getByText('A bracket isn’t closed at the end.'),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Fix the equation to see each level’s XP.'),
+    ).toBeInTheDocument();
+    await userEvent.type(formula, ')');
+    const chart = screen.getByRole('slider', { name: 'XP each level needs' });
+    chart.focus();
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}');
+    expect(chart).toHaveAttribute('aria-valuetext', 'Level 3 needs 300 XP');
+    expect(screen.getByText('600 XP in all')).toBeInTheDocument();
     await save();
     expect(await live()).toBeInTheDocument();
   }, 30_000);
@@ -121,9 +134,6 @@ describe('Levels & XP', () => {
       'region',
       { name: 'Reward roles' },
       { timeout: 8000 },
-    );
-    expect(within(rewards).getByLabelText('Reward ladder')).toHaveTextContent(
-      /Lv 5.*Lv 10.*Lv 20/,
     );
     expect(
       within(rewards).getByTitle('3 of 5 reward roles used'),
@@ -162,7 +172,7 @@ describe('Levels & XP', () => {
       screen.getByRole('switch', { name: /XP crates on or off/ }),
     );
     expect(
-      screen.getByText(/About 1 in 50 messages drops a crate/),
+      screen.getByText(/About 1 in 50 messages drops it/),
     ).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('button', { name: 'Use a default template' }),
@@ -176,8 +186,43 @@ describe('Levels & XP', () => {
     );
     expect(await screen.findByText('Live preview')).toBeInTheDocument();
     expect(screen.getByLabelText('Crate button')).toHaveTextContent('Open');
+    // Each crate has its own claim message too.
+    const crate = screen.getByRole('listitem', { name: 'XP crate' });
+    await userEvent.click(
+      within(crate).getByRole('button', { name: /Claim message/ }),
+    );
+    expect(
+      await screen.findByText(
+        'How should the claim message for XP crate look?',
+      ),
+    ).toBeInTheDocument();
     await save();
     expect(await live()).toBeInTheDocument();
+  }, 30_000);
+
+  it('adds crates as cards, up to the plan’s limit', async () => {
+    open(`${pixel}?tab=crates`);
+    const add = await screen.findByRole(
+      'button',
+      { name: 'Crate' },
+      { timeout: 8000 },
+    );
+    await userEvent.click(
+      screen.getByRole('switch', { name: /XP crates on or off/ }),
+    );
+    await userEvent.click(add);
+    const card = screen.getByRole('listitem', { name: 'Crate 2' });
+    await userEvent.clear(within(card).getByLabelText('Crate name'));
+    await userEvent.type(
+      within(card).getByLabelText('Crate name'),
+      'Golden crate',
+    );
+    await userEvent.clear(within(card).getByLabelText('Claim amount'));
+    await userEvent.type(within(card).getByLabelText('Claim amount'), '3');
+    expect(
+      screen.getByRole('listitem', { name: 'Golden crate' }),
+    ).toHaveTextContent(/Up to 3 members claim/);
+    expect(screen.getByRole('button', { name: 'Crate' })).toBeDisabled();
   }, 30_000);
 
   it('shows the leaderboard, a member, and changes their XP', async () => {
@@ -257,7 +302,7 @@ describe('Levels & XP', () => {
     expect(await screen.findByText('Nobody here yet')).toBeInTheDocument();
   }, 30_000);
 
-  it('lists recent crates and who opened them', async () => {
+  it('lists recent crates and who claimed them', async () => {
     open(`${cozy}?tab=crates`);
     const recent = await screen.findByRole(
       'region',
@@ -265,12 +310,17 @@ describe('Levels & XP', () => {
       { timeout: 8000 },
     );
     expect(
-      await within(recent).findByText('mossy_bun won 118 XP'),
+      await within(recent).findByText('XP crate: mossy_bun got 118 XP'),
     ).toBeInTheDocument();
-    expect(within(recent).getByText('Nobody opened it')).toBeInTheDocument();
+    expect(
+      within(recent).getByText(/^Golden crate: .* and 1 more got 947 XP$/),
+    ).toBeInTheDocument();
+    expect(
+      within(recent).getByText('XP crate: nobody claimed it'),
+    ).toBeInTheDocument();
     expect(
       within(recent).getByText('XP given', { selector: 'dt' }).nextSibling,
-    ).toHaveTextContent('332');
+    ).toHaveTextContent('1,479');
   }, 30_000);
 
   it('filters the log', async () => {

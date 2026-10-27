@@ -14,16 +14,21 @@ import {
   lvMessageIssue,
   lvMessageXp,
   lvMultiplier,
+  LV_FORMULA,
+  lvFormulaIssue,
   lvNeed,
+  lvParseFormula,
   lvPayload,
   lvProgress,
   lvRewardPlan,
   lvShouldAnnounce,
   lvTotalFor,
   lvUpgrade,
+  lvNewCrate,
   lvVariables,
   lvDefaultMessage,
   type Levels,
+  type LvCrateType,
 } from './levels.ts';
 
 const base = (patch: Partial<Levels> = {}): Levels => ({
@@ -32,24 +37,66 @@ const base = (patch: Partial<Levels> = {}): Levels => ({
 });
 
 describe('the curve', () => {
-  it('needs more XP for each level, steeper on steeper curves', () => {
-    expect(lvNeed('standard', 0)).toBe(100);
-    expect(lvNeed('standard', 1)).toBe(155);
-    expect(lvTotalFor('standard', 2)).toBe(255);
-    expect(lvNeed('gentle', 5)).toBeLessThan(lvNeed('standard', 5));
-    expect(lvNeed('steep', 5)).toBeGreaterThan(lvNeed('standard', 5));
+  it('needs more XP for each level, from the equation', () => {
+    expect(lvNeed(LV_FORMULA, 0)).toBe(100);
+    expect(lvNeed(LV_FORMULA, 1)).toBe(155);
+    expect(lvTotalFor(LV_FORMULA, 2)).toBe(255);
+    expect(lvNeed('100 * x', 4)).toBe(500);
+    expect(lvNeed('(x + 1) ^ 2 % 7 + 2 * -(-3)', 1)).toBe(8);
+    expect(lvNeed('2 ** 3 ^ 2 / x', 0)).toBe(512);
+    // Never under 1, and an equation that can't be read uses Sparko's own.
+    expect(lvNeed('x - 10', 0)).toBe(1);
+    expect(lvNeed('nope', 0)).toBe(100);
+  });
+
+  it('reads equations safely and says what’s wrong', () => {
+    expect(lvParseFormula('5*x^2 + 40*x + 55')).toHaveProperty('fn');
+    expect(lvParseFormula('')).toEqual({
+      problem: 'Write an equation for the XP each level needs.',
+    });
+    expect(lvParseFormula('100')).toEqual({
+      problem: 'Use x for the level somewhere, like 100*x.',
+    });
+    expect(lvParseFormula('(x + 1')).toEqual({
+      problem: 'A bracket isn’t closed at the end.',
+    });
+    expect(lvParseFormula('x + ')).toEqual({
+      problem: 'The equation ends too soon.',
+    });
+    expect(lvParseFormula('level * 2')).toEqual({
+      problem: 'Use x for the level. “l” isn’t something the equation knows.',
+    });
+    expect(lvParseFormula('x 2')).toEqual({
+      problem: 'Something’s off near “2”.',
+    });
+    expect(lvParseFormula('alert(1)')).toHaveProperty('problem');
+  });
+
+  it('checks every level the equation gives', () => {
+    expect(lvFormulaIssue(LV_FORMULA, 500)).toBeNull();
+    expect(lvFormulaIssue('600 / (3 - x)', 10)).toMatch(
+      /^Level 3 can’t be worked out/,
+    );
+    expect(lvFormulaIssue('50 - x', 100)).toBe(
+      'Level 50 would need 0 XP. Every level has to need at least 1.',
+    );
+    expect(lvFormulaIssue('10^x', 100)).toMatch(/^Level 9 would need over/);
+    expect(lvIssue(base({ formula: 'x +' }))).toEqual({
+      at: 'formula',
+      problem: 'The equation ends too soon.',
+    });
   });
 
   it('says where someone is inside a level', () => {
-    expect(lvProgress('standard', 0)).toMatchObject({
+    expect(lvProgress(LV_FORMULA, 0)).toMatchObject({
       level: 0,
       into: 0,
       need: 100,
       next: 100,
       percent: 0,
     });
-    expect(lvProgress('standard', 100)).toMatchObject({ level: 1, into: 0 });
-    expect(lvProgress('standard', 177)).toMatchObject({
+    expect(lvProgress(LV_FORMULA, 100)).toMatchObject({ level: 1, into: 0 });
+    expect(lvProgress(LV_FORMULA, 177)).toMatchObject({
       level: 1,
       into: 77,
       need: 155,
@@ -59,7 +106,7 @@ describe('the curve', () => {
   });
 
   it('stops at the highest level, while XP still counts', () => {
-    const p = lvProgress('standard', 1_000_000, 3);
+    const p = lvProgress(LV_FORMULA, 1_000_000, 3);
     expect(p).toMatchObject({ level: 3, max: true, percent: 100, need: 0 });
     expect(lvLevelOf(base({ maxLevel: 3 }), 1_000_000)).toBe(3);
   });
@@ -149,16 +196,79 @@ describe('reward roles', () => {
 
 describe('crates', () => {
   const c = base({ crates: { ...lvDefault().crates, on: true } });
+  const k = c.crates.list[0]!;
   it('drop only where allowed and not too soon after the last', () => {
-    expect(lvCrateCanDrop(c, { channelId: '1' }, null, 0)).toBe(true);
-    expect(lvCrateCanDrop(c, { channelId: '1' }, 0, 5 * 60_000)).toBe(false);
-    expect(lvCrateCanDrop(c, { channelId: '1' }, 0, 10 * 60_000)).toBe(true);
-    const only = { ...c, crates: { ...c.crates, channels: ['7'] } };
-    expect(lvCrateCanDrop(only, { channelId: '1' }, null, 0)).toBe(false);
+    expect(lvCrateCanDrop(c, k, { channelId: '1' }, null, 0)).toBe(true);
+    expect(lvCrateCanDrop(c, k, { channelId: '1' }, 0, 5 * 60_000)).toBe(false);
+    expect(lvCrateCanDrop(c, k, { channelId: '1' }, 0, 10 * 60_000)).toBe(true);
+    const only = { ...k, channels: ['7'] };
+    expect(lvCrateCanDrop(c, only, { channelId: '1' }, null, 0)).toBe(false);
     expect(
-      lvCrateCanDrop(only, { channelId: '8', parentId: '7' }, null, 0),
+      lvCrateCanDrop(c, only, { channelId: '8', parentId: '7' }, null, 0),
     ).toBe(true);
-    expect(lvCrateCanDrop(base(), { channelId: '1' }, null, 0)).toBe(false);
+    expect(lvCrateCanDrop(base(), k, { channelId: '1' }, null, 0)).toBe(false);
+  });
+
+  it('checks each crate, and the plan’s limit', () => {
+    const crate = (patch: Partial<LvCrateType>) =>
+      base({ crates: { on: true, list: [{ ...k, ...patch }] } });
+    expect(lvIssue(crate({}))).toBeNull();
+    expect(lvIssue(crate({ name: ' ' }))).toMatchObject({
+      at: 'crate:crate1:name',
+    });
+    expect(lvIssue(crate({ claims: 0 }))).toMatchObject({
+      at: 'crate:crate1:claims',
+    });
+    expect(lvIssue(crate({ min: 90, max: 10 }))).toMatchObject({
+      at: 'crate:crate1:xp',
+    });
+    expect(lvIssue(crate({ image: 'http://x.png' }))).toMatchObject({
+      at: 'crate:crate1:image',
+    });
+    expect(
+      lvIssue(crate({ claimTemplate: 'gone' }), { templates: new Set() }),
+    ).toMatchObject({ at: 'message:claim:crate1' });
+    const three = base({
+      crates: {
+        on: true,
+        list: ['a', 'b', 'c'].map((id) => lvNewCrate(id)),
+      },
+    });
+    expect(lvIssue(three)).toMatchObject({ at: 'crates' });
+    expect(lvIssue(three, { plan: 'plus' })).toBeNull();
+    expect(lvIssue(base({ crates: { on: true, list: [] } }))).toMatchObject({
+      at: 'crates',
+    });
+  });
+
+  it('fills in who claimed a crate and what’s left', () => {
+    const vars = lvVariables(c, {
+      xp: 0,
+      rank: 0,
+      messages: 0,
+      voiceMinutes: 0,
+      crate: {
+        name: 'Gold',
+        image: '',
+        min: 5,
+        max: 9,
+        endsAt: 60_000,
+        claims: 3,
+        claimed: [
+          { id: '1', name: 'kit' },
+          { id: '2', name: 'rhea' },
+        ],
+        won: 7,
+      },
+    });
+    expect(vars).toMatchObject({
+      'crate.name': 'Gold',
+      'crate.range': '5–9 XP',
+      'crate.xp': '7',
+      'claimed.users': 'kit, rhea',
+      'claimed.users.mention': '<@1> <@2>',
+      remaining: '1',
+    });
   });
   it('has an Open button that becomes who won, or that it vanished', () => {
     expect(lvCrateRow({ open: true }).components[0]).toMatchObject({
@@ -231,7 +341,18 @@ describe('messages', () => {
     const crate = lvPayload(
       lvDefaultMessage('crate'),
       c,
-      { ...facts, crate: { min: 5, max: 5, endsAt: 60_000 } },
+      {
+        ...facts,
+        crate: {
+          name: 'Pebble',
+          image: '',
+          min: 5,
+          max: 5,
+          endsAt: 60_000,
+          claims: 1,
+          claimed: [],
+        },
+      },
       { now: 0 },
       { open: true },
     );
@@ -306,11 +427,23 @@ describe('checks', () => {
       }),
     ).toMatchObject({ at: 'boost:a', problem: /steps of 0.1/ });
     expect(
-      lvIssue({ ...c, crates: { ...c.crates, cooldown: '5s' } }),
-    ).toMatchObject({ at: 'crates:cooldown' });
+      lvIssue({
+        ...c,
+        crates: {
+          ...c.crates,
+          list: [{ ...c.crates.list[0]!, cooldown: '5s' }],
+        },
+      }),
+    ).toMatchObject({ at: 'crate:crate1:cooldown' });
     expect(
-      lvIssue({ ...c, crates: { ...c.crates, min: 10, max: 5 } }),
-    ).toMatchObject({ at: 'crates:xp' });
+      lvIssue({
+        ...c,
+        crates: {
+          ...c.crates,
+          list: [{ ...c.crates.list[0]!, min: 10, max: 5 }],
+        },
+      }),
+    ).toMatchObject({ at: 'crate:crate1:xp' });
     expect(lvIssue(c, { templates: new Set() })).toBeNull();
     expect(
       lvIssue(
@@ -345,10 +478,36 @@ describe('checks', () => {
   it('keeps only known fields, and fills in older settings', () => {
     const c = { ...base(), extra: 1 } as Levels;
     expect(cleanLevels(c)).not.toHaveProperty('extra');
-    expect(lvUpgrade({ curve: 'steep' } as Partial<Levels>)).toMatchObject({
+    const old = lvUpgrade({
       curve: 'steep',
-      crates: { on: false },
+      crates: { on: true, chance: 5, min: 10, max: 20, template: 't1' },
+    } as unknown as Partial<Levels>);
+    expect(old).toMatchObject({
+      formula: '8*x^2 + 64*x + 78',
+      crates: {
+        on: true,
+        list: [{ id: 'crate1', name: 'XP crate', chance: 5, min: 10, max: 20 }],
+      },
     });
+    expect(old.crates.list[0]).toMatchObject({
+      template: 't1',
+      claimTemplate: '',
+      claims: 1,
+    });
+    expect(old).not.toHaveProperty('curve');
+    // The old curve's numbers carry over exactly.
+    expect(lvNeed(old.formula, 5)).toBe(8 * 25 + 80 * 5 + 150);
+  });
+
+  it('uses the picture rank card unless a rank message was picked', () => {
+    expect(lvDefault().rank.card).toBe(true);
+    expect(lvUpgrade({ rank: { template: '' } } as never).rank.card).toBe(true);
+    expect(lvUpgrade({ rank: { template: 'tpl1' } } as never).rank.card).toBe(
+      false,
+    );
+    const c = base();
+    delete (c.rank as Partial<Levels['rank']>).card;
+    expect(lvIssue(c)).not.toBeNull();
   });
 });
 

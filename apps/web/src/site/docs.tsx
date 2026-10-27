@@ -20,6 +20,7 @@ import { eventsDoc } from './doc-pages/events';
 import { birthdaysDoc } from './doc-pages/birthdays';
 import { tempVoiceDoc } from './doc-pages/temp-voice';
 import { invitesDoc } from './doc-pages/invites';
+import { levelsDoc } from './doc-pages/levels';
 
 const pages: DocPage[] = [
   ...startDocs,
@@ -36,6 +37,7 @@ const pages: DocPage[] = [
   birthdaysDoc,
   tempVoiceDoc,
   invitesDoc,
+  levelsDoc,
   ...referenceDocs,
 ];
 

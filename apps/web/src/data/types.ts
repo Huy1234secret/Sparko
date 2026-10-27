@@ -992,7 +992,7 @@ export interface PanelApi {
 export type LVState = {
   on: boolean;
   config: Levels;
-  limits: { rewards: number; boosts: number };
+  limits: { rewards: number; boosts: number; crates: number };
   /** How many members have XP. */
   count: number;
   /** Crates dropped and opened so far, and the XP they gave. */
@@ -1039,18 +1039,21 @@ export type LVDetail = {
   max: boolean;
   rewards: { level: number; role: string }[];
 };
-/** A crate that dropped, and who opened it. */
+/** A crate that dropped, and who claimed it. */
 export type LVCrate = {
   id: number;
+  /** Which of the server's crates it is. */
+  typeId: string;
   channelId: string;
   messageId: string | null;
+  /** XP given out from it so far. */
   xp: number;
+  /** How many members can claim it. */
+  claims: number;
   state: 'open' | 'claimed' | 'expired';
   droppedAt: number;
   endsAt: number;
-  claimedBy: string | null;
-  claimedName: string;
-  claimedAt: number | null;
+  claimed: { userId: string; name: string; xp: number; at: number }[];
 };
 /** A server member found to change their XP. */
 export type LVFound = {
@@ -1087,5 +1090,11 @@ export interface PanelApi {
   /** Resets one member's XP, or everyone's with null. */
   resetXp(serverId: string, userId: string | null): Promise<void>;
   /** Posts a made-up level-up, rank card or crate in a channel, to see it. */
-  testLevels(serverId: string, channel: string, kind: LvKind): Promise<void>;
+  /** For a crate or claim message, `crate` says which crate. */
+  testLevels(
+    serverId: string,
+    channel: string,
+    kind: LvKind,
+    crate?: string,
+  ): Promise<void>;
 }

@@ -757,6 +757,7 @@ const samplePictures: Record<string, string> = {
   '{server.icon}': sample('S', '#5865F2'),
   '{author.avatar}': sample('A', '#57F287'),
   '{message.image}': sample('★', '#FACC15'),
+  '{crate.image}': '/brand/crate.png',
 };
 /** What a picture link shows in the preview: picture variables get a stand-in. */
 export const previewPicture = (url: string) => samplePictures[url] ?? url;

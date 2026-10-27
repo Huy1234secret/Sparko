@@ -4,6 +4,7 @@ import {
   lvCrates,
   lvDefault,
   lvDropCrate,
+  lvNewCrate,
   lvMember,
   openDb,
   upsertGuild,
@@ -170,39 +171,41 @@ describe('earning in the bot', () => {
 
 describe('crates and commands', () => {
   it('opens a crate for the first to press, and greys the button out', async () => {
-    const t = setup({
-      crates: { ...lvDefault().crates, on: true, min: 30, max: 30 },
-    });
-    await lvDropCrate(t.rest, t.db, 'g', '100');
+    const one = { ...lvNewCrate('crate1', 'Pebble'), min: 30, max: 30 };
+    const t = setup({ crates: { on: true, list: [one] } });
+    await lvDropCrate(t.rest, t.db, 'g', '100', one);
     const messageId = lvCrates(t.db, 'g')[0]!.messageId!;
     const press = (id: string) => ({
+      id: `i${id}`,
+      token: `t${id}`,
+      applicationId: 'app',
       guildId: 'g',
       customId: 'lv:crate',
+      user: { createdTimestamp: 0 },
       member: t.member(id),
-      message: {
-        id: messageId,
-        components: [
-          {
-            toJSON: () => ({
-              type: 1,
-              components: [{ type: 2, custom_id: 'lv:crate' }],
-            }),
-          },
-        ],
-      },
-      update: vi.fn(async () => {}),
-      followUp: vi.fn(async () => {}),
+      message: { id: messageId },
       reply: vi.fn(async () => {}),
     });
+    const post = t.rest.post as unknown as {
+      mock: { calls: [string, unknown][] };
+    };
     const first = press('1');
     await t.bot.crate(first as never);
-    expect(JSON.stringify(first.update.mock.calls[0])).toContain(
-      'm1 got 30 XP',
-    );
+    const sent = (path: string) =>
+      JSON.stringify(post.mock.calls.find(([p]) => p === path)?.[1]);
+    // The crate message updates, and only the member sees their claim.
+    expect(sent('/interactions/i1/t1/callback')).toContain('m1 got 30 XP');
+    expect(sent('/webhooks/app/t1')).toContain('+30 XP');
+    expect(sent('/webhooks/app/t1')).toContain('"flags":64');
     expect(lvMember(t.db, 'g', '1')?.xp).toBe(30);
     const second = press('2');
     await t.bot.crate(second as never);
     expect(JSON.stringify(second.reply.mock.calls[0])).toContain('Too slow');
+    const again = press('1');
+    await t.bot.crate(again as never);
+    expect(JSON.stringify(again.reply.mock.calls[0])).toContain(
+      'already claimed',
+    );
   });
 
   it('lets only staff change XP', async () => {

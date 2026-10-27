@@ -11,6 +11,7 @@ import {
   lvChangeXp,
   lvDefault,
   lvDropCrate,
+  lvNewCrate,
   openDb,
   Perm,
   studioDefault,
@@ -198,7 +199,10 @@ describe('levels API', () => {
       await problem(
         await put('/9001/levels', {
           on: true,
-          config: { ...config, rank: { template: '42', public: true } },
+          config: {
+            ...config,
+            rank: { card: false, template: '42', public: true },
+          },
         }),
       ),
     ).toMatch(/rank card template was deleted/);
@@ -256,7 +260,9 @@ describe('levels API', () => {
     expect(
       await body<Detail>(await call('/9001/levels/members/555')),
     ).toMatchObject({ name: 'Mia', xp: 300, level: 2 });
-    await lvDropCrate(fakeDiscord, db, '9001', '501', { now: 1000 });
+    await lvDropCrate(fakeDiscord, db, '9001', '501', lvNewCrate('crate1'), {
+      now: 1000,
+    });
     type Crates = {
       crates: { channelId: string }[];
       stats: { dropped: number };
@@ -329,7 +335,7 @@ describe('levels API', () => {
       await problem(
         await postJson('/9001/levels/test', { channel: '501', kind: 'boost' }),
       ),
-    ).toMatch(/level-up message, the rank card or the XP crate/);
+    ).toMatch(/a crate or claim message/);
     expect(
       (await postJson('/9001/levels/test', { channel: '501', kind: 'rank' }))
         .status,
@@ -338,6 +344,15 @@ describe('levels API', () => {
       channel: '501',
       kind: 'rank',
       userName: 'Quinn',
+    });
+    await postJson('/9001/levels/test', {
+      channel: '501',
+      kind: 'claim',
+      crate: 'crate1',
+    });
+    expect(jobOf('levels-test')?.payload).toMatchObject({
+      kind: 'claim',
+      crate: 'crate1',
     });
   });
 
