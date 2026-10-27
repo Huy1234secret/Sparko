@@ -76,7 +76,7 @@ export const featureDetails: Record<string, FeatureDetail> = {
       {
         icon: 'file-text',
         title: 'Templates everywhere',
-        body: 'Save a message as a template and use it in Welcome, Tickets and Reaction roles. Free includes 10 templates; Plus includes 100.',
+        body: 'Save a message as a template and use it in Welcome, Tickets and Reaction roles. Free keeps 100 templates; Plus keeps 500.',
       },
       {
         icon: 'rotate-ccw',
